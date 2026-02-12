@@ -4,3 +4,5 @@ paintress
 coverage.out
 # paintress
 .expedition/
+# claude local settings
+.claude/*.local.*
