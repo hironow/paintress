@@ -1,0 +1,70 @@
+# Paintress — task runner
+# https://just.systems
+
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+# Default: show help
+default: help
+
+# Help: list available recipes
+help:
+    @just --list --unsorted
+
+# Define specific commands
+MARKDOWNLINT := "bunx markdownlint-cli2"
+
+# Lint markdown files
+lint-md:
+    @{{MARKDOWNLINT}} --fix "*.md" "docs/**/*.md"
+
+# Version from git tags
+VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+
+# Build the binary with version info
+build:
+    go build -ldflags "-X main.version={{VERSION}}" -o paintress .
+
+# Build and install to /usr/local/bin
+install: build
+    mv paintress /usr/local/bin/
+
+# Run all tests
+test:
+    go test ./... -count=1 -timeout=60s
+
+# Run tests with verbose output
+test-v:
+    go test ./... -count=1 -timeout=60s -v
+
+# Run tests with race detector
+test-race:
+    go test ./... -race -count=1 -timeout=120s
+
+# Run tests with coverage report
+cover:
+    go test ./... -coverprofile=coverage.out -count=1 -timeout=60s
+    go tool cover -func=coverage.out
+
+# Open coverage in browser
+cover-html: cover
+    go tool cover -html=coverage.out
+
+# Format code
+fmt:
+    gofmt -w .
+
+# Run go vet
+vet:
+    go vet ./...
+
+# Lint (fmt check + vet + markdown lint)
+lint: vet lint-md
+    @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
+
+# Format, vet, test — full check before commit
+check: fmt vet test
+
+# Clean build artifacts
+clean:
+    rm -f coverage.out
+    go clean

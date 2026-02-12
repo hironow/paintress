@@ -1,0 +1,81 @@
+# Mission — 行動規範
+
+このファイルは Expedition の行動規範を定義する。
+全ての Expeditioner はこのファイルを読み、使命を遂行する。
+
+---
+
+## 使命の取得
+
+1. Linear MCP を使い、未完了の issue を取得する（Done 以外の全ステータスが対象 — Backlog・Todo だけでなく、Testing や In Review で滞留している issue も含む）
+2. **Gradient Gauge** の指示に従った難易度の issue を選ぶ
+
+## 使命の判定
+
+issue の内容を分析し、以下の3つの型のいずれかに分類する：
+
+### implement（実装）
+
+コード実装、機能追加、リファクタリング等。
+
+### verify（検証）
+
+E2Eテスト、UI確認、チェックリスト消化、動作検証等。
+判定基準: description に「テスト」「確認」「検証」「チェック」「QA」「E2E」
+等のキーワードがある、またはチェックリスト（`- [ ]`）が含まれる。
+
+### fix（修正）
+
+verify の結果として自動遷移する。Expeditioner が直接選ぶことはない。
+
+---
+
+## implement の手順
+
+1. `git checkout <base-branch> && git pull origin <base-branch>`
+2. ブランチ作成: `feat/<issue-id>-<短い説明>`
+3. TDD: テストを書く -> 実装する -> テストを通す
+4. こまめにコミット（コミットメッセージに issue ID を含める）
+5. lint / format チェック
+6. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
+7. `gh pr create` で PR 作成（ボディに `Closes <issue-id>`）
+8. Linear MCP で issue を "In Review" に更新
+
+## verify の手順
+
+1. Dev server が起動済みであることを確認（URL にアクセスできるか）
+2. Chrome DevTools MCP でブラウザを開き、対象ページにアクセス
+3. チェックリスト項目を **1つずつ** 実行:
+   a. UI を操作
+   b. 期待結果と実際の結果を比較
+   c. スクリーンショット撮影（Chrome DevTools MCP の Page.captureScreenshot）
+   d. 結果を記録（Pass / Fail + 詳細）
+4. QA レポートを作成し、Linear MCP で issue にコメント
+5. **不具合がない場合**: issue を "Done" に更新
+6. **不具合がある場合**: -> fix に遷移
+
+## fix の手順（verify から自動遷移）
+
+不具合ごとに:
+
+1. Linear MCP で bug issue を起票
+2. `git checkout <base-branch> && git pull origin <base-branch>`
+3. ブランチ: `fix/<bug-issue-id>-<短い説明>`
+4. 修正を実装しテストを書く
+5. `gh pr create` で PR 作成（ボディに `Closes <bug-issue-id>`）
+
+---
+
+## 禁止事項
+
+- force push しない
+- base branch に直接 commit しない
+- テストが通らない状態で PR を出さない
+- dev server を停止しない（外部プロセスで管理）
+- `.expedition/mission.md` を変更しない
+
+## 曖昧さへの対処
+
+- 曖昧な項目は最善の判断で実行し、journal に判断理由を残す
+- 仕様不明確な issue はスキップし、journal に記録
+- 自信がない場合はスキップして次の Expedition に託す

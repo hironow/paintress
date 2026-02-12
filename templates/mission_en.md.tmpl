@@ -1,0 +1,81 @@
+# Mission — Rules of Engagement
+
+This file defines the rules of engagement for the Expedition.
+All Expeditioners must read this file and carry out their mission.
+
+---
+
+## Obtaining the Mission
+
+1. Use Linear MCP to retrieve unfinished issues (all statuses except Done — including issues stalled in Testing or In Review from previous Expeditions)
+2. Choose an issue matching the difficulty indicated by the **Gradient Gauge**
+
+## Mission Assessment
+
+Analyze the issue content and classify it into one of three types:
+
+### implement
+
+Code implementation, feature additions, refactoring, etc.
+
+### verify
+
+E2E testing, UI review, checklist completion, behavior verification, etc.
+Criteria: description contains keywords like "test", "check", "verify", "QA", "E2E",
+or includes a checklist (`- [ ]`).
+
+### fix
+
+Automatically transitions from verify results. Expeditioners do not select this directly.
+
+---
+
+## implement Procedure
+
+1. `git checkout <base-branch> && git pull origin <base-branch>`
+2. Create branch: `feat/<issue-id>-<short-description>`
+3. TDD: write tests -> implement -> make tests pass
+4. Commit frequently (include issue ID in commit messages)
+5. Run lint / format checks
+6. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+7. `gh pr create` to create PR (body includes `Closes <issue-id>`)
+8. Update issue to "In Review" via Linear MCP
+
+## verify Procedure
+
+1. Confirm dev server is running (check URL accessibility)
+2. Open browser via Chrome DevTools MCP and navigate to target page
+3. Execute checklist items **one by one**:
+   a. Interact with UI
+   b. Compare expected vs actual results
+   c. Take screenshot (Chrome DevTools MCP Page.captureScreenshot)
+   d. Record result (Pass / Fail + details)
+4. Create QA report and comment on issue via Linear MCP
+5. **If no defects**: update issue to "Done"
+6. **If defects found**: -> transition to fix
+
+## fix Procedure (auto-transition from verify)
+
+For each defect:
+
+1. File a bug issue via Linear MCP
+2. `git checkout <base-branch> && git pull origin <base-branch>`
+3. Branch: `fix/<bug-issue-id>-<short-description>`
+4. Implement fix and write tests
+5. `gh pr create` to create PR (body includes `Closes <bug-issue-id>`)
+
+---
+
+## Prohibitions
+
+- Do not force push
+- Do not commit directly to the base branch
+- Do not create a PR with failing tests
+- Do not stop the dev server (managed by external process)
+- Do not modify `.expedition/mission.md`
+
+## Handling Ambiguity
+
+- Execute ambiguous items using best judgment and record reasoning in journal
+- Skip issues with unclear specs and record in journal
+- If unsure, skip and leave it to the next Expedition
