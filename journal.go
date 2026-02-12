@@ -45,6 +45,7 @@ func WriteJournal(continent string, report *ExpeditionReport) error {
 - **PR**: %s
 - **Bugs found**: %d
 - **Bug issues**: %s
+- **Insight**: %s
 `,
 		report.Expedition,
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -55,6 +56,7 @@ func WriteJournal(continent string, report *ExpeditionReport) error {
 		report.PRUrl,
 		report.BugsFound,
 		report.BugIssues,
+		report.Insight,
 	)
 
 	return os.WriteFile(path, []byte(content), 0644)

@@ -75,6 +75,7 @@ reason: テスト全件 Pass、PR 作成済み
 remaining_issues: 2
 bugs_found: 0
 bug_issues: none
+insight: This project uses Tailwind CSS v4 with @apply directives in module CSS files
 __EXPEDITION_END__`
 
 	report, status := ParseReport(output, 7)
@@ -102,6 +103,61 @@ __EXPEDITION_END__`
 	}
 	if report.Remaining != "2" {
 		t.Errorf("Remaining = %q", report.Remaining)
+	}
+	if report.Insight != "This project uses Tailwind CSS v4 with @apply directives in module CSS files" {
+		t.Errorf("Insight = %q", report.Insight)
+	}
+}
+
+func TestParseReport_WithInsight(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 3
+issue_id: AWE-50
+issue_title: Fix auth flow
+mission_type: fix
+branch: fix/AWE-50-auth
+pr_url: none
+status: failed
+reason: test timeout
+remaining_issues: 8
+bugs_found: 0
+bug_issues: none
+insight: The auth module requires Redis connection and tests need REDIS_URL env var set
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 3)
+	if status != StatusFailed {
+		t.Fatalf("got %v, want StatusFailed", status)
+	}
+	if report.Insight != "The auth module requires Redis connection and tests need REDIS_URL env var set" {
+		t.Errorf("Insight = %q", report.Insight)
+	}
+}
+
+func TestParseReport_InsightWithColons(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 2
+issue_id: AWE-30
+issue_title: Setup CI
+mission_type: implement
+branch: feat/AWE-30-ci
+pr_url: https://github.com/org/repo/pull/10
+status: success
+reason: done
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+insight: Dev server config: host must be 0.0.0.0: not localhost for Docker
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 2)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.Insight != "Dev server config: host must be 0.0.0.0: not localhost for Docker" {
+		t.Errorf("Insight = %q", report.Insight)
 	}
 }
 

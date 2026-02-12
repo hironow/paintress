@@ -228,3 +228,127 @@ func TestScanJournalsForLumina_DifferentFailureReasons(t *testing.T) {
 		t.Errorf("different failure reasons should not create luminas, got %d", len(luminas))
 	}
 }
+
+func TestScanJournalsForLumina_InsightUsedForDefensive(t *testing.T) {
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	// 2 failures with same insight — should become a defensive lumina using insight text
+	for i := 1; i <= 2; i++ {
+		content := fmt.Sprintf(`# Expedition #%d — Journal
+
+- **Status**: failed
+- **Reason**: test timeout
+- **Mission**: implement
+- **Insight**: Redis connection required for auth tests but REDIS_URL not set
+`, i)
+		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
+	}
+
+	luminas := ScanJournalsForLumina(dir)
+
+	hasInsight := false
+	for _, l := range luminas {
+		if containsStr(l.Pattern, "Redis connection required") {
+			hasInsight = true
+		}
+		// Should NOT contain the raw reason "test timeout" as the pattern
+		if l.Pattern == "[WARN] Failed 2 times: test timeout" {
+			t.Error("should use insight text, not reason text")
+		}
+	}
+	if !hasInsight {
+		t.Error("should have defensive lumina with insight text")
+	}
+}
+
+func TestScanJournalsForLumina_InsightUsedForOffensive(t *testing.T) {
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	// 3 successes with same insight — should become an offensive lumina using insight text
+	for i := 1; i <= 3; i++ {
+		content := fmt.Sprintf(`# Expedition #%d — Journal
+
+- **Status**: success
+- **Mission**: implement
+- **Insight**: TDD cycle with bun test works reliably for this codebase
+`, i)
+		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
+	}
+
+	luminas := ScanJournalsForLumina(dir)
+
+	hasInsight := false
+	for _, l := range luminas {
+		if containsStr(l.Pattern, "TDD cycle with bun test") {
+			hasInsight = true
+		}
+		// Should NOT contain the raw mission type as the pattern
+		if l.Pattern == "[OK] implement mission: 3 proven successes" {
+			t.Error("should use insight text, not mission type")
+		}
+	}
+	if !hasInsight {
+		t.Error("should have offensive lumina with insight text")
+	}
+}
+
+func TestScanJournalsForLumina_FallbackToReasonWhenNoInsight(t *testing.T) {
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	// 2 failures WITHOUT insight — should fall back to reason
+	for i := 1; i <= 2; i++ {
+		content := fmt.Sprintf(`# Expedition #%d — Journal
+
+- **Status**: failed
+- **Reason**: lint error
+- **Mission**: fix
+`, i)
+		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
+	}
+
+	luminas := ScanJournalsForLumina(dir)
+
+	hasReason := false
+	for _, l := range luminas {
+		if containsStr(l.Pattern, "lint error") {
+			hasReason = true
+		}
+	}
+	if !hasReason {
+		t.Error("should fall back to reason when insight is empty")
+	}
+}
+
+func TestScanJournalsForLumina_FallbackToMissionWhenNoInsight(t *testing.T) {
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	// 3 successes WITHOUT insight — should fall back to mission type
+	for i := 1; i <= 3; i++ {
+		content := fmt.Sprintf(`# Expedition #%d — Journal
+
+- **Status**: success
+- **Mission**: implement
+`, i)
+		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
+	}
+
+	luminas := ScanJournalsForLumina(dir)
+
+	hasMission := false
+	for _, l := range luminas {
+		if containsStr(l.Pattern, "implement") {
+			hasMission = true
+		}
+	}
+	if !hasMission {
+		t.Error("should fall back to mission when insight is empty")
+	}
+}
