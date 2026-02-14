@@ -305,6 +305,17 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 			return
 		}
 
+		// Ensure we are on the PR branch before applying fixes
+		gitCmd := exec.CommandContext(reviewCtx, "git", "checkout", branch)
+		gitCmd.Dir = p.config.Continent
+		if err := gitCmd.Run(); err != nil {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += fmt.Sprintf("Reviewfix skipped: checkout %s failed: %v", branch, err)
+			return
+		}
+
 		// Run a focused reviewfix session via Claude Code
 		prompt := BuildReviewFixPrompt(branch, result.Comments)
 
