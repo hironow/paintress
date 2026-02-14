@@ -25,6 +25,7 @@ type Config struct {
 	DevCmd         string
 	DevDir         string // working directory for dev server (defaults to Continent)
 	DevURL         string
+	ReviewCmd      string // Code review command (e.g. "codex review --base main")
 	DryRun         bool
 }
 
@@ -66,6 +67,7 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.DevCmd, "dev-cmd", "npm run dev", "Dev server command")
 	flag.StringVar(&cfg.DevDir, "dev-dir", "", "Dev server working directory (defaults to repo path)")
 	flag.StringVar(&cfg.DevURL, "dev-url", "http://localhost:3000", "Dev server URL")
+	flag.StringVar(&cfg.ReviewCmd, "review-cmd", "codex review --base main", "Code review command after PR creation")
 	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Generate prompts only")
 	flag.StringVar(&lang, "lang", "en", "Output language: en, ja, fr")
 

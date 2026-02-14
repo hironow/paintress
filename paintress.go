@@ -197,6 +197,10 @@ func (p *Paintress) Run(ctx context.Context) int {
 			case StatusSuccess:
 				p.handleSuccess(report)
 				p.gradient.Charge()
+				// Review gate: run code review on the PR if review command is configured
+				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
+					p.runReviewLoop(ctx, report)
+				}
 				WriteFlag(p.config.Continent, exp, report.IssueID, "success", report.Remaining)
 				WriteJournal(p.config.Continent, report)
 				consecutiveFailures = 0
@@ -244,6 +248,79 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	p.printSummary(p.config.MaxExpeditions)
 	return 0
+}
+
+// runReviewLoop executes the code review command and, if comments are found,
+// runs a lightweight Claude Code session to fix them. Repeats up to maxReviewCycles.
+// Remaining review insights are appended to the report for journal recording.
+// The entire loop is bounded by the expedition timeout to prevent hangs.
+func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport) {
+	// Bound the entire review loop with the expedition timeout
+	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	reviewCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for cycle := 1; cycle <= maxReviewCycles; cycle++ {
+		// Check context before starting each cycle
+		if reviewCtx.Err() != nil {
+			LogWarn("%s", fmt.Sprintf(Msg("review_error"), reviewCtx.Err()))
+			return
+		}
+
+		LogInfo("%s", fmt.Sprintf(Msg("review_running"), cycle, maxReviewCycles))
+
+		result, err := RunReview(reviewCtx, p.config.ReviewCmd, p.config.Continent)
+		if err != nil {
+			LogWarn("%s", fmt.Sprintf(Msg("review_error"), err))
+			return
+		}
+
+		if result.Passed {
+			LogOK("%s", Msg("review_passed"))
+			return
+		}
+
+		LogWarn("%s", fmt.Sprintf(Msg("review_comments"), cycle))
+
+		if cycle >= maxReviewCycles {
+			// Record remaining review insights in the report for journal
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Review not fully resolved: " + summarizeReview(result.Comments)
+			LogWarn("%s", Msg("review_limit"))
+			return
+		}
+
+		// Run a focused reviewfix session via Claude Code
+		prompt := BuildReviewFixPrompt(report.Branch, result.Comments)
+
+		claudeCmd := p.config.ClaudeCmd
+		if claudeCmd == "" {
+			claudeCmd = defaultClaudeCmd
+		}
+
+		model := p.reserve.ActiveModel()
+		cmd := exec.CommandContext(reviewCtx, claudeCmd,
+			"--model", model,
+			"--continue",
+			"--dangerously-skip-permissions",
+			"--print",
+			"-p", prompt,
+		)
+		cmd.Dir = p.config.Continent
+
+		LogInfo("%s", fmt.Sprintf(Msg("reviewfix_running"), model))
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			LogWarn("%s", fmt.Sprintf(Msg("reviewfix_error"), err))
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Reviewfix failed: " + string(out)
+			return
+		}
+	}
 }
 
 func (p *Paintress) handleSuccess(report *ExpeditionReport) {

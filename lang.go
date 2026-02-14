@@ -63,6 +63,15 @@ var messages = map[string]map[string]string{
 	"qa_all_pass": {"en": "All checks passed", "ja": "全項目 Pass", "fr": "Tous les contrôles réussis"},
 	"qa_bugs":     {"en": "%d bug(s) found -> %s", "ja": "不具合 %d 件 -> %s", "fr": "%d bug(s) trouvé(s) -> %s"},
 
+	// === Review ===
+	"review_running":    {"en": "Running code review (%d/%d)...", "ja": "コードレビュー実行中 (%d/%d)...", "fr": "Revue de code en cours (%d/%d)..."},
+	"review_passed":     {"en": "Code review passed", "ja": "コードレビュー通過", "fr": "Revue de code validée"},
+	"review_comments":   {"en": "Review cycle %d: comments found, fixing...", "ja": "レビュー %d 回目: 指摘あり、修正中...", "fr": "Cycle de revue %d : commentaires trouvés, correction..."},
+	"review_error":      {"en": "Review skipped (command error: %v)", "ja": "レビュースキップ（コマンドエラー: %v）", "fr": "Revue ignorée (erreur de commande : %v)"},
+	"review_limit":      {"en": "Review cycle limit reached — remaining insights recorded in journal", "ja": "レビュー回数上限 — 残りの指摘を journal に記録", "fr": "Limite de cycles de revue atteinte — remarques restantes consignées dans le journal"},
+	"reviewfix_running": {"en": "Running reviewfix (model: %s)...", "ja": "レビュー修正実行中 (model: %s)...", "fr": "Correction de revue en cours (modèle : %s)..."},
+	"reviewfix_error":   {"en": "Reviewfix failed: %v", "ja": "レビュー修正失敗: %v", "fr": "Échec de la correction de revue : %v"},
+
 	// === Signal ===
 	"signal_received": {"en": "Signal received: %v — cleaning up...", "ja": "シグナル受信: %v — クリーンアップ中...", "fr": "Signal reçu : %v — nettoyage en cours..."},
 

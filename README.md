@@ -2,7 +2,7 @@
 
 **An autonomous loop that sends AI agents to drain your Linear issues to zero.**
 
-Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues one by one — implementing code, running tests, creating PRs, verifying UI, and fixing bugs — with no human intervention, until every issue is done.
+Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues one by one — implementing code, running tests, creating PRs, running code reviews, verifying UI, and fixing bugs — with no human intervention, until every issue is done.
 
 ```bash
 paintress --model opus,sonnet ./your-repo 
@@ -13,8 +13,9 @@ This single command makes Paintress repeat the following cycle:
 1. Fetch an unfinished issue from Linear
 2. Analyze it and determine the mission type: implement / verify / fix
 3. Claude Code creates a branch, implements, tests, opens a PR
-4. Record results, move to the next issue
-5. Stop when all issues are complete
+4. Run code review gate — review comments trigger automatic fixes (up to 3 cycles)
+5. Record results, move to the next issue
+6. Stop when all issues are complete
 
 ## Why "Paintress"?
 
@@ -101,6 +102,12 @@ Paintress (binary)         <- Outside the repository
 Monolith (Linear)          <- Fully external
     |
     v
+Expedition (Claude Code)   <- One session per issue
+    |
+    v
+Review Gate (exec)         <- Codex review + Claude Code --continue (up to 3 cycles)
+    |
+    v
 Continent (Git repo)       <- Persistent world
     +-- src/
     +-- CLAUDE.md
@@ -121,6 +128,18 @@ Continent (Git repo)       <- Persistent world
 | Journal scanner | Parallel file reads → Lumina extraction | Resting at Flag |
 | Output streaming | stdout tee + rate limit detection | Reserve Party standby |
 | Timeout watchdog | context.WithTimeout | Gommage (time's up) |
+
+## Code Review Gate
+
+After a successful Expedition creates a PR, Paintress runs an automated code review using [Codex CLI](https://github.com/openai/codex) (default: `codex review --base main`). The review itself runs outside the LLM context window to avoid polluting the Expedition's Canvas.
+
+- **Pass**: Review finds no actionable issues → proceed to next Expedition
+- **Fail**: Review comments tagged `[P0]`–`[P4]` are detected → Claude Code resumes the Expedition session (`--continue`) to fix them, reusing full implementation context
+- **Retry**: Up to 3 review-fix cycles per Expedition; unresolved insights are recorded in the journal
+- **Timeout**: The entire review loop is bounded by the expedition timeout (`--timeout`)
+- **Rate limit / error**: Review is skipped gracefully (logged as WARN, does not block the loop)
+
+The review command is customizable via `--review-cmd`. Set to empty string (`--review-cmd ""`) to disable.
 
 ## Setup
 
@@ -171,7 +190,11 @@ paintress \
   --dev-cmd "pnpm dev" \
   --dev-dir /path/to/frontend \
   --dev-url "http://localhost:3000" \
+  --review-cmd "codex review --base main" \
   /path/to/repo
+
+# Skip code review gate
+paintress --review-cmd "" /path/to/repo
 
 # Dry run (generate prompts only)
 paintress --dry-run /path/to/repo
@@ -198,12 +221,13 @@ paintress \
 | `--model` | `opus` | Model(s), comma-separated for Reserve Party |
 | `--lang` | `en` | Prompt language: `en`, `ja`, or `fr` |
 | `--max-expeditions` | `50` | Maximum number of expeditions |
-| `--timeout` | `1980` | Timeout per expedition in seconds (33 min) |
+| `--timeout` | `1980` | Timeout per expedition and review loop in seconds (33 min) |
 | `--base-branch` | `main` | Base git branch |
 | `--claude-cmd` | `claude` | Claude Code CLI command name |
 | `--dev-cmd` | `npm run dev` | Dev server command |
 | `--dev-dir` | repo path | Dev server working directory |
 | `--dev-url` | `http://localhost:3000` | Dev server URL |
+| `--review-cmd` | `codex review --base main` | Code review command after PR creation |
 | `--dry-run` | `false` | Generate prompts without executing |
 
 ## Development
@@ -233,6 +257,7 @@ just check          # fmt + vet + test (pre-commit check)
 +-- flag.go              Flag read/write
 +-- journal.go           Journal read/write
 +-- report.go            Report parser
++-- review.go            Code review gate (exec + parse)
 +-- mission.go           Mission writer (embed + template)
 +-- lang.go              i18n message map (en/ja/fr)
 +-- logger.go            Colored logging
@@ -246,6 +271,7 @@ just check          # fmt + vet + test (pre-commit check)
 ## Prerequisites
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- [Codex CLI](https://github.com/openai/codex) (for code review gate, customizable via `--review-cmd`)
 - GitHub: accessible for Pull Request operations (e.g. [GitHub CLI](https://cli.github.com/))
 - Linear: accessible for Issue operations (e.g. Linear MCP)
 - Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
