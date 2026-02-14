@@ -47,7 +47,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 
 	// Non-zero exit with no review comments — command failure, treat as skippable
 	if err != nil {
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, output)
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, summarizeReview(output))
 	}
 
 	return &ReviewResult{
@@ -57,6 +57,8 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 }
 
 // hasReviewComments checks whether the review output contains actionable comments.
+// It looks for priority tags [P0]–[P4] (P0 = critical, P4 = nit) commonly used by
+// code review tools like Codex CLI, or the "Review comment:" keyword pattern.
 func hasReviewComments(output string) bool {
 	indicators := []string{"[P0]", "[P1]", "[P2]", "[P3]", "[P4]"}
 	for _, tag := range indicators {

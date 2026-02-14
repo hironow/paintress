@@ -255,11 +255,23 @@ func (p *Paintress) Run(ctx context.Context) int {
 // Remaining review insights are appended to the report for journal recording.
 // The entire loop is bounded by the expedition timeout to prevent hangs.
 func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport) {
-	// Bound the entire review loop with the expedition timeout
+	// Bound the entire review loop by the expedition timeout,
+	// but respect any existing deadline on the parent context.
 	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			LogWarn("%s", fmt.Sprintf(Msg("review_error"), context.DeadlineExceeded))
+			return
+		}
+		if remaining < timeout {
+			timeout = remaining
+		}
+	}
 	reviewCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	var lastComments string
 	for cycle := 1; cycle <= maxReviewCycles; cycle++ {
 		// Check context before starting each cycle
 		if reviewCtx.Err() != nil {
@@ -280,20 +292,21 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 			return
 		}
 
+		lastComments = result.Comments
 		LogWarn("%s", fmt.Sprintf(Msg("review_comments"), cycle))
 
-		if cycle >= maxReviewCycles {
-			// Record remaining review insights in the report for journal
+		// Validate branch before attempting fix
+		branch := strings.TrimSpace(report.Branch)
+		if branch == "" || strings.EqualFold(branch, "none") {
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Review not fully resolved: " + summarizeReview(result.Comments)
-			LogWarn("%s", Msg("review_limit"))
+			report.Insight += "Reviewfix skipped: no valid branch"
 			return
 		}
 
 		// Run a focused reviewfix session via Claude Code
-		prompt := BuildReviewFixPrompt(report.Branch, result.Comments)
+		prompt := BuildReviewFixPrompt(branch, result.Comments)
 
 		claudeCmd := p.config.ClaudeCmd
 		if claudeCmd == "" {
@@ -321,6 +334,13 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 			return
 		}
 	}
+
+	// All review-fix cycles exhausted — record remaining insights
+	if report.Insight != "" {
+		report.Insight += " | "
+	}
+	report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
+	LogWarn("%s", Msg("review_limit"))
 }
 
 func (p *Paintress) handleSuccess(report *ExpeditionReport) {

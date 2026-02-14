@@ -16,8 +16,8 @@ MARKDOWNLINT := "bunx markdownlint-cli2"
 # Install prek hooks (pre-commit + pre-push) with quiet mode
 prek-install:
     prek install -t pre-commit -t pre-push --overwrite
-    @sed -i '' 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-commit
-    @sed -i '' 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-push
+    @sed 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-commit > .git/hooks/pre-commit.tmp && mv .git/hooks/pre-commit.tmp .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+    @sed 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-push > .git/hooks/pre-push.tmp && mv .git/hooks/pre-push.tmp .git/hooks/pre-push && chmod +x .git/hooks/pre-push
     @echo "prek hooks installed (quiet mode)"
 
 # Run all prek hooks on all files

@@ -86,6 +86,17 @@ func parseFlags() Config {
 
 	flag.Parse()
 
+	// Derive --review-cmd default from --base-branch when not explicitly set
+	reviewCmdExplicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "review-cmd" {
+			reviewCmdExplicit = true
+		}
+	})
+	if !reviewCmdExplicit {
+		cfg.ReviewCmd = fmt.Sprintf("codex review --base %s", cfg.BaseBranch)
+	}
+
 	if showVersion {
 		fmt.Printf("paintress %s\n", version)
 		os.Exit(0)

@@ -271,7 +271,7 @@ just check          # fmt + vet + test (pre-commit check)
 ## Prerequisites
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-- [Codex CLI](https://github.com/openai/codex) (for code review gate, customizable via `--review-cmd`)
+- A code review CLI (for code review gate, customizable via `--review-cmd`, e.g. tools that output `[P0]`–`[P4]` priorities)
 - GitHub: accessible for Pull Request operations (e.g. [GitHub CLI](https://cli.github.com/))
 - Linear: accessible for Issue operations (e.g. Linear MCP)
 - Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
