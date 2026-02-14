@@ -7,8 +7,8 @@ All Expeditioners must read this file and carry out their mission.
 
 ## Obtaining the Mission
 
-1. Use Linear MCP to retrieve unfinished issues (all statuses except Done — including issues stalled in Testing or In Review from previous Expeditions)
-2. Choose an issue matching the difficulty indicated by the **Gradient Gauge**
+1. Use Linear to retrieve unfinished issues (all statuses except Done — including issues stalled in Testing or In Review from previous Expeditions)
+2. If a **Gradient Gauge** is provided, use it as a hint for how much complexity to take on; otherwise, pick an appropriate issue based on your own judgment
 
 ## Mission Assessment
 
@@ -38,19 +38,19 @@ Automatically transitions from verify results. Expeditioners do not select this 
 4. Commit frequently (include issue ID in commit messages)
 5. Run lint / format checks
 6. If it still fails after 3 fix attempts -> skip (record lesson in journal)
-7. `gh pr create` to create PR (body includes `Closes <issue-id>`)
-8. Update issue to "In Review" via Linear MCP
+7. Create PR via GitHub (body includes `Closes <issue-id>`)
+8. Update issue to "In Review" via Linear
 
 ## verify Procedure
 
 1. Confirm dev server is running (check URL accessibility)
-2. Open browser via Chrome DevTools MCP and navigate to target page
+2. If browser automation tools are available (Playwright, Chrome DevTools, etc.), use them to open a browser and navigate to the target page
 3. Execute checklist items **one by one**:
    a. Interact with UI
    b. Compare expected vs actual results
-   c. Take screenshot (Chrome DevTools MCP Page.captureScreenshot)
+   c. Take screenshot if browser automation is available
    d. Record result (Pass / Fail + details)
-4. Create QA report and comment on issue via Linear MCP
+4. Create QA report and comment on issue via Linear
 5. **If no defects**: update issue to "Done"
 6. **If defects found**: -> transition to fix
 
@@ -58,11 +58,12 @@ Automatically transitions from verify results. Expeditioners do not select this 
 
 For each defect:
 
-1. File a bug issue via Linear MCP
+1. File a bug issue via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`
 3. Branch: `fix/<bug-issue-id>-<short-description>`
 4. Implement fix and write tests
-5. `gh pr create` to create PR (body includes `Closes <bug-issue-id>`)
+5. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+6. Create PR via GitHub (body includes `Closes <bug-issue-id>`)
 
 ---
 
@@ -72,6 +73,7 @@ For each defect:
 - Do not commit directly to the base branch
 - Do not create a PR with failing tests
 - Do not stop the dev server (managed by external process)
+- Do not re-verify fixes within the same Expedition — leave verification to the next Expedition
 - Do not modify `.expedition/mission.md`
 
 ## Handling Ambiguity

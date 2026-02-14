@@ -245,9 +245,10 @@ just check          # fmt + vet + test (pre-commit check)
 
 ## Prerequisites
 
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) with Linear MCP + Chrome DevTools MCP
-- [GitHub CLI](https://cli.github.com/) (`gh auth login`)
-- Chrome with `--remote-debugging-port=9222` (for verify missions)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- GitHub: accessible for Pull Request operations (e.g. [GitHub CLI](https://cli.github.com/))
+- Linear: accessible for Issue operations (e.g. Linear MCP)
+- Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
 
 ## License
 

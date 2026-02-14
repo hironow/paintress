@@ -7,8 +7,8 @@
 
 ## 使命の取得
 
-1. Linear MCP を使い、未完了の issue を取得する（Done 以外の全ステータスが対象 — Backlog・Todo だけでなく、Testing や In Review で滞留している issue も含む）
-2. **Gradient Gauge** の指示に従った難易度の issue を選ぶ
+1. Linear を使い、未完了の issue を取得する（Done 以外の全ステータスが対象 — Backlog・Todo だけでなく、Testing や In Review で滞留している issue も含む）
+2. **Gradient Gauge** が提供されている場合は、どの程度の複雑さに挑戦するかの目安にする。なければ自身の判断で適切な issue を選ぶ
 
 ## 使命の判定
 
@@ -38,19 +38,19 @@ verify の結果として自動遷移する。Expeditioner が直接選ぶこと
 4. こまめにコミット（コミットメッセージに issue ID を含める）
 5. lint / format チェック
 6. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
-7. `gh pr create` で PR 作成（ボディに `Closes <issue-id>`）
-8. Linear MCP で issue を "In Review" に更新
+7. GitHub で PR 作成（ボディに `Closes <issue-id>`）
+8. Linear で issue を "In Review" に更新
 
 ## verify の手順
 
 1. Dev server が起動済みであることを確認（URL にアクセスできるか）
-2. Chrome DevTools MCP でブラウザを開き、対象ページにアクセス
+2. ブラウザ自動化ツール（Playwright, Chrome DevTools 等）が利用可能であれば、ブラウザを開き対象ページにアクセス
 3. チェックリスト項目を **1つずつ** 実行:
    a. UI を操作
    b. 期待結果と実際の結果を比較
-   c. スクリーンショット撮影（Chrome DevTools MCP の Page.captureScreenshot）
+   c. ブラウザ自動化が可能ならスクリーンショットを撮影
    d. 結果を記録（Pass / Fail + 詳細）
-4. QA レポートを作成し、Linear MCP で issue にコメント
+4. QA レポートを作成し、Linear で issue にコメント
 5. **不具合がない場合**: issue を "Done" に更新
 6. **不具合がある場合**: -> fix に遷移
 
@@ -58,11 +58,12 @@ verify の結果として自動遷移する。Expeditioner が直接選ぶこと
 
 不具合ごとに:
 
-1. Linear MCP で bug issue を起票
+1. Linear で bug issue を起票
 2. `git checkout <base-branch> && git pull origin <base-branch>`
 3. ブランチ: `fix/<bug-issue-id>-<短い説明>`
 4. 修正を実装しテストを書く
-5. `gh pr create` で PR 作成（ボディに `Closes <bug-issue-id>`）
+5. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
+6. GitHub で PR 作成（ボディに `Closes <bug-issue-id>`）
 
 ---
 
@@ -72,6 +73,7 @@ verify の結果として自動遷移する。Expeditioner が直接選ぶこと
 - base branch に直接 commit しない
 - テストが通らない状態で PR を出さない
 - dev server を停止しない（外部プロセスで管理）
+- 同じ Expedition 内で fix の結果を再検証しない — 検証は次の Expedition に委ねる
 - `.expedition/mission.md` を変更しない
 
 ## 曖昧さへの対処
