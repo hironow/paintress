@@ -26,9 +26,9 @@ Wisdom auto-extracted from past Expeditions. Always take these into account:
 - {{.ReserveSection}}
 - Base branch: {{.Bt}}{{.BaseBranch}}{{.Bt}}
 - Dev server: {{.Bt}}{{.DevURL}}{{.Bt}} (used for verify missions, already running)
-- PR creation: use {{.Bt}}gh pr create{{.Bt}}
-- Linear MCP: tools are lazy-loaded — search {{.Bt}}"linear"{{.Bt}} with {{.Bt}}ToolSearch{{.Bt}} before use
-  Key tools: {{.Bt}}mcp__claude_ai_Linear__list_issues{{.Bt}}, {{.Bt}}mcp__claude_ai_Linear__update_issue{{.Bt}}, {{.Bt}}mcp__claude_ai_Linear__create_comment{{.Bt}}
+- GitHub: use for Pull Requests only (do NOT use GitHub Issues)
+- Linear: use for Issues only (retrieve, update status, comment)
+- Note: MCP tools are lazy-loaded — use {{.Bt}}ToolSearch{{.Bt}} to discover available tools before use
 
 ## Required Output
 
@@ -44,6 +44,7 @@ branch: <branch name or "none">
 pr_url: <PR URL or "none">
 status: success|skipped|failed
 reason: <summary of result>
+insight: <a meaningful lesson about the codebase, tooling, or patterns discovered during this expedition — NOT just an error message>
 remaining_issues: <number of remaining Linear issues>
 bugs_found: <number of bugs found or 0>
 bug_issues: <comma-separated bug issue IDs or "none">

@@ -7,8 +7,8 @@ Tous les Expéditionnaires doivent lire ce fichier et accomplir leur mission.
 
 ## Acquisition de la mission
 
-1. Utiliser Linear MCP pour récupérer les issues non terminées (tous les statuts sauf Done — y compris les issues bloquées en Testing ou In Review des Expéditions précédentes)
-2. Choisir une issue correspondant à la difficulté indiquée par le **Gradient Gauge**
+1. Utiliser Linear pour récupérer les issues non terminées (tous les statuts sauf Done — y compris les issues bloquées en Testing ou In Review des Expéditions précédentes)
+2. Si un **Gradient Gauge** est fourni, l'utiliser comme indicateur du niveau de complexité à entreprendre ; sinon, choisir une issue appropriée selon votre propre jugement
 
 ## Évaluation de la mission
 
@@ -38,19 +38,19 @@ Transition automatique depuis les résultats de verify. Les Expéditionnaires ne
 4. Commits fréquents (inclure l'ID de l'issue dans les messages de commit)
 5. Vérification lint / format
 6. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
-7. `gh pr create` pour créer la PR (corps incluant `Closes <issue-id>`)
-8. Mettre à jour l'issue en « In Review » via Linear MCP
+7. Créer la PR via GitHub (corps incluant `Closes <issue-id>`)
+8. Mettre à jour l'issue en « In Review » via Linear
 
 ## Procédure verify
 
 1. Vérifier que le serveur dev est en cours d'exécution (accès à l'URL)
-2. Ouvrir le navigateur via Chrome DevTools MCP et naviguer vers la page cible
+2. Si des outils d'automatisation de navigateur sont disponibles (Playwright, Chrome DevTools, etc.), les utiliser pour ouvrir un navigateur et naviguer vers la page cible
 3. Exécuter les éléments de la checklist **un par un** :
    a. Interagir avec l'UI
    b. Comparer les résultats attendus et réels
-   c. Capture d'écran (Chrome DevTools MCP Page.captureScreenshot)
+   c. Capture d'écran si l'automatisation du navigateur est disponible
    d. Enregistrer le résultat (Pass / Fail + détails)
-4. Créer un rapport QA et commenter l'issue via Linear MCP
+4. Créer un rapport QA et commenter l'issue via Linear
 5. **Aucun défaut** : mettre l'issue à « Done »
 6. **Défauts trouvés** : -> transition vers fix
 
@@ -58,11 +58,12 @@ Transition automatique depuis les résultats de verify. Les Expéditionnaires ne
 
 Pour chaque défaut :
 
-1. Créer une issue bug via Linear MCP
+1. Créer une issue bug via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`
 3. Branche : `fix/<bug-issue-id>-<description-courte>`
 4. Implémenter la correction et écrire les tests
-5. `gh pr create` pour créer la PR (corps incluant `Closes <bug-issue-id>`)
+5. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
+6. Créer la PR via GitHub (corps incluant `Closes <bug-issue-id>`)
 
 ---
 
@@ -72,6 +73,7 @@ Pour chaque défaut :
 - Ne pas commiter directement sur la branche de base
 - Ne pas créer de PR avec des tests en échec
 - Ne pas arrêter le serveur dev (géré par un processus externe)
+- Ne pas re-vérifier les corrections au sein de la même Expédition — laisser la vérification à la prochaine Expédition
 - Ne pas modifier `.expedition/mission.md`
 
 ## Gestion de l'ambiguïté

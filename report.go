@@ -27,6 +27,7 @@ type ExpeditionReport struct {
 	Remaining   string
 	BugsFound   int
 	BugIssues   string
+	Insight     string
 }
 
 func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
@@ -79,6 +80,8 @@ func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
 			fmt.Sscanf(val, "%d", &report.BugsFound)
 		case "bug_issues":
 			report.BugIssues = val
+		case "insight":
+			report.Insight = val
 		}
 	}
 

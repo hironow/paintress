@@ -26,9 +26,9 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 - {{.ReserveSection}}
 - Base branch: {{.Bt}}{{.BaseBranch}}{{.Bt}}
 - Dev server: {{.Bt}}{{.DevURL}}{{.Bt}}（verify mission で使用、既に起動済み）
-- PR 作成: {{.Bt}}gh pr create{{.Bt}} を使用
-- Linear MCP: ツールは遅延ロード — 使用前に {{.Bt}}ToolSearch{{.Bt}} で {{.Bt}}"linear"{{.Bt}} を検索してロードすること
-  主要ツール: {{.Bt}}mcp__claude_ai_Linear__list_issues{{.Bt}}, {{.Bt}}mcp__claude_ai_Linear__update_issue{{.Bt}}, {{.Bt}}mcp__claude_ai_Linear__create_comment{{.Bt}}
+- GitHub: Pull Request 専用で使用する（GitHub Issues は使わないこと）
+- Linear: Issue 専用で使用する（取得・ステータス更新・コメント）
+- 注意: MCP ツールは遅延ロード — 使用前に {{.Bt}}ToolSearch{{.Bt}} で利用可能なツールを検索すること
 
 ## 完了時の出力
 
@@ -44,6 +44,7 @@ branch: <branch name or "none">
 pr_url: <PR URL or "none">
 status: success|skipped|failed
 reason: <結果の要約>
+insight: <この Expedition で得たコードベース・ツール・パターンに関する有意義な教訓 — 単なるエラーメッセージではなく>
 remaining_issues: <Linear の残 issue 数>
 bugs_found: <検出した不具合数 or 0>
 bug_issues: <起票した bug issue ID のカンマ区切り or "none">

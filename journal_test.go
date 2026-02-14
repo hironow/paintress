@@ -52,6 +52,7 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 		PRUrl:       "https://github.com/org/repo/pull/100",
 		BugsFound:   2,
 		BugIssues:   "AWE-43,AWE-44",
+		Insight:     "Tailwind config uses content paths with glob patterns",
 	}
 
 	if err := WriteJournal(dir, report); err != nil {
@@ -74,6 +75,7 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 		"https://github.com/org/repo/pull/100",
 		"Bugs found**: 2",
 		"AWE-43,AWE-44",
+		"Insight**: Tailwind config uses content paths with glob patterns",
 	}
 	for _, c := range checks {
 		if !containsStr(s, c) {

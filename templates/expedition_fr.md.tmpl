@@ -26,9 +26,9 @@ Sagesse extraite automatiquement des Expéditions passées. Toujours en tenir co
 - {{.ReserveSection}}
 - Branche de base : {{.Bt}}{{.BaseBranch}}{{.Bt}}
 - Serveur dev : {{.Bt}}{{.DevURL}}{{.Bt}} (utilisé pour les missions verify, déjà lancé)
-- Création de PR : utiliser {{.Bt}}gh pr create{{.Bt}}
-- Linear MCP : les outils sont en chargement différé — rechercher {{.Bt}}"linear"{{.Bt}} avec {{.Bt}}ToolSearch{{.Bt}} avant utilisation
-  Outils principaux : {{.Bt}}mcp__claude_ai_Linear__list_issues{{.Bt}}, {{.Bt}}mcp__claude_ai_Linear__update_issue{{.Bt}}, {{.Bt}}mcp__claude_ai_Linear__create_comment{{.Bt}}
+- GitHub : utiliser uniquement pour les Pull Requests (ne PAS utiliser les GitHub Issues)
+- Linear : utiliser uniquement pour les Issues (récupérer, mettre à jour le statut, commenter)
+- Note : les outils MCP sont en chargement différé — utiliser {{.Bt}}ToolSearch{{.Bt}} pour découvrir les outils disponibles avant utilisation
 
 ## Sortie requise
 
@@ -44,6 +44,7 @@ branch: <nom de branche ou "none">
 pr_url: <URL de la PR ou "none">
 status: success|skipped|failed
 reason: <résumé du résultat>
+insight: <une leçon significative sur le codebase, l'outillage ou les patterns découverts — PAS un simple message d'erreur>
 remaining_issues: <nombre d'issues restantes dans Linear>
 bugs_found: <nombre de bugs trouvés ou 0>
 bug_issues: <IDs des issues bug séparés par des virgules ou "none">

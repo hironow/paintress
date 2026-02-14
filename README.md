@@ -68,8 +68,8 @@ Consecutive successes fill the gauge, unlocking higher-difficulty issues.
 Past journals are scanned in parallel goroutines to extract recurring patterns.
 Saved to `.expedition/lumina.md` and injected into the next Expedition's prompt.
 
-- **Defensive**: Failure reasons that appear 2+ times → "Watch out for this pattern"
-- **Offensive**: Mission types that succeed 3+ times → "This approach is reliable"
+- **Defensive**: Insights from failed expeditions that appear 2+ times → "Watch out for this pattern" (falls back to failure reason if no insight)
+- **Offensive**: Insights from successful expeditions that appear 3+ times → "This approach is reliable" (falls back to mission type if no insight)
 
 ### Reserve Party (Model Fallback)
 
@@ -245,9 +245,10 @@ just check          # fmt + vet + test (pre-commit check)
 
 ## Prerequisites
 
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) with Linear MCP + Chrome DevTools MCP
-- [GitHub CLI](https://cli.github.com/) (`gh auth login`)
-- Chrome with `--remote-debugging-port=9222` (for verify missions)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- GitHub: accessible for Pull Request operations (e.g. [GitHub CLI](https://cli.github.com/))
+- Linear: accessible for Issue operations (e.g. Linear MCP)
+- Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
 
 ## License
 

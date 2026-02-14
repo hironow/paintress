@@ -37,6 +37,7 @@ func ScanJournalsForLumina(continent string) []Lumina {
 		reason  string
 		mission string
 		issue   string
+		insight string
 	}
 
 	// Parallel journal scanning
@@ -65,6 +66,8 @@ func ScanJournalsForLumina(continent string) []Lumina {
 					entry.mission = extractValue(line)
 				} else if strings.HasPrefix(line, "- **Issue**:") {
 					entry.issue = extractValue(line)
+				} else if strings.HasPrefix(line, "- **Insight**:") {
+					entry.insight = extractValue(line)
 				}
 			}
 
@@ -80,11 +83,25 @@ func ScanJournalsForLumina(continent string) []Lumina {
 	successPatterns := make(map[string]int)
 
 	for _, e := range entries {
-		if e.status == "failed" && e.reason != "" {
-			failureReasons[e.reason]++
+		if e.status == "failed" {
+			// Prefer insight over raw reason for defensive lumina
+			key := e.insight
+			if key == "" {
+				key = e.reason
+			}
+			if key != "" {
+				failureReasons[key]++
+			}
 		}
-		if e.status == "success" && e.mission != "" {
-			successPatterns[e.mission]++
+		if e.status == "success" {
+			// Prefer insight over mission type for offensive lumina
+			key := e.insight
+			if key == "" {
+				key = e.mission
+			}
+			if key != "" {
+				successPatterns[key]++
+			}
 		}
 	}
 
