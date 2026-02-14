@@ -13,6 +13,17 @@ help:
 # Define specific commands
 MARKDOWNLINT := "bunx markdownlint-cli2"
 
+# Install prek hooks (pre-commit + pre-push) with quiet mode
+prek-install:
+    prek install -t pre-commit -t pre-push --overwrite
+    @sed -i '' 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-commit
+    @sed -i '' 's/-- "\$@"/--quiet -- "\$@"/' .git/hooks/pre-push
+    @echo "prek hooks installed (quiet mode)"
+
+# Run all prek hooks on all files
+prek-run:
+    prek run --all-files
+
 # Lint markdown files
 lint-md:
     @{{MARKDOWNLINT}} --fix "*.md" "docs/**/*.md"

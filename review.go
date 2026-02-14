@@ -20,34 +20,34 @@ type ReviewResult struct {
 // It returns a ReviewResult indicating whether the review passed
 // and any comments that were found.
 func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult, error) {
-	if reviewCmd == "" {
+	if strings.TrimSpace(reviewCmd) == "" {
 		return &ReviewResult{Passed: true}, nil
 	}
 
-	parts := strings.Fields(reviewCmd)
-	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	cmd := exec.CommandContext(ctx, "sh", "-c", reviewCmd)
 	cmd.Dir = dir
 
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
-	if err != nil {
-		// Rate limit, quota limit, or command failure — treat as skippable
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, output)
-	}
-
-	// Rate limit / quota signals in successful output (command exited 0 but reported limit)
+	// Rate limit / quota signals — skip review gracefully regardless of exit code
 	if isRateLimited(output) {
 		return nil, fmt.Errorf("review service rate/quota limited")
 	}
 
-	// Detect review comments by priority tags like [P1], [P2], etc.
+	// Check for review comments before treating non-zero exit as failure.
+	// Many review tools exit non-zero when they find issues.
 	if hasReviewComments(output) {
 		return &ReviewResult{
 			Passed:   false,
 			Output:   output,
 			Comments: output,
 		}, nil
+	}
+
+	// Non-zero exit with no review comments — command failure, treat as skippable
+	if err != nil {
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, output)
 	}
 
 	return &ReviewResult{
@@ -101,14 +101,20 @@ func BuildReviewFixPrompt(branch string, comments string) string {
 Fix all review comments above. Commit and push your changes. Do not create a new branch or PR.
 Keep fixes focused — only address the review comments, do not refactor unrelated code.
 If a review comment is unclear or you cannot resolve it after a reasonable attempt, skip it and move on to the next.
-After all fixes are committed, update the Linear issue status to a testing/QA-ready status (e.g. "Testing").`, branch, comments)
+Do not change the Linear issue status — it stays in its current state until the next Expedition.`, branch, comments)
 }
 
-// summarizeReview truncates long review output for journal storage.
+// summarizeReview normalizes multi-line review output to a single line
+// and truncates for journal storage. Uses rune-based truncation to avoid
+// splitting multi-byte UTF-8 characters.
 func summarizeReview(comments string) string {
+	// Normalize to single line for journal compatibility
+	normalized := strings.Join(strings.Fields(comments), " ")
+
 	const maxLen = 500
-	if len(comments) <= maxLen {
-		return comments
+	runes := []rune(normalized)
+	if len(runes) <= maxLen {
+		return normalized
 	}
-	return comments[:maxLen] + "...(truncated)"
+	return string(runes[:maxLen]) + "...(truncated)"
 }

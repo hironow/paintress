@@ -317,7 +317,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Reviewfix failed: " + string(out)
+			report.Insight += "Reviewfix failed: " + summarizeReview(string(out))
 			return
 		}
 	}

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -185,6 +187,16 @@ func TestBuildReviewFixPrompt_NoBranchCreation(t *testing.T) {
 	}
 }
 
+func TestBuildReviewFixPrompt_NoStatusChange(t *testing.T) {
+	prompt := BuildReviewFixPrompt("feat/x", "fix this")
+	if strings.Contains(prompt, "Testing") {
+		t.Error("prompt should NOT instruct to change status to Testing")
+	}
+	if !strings.Contains(prompt, "Do not change the Linear issue status") {
+		t.Error("prompt should explicitly say not to change issue status")
+	}
+}
+
 // === RunReview ===
 
 func TestRunReview_EmptyCommand(t *testing.T) {
@@ -200,6 +212,46 @@ func TestRunReview_EmptyCommand(t *testing.T) {
 	}
 	if !result.Passed {
 		t.Error("empty command should auto-pass")
+	}
+}
+
+func TestRunReview_WhitespaceOnlyCommand(t *testing.T) {
+	// given
+	ctx := context.Background()
+
+	// when
+	result, err := RunReview(ctx, "   ", "/tmp")
+
+	// then
+	if err != nil {
+		t.Fatalf("whitespace-only command should not error: %v", err)
+	}
+	if !result.Passed {
+		t.Error("whitespace-only command should auto-pass")
+	}
+}
+
+func TestRunReview_NonZeroExitWithComments(t *testing.T) {
+	// given — review tool exits non-zero when it finds issues (common for CI/lint tools)
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// Create a script that outputs review comments and exits non-zero
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Reset live URL'\nexit 1\n"), 0755)
+
+	// when
+	result, err := RunReview(ctx, scriptPath, dir)
+
+	// then — should return review comments, NOT an error
+	if err != nil {
+		t.Fatalf("non-zero exit with review comments should not error: %v", err)
+	}
+	if result.Passed {
+		t.Error("review with [P2] comments should not pass")
+	}
+	if result.Comments == "" {
+		t.Error("comments should not be empty")
 	}
 }
 

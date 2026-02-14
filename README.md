@@ -5,7 +5,7 @@
 Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues one by one — implementing code, running tests, creating PRs, running code reviews, verifying UI, and fixing bugs — with no human intervention, until every issue is done.
 
 ```bash
-paintress --model opus,sonnet ./your-repo 
+paintress --model opus,sonnet ./your-repo
 ```
 
 This single command makes Paintress repeat the following cycle:
