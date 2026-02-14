@@ -26,33 +26,36 @@ ou inclut une checklist (`- [ ]`).
 
 ### fix (correction)
 
-Transition automatique depuis les résultats de verify. Les Expéditionnaires ne sélectionnent pas ce type directement.
+Lorsque des défauts sont découverts pendant verify, vous passez à fix au sein de la même Expédition. Ce n'est pas une sélection séparée — cela découle naturellement des résultats de verify.
 
 ---
 
 ## Procédure implement
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
-2. Créer la branche : `feat/<issue-id>-<description-courte>`
-3. TDD : écrire les tests -> implémenter -> faire passer les tests
-4. Commits fréquents (inclure l'ID de l'issue dans les messages de commit)
-5. Vérification lint / format
-6. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
-7. Créer la PR via GitHub (corps incluant `Closes <issue-id>`)
-8. Mettre à jour l'issue en « In Review » via Linear
+2. Mettre à jour l'issue vers un statut de travail en cours dans Linear (ex. « In Progress »)
+3. Créer la branche : `feat/<issue-id>-<description-courte>`
+4. TDD : écrire les tests -> implémenter -> faire passer les tests
+5. Commits fréquents (inclure l'ID de l'issue dans les messages de commit)
+6. Vérification lint / format
+7. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
+8. Créer la PR via GitHub (corps incluant `Closes <issue-id>`)
+9. Mettre à jour l'issue vers un statut de revue dans Linear (ex. « In Review »)
+10. La revue de code est gérée par l'orchestrateur (Paintress) après la création de la PR — ne pas exécuter de commandes de revue vous-même
 
 ## Procédure verify
 
-1. Vérifier que le serveur dev est en cours d'exécution (accès à l'URL)
-2. Si des outils d'automatisation de navigateur sont disponibles (Playwright, Chrome DevTools, etc.), les utiliser pour ouvrir un navigateur et naviguer vers la page cible
-3. Exécuter les éléments de la checklist **un par un** :
+1. Mettre à jour l'issue vers un statut de test/QA dans Linear (ex. « Testing ») si ce n'est pas déjà le cas
+2. Vérifier que le serveur dev est en cours d'exécution (accès à l'URL)
+3. Si des outils d'automatisation de navigateur sont disponibles (Playwright, Chrome DevTools, etc.), les utiliser pour ouvrir un navigateur et naviguer vers la page cible
+4. Exécuter les éléments de la checklist **un par un** :
    a. Interagir avec l'UI
    b. Comparer les résultats attendus et réels
    c. Capture d'écran si l'automatisation du navigateur est disponible
    d. Enregistrer le résultat (Pass / Fail + détails)
-4. Créer un rapport QA et commenter l'issue via Linear
-5. **Aucun défaut** : mettre l'issue à « Done »
-6. **Défauts trouvés** : -> transition vers fix
+5. Créer un rapport QA et commenter l'issue via Linear
+6. **Aucun défaut** : mettre à jour l'issue vers un statut complété dans Linear (ex. « Done »)
+7. **Défauts trouvés** : -> transition vers fix
 
 ## Procédure fix (transition automatique depuis verify)
 
@@ -60,10 +63,13 @@ Pour chaque défaut :
 
 1. Créer une issue bug via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`
-3. Branche : `fix/<bug-issue-id>-<description-courte>`
-4. Implémenter la correction et écrire les tests
-5. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
-6. Créer la PR via GitHub (corps incluant `Closes <bug-issue-id>`)
+3. Mettre à jour l'issue bug vers un statut de travail en cours dans Linear (ex. « In Progress »)
+4. Branche : `fix/<bug-issue-id>-<description-courte>`
+5. Implémenter la correction et écrire les tests
+6. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
+7. Créer la PR via GitHub (corps incluant `Closes <bug-issue-id>`)
+8. Mettre à jour l'issue bug vers un statut de revue dans Linear (ex. « In Review »)
+9. La revue de code est gérée par l'orchestrateur (Paintress) après la création de la PR — ne pas exécuter de commandes de revue vous-même
 
 ---
 

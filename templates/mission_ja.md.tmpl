@@ -26,33 +26,36 @@ E2Eテスト、UI確認、チェックリスト消化、動作検証等。
 
 ### fix（修正）
 
-verify の結果として自動遷移する。Expeditioner が直接選ぶことはない。
+verify 中に不具合が見つかった場合、同じ Expedition 内で fix に遷移する。独立した選択肢ではなく、verify の結果から自然に続く。
 
 ---
 
 ## implement の手順
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
-2. ブランチ作成: `feat/<issue-id>-<短い説明>`
-3. TDD: テストを書く -> 実装する -> テストを通す
-4. こまめにコミット（コミットメッセージに issue ID を含める）
-5. lint / format チェック
-6. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
-7. GitHub で PR 作成（ボディに `Closes <issue-id>`）
-8. Linear で issue を "In Review" に更新
+2. Linear で issue を作業開始を示すステータスに更新する（例: "In Progress"）
+3. ブランチ作成: `feat/<issue-id>-<短い説明>`
+4. TDD: テストを書く -> 実装する -> テストを通す
+5. こまめにコミット（コミットメッセージに issue ID を含める）
+6. lint / format チェック
+7. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
+8. GitHub で PR 作成（ボディに `Closes <issue-id>`）
+9. Linear で issue をレビュー中を示すステータスに更新する（例: "In Review"）
+10. コードレビューは PR 作成後にオーケストレーター（Paintress）が処理する — 自分でレビューコマンドを実行しないこと
 
 ## verify の手順
 
-1. Dev server が起動済みであることを確認（URL にアクセスできるか）
-2. ブラウザ自動化ツール（Playwright, Chrome DevTools 等）が利用可能であれば、ブラウザを開き対象ページにアクセス
-3. チェックリスト項目を **1つずつ** 実行:
+1. Linear で issue をテスト中/QA のステータスに更新する（例: "Testing"）— 既にそのステータスならスキップ
+2. Dev server が起動済みであることを確認（URL にアクセスできるか）
+3. ブラウザ自動化ツール（Playwright, Chrome DevTools 等）が利用可能であれば、ブラウザを開き対象ページにアクセス
+4. チェックリスト項目を **1つずつ** 実行:
    a. UI を操作
    b. 期待結果と実際の結果を比較
    c. ブラウザ自動化が可能ならスクリーンショットを撮影
    d. 結果を記録（Pass / Fail + 詳細）
-4. QA レポートを作成し、Linear で issue にコメント
-5. **不具合がない場合**: issue を "Done" に更新
-6. **不具合がある場合**: -> fix に遷移
+5. QA レポートを作成し、Linear で issue にコメント
+6. **不具合がない場合**: Linear で issue を完了のステータスに更新する（例: "Done"）
+7. **不具合がある場合**: -> fix に遷移
 
 ## fix の手順（verify から自動遷移）
 
@@ -60,10 +63,13 @@ verify の結果として自動遷移する。Expeditioner が直接選ぶこと
 
 1. Linear で bug issue を起票
 2. `git checkout <base-branch> && git pull origin <base-branch>`
-3. ブランチ: `fix/<bug-issue-id>-<短い説明>`
-4. 修正を実装しテストを書く
-5. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
-6. GitHub で PR 作成（ボディに `Closes <bug-issue-id>`）
+3. Linear で bug issue を作業開始を示すステータスに更新する（例: "In Progress"）
+4. ブランチ: `fix/<bug-issue-id>-<短い説明>`
+5. 修正を実装しテストを書く
+6. 3回修正しても通らない場合 -> スキップ（journal に教訓を残す）
+7. GitHub で PR 作成（ボディに `Closes <bug-issue-id>`）
+8. Linear で bug issue をレビュー中を示すステータスに更新する（例: "In Review"）
+9. コードレビューは PR 作成後にオーケストレーター（Paintress）が処理する — 自分でレビューコマンドを実行しないこと
 
 ---
 

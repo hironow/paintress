@@ -99,7 +99,9 @@ func BuildReviewFixPrompt(branch string, comments string) string {
 %s
 
 Fix all review comments above. Commit and push your changes. Do not create a new branch or PR.
-Keep fixes focused — only address the review comments, do not refactor unrelated code.`, branch, comments)
+Keep fixes focused — only address the review comments, do not refactor unrelated code.
+If a review comment is unclear or you cannot resolve it after a reasonable attempt, skip it and move on to the next.
+After all fixes are committed, update the Linear issue status to a testing/QA-ready status (e.g. "Testing").`, branch, comments)
 }
 
 // summarizeReview truncates long review output for journal storage.

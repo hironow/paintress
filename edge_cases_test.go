@@ -566,15 +566,18 @@ func TestWriteLumina_EmptySlice(t *testing.T) {
 
 func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
 	luminas := []Lumina{
-		{Pattern: "only one pattern", Source: "test", Uses: 1},
+		{Pattern: "only one pattern", Source: "failure-pattern", Uses: 1},
 	}
 	result := FormatLuminaForPrompt(luminas)
 	if !containsStr(result, "only one pattern") {
 		t.Errorf("should contain pattern: %q", result)
 	}
-	// Should have bullet prefix
-	if !strings.HasPrefix(result, "- ") {
-		t.Errorf("should start with bullet: %q", result)
+	// Should contain section header and bullet
+	if !containsStr(result, "Defensive") {
+		t.Errorf("should contain Defensive header: %q", result)
+	}
+	if !containsStr(result, "- only one pattern") {
+		t.Errorf("should contain bulleted pattern: %q", result)
 	}
 }
 

@@ -14,7 +14,7 @@ You have been sent into the Continent (this repository) to fulfill your mission.
 
 ## Lumina (Learned Passive Skills)
 
-Wisdom auto-extracted from past Expeditions. Always take these into account:
+Patterns auto-extracted from past Expeditions. Apply these as constraints — avoid repeating past mistakes (Defensive) and prefer proven approaches (Offensive):
 
 {{.LuminaSection}}
 
@@ -32,7 +32,7 @@ Wisdom auto-extracted from past Expeditions. Always take these into account:
 
 ## Required Output
 
-When your mission is complete, you **must** output the following at the end of stdout:
+Whether your mission succeeds, is skipped, or fails, you **must** output the following at the end of stdout:
 
 {{.Cb}}
 __EXPEDITION_REPORT__
@@ -42,16 +42,16 @@ issue_title: <title>
 mission_type: implement|verify|fix
 branch: <branch name or "none">
 pr_url: <PR URL or "none">
-status: success|skipped|failed
+status: success|skipped|failed (success = mission accomplished, skipped = abandoned after retries or unclear spec, failed = blocked by error)
 reason: <summary of result>
 insight: <a meaningful lesson about the codebase, tooling, or patterns discovered during this expedition — NOT just an error message>
-remaining_issues: <number of remaining Linear issues>
+remaining_issues: <number of remaining unfinished issues in Linear>
 bugs_found: <number of bugs found or 0>
 bug_issues: <comma-separated bug issue IDs or "none">
 __EXPEDITION_END__
 {{.Cb}}
 
-If there are no issues left:
+If no unfinished issues remain in Linear (all issues are Done or Cancelled), output this instead of the report above:
 {{.Cb}}
 __EXPEDITION_COMPLETE__
 {{.Cb}}

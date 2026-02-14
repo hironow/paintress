@@ -33,7 +33,7 @@ This structure maps directly to AI agent loop design:
 | **Expedition Flag** | `.expedition/flag.md` | Checkpoint passed to the next run |
 | **Journal** | `.expedition/journal/` | Record of past decisions and lessons |
 | **Canvas** | LLM context window | Beautiful but temporary — destroyed each run |
-| **Lumina** | Auto-extracted patterns | Wisdom learned from past failures/successes |
+| **Lumina** | Auto-extracted patterns | Patterns learned from past failures/successes |
 | **Gradient Gauge** | Consecutive success tracker | Momentum unlocks harder challenges |
 | **Reserve Party** | Model fallback | When Opus falls, Sonnet takes over |
 
@@ -69,8 +69,8 @@ Consecutive successes fill the gauge, unlocking higher-difficulty issues.
 Past journals are scanned in parallel goroutines to extract recurring patterns.
 Saved to `.expedition/lumina.md` and injected into the next Expedition's prompt.
 
-- **Defensive**: Insights from failed expeditions that appear 2+ times → "Watch out for this pattern" (falls back to failure reason if no insight)
-- **Offensive**: Insights from successful expeditions that appear 3+ times → "This approach is reliable" (falls back to mission type if no insight)
+- **Defensive**: Insights from failed expeditions that appear 2+ times → "Avoid — failed N times: ..." (falls back to failure reason if no insight)
+- **Offensive**: Insights from successful expeditions that appear 3+ times → "Proven approach (Nx successful): ..." (falls back to mission type if no insight)
 
 ### Reserve Party (Model Fallback)
 

@@ -111,18 +111,18 @@ func ScanJournalsForLumina(continent string) []Lumina {
 	for reason, count := range failureReasons {
 		if count >= 2 { // "Mastered" after 2 occurrences (like Pictos after 4 uses, scaled down)
 			luminas = append(luminas, Lumina{
-				Pattern: fmt.Sprintf("[WARN] Failed %d times: %s", count, reason),
+				Pattern: fmt.Sprintf("[WARN] Avoid — failed %d times: %s", count, reason),
 				Source:  "failure-pattern",
 				Uses:    count,
 			})
 		}
 	}
 
-	// Successful mission types become offensive Luminas
-	for mission, count := range successPatterns {
+	// Successful patterns become offensive Luminas
+	for pattern, count := range successPatterns {
 		if count >= 3 { // Reliable pattern after 3 successes
 			luminas = append(luminas, Lumina{
-				Pattern: fmt.Sprintf("[OK] %s mission: %d proven successes", mission, count),
+				Pattern: fmt.Sprintf("[OK] Proven approach (%dx successful): %s", count, pattern),
 				Source:  "success-pattern",
 				Uses:    count,
 			})
@@ -163,14 +163,39 @@ func WriteLumina(continent string, luminas []Lumina) error {
 }
 
 // FormatLuminaForPrompt formats Luminas for injection into the expedition prompt.
+// Groups entries by Defensive (failure-pattern) and Offensive (success-pattern).
 func FormatLuminaForPrompt(luminas []Lumina) string {
 	if len(luminas) == 0 {
 		return Msg("lumina_none")
 	}
 
-	var sb strings.Builder
+	var defensive, offensive []string
 	for _, l := range luminas {
-		sb.WriteString(fmt.Sprintf("- %s\n", l.Pattern))
+		switch l.Source {
+		case "failure-pattern":
+			defensive = append(defensive, fmt.Sprintf("- %s", l.Pattern))
+		case "success-pattern":
+			offensive = append(offensive, fmt.Sprintf("- %s", l.Pattern))
+		}
+	}
+
+	var sb strings.Builder
+	if len(defensive) > 0 {
+		sb.WriteString(Msg("lumina_defensive"))
+		sb.WriteString("\n")
+		for _, d := range defensive {
+			sb.WriteString(d)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	}
+	if len(offensive) > 0 {
+		sb.WriteString(Msg("lumina_offensive"))
+		sb.WriteString("\n")
+		for _, o := range offensive {
+			sb.WriteString(o)
+			sb.WriteString("\n")
+		}
 	}
 	return sb.String()
 }
