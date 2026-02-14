@@ -174,8 +174,7 @@ func TestReserve_PartialSignalNoMatch(t *testing.T) {
 		rp2 := NewReserveParty("opus", []string{"sonnet"})
 		detected := rp2.CheckOutput(s)
 		// "at full capacity to serve you" contains "capacity" so it will match
-		// "429th item" contains "429" so it will match
-		// These are acceptable false positives for the current implementation
+		// "429th item" no longer matches — bare "429" was removed to avoid false positives
 		_ = detected
 	}
 	_ = rp

@@ -30,19 +30,20 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
-	// Rate limit / quota signals — skip review gracefully regardless of exit code
-	if isRateLimited(output) {
-		return nil, fmt.Errorf("review service rate/quota limited")
-	}
-
-	// Check for review comments before treating non-zero exit as failure.
-	// Many review tools exit non-zero when they find issues.
+	// Check for review comments first — actionable findings take priority
+	// over rate-limit signals (review output may mention "429" in findings).
 	if hasReviewComments(output) {
 		return &ReviewResult{
 			Passed:   false,
 			Output:   output,
 			Comments: output,
 		}, nil
+	}
+
+	// Rate limit / quota signals — skip review gracefully (checked after
+	// comment extraction so legitimate findings are never suppressed).
+	if isRateLimited(output) {
+		return nil, fmt.Errorf("review service rate/quota limited")
 	}
 
 	// Non-zero exit with no review comments — command failure, treat as skippable
@@ -82,7 +83,6 @@ func isRateLimited(output string) bool {
 		"quota exceeded",
 		"quota limit",
 		"too many requests",
-		"429",
 		"usage limit",
 	}
 	for _, s := range signals {

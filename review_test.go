@@ -97,9 +97,11 @@ func TestIsRateLimited_TooManyRequests(t *testing.T) {
 	}
 }
 
-func TestIsRateLimited_429(t *testing.T) {
-	if !isRateLimited("HTTP 429: slow down") {
-		t.Error("should detect '429'")
+func TestIsRateLimited_Bare429NotDetected(t *testing.T) {
+	// Bare "429" should NOT trigger rate-limit detection to avoid false positives
+	// (e.g. review comments about HTTP 429 handling, line numbers, test names).
+	if isRateLimited("HTTP 429: slow down") {
+		t.Error("bare '429' without rate-limit keywords should not be detected")
 	}
 }
 
@@ -296,6 +298,26 @@ func TestRunReview_FailingReview(t *testing.T) {
 	// then
 	if err != nil {
 		t.Fatalf("should not error: %v", err)
+	}
+	if result.Passed {
+		t.Error("review with [P2] comments should not pass")
+	}
+	if result.Comments == "" {
+		t.Error("comments should not be empty")
+	}
+}
+
+func TestRunReview_FindingsWithHTTP429MentionNotRateLimited(t *testing.T) {
+	// given — review output contains [P2] finding that mentions "429"
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// when — review comments reference HTTP 429 in the finding itself
+	result, err := RunReview(ctx, "echo '[P2] Fix HTTP 429 error handling in API client'", dir)
+
+	// then — should return review comments, NOT treat as rate-limited
+	if err != nil {
+		t.Fatalf("review findings mentioning 429 should not error: %v", err)
 	}
 	if result.Passed {
 		t.Error("review with [P2] comments should not pass")
