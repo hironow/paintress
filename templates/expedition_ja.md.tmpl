@@ -14,7 +14,7 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 ## Lumina（学習済みパッシブスキル）
 
-過去の Expedition から自動抽出された知恵。これらを必ず考慮に入れよ：
+過去の Expedition から自動抽出されたパターン。以下を制約として適用せよ — 過去の失敗を繰り返さない（Defensive）こと、実績あるアプローチを優先する（Offensive）こと：
 
 {{.LuminaSection}}
 
@@ -32,7 +32,7 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 ## 完了時の出力
 
-使命が完了したら、以下を **必ず** 標準出力の最後に出してください：
+使命の結果が成功・スキップ・失敗のいずれであっても、以下を **必ず** 標準出力の最後に出してください：
 
 {{.Cb}}
 __EXPEDITION_REPORT__
@@ -42,16 +42,16 @@ issue_title: <title>
 mission_type: implement|verify|fix
 branch: <branch name or "none">
 pr_url: <PR URL or "none">
-status: success|skipped|failed
+status: success|skipped|failed（success = 使命達成、skipped = リトライ上限や仕様不明で断念、failed = エラーで中断）
 reason: <結果の要約>
 insight: <この Expedition で得たコードベース・ツール・パターンに関する有意義な教訓 — 単なるエラーメッセージではなく>
-remaining_issues: <Linear の残 issue 数>
+remaining_issues: <Linear の未完了 issue の残数>
 bugs_found: <検出した不具合数 or 0>
 bug_issues: <起票した bug issue ID のカンマ区切り or "none">
 __EXPEDITION_END__
 {{.Cb}}
 
-issue が1つもなければ：
+Linear に未完了の issue が残っていない場合（全て Done または Cancelled）、上記レポートの代わりにこれを出力：
 {{.Cb}}
 __EXPEDITION_COMPLETE__
 {{.Cb}}

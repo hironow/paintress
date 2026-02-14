@@ -14,7 +14,7 @@ Vous avez été envoyé dans le Continent (ce dépôt) pour accomplir votre miss
 
 ## Lumina (Compétences passives acquises)
 
-Sagesse extraite automatiquement des Expéditions passées. Toujours en tenir compte :
+Patterns extraits automatiquement des Expéditions passées. Appliquer comme contraintes — éviter de répéter les erreurs passées (Defensive) et préférer les approches éprouvées (Offensive) :
 
 {{.LuminaSection}}
 
@@ -32,7 +32,7 @@ Sagesse extraite automatiquement des Expéditions passées. Toujours en tenir co
 
 ## Sortie requise
 
-Lorsque votre mission est terminée, vous **devez** afficher ce qui suit à la fin de stdout :
+Que votre mission réussisse, soit ignorée ou échoue, vous **devez** afficher ce qui suit à la fin de stdout :
 
 {{.Cb}}
 __EXPEDITION_REPORT__
@@ -42,16 +42,16 @@ issue_title: <titre>
 mission_type: implement|verify|fix
 branch: <nom de branche ou "none">
 pr_url: <URL de la PR ou "none">
-status: success|skipped|failed
+status: success|skipped|failed (success = mission accomplie, skipped = abandonné après tentatives ou spec floue, failed = bloqué par erreur)
 reason: <résumé du résultat>
 insight: <une leçon significative sur le codebase, l'outillage ou les patterns découverts — PAS un simple message d'erreur>
-remaining_issues: <nombre d'issues restantes dans Linear>
+remaining_issues: <nombre d'issues non terminées restantes dans Linear>
 bugs_found: <nombre de bugs trouvés ou 0>
 bug_issues: <IDs des issues bug séparés par des virgules ou "none">
 __EXPEDITION_END__
 {{.Cb}}
 
-S'il ne reste aucune issue :
+S'il ne reste aucune issue non terminée dans Linear (toutes en Done ou Cancelled), affichez ceci à la place du rapport ci-dessus :
 {{.Cb}}
 __EXPEDITION_COMPLETE__
 {{.Cb}}

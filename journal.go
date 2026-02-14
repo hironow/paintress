@@ -36,6 +36,7 @@ func WriteJournal(continent string, report *ExpeditionReport) error {
 	path := filepath.Join(dir, filename)
 
 	content := fmt.Sprintf(`# Expedition #%d — Journal
+# This is a record of a past Expedition. Use the Insight field as a lesson for your mission.
 
 - **Date**: %s
 - **Issue**: %s — %s

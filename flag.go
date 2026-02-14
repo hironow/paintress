@@ -53,10 +53,13 @@ func ReadFlag(continent string) ExpeditionFlag {
 
 func WriteFlag(continent string, expNum int, issueID, status, remaining string) error {
 	content := fmt.Sprintf(`# Expedition Flag
+# This checkpoint summarizes the previous Expedition's outcome.
+# Use it as context when starting your mission.
 # Last planted by Expedition #%d
 
 last_expedition: %d
 last_updated: %s
+# The issue attempted in the previous Expedition (check last_status for outcome)
 last_issue: %s
 last_status: %s
 remaining_issues: %s

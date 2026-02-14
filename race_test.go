@@ -45,7 +45,7 @@ func TestLumina_ConcurrentScan_ManyJournals(t *testing.T) {
 		if containsStr(l.Pattern, "timeout error") {
 			hasFailure = true
 		}
-		if containsStr(l.Pattern, "implement mission") {
+		if containsStr(l.Pattern, "implement") && containsStr(l.Pattern, "Proven approach") {
 			hasSuccess = true
 		}
 	}

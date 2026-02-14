@@ -60,15 +60,21 @@ func TestFormatLuminaForPrompt_Empty(t *testing.T) {
 
 func TestFormatLuminaForPrompt_WithLuminas(t *testing.T) {
 	luminas := []Lumina{
-		{Pattern: "[WARN] Failed 3 times: tests failing", Source: "failure-pattern", Uses: 3},
-		{Pattern: "[OK] implement mission: 4 proven successes", Source: "success-pattern", Uses: 4},
+		{Pattern: "[WARN] Avoid — failed 3 times: tests failing", Source: "failure-pattern", Uses: 3},
+		{Pattern: "[OK] Proven approach (4x successful): implement", Source: "success-pattern", Uses: 4},
 	}
 	result := FormatLuminaForPrompt(luminas)
 
+	if !containsStr(result, "Defensive") {
+		t.Errorf("should contain Defensive section header: %q", result)
+	}
+	if !containsStr(result, "Offensive") {
+		t.Errorf("should contain Offensive section header: %q", result)
+	}
 	if !containsStr(result, "tests failing") {
 		t.Errorf("should contain failure pattern: %q", result)
 	}
-	if !containsStr(result, "implement mission") {
+	if !containsStr(result, "implement") {
 		t.Errorf("should contain success pattern: %q", result)
 	}
 }
@@ -85,8 +91,8 @@ func TestWriteLumina_WritesFile(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	luminas := []Lumina{
-		{Pattern: "[WARN] Failed 2 times: timeout", Source: "failure-pattern", Uses: 2},
-		{Pattern: "[OK] fix mission: 3 proven successes", Source: "success-pattern", Uses: 3},
+		{Pattern: "[WARN] Avoid — failed 2 times: timeout", Source: "failure-pattern", Uses: 2},
+		{Pattern: "[OK] Proven approach (3x successful): fix", Source: "success-pattern", Uses: 3},
 	}
 
 	err := WriteLumina(dir, luminas)
@@ -112,7 +118,7 @@ func TestWriteLumina_WritesFile(t *testing.T) {
 	if !containsStr(s, "timeout") {
 		t.Error("should contain failure pattern")
 	}
-	if !containsStr(s, "fix mission") {
+	if !containsStr(s, "fix") {
 		t.Error("should contain success pattern")
 	}
 }
@@ -155,7 +161,7 @@ func TestScanJournalsForLumina_SuccessThreshold(t *testing.T) {
 
 	luminas := ScanJournalsForLumina(dir)
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "verify mission") {
+		if containsStr(l.Pattern, "verify") {
 			t.Error("2 successes should not reach threshold of 3")
 		}
 	}
@@ -193,7 +199,7 @@ func TestScanJournalsForLumina_MixedStatuses(t *testing.T) {
 		if containsStr(l.Pattern, "lint error") {
 			hasFailure = true
 		}
-		if containsStr(l.Pattern, "implement mission") {
+		if containsStr(l.Pattern, "implement") && containsStr(l.Pattern, "Proven approach") {
 			hasSuccess = true
 		}
 	}
@@ -202,7 +208,7 @@ func TestScanJournalsForLumina_MixedStatuses(t *testing.T) {
 		t.Error("should have failure lumina for 'lint error'")
 	}
 	if !hasSuccess {
-		t.Error("should have success lumina for 'implement mission'")
+		t.Error("should have success lumina for 'implement'")
 	}
 }
 
@@ -254,7 +260,7 @@ func TestScanJournalsForLumina_InsightUsedForDefensive(t *testing.T) {
 			hasInsight = true
 		}
 		// Should NOT contain the raw reason "test timeout" as the pattern
-		if l.Pattern == "[WARN] Failed 2 times: test timeout" {
+		if l.Pattern == "[WARN] Avoid — failed 2 times: test timeout" {
 			t.Error("should use insight text, not reason text")
 		}
 	}
@@ -287,7 +293,7 @@ func TestScanJournalsForLumina_InsightUsedForOffensive(t *testing.T) {
 			hasInsight = true
 		}
 		// Should NOT contain the raw mission type as the pattern
-		if l.Pattern == "[OK] implement mission: 3 proven successes" {
+		if l.Pattern == "[OK] Proven approach (3x successful): implement" {
 			t.Error("should use insight text, not mission type")
 		}
 	}

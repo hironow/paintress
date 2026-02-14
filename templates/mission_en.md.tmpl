@@ -26,33 +26,36 @@ or includes a checklist (`- [ ]`).
 
 ### fix
 
-Automatically transitions from verify results. Expeditioners do not select this directly.
+When defects are found during verify, you transition to fix within the same Expedition. This is not a separate selection — it follows naturally from verify results.
 
 ---
 
 ## implement Procedure
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
-2. Create branch: `feat/<issue-id>-<short-description>`
-3. TDD: write tests -> implement -> make tests pass
-4. Commit frequently (include issue ID in commit messages)
-5. Run lint / format checks
-6. If it still fails after 3 fix attempts -> skip (record lesson in journal)
-7. Create PR via GitHub (body includes `Closes <issue-id>`)
-8. Update issue to "In Review" via Linear
+2. Update the issue to a started/in-progress status in Linear (e.g. "In Progress")
+3. Create branch: `feat/<issue-id>-<short-description>`
+4. TDD: write tests -> implement -> make tests pass
+5. Commit frequently (include issue ID in commit messages)
+6. Run lint / format checks
+7. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+8. Create PR via GitHub (body includes `Closes <issue-id>`)
+9. Update the issue to a review status in Linear (e.g. "In Review")
+10. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
 
 ## verify Procedure
 
-1. Confirm dev server is running (check URL accessibility)
-2. If browser automation tools are available (Playwright, Chrome DevTools, etc.), use them to open a browser and navigate to the target page
-3. Execute checklist items **one by one**:
+1. Update the issue to a testing/QA status in Linear (e.g. "Testing") if not already in one
+2. Confirm dev server is running (check URL accessibility)
+3. If browser automation tools are available (Playwright, Chrome DevTools, etc.), use them to open a browser and navigate to the target page
+4. Execute checklist items **one by one**:
    a. Interact with UI
    b. Compare expected vs actual results
    c. Take screenshot if browser automation is available
    d. Record result (Pass / Fail + details)
-4. Create QA report and comment on issue via Linear
-5. **If no defects**: update issue to "Done"
-6. **If defects found**: -> transition to fix
+5. Create QA report and comment on issue via Linear
+6. **If no defects**: update the issue to a completed status in Linear (e.g. "Done")
+7. **If defects found**: -> transition to fix
 
 ## fix Procedure (auto-transition from verify)
 
@@ -60,10 +63,13 @@ For each defect:
 
 1. File a bug issue via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`
-3. Branch: `fix/<bug-issue-id>-<short-description>`
-4. Implement fix and write tests
-5. If it still fails after 3 fix attempts -> skip (record lesson in journal)
-6. Create PR via GitHub (body includes `Closes <bug-issue-id>`)
+3. Update the bug issue to a started/in-progress status in Linear (e.g. "In Progress")
+4. Branch: `fix/<bug-issue-id>-<short-description>`
+5. Implement fix and write tests
+6. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+7. Create PR via GitHub (body includes `Closes <bug-issue-id>`)
+8. Update the bug issue to a review status in Linear (e.g. "In Review")
+9. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
 
 ---
 

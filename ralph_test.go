@@ -310,7 +310,7 @@ func TestLumina_ScanWithSuccesses(t *testing.T) {
 	luminas := ScanJournalsForLumina(dir)
 	found := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "implement mission") && containsStr(l.Pattern, "proven successes") {
+		if containsStr(l.Pattern, "implement") && containsStr(l.Pattern, "Proven approach") {
 			found = true
 		}
 	}
