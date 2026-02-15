@@ -18,6 +18,7 @@ func setupGitRepoWithBranch(t *testing.T, dir string, branch string) {
 		{"git", "init"},
 		{"git", "config", "user.email", "test@test.com"},
 		{"git", "config", "user.name", "test"},
+		{"git", "config", "commit.gpgsign", "false"},
 		{"git", "checkout", "-b", "main"},
 		{"git", "commit", "--allow-empty", "-m", "init"},
 		{"git", "checkout", "-b", branch},
@@ -193,8 +194,13 @@ func TestReviewLoop_ParentContextCancellationStopsLoop(t *testing.T) {
 // TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig verifies that each
 // review command call is bounded by TimeoutSec / maxReviewCycles.
 // With TimeoutSec=6 and maxReviewCycles=3, each review gets 2s.
+// minReviewTimeout is lowered so the computed 2s is not clamped.
 func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
-	// given — TimeoutSec=6 → review timeout = 6s/3 = 2s per call
+	// given — lower clamp so computed timeout (2s) is used
+	old := minReviewTimeout
+	minReviewTimeout = 1 * time.Second
+	defer func() { minReviewTimeout = old }()
+
 	dir := t.TempDir()
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
@@ -204,6 +210,7 @@ func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "exit 0\n")
 
+	// TimeoutSec=6 → review timeout = 6s/3 = 2s per call
 	p := newTestPaintress(t, dir, 6, reviewScript, fakeClaudeCmd)
 	report := &ExpeditionReport{Branch: "feat/test"}
 
@@ -246,6 +253,36 @@ func TestReviewLoop_BudgetSharedWithExpedition(t *testing.T) {
 	}
 	if report.Insight == "" {
 		t.Error("expected insight about budget exhaustion or fix timeout")
+	}
+}
+
+// TestReviewLoop_ShortTimeoutStillRunsReview verifies that a very short
+// --timeout value does not produce a zero or near-zero review timeout
+// that would cancel RunReview instantly. The review timeout should be
+// clamped to a minimum so the review command has a chance to execute.
+func TestReviewLoop_ShortTimeoutStillRunsReview(t *testing.T) {
+	// given — TimeoutSec=0 → naive reviewTimeout = 0s/3 = 0 → instant cancel
+	// The clamp should ensure the review command still gets a chance to execute.
+	dir := t.TempDir()
+	setupGitRepoWithBranch(t, dir, "feat/test")
+
+	marker := filepath.Join(dir, ".review-ran")
+	reviewScript := filepath.Join(dir, "review.sh")
+	writeScript(t, reviewScript, fmt.Sprintf("touch \"%s\"\necho 'all good'\n", marker))
+
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, "exit 0\n")
+
+	// TimeoutSec=0 → without clamp, reviewTimeout=0 → instant cancel
+	p := newTestPaintress(t, dir, 0, reviewScript, fakeClaudeCmd)
+	report := &ExpeditionReport{Branch: "feat/test"}
+
+	// when
+	p.runReviewLoop(context.Background(), report, 30*time.Second)
+
+	// then — the review script should have actually executed
+	if _, err := os.Stat(marker); os.IsNotExist(err) {
+		t.Error("review command was never executed; reviewTimeout clamp needed")
 	}
 }
 

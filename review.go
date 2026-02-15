@@ -10,6 +10,10 @@ import (
 
 const maxReviewCycles = 3
 
+// minReviewTimeout is the floor for the per-cycle review timeout.
+// Prevents very short --timeout values from instantly cancelling reviews.
+var minReviewTimeout = 30 * time.Second
+
 // gitCmdTimeout is the per-call timeout for git operations in the review loop.
 var gitCmdTimeout = 30 * time.Second
 

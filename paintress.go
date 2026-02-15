@@ -269,8 +269,12 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 	// do not eat into the fix allowance.
 	var consumed time.Duration
 
-	// Each review command gets timeout / maxReviewCycles
-	reviewTimeout := time.Duration(p.config.TimeoutSec) * time.Second / time.Duration(maxReviewCycles)
+	// Each review command gets timeout / maxReviewCycles, with a floor
+	// so that very short --timeout values don't instantly cancel reviews.
+	reviewTimeout := max(
+		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewCycles),
+		minReviewTimeout,
+	)
 	var lastComments string
 	for cycle := 1; cycle <= maxReviewCycles; cycle++ {
 		// Check parent context before starting each cycle
