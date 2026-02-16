@@ -32,6 +32,7 @@ type PromptData struct {
 	ReserveSection  string
 	BaseBranch      string
 	DevURL          string
+	ContextSection  string
 }
 
 // Expedition represents a single expedition into the Continent.
@@ -63,6 +64,7 @@ func (e *Expedition) BuildPrompt() string {
 		ReserveSection:  e.Reserve.FormatForPrompt(),
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
+		ContextSection:  ReadContextFiles(e.Continent),
 	}
 
 	tmplName := "expedition_en.md.tmpl"

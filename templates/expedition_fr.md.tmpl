@@ -29,6 +29,14 @@ Patterns extraits automatiquement des Expéditions passées. Appliquer comme con
 - GitHub : utiliser uniquement pour les Pull Requests (ne PAS utiliser les GitHub Issues)
 - Linear : utiliser uniquement pour les Issues (récupérer, mettre à jour le statut, commenter)
 - Note : les outils MCP sont en chargement différé — utiliser {{.Bt}}ToolSearch{{.Bt}} pour découvrir les outils disponibles avant utilisation
+{{- if .ContextSection}}
+
+## Contexte injecté
+
+Le contexte suivant a été fourni pour cette expédition. Traitez-le comme une directive faisant autorité :
+
+{{.ContextSection}}
+{{- end}}
 
 ## Sortie requise
 

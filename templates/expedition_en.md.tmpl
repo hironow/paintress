@@ -29,6 +29,14 @@ Patterns auto-extracted from past Expeditions. Apply these as constraints — av
 - GitHub: use for Pull Requests only (do NOT use GitHub Issues)
 - Linear: use for Issues only (retrieve, update status, comment)
 - Note: MCP tools are lazy-loaded — use {{.Bt}}ToolSearch{{.Bt}} to discover available tools before use
+{{- if .ContextSection}}
+
+## Injected Context
+
+The following context has been provided for this expedition. Treat it as authoritative guidance:
+
+{{.ContextSection}}
+{{- end}}
 
 ## Required Output
 
