@@ -694,9 +694,6 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 	}
 }
 
-// TestSwarmMode_FlagMonotonic_NoRegression verifies that the flag checkpoint
-// is monotonic: a lower-numbered expedition completing after a higher one
-// must not overwrite the flag with a smaller expedition number.
 // TestSwarmMode_StatusParseError_WritesJournalAndFlag verifies that when an
 // expedition output cannot be parsed (StatusParseError), a journal entry and
 // flag checkpoint are still written — matching the behavior of all other
@@ -745,6 +742,9 @@ func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 	}
 }
 
+// TestSwarmMode_FlagMonotonic_NoRegression verifies that the flag checkpoint
+// is monotonic: a lower-numbered expedition completing after a higher one
+// must not overwrite the flag with a smaller expedition number.
 func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 	dir := setupTestRepo(t)
 
