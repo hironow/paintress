@@ -593,9 +593,13 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 
-	// The expedition ran (ClaudeCmd executed, output parsed) so it must be counted
-	totalRan := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
-	if totalRan == 0 {
-		t.Error("StatusComplete expedition not counted in summary totals")
+	// The expedition ran (ClaudeCmd executed, output parsed) — must be counted
+	// in totalAttempted, but NOT in any outcome counter (success/failed/skipped).
+	if p.totalAttempted.Load() == 0 {
+		t.Error("StatusComplete expedition not counted in totalAttempted")
+	}
+	if p.totalSuccess.Load() != 0 || p.totalFailed.Load() != 0 || p.totalSkipped.Load() != 0 {
+		t.Errorf("StatusComplete should not increment outcome counters: success=%d failed=%d skipped=%d",
+			p.totalSuccess.Load(), p.totalFailed.Load(), p.totalSkipped.Load())
 	}
 }

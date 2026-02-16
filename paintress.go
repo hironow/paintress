@@ -33,6 +33,7 @@ type Paintress struct {
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter          atomic.Int64
+	totalAttempted      atomic.Int64
 	totalSuccess        atomic.Int64
 	totalSkipped        atomic.Int64
 	totalFailed         atomic.Int64
@@ -191,6 +192,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			return nil
 		}
 
+		p.totalAttempted.Add(1)
 		LogExp("%s", fmt.Sprintf(Msg("departing"), exp))
 		p.reserve.TryRecoverPrimary()
 		LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
@@ -265,7 +267,6 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
 				p.flagMu.Unlock()
-				p.totalSkipped.Add(1)
 				return errComplete
 			case StatusParseError:
 				LogWarn("%s", Msg("report_parse_fail"))
@@ -504,7 +505,7 @@ func (p *Paintress) printBanner() {
 }
 
 func (p *Paintress) printSummary() {
-	total := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
+	total := p.totalAttempted.Load()
 	fmt.Println()
 	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
 	fmt.Printf("%s║          The Paintress rests                 ║%s\n", colorCyan, colorReset)
