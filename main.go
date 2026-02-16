@@ -26,6 +26,8 @@ type Config struct {
 	DevDir         string // working directory for dev server (defaults to Continent)
 	DevURL         string
 	ReviewCmd      string // Code review command (e.g. "codex review --base main")
+	Workers        int    // Number of worktrees in pool (0 = direct execution)
+	SetupCmd       string // Command to run after worktree creation (e.g. "bun install")
 	DryRun         bool
 }
 
@@ -68,6 +70,8 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.DevDir, "dev-dir", "", "Dev server working directory (defaults to repo path)")
 	flag.StringVar(&cfg.DevURL, "dev-url", "http://localhost:3000", "Dev server URL")
 	flag.StringVar(&cfg.ReviewCmd, "review-cmd", "codex review --base main", "Code review command after PR creation")
+	flag.IntVar(&cfg.Workers, "workers", 1, "Number of worktrees in pool (0 = direct execution)")
+	flag.StringVar(&cfg.SetupCmd, "setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
 	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Generate prompts only")
 	flag.StringVar(&lang, "lang", "en", "Output language: en, ja, fr")
 
@@ -130,7 +134,7 @@ func validateContinent(continent string) error {
 	// Ensure .logs/ is gitignored
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
 	if _, err := os.Stat(gitignore); os.IsNotExist(err) {
-		os.WriteFile(gitignore, []byte(".logs/\n"), 0644)
+		os.WriteFile(gitignore, []byte(".logs/\nworktrees/\n"), 0644)
 	}
 	return nil
 }
