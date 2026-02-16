@@ -6,3 +6,5 @@ coverage.out
 .expedition/
 # claude local settings
 .claude/*.local.*
+# git worktrees
+.worktrees/
