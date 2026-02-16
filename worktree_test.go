@@ -197,3 +197,58 @@ func TestContainerGitExecutor_Shell_EchoCommand(t *testing.T) {
 
 // Verify that containerGitExecutor satisfies the GitExecutor interface at compile time.
 var _ GitExecutor = (*containerGitExecutor)(nil)
+
+func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-pool-repo"
+
+	// init a repo with an initial commit so the branch exists
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 3)
+
+	// when
+	err = pool.Init(ctx)
+
+	// then
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// verify: git worktree list shows 4 entries (1 main + 3 workers)
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 4 {
+		t.Errorf("expected 4 worktree entries (1 main + 3 workers), got %d:\n%s", len(lines), string(out))
+	}
+
+	// verify: 3 paths available in workers channel
+	if len(pool.workers) != 3 {
+		t.Fatalf("expected 3 workers in channel, got %d", len(pool.workers))
+	}
+	for i := 0; i < 3; i++ {
+		path := <-pool.workers
+		expectedName := fmt.Sprintf("worker-%03d", i+1)
+		if !strings.HasSuffix(path, expectedName) {
+			t.Errorf("worker %d: expected path ending with %q, got %q", i+1, expectedName, path)
+		}
+		pool.workers <- path // put back
+	}
+}

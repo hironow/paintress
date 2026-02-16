@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
+	"path/filepath"
 )
 
 // GitExecutor abstracts git command execution for testability.
@@ -24,4 +26,54 @@ func (e *localGitExecutor) Shell(ctx context.Context, dir string, command string
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Dir = dir
 	return cmd.CombinedOutput()
+}
+
+// WorktreePool manages a pool of git worktrees for parallel expedition workers.
+type WorktreePool struct {
+	git        GitExecutor
+	baseBranch string
+	repoDir    string      // original repository
+	poolDir    string      // .expedition/worktrees/
+	setupCmd   string      // command to run after worktree creation
+	workers    chan string // available worktree paths
+	size       int
+}
+
+// NewWorktreePool creates a new WorktreePool with the given configuration.
+func NewWorktreePool(git GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool {
+	return &WorktreePool{
+		git:        git,
+		baseBranch: baseBranch,
+		repoDir:    repoDir,
+		poolDir:    filepath.Join(repoDir, ".expedition", "worktrees"),
+		setupCmd:   setupCmd,
+		workers:    make(chan string, size),
+		size:       size,
+	}
+}
+
+// Init prunes stale worktree references and creates fresh worktrees for each worker.
+func (wp *WorktreePool) Init(ctx context.Context) error {
+	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "prune"); err != nil {
+		return fmt.Errorf("worktree prune: %w", err)
+	}
+
+	for i := range wp.size {
+		name := fmt.Sprintf("worker-%03d", i+1)
+		path := filepath.Join(wp.poolDir, name)
+
+		if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "add", "--detach", path, wp.baseBranch); err != nil {
+			return fmt.Errorf("worktree add %s: %w", name, err)
+		}
+
+		if wp.setupCmd != "" {
+			if _, err := wp.git.Shell(ctx, path, wp.setupCmd); err != nil {
+				return fmt.Errorf("setup cmd in %s: %w", name, err)
+			}
+		}
+
+		wp.workers <- path
+	}
+
+	return nil
 }
