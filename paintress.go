@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,10 +23,16 @@ type Paintress struct {
 	reserve   *ReserveParty
 	pool      *WorktreePool // nil when --workers=0
 
-	totalSuccess int
-	totalSkipped int
-	totalFailed  int
-	totalBugs    int
+	// Swarm Mode: atomic counters for concurrent worker access
+	expCounter          atomic.Int64
+	totalSuccess        atomic.Int64
+	totalSkipped        atomic.Int64
+	totalFailed         atomic.Int64
+	totalBugs           atomic.Int64
+	consecutiveFailures atomic.Int64
+
+	// Swarm Mode: mutex-protected shared resources
+	flagMu sync.Mutex
 }
 
 func NewPaintress(cfg Config) *Paintress {
@@ -121,14 +129,13 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}()
 	}
 
-	consecutiveFailures := 0
 	startExp := monolith.LastExpedition + 1
 
 	for exp := startExp; exp < startExp+p.config.MaxExpeditions; exp++ {
 		select {
 		case <-ctx.Done():
 			LogWarn("%s", Msg("interrupted"))
-			p.printSummary(exp - startExp)
+			p.printSummary()
 			return 130
 		default:
 		}
@@ -199,7 +206,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 			if ctx.Err() == context.Canceled {
 				releaseWorkDir()
 				LogWarn("%s", Msg("interrupted"))
-				p.printSummary(exp - startExp + 1)
+				p.printSummary()
 				return 130
 			}
 
@@ -211,14 +218,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 			}
 
 			p.gradient.Discharge()
+			p.flagMu.Lock()
 			WriteFlag(p.config.Continent, exp, "error", "failed", monolith.Remaining)
+			p.flagMu.Unlock()
 			WriteJournal(p.config.Continent, &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
 				MissionType: "?", Status: "failed", Reason: err.Error(),
 				PRUrl: "none", BugIssues: "none",
 			})
-			consecutiveFailures++
-			p.totalFailed++
+			p.consecutiveFailures.Add(1)
+			p.totalFailed.Add(1)
 		} else {
 			report, status := ParseReport(output, exp)
 
@@ -226,16 +235,18 @@ func (p *Paintress) Run(ctx context.Context) int {
 			case StatusComplete:
 				releaseWorkDir()
 				LogOK("%s", Msg("all_complete"))
+				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
-				p.printSummary(exp - startExp + 1)
+				p.flagMu.Unlock()
+				p.printSummary()
 				return 0
 
 			case StatusParseError:
 				LogWarn("%s", Msg("report_parse_fail"))
 				LogWarn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
-				consecutiveFailures++
-				p.totalFailed++
+				p.consecutiveFailures.Add(1)
+				p.totalFailed.Add(1)
 
 			case StatusSuccess:
 				p.handleSuccess(report)
@@ -248,33 +259,39 @@ func (p *Paintress) Run(ctx context.Context) int {
 						p.runReviewLoop(ctx, report, remaining, workDir)
 					}
 				}
+				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, report.IssueID, "success", report.Remaining)
+				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
-				consecutiveFailures = 0
-				p.totalSuccess++
+				p.consecutiveFailures.Store(0)
+				p.totalSuccess.Add(1)
 
 			case StatusSkipped:
 				LogWarn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
+				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, report.IssueID, "skipped", report.Remaining)
+				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
-				p.totalSkipped++
+				p.totalSkipped.Add(1)
 
 			case StatusFailed:
 				LogError("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
+				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, report.IssueID, "failed", report.Remaining)
+				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
-				consecutiveFailures++
-				p.totalFailed++
+				p.consecutiveFailures.Add(1)
+				p.totalFailed.Add(1)
 			}
 		}
 
 		// Gutter detection — Gommage
-		if consecutiveFailures >= maxConsecutiveFailures {
+		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
 			releaseWorkDir()
 			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
-			p.printSummary(exp - startExp + 1)
+			p.printSummary()
 			return 1
 		}
 
@@ -294,12 +311,12 @@ func (p *Paintress) Run(ctx context.Context) int {
 		case <-ctx.Done():
 			releaseWorkDir()
 			LogWarn("%s", Msg("interrupted"))
-			p.printSummary(exp - startExp + 1)
+			p.printSummary()
 			return 130
 		}
 	}
 
-	p.printSummary(p.config.MaxExpeditions)
+	p.printSummary()
 	return 0
 }
 
@@ -452,7 +469,7 @@ func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 		LogQA("%s: %s", report.IssueID, report.IssueTitle)
 		if report.BugsFound > 0 {
 			LogQA("%s", fmt.Sprintf(Msg("qa_bugs"), report.BugsFound, report.BugIssues))
-			p.totalBugs += report.BugsFound
+			p.totalBugs.Add(int64(report.BugsFound))
 		} else {
 			LogQA("%s", Msg("qa_all_pass"))
 		}
@@ -475,18 +492,19 @@ func (p *Paintress) printBanner() {
 	fmt.Println()
 }
 
-func (p *Paintress) printSummary(expeditions int) {
+func (p *Paintress) printSummary() {
+	total := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
 	fmt.Println()
 	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
 	fmt.Printf("%s║          The Paintress rests                 ║%s\n", colorCyan, colorReset)
 	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
 	fmt.Println()
-	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), expeditions))
-	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess))
-	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped))
-	LogError("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed))
-	if p.totalBugs > 0 {
-		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs))
+	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
+	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
+	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
+	LogError("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed.Load()))
+	if p.totalBugs.Load() > 0 {
+		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}
 	fmt.Println()
 	LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatLog()))
