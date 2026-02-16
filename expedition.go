@@ -38,6 +38,7 @@ type PromptData struct {
 type Expedition struct {
 	Number    int
 	Continent string
+	WorkDir   string // execution directory (worktree path or Continent)
 	Config    Config
 	LogDir    string
 
@@ -113,7 +114,11 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		"--print",
 		"-p", prompt,
 	)
-	cmd.Dir = e.Continent
+	workDir := e.WorkDir
+	if workDir == "" {
+		workDir = e.Continent
+	}
+	cmd.Dir = workDir
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
