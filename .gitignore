@@ -1,5 +1,5 @@
 # build files
-paintress
+/paintress
 # test
 coverage.out
 # paintress runtime state on target repository
