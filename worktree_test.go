@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/testcontainers/testcontainers-go"
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
@@ -545,5 +547,411 @@ func TestWorktreePool_Shutdown_RemovesAll(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	if len(lines) != 1 {
 		t.Errorf("expected 1 worktree entry (main only), got %d:\n%s", len(lines), string(out))
+	}
+}
+
+// === Edge case tests (P0–P3) ===
+
+func TestWorktreePool_Release_ResetsCommittedChanges(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-release-committed-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	// record the baseBranch commit hash for later comparison
+	baseBranchOut, err := executor.Git(ctx, repoDir, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatalf("rev-parse HEAD failed: %v", err)
+	}
+	baseBranchCommit := strings.TrimSpace(string(baseBranchOut))
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// simulate the real expedition workflow: branch, create file, add, commit
+	_, err = executor.Git(ctx, path, "checkout", "-b", "feature-branch")
+	if err != nil {
+		t.Fatalf("checkout -b failed: %v", err)
+	}
+	_, err = executor.Shell(ctx, path, "echo 'expedition work' > expedition-file.txt")
+	if err != nil {
+		t.Fatalf("creating file failed: %v", err)
+	}
+	_, err = executor.Git(ctx, path, "add", "expedition-file.txt")
+	if err != nil {
+		t.Fatalf("git add failed: %v", err)
+	}
+	_, err = executor.Git(ctx, path, "commit", "-m", "expedition commit")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	// verify the commit exists before release
+	_, err = executor.Git(ctx, path, "log", "--oneline", "-1")
+	if err != nil {
+		t.Fatalf("git log failed: %v", err)
+	}
+
+	// when
+	err = pool.Release(ctx, path)
+
+	// then
+	if err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+
+	// verify: status --porcelain is clean
+	out, err := executor.Git(ctx, path, "status", "--porcelain")
+	if err != nil {
+		t.Fatalf("git status failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "" {
+		t.Errorf("expected clean status, got: %q", string(out))
+	}
+
+	// verify: HEAD is detached at baseBranch commit
+	out, err = executor.Git(ctx, path, "symbolic-ref", "HEAD")
+	if err == nil {
+		t.Errorf("expected error (detached HEAD), but symbolic-ref succeeded with: %s", string(out))
+	}
+
+	headOut, err := executor.Git(ctx, path, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatalf("rev-parse HEAD after release failed: %v", err)
+	}
+	if strings.TrimSpace(string(headOut)) != baseBranchCommit {
+		t.Errorf("expected HEAD at %s, got %s", baseBranchCommit, strings.TrimSpace(string(headOut)))
+	}
+
+	// verify: the committed file is gone
+	_, err = executor.Shell(ctx, path, "test -f expedition-file.txt")
+	if err == nil {
+		t.Error("expected expedition-file.txt to be removed after release, but it still exists")
+	}
+}
+
+func TestWorktreePool_Init_SetupCmdFailure_PartialInit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-setupfail-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	// pool with setupCmd that always fails
+	failingPool := NewWorktreePool(executor, repoDir, "main", "exit 1", 3)
+
+	// when
+	err = failingPool.Init(ctx)
+
+	// then — Init should return error
+	if err == nil {
+		t.Fatal("expected Init to fail with failing setupCmd, got nil")
+	}
+
+	// verify: no workers completed (channel is empty) because setupCmd fails on worker-001
+	if len(failingPool.workers) != 0 {
+		t.Errorf("expected 0 workers in channel, got %d", len(failingPool.workers))
+	}
+
+	// verify self-healing: remove the partial worktree directories (simulating cleanup),
+	// then a SECOND pool with the same repoDir can Init successfully
+	// because prune cleans up the stale refs whose directories no longer exist
+	poolDir := repoDir + "/.expedition/worktrees"
+	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", poolDir))
+	if err != nil {
+		t.Fatalf("rm -rf poolDir failed: %v", err)
+	}
+
+	healthyPool := NewWorktreePool(executor, repoDir, "main", "", 3)
+	err = healthyPool.Init(ctx)
+	if err != nil {
+		t.Fatalf("second Init (self-healing) failed: %v", err)
+	}
+
+	if len(healthyPool.workers) != 3 {
+		t.Errorf("expected 3 workers after self-healing Init, got %d", len(healthyPool.workers))
+	}
+}
+
+func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-shutdown-partial-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 2)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// acquire 1 worker (don't release it)
+	_ = pool.Acquire()
+
+	// when — shutdown should only remove the 1 worker still in the channel
+	err = pool.Shutdown(ctx)
+	if err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	// then: git worktree list shows 2 entries (main + 1 acquired worker still registered)
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 2 {
+		t.Errorf("expected 2 worktree entries (main + acquired), got %d:\n%s", len(lines), string(out))
+	}
+
+	// verify self-healing: remove the acquired worker's directory (simulating a crash),
+	// then a new pool calling Init prunes the orphaned worktree ref
+	poolDir := repoDir + "/.expedition/worktrees"
+	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", poolDir))
+	if err != nil {
+		t.Fatalf("rm -rf poolDir failed: %v", err)
+	}
+
+	newPool := NewWorktreePool(executor, repoDir, "main", "", 1)
+	err = newPool.Init(ctx)
+	if err != nil {
+		t.Fatalf("new pool Init (self-healing) failed: %v", err)
+	}
+
+	out, err = executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list after self-healing failed: %v", err)
+	}
+	// After prune cleans stale refs + adding 1 new worker: main + 1 new worker = 2 entries
+	lines = strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 2 {
+		t.Errorf("expected 2 worktree entries after self-healing, got %d:\n%s", len(lines), string(out))
+	}
+}
+
+func TestWorktreePool_Release_ResetsStagedChanges(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-release-staged-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// stage a file without committing
+	_, err = executor.Shell(ctx, path, "echo 'staged content' > staged-file.txt")
+	if err != nil {
+		t.Fatalf("creating file failed: %v", err)
+	}
+	_, err = executor.Git(ctx, path, "add", ".")
+	if err != nil {
+		t.Fatalf("git add failed: %v", err)
+	}
+
+	// verify the file is staged before release
+	statusBefore, err := executor.Git(ctx, path, "status", "--porcelain")
+	if err != nil {
+		t.Fatalf("git status before release failed: %v", err)
+	}
+	if !strings.Contains(string(statusBefore), "staged-file.txt") {
+		t.Fatalf("expected staged-file.txt in status, got: %q", string(statusBefore))
+	}
+
+	// when
+	err = pool.Release(ctx, path)
+
+	// then
+	if err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+
+	// verify: status --porcelain is clean (staged changes are gone)
+	out, err := executor.Git(ctx, path, "status", "--porcelain")
+	if err != nil {
+		t.Fatalf("git status after release failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "" {
+		t.Errorf("expected clean status after release, got: %q", string(out))
+	}
+}
+
+func TestWorktreePool_Init_ContextCancellation(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-ctx-cancel-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 3)
+
+	// cancel the context before calling Init
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+
+	// when
+	err = pool.Init(cancelledCtx)
+
+	// then — Init should return error due to cancelled context
+	if err == nil {
+		t.Fatal("expected Init to fail with cancelled context, got nil")
+	}
+
+	// the pool should NOT have all workers available
+	if len(pool.workers) == 3 {
+		t.Error("expected fewer than 3 workers with cancelled context, but got 3")
+	}
+}
+
+func TestWorktreePool_Acquire_BlocksWhenExhausted(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-acquire-blocks-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// exhaust the pool
+	firstPath := pool.Acquire()
+
+	// when — start a goroutine that tries to acquire (should block)
+	var acquiredPath atomic.Value
+	done := make(chan struct{})
+	go func() {
+		path := pool.Acquire()
+		acquiredPath.Store(path)
+		close(done)
+	}()
+
+	// wait 200ms and verify the goroutine is still blocked
+	time.Sleep(200 * time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("expected Acquire to block, but it returned immediately")
+	default:
+		// still blocked — expected
+	}
+
+	// release the first worker
+	err = pool.Release(ctx, firstPath)
+	if err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+
+	// wait for the goroutine to complete
+	select {
+	case <-done:
+		// goroutine returned — expected
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for Acquire to unblock after Release")
+	}
+
+	// then — verify the path is valid
+	got, ok := acquiredPath.Load().(string)
+	if !ok || got == "" {
+		t.Fatal("Acquire returned empty or invalid path after unblocking")
+	}
+	if got != firstPath {
+		t.Errorf("expected same path %q, got %q", firstPath, got)
+	}
+
+	// verify it is a valid git worktree
+	out, err := executor.Git(ctx, got, "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		t.Fatalf("rev-parse failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "true" {
+		t.Errorf("expected 'true', got %q", strings.TrimSpace(string(out)))
 	}
 }
