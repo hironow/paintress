@@ -252,3 +252,55 @@ func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
 		pool.workers <- path // put back
 	}
 }
+
+func TestWorktreePool_Init_PrunesStale(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-prune-repo"
+
+	// init a repo with an initial commit
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	// create a worktree manually, then remove its directory to simulate a crash
+	staleWorktreePath := repoDir + "/stale-wt"
+	_, err = executor.Git(ctx, repoDir, "worktree", "add", "--detach", staleWorktreePath, "main")
+	if err != nil {
+		t.Fatalf("git worktree add failed: %v", err)
+	}
+	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", staleWorktreePath))
+	if err != nil {
+		t.Fatalf("rm -rf stale worktree failed: %v", err)
+	}
+
+	// verify that stale ref exists (worktree list still shows it)
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	if !strings.Contains(string(out), "stale-wt") {
+		t.Fatalf("expected stale worktree ref in list, got:\n%s", string(out))
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
+
+	// when — Init should succeed because prune cleans the stale ref
+	err = pool.Init(ctx)
+
+	// then
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+}
