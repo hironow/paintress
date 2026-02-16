@@ -44,6 +44,7 @@ branch: <branch name or "none">
 pr_url: <PR URL or "none">
 status: success|skipped|failed (success = mission accomplished, skipped = abandoned after retries or unclear spec, failed = blocked by error)
 reason: <summary of result>
+failure_type: blocker|ambiguity|performance|none (blocker = technically impossible or missing dependency, ambiguity = unclear spec, performance = non-functional requirements unmet, none = not a failure)
 insight: <a meaningful lesson about the codebase, tooling, or patterns discovered during this expedition — NOT just an error message>
 remaining_issues: <number of remaining unfinished issues in Linear>
 bugs_found: <number of bugs found or 0>

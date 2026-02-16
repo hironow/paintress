@@ -44,6 +44,7 @@ branch: <branch name or "none">
 pr_url: <PR URL or "none">
 status: success|skipped|failed（success = 使命達成、skipped = リトライ上限や仕様不明で断念、failed = エラーで中断）
 reason: <結果の要約>
+failure_type: blocker|ambiguity|performance|none（blocker = 技術的に不可能または依存欠落、ambiguity = 仕様不明瞭、performance = 非機能要件未達、none = 失敗ではない）
 insight: <この Expedition で得たコードベース・ツール・パターンに関する有意義な教訓 — 単なるエラーメッセージではなく>
 remaining_issues: <Linear の未完了 issue の残数>
 bugs_found: <検出した不具合数 or 0>
