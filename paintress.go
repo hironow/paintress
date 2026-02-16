@@ -114,7 +114,11 @@ func (p *Paintress) Run(ctx context.Context) int {
 			LogError("worktree pool init failed: %v", err)
 			return 1
 		}
-		defer p.pool.Shutdown(ctx)
+		defer func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer shutdownCancel()
+			p.pool.Shutdown(shutdownCtx)
+		}()
 	}
 
 	consecutiveFailures := 0
@@ -153,6 +157,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 		if p.pool != nil {
 			workDir = p.pool.Acquire()
 		}
+		releaseWorkDir := func() {
+			if p.pool != nil && workDir != "" {
+				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer rCancel()
+				if err := p.pool.Release(rCtx, workDir); err != nil {
+					LogWarn("worktree release: %v", err)
+				}
+				workDir = ""
+			}
+		}
 
 		expedition := &Expedition{
 			Number:    exp,
@@ -169,6 +183,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
 			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
+			releaseWorkDir()
 			break
 		}
 
@@ -182,6 +197,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		// === Process result ===
 		if err != nil {
 			if ctx.Err() == context.Canceled {
+				releaseWorkDir()
 				LogWarn("%s", Msg("interrupted"))
 				p.printSummary(exp - startExp + 1)
 				return 130
@@ -208,6 +224,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 			switch status {
 			case StatusComplete:
+				releaseWorkDir()
 				LogOK("%s", Msg("all_complete"))
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
 				p.printSummary(exp - startExp + 1)
@@ -255,17 +272,15 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 		// Gutter detection — Gommage
 		if consecutiveFailures >= maxConsecutiveFailures {
+			releaseWorkDir()
 			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
 			p.printSummary(exp - startExp + 1)
 			return 1
 		}
 
 		// Release worktree (resets state for next expedition)
-		if p.pool != nil && workDir != "" {
-			if err := p.pool.Release(ctx, workDir); err != nil {
-				LogWarn("worktree release: %v", err)
-			}
-		} else {
+		releaseWorkDir()
+		if p.pool == nil {
 			// Return to base branch (no pool — direct execution)
 			gitCmd := exec.CommandContext(ctx, "git", "checkout", p.config.BaseBranch)
 			gitCmd.Dir = p.config.Continent
@@ -277,6 +292,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		select {
 		case <-time.After(10 * time.Second):
 		case <-ctx.Done():
+			releaseWorkDir()
 			LogWarn("%s", Msg("interrupted"))
 			p.printSummary(exp - startExp + 1)
 			return 130
