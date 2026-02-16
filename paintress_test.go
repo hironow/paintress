@@ -9,9 +9,20 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+// TestMain strips git environment variables that leak from parent processes
+// (e.g. pre-push hooks set GIT_DIR). Without this, exec.Command("git",...)
+// in both test helpers and production code under test would target the parent
+// repo instead of the test's temp dir, corrupting worktree state.
+func TestMain(m *testing.M) {
+	os.Unsetenv("GIT_DIR")
+	os.Unsetenv("GIT_WORK_TREE")
+	os.Exit(m.Run())
+}
 
 func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
 	dir := t.TempDir()
@@ -247,21 +258,41 @@ func TestSentinelErrors_AreDistinct(t *testing.T) {
 
 // === Swarm Mode DryRun Integration Tests ===
 
+// gitIsolatedEnv returns an environment that strips GIT_DIR and GIT_WORK_TREE
+// to prevent test git commands from operating on the parent repo.
+// When pre-push hooks run go test, GIT_DIR is set to the hook's repo,
+// causing exec.Command("git",...) to ignore cmd.Dir entirely.
+func gitIsolatedEnv(dir string) []string {
+	var env []string
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "GIT_DIR=") ||
+			strings.HasPrefix(e, "GIT_WORK_TREE=") {
+			continue
+		}
+		env = append(env, e)
+	}
+	env = append(env, "GIT_CEILING_DIRECTORIES="+filepath.Dir(dir))
+	return env
+}
+
 // setupTestRepo creates a minimal git repo for Paintress tests.
+// Strips GIT_DIR/GIT_WORK_TREE to prevent parent repo corruption
+// when tests run inside a git worktree (e.g. pre-push hooks).
 func setupTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
+	gitEnv := gitIsolatedEnv(dir)
 	commands := [][]string{
-		{"git", "init"},
+		{"git", "init", "-b", "main"},
 		{"git", "config", "user.email", "test@test.com"},
 		{"git", "config", "user.name", "test"},
 		{"git", "config", "commit.gpgsign", "false"},
-		{"git", "checkout", "-b", "main"},
 		{"git", "commit", "--allow-empty", "-m", "init"},
 	}
 	for _, args := range commands {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Dir = dir
+		cmd.Env = gitEnv
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git setup (%v) failed: %s", args, string(out))
 		}
