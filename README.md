@@ -162,6 +162,8 @@ paintress /path/to/your/repo
 
 Paintress creates `.expedition/` and all files (`flag.md`, `mission.md`,
 `lumina.md`, journal entries) automatically at runtime.
+Git worktrees for Swarm Mode are also fully managed — Paintress creates them
+on startup and removes them on shutdown. No manual `git worktree` commands needed.
 
 ## Usage
 
