@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -330,5 +332,45 @@ func TestSwarmMode_DryRun_SingleWorker(t *testing.T) {
 	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
 	if len(prompts) != 1 {
 		t.Errorf("expected 1 prompt file, got %d", len(prompts))
+	}
+}
+
+func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	// Start a trivial HTTP server so DevServer.Start() succeeds immediately
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 20,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      "/bin/false", // always exits with code 1
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	if code != 1 {
+		t.Errorf("expected exit code 1 (gommage), got %d", code)
+	}
+
+	totalFailed := p.totalFailed.Load()
+	if totalFailed < int64(maxConsecutiveFailures) {
+		t.Errorf("expected at least %d failures before gommage, got %d",
+			maxConsecutiveFailures, totalFailed)
+	}
+
+	// Should not have run all 20 expeditions (gommage stops early)
+	totalRan := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
+	if totalRan >= 20 {
+		t.Errorf("gommage should have stopped early, but ran all %d expeditions", totalRan)
 	}
 }
