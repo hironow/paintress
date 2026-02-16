@@ -77,7 +77,7 @@ func TestReviewLoop_ReviewTimeDoesNotConsumeBudget(t *testing.T) {
 
 	// when — pass 2s budget (simulating expedition consumed most of the 30s)
 	start := time.Now()
-	p.runReviewLoop(context.Background(), report, 2*time.Second)
+	p.runReviewLoop(context.Background(), report, 2*time.Second, "")
 	elapsed := time.Since(start)
 
 	// then — all 3 review cycles should have run (~1.5s review + ~0s fix)
@@ -107,7 +107,7 @@ func TestReviewLoop_FixTimeConsumesBudget(t *testing.T) {
 	report := &ExpeditionReport{Branch: "feat/test"}
 
 	// when — pass 1s budget
-	p.runReviewLoop(context.Background(), report, 1*time.Second)
+	p.runReviewLoop(context.Background(), report, 1*time.Second, "")
 
 	// then — budget exhaustion should stop the loop
 	if report.Insight == "" {
@@ -145,7 +145,7 @@ func TestReviewLoop_GitCheckoutTimeoutPreventsHang(t *testing.T) {
 
 	// when
 	start := time.Now()
-	p.runReviewLoop(context.Background(), report, 30*time.Second)
+	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
 	elapsed := time.Since(start)
 
 	// then
@@ -182,7 +182,7 @@ func TestReviewLoop_ParentContextCancellationStopsLoop(t *testing.T) {
 	}()
 
 	start := time.Now()
-	p.runReviewLoop(ctx, report, 30*time.Second)
+	p.runReviewLoop(ctx, report, 30*time.Second, "")
 	elapsed := time.Since(start)
 
 	// then
@@ -216,7 +216,7 @@ func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
 
 	// when
 	start := time.Now()
-	p.runReviewLoop(context.Background(), report, 30*time.Second)
+	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
 	elapsed := time.Since(start)
 
 	// then — review should timeout at ~2s (6s/3), not hang
@@ -244,7 +244,7 @@ func TestReviewLoop_BudgetSharedWithExpedition(t *testing.T) {
 
 	// when — only 0.5s budget remaining (expedition consumed 29.5s of 30s)
 	start := time.Now()
-	p.runReviewLoop(context.Background(), report, 500*time.Millisecond)
+	p.runReviewLoop(context.Background(), report, 500*time.Millisecond, "")
 	elapsed := time.Since(start)
 
 	// then — should complete quickly (only 1-2 fix cycles possible)
@@ -278,7 +278,7 @@ func TestReviewLoop_ShortTimeoutStillRunsReview(t *testing.T) {
 	report := &ExpeditionReport{Branch: "feat/test"}
 
 	// when
-	p.runReviewLoop(context.Background(), report, 30*time.Second)
+	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
 
 	// then — the review script should have actually executed
 	if _, err := os.Stat(marker); os.IsNotExist(err) {
@@ -313,7 +313,7 @@ fi
 	report := &ExpeditionReport{Branch: "feat/test"}
 
 	// when
-	p.runReviewLoop(context.Background(), report, 30*time.Second)
+	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
 
 	// then — cycle 1's review comments should be preserved in insight
 	if report.Insight == "" {
