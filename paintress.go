@@ -239,7 +239,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		expElapsed := time.Since(expStart)
 
 		if err != nil {
-			if ctx.Err() == context.Canceled {
+			if ctx.Err() != nil {
 				releaseWorkDir()
 				return nil
 			}

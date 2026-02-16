@@ -528,6 +528,54 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 	}
 }
 
+// TestSwarmMode_DeadlineExceeded_NotCountedAsFailure verifies that a
+// context deadline during expedition execution does not increment failure
+// counters or trigger gommage.
+func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	// Script that sleeps long enough for the deadline to fire mid-expedition.
+	// Use 'exec' so bash replaces itself with sleep (no child process leak).
+	sleepScript := filepath.Join(dir, "slowclaude.sh")
+	if err := os.WriteFile(sleepScript, []byte("#!/bin/bash\nexec sleep 999\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        3,
+		MaxExpeditions: 100,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      sleepScript,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     60, // expedition timeout is long
+		Model:          "opus",
+	}
+
+	// Context deadline is short — fires while expeditions are running
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	p := NewPaintress(cfg)
+	code := p.Run(ctx)
+
+	// Should be interrupted (130), NOT gommage (1)
+	if code != 130 {
+		t.Errorf("expected exit code 130 (interrupted), got %d", code)
+	}
+
+	// Deadline-induced errors should NOT count as real failures
+	if p.totalFailed.Load() > 0 {
+		t.Errorf("deadline cancellation should not count as failure, got totalFailed=%d",
+			p.totalFailed.Load())
+	}
+}
+
 func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 	dir := setupTestRepo(t)
 
