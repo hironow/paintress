@@ -652,6 +652,48 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 	}
 }
 
+// TestSwarmMode_RunResetsCounters verifies that calling Run() twice on the
+// same Paintress resets all run-scoped counters so the second run starts clean.
+func TestSwarmMode_RunResetsCounters(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 2,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+
+	// First run: 2 DryRun expeditions
+	code := p.Run(context.Background())
+	if code != 0 {
+		t.Fatalf("first Run() = %d, want 0", code)
+	}
+	if p.totalAttempted.Load() != 2 {
+		t.Fatalf("first run: expected totalAttempted=2, got %d", p.totalAttempted.Load())
+	}
+
+	// Second run on same instance: counters should be fresh
+	code = p.Run(context.Background())
+	if code != 0 {
+		t.Fatalf("second Run() = %d, want 0", code)
+	}
+	if p.totalAttempted.Load() != 2 {
+		t.Errorf("second run: expected totalAttempted=2 (reset), got %d", p.totalAttempted.Load())
+	}
+	if p.totalSuccess.Load() != 2 {
+		t.Errorf("second run: expected totalSuccess=2 (reset), got %d", p.totalSuccess.Load())
+	}
+	if p.consecutiveFailures.Load() != 0 {
+		t.Errorf("second run: expected consecutiveFailures=0 (reset), got %d", p.consecutiveFailures.Load())
+	}
+}
+
 // TestSwarmMode_FlagMonotonic_NoRegression verifies that the flag checkpoint
 // is monotonic: a lower-numbered expedition completing after a higher one
 // must not overwrite the flag with a smaller expedition number.

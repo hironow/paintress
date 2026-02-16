@@ -138,7 +138,14 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}()
 	}
 
-	// === Swarm Mode: launch workers ===
+	// === Swarm Mode: reset run-scoped counters and launch workers ===
+	p.totalAttempted.Store(0)
+	p.totalSuccess.Store(0)
+	p.totalSkipped.Store(0)
+	p.totalFailed.Store(0)
+	p.totalBugs.Store(0)
+	p.consecutiveFailures.Store(0)
+
 	startExp := monolith.LastExpedition + 1
 	p.expCounter.Store(int64(startExp))
 
