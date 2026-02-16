@@ -28,6 +28,7 @@ type ExpeditionReport struct {
 	BugsFound   int
 	BugIssues   string
 	Insight     string
+	FailureType string
 }
 
 func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
@@ -82,6 +83,8 @@ func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
 			report.BugIssues = val
 		case "insight":
 			report.Insight = val
+		case "failure_type":
+			report.FailureType = val
 		}
 	}
 

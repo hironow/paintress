@@ -1,6 +1,62 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
+
+func TestParseReport_FailureType_Blocker(t *testing.T) {
+	output := `some output
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-99
+issue_title: Fix auth
+mission_type: implement
+branch: feat/auth
+pr_url: none
+status: failed
+reason: dependency not available
+failure_type: blocker
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+insight: External service was down
+__EXPEDITION_END__
+trailing output`
+
+	report, status := ParseReport(output, 1)
+	if status != StatusFailed {
+		t.Fatalf("expected StatusFailed, got %v", status)
+	}
+	if report.FailureType != "blocker" {
+		t.Errorf("expected failure_type='blocker', got %q", report.FailureType)
+	}
+}
+
+func TestParseReport_FailureType_Empty_OnSuccess(t *testing.T) {
+	output := `__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-10
+issue_title: Add feature
+mission_type: implement
+branch: feat/add
+pr_url: https://github.com/org/repo/pull/1
+status: success
+reason: implemented
+failure_type: none
+remaining_issues: 3
+bugs_found: 0
+bug_issues: none
+insight: Clean approach
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("expected StatusSuccess, got %v", status)
+	}
+	if report.FailureType != "none" {
+		t.Errorf("expected failure_type='none', got %q", report.FailureType)
+	}
+}
 
 func TestParseReport_SkippedStatus(t *testing.T) {
 	output := `
