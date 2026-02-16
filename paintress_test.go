@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -222,5 +224,111 @@ func TestWriteJournal_ResumedNumbering(t *testing.T) {
 	}
 	if !containsStr(string(content), "Expedition #8") {
 		t.Error("journal should reference expedition #8")
+	}
+}
+
+// === Sentinel Errors ===
+
+func TestSentinelErrors_AreDistinct(t *testing.T) {
+	if errors.Is(errGommage, errComplete) {
+		t.Error("errGommage and errComplete must be distinct errors")
+	}
+	if errGommage.Error() == "" {
+		t.Error("errGommage must have a non-empty message")
+	}
+	if errComplete.Error() == "" {
+		t.Error("errComplete must have a non-empty message")
+	}
+}
+
+// === Swarm Mode DryRun Integration Tests ===
+
+// setupTestRepo creates a minimal git repo for Paintress tests.
+func setupTestRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	commands := [][]string{
+		{"git", "init"},
+		{"git", "config", "user.email", "test@test.com"},
+		{"git", "config", "user.name", "test"},
+		{"git", "config", "commit.gpgsign", "false"},
+		{"git", "checkout", "-b", "main"},
+		{"git", "commit", "--allow-empty", "-m", "init"},
+	}
+	for _, args := range commands {
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git setup (%v) failed: %s", args, string(out))
+		}
+	}
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	return dir
+}
+
+func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        3,
+		MaxExpeditions: 3,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	logDir := filepath.Join(dir, ".expedition", ".logs")
+	prompts, err := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
+	if err != nil {
+		t.Fatalf("glob error: %v", err)
+	}
+	if len(prompts) != 3 {
+		t.Errorf("expected 3 prompt files, got %d: %v", len(prompts), prompts)
+	}
+
+	// Verify all expedition numbers are unique
+	seen := make(map[string]bool)
+	for _, p := range prompts {
+		base := filepath.Base(p)
+		if seen[base] {
+			t.Errorf("duplicate prompt file: %s", base)
+		}
+		seen[base] = true
+	}
+}
+
+func TestSwarmMode_DryRun_SingleWorker(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 1,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	logDir := filepath.Join(dir, ".expedition", ".logs")
+	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
+	if len(prompts) != 1 {
+		t.Errorf("expected 1 prompt file, got %d", len(prompts))
 	}
 }

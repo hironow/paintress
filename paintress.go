@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,10 +11,17 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const maxConsecutiveFailures = 3
 const gradientMax = 5
+
+var (
+	errGommage  = errors.New("gommage: consecutive failures exceeded threshold")
+	errComplete = errors.New("expedition complete: no remaining issues")
+)
 
 type Paintress struct {
 	config    Config
@@ -129,37 +137,65 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}()
 	}
 
+	// === Swarm Mode: launch workers ===
 	startExp := monolith.LastExpedition + 1
+	p.expCounter.Store(int64(startExp))
 
-	for exp := startExp; exp < startExp+p.config.MaxExpeditions; exp++ {
-		select {
-		case <-ctx.Done():
-			LogWarn("%s", Msg("interrupted"))
-			p.printSummary()
-			return 130
-		default:
+	// Pre-flight Lumina scan (once, before workers start)
+	luminas := ScanJournalsForLumina(p.config.Continent)
+	if len(luminas) > 0 {
+		LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
+		WriteLumina(p.config.Continent, luminas)
+	}
+
+	g, gCtx := errgroup.WithContext(ctx)
+	workerCount := max(p.config.Workers, 1)
+
+	for i := range workerCount {
+		g.Go(func() error {
+			return p.runWorker(gCtx, i, startExp, luminas)
+		})
+	}
+
+	err := g.Wait()
+
+	fmt.Println()
+	p.printSummary()
+
+	switch {
+	case errors.Is(err, errComplete):
+		return 0
+	case errors.Is(err, errGommage):
+		return 1
+	case ctx.Err() == context.Canceled:
+		return 130
+	case err != nil:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// runWorker is the expedition loop that each worker goroutine runs.
+// Each worker atomically claims expedition numbers and processes them
+// until MaxExpeditions is reached, context is cancelled, or a sentinel
+// error (errGommage/errComplete) terminates the group.
+func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, luminas []Lumina) error {
+	for {
+		if ctx.Err() != nil {
+			return nil
 		}
 
-		fmt.Println()
+		exp := int(p.expCounter.Add(1) - 1)
+		if exp >= startExp+p.config.MaxExpeditions {
+			return nil
+		}
+
 		LogExp("%s", fmt.Sprintf(Msg("departing"), exp))
-
-		// === Rest at Flag: Lumina scan + Reserve recovery ===
-		// (goroutine-parallel journal scan happens here)
-		LogInfo("%s", Msg("resting_at_flag"))
-		luminas := ScanJournalsForLumina(p.config.Continent)
-		if len(luminas) > 0 {
-			LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
-			WriteLumina(p.config.Continent, luminas)
-		}
-
-		// Try to recover primary model
 		p.reserve.TryRecoverPrimary()
-
-		// Log current state
 		LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
 		LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 
-		// Acquire worktree for this expedition (if pool is active)
 		var workDir string
 		if p.pool != nil {
 			workDir = p.pool.Acquire()
@@ -191,35 +227,26 @@ func (p *Paintress) Run(ctx context.Context) int {
 			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
 			releaseWorkDir()
-			break
+			return nil
 		}
 
-		// === Send Expeditioner ===
 		LogInfo("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
-
 		expStart := time.Now()
 		output, err := expedition.Run(ctx)
 		expElapsed := time.Since(expStart)
 
-		// === Process result ===
 		if err != nil {
 			if ctx.Err() == context.Canceled {
 				releaseWorkDir()
-				LogWarn("%s", Msg("interrupted"))
-				p.printSummary()
-				return 130
+				return nil
 			}
-
 			LogError("%s", fmt.Sprintf(Msg("exp_failed"), exp, err))
-
-			// If timeout, might be rate limit — consider switching to reserve
 			if strings.Contains(err.Error(), "timeout") {
 				p.reserve.ForceReserve()
 			}
-
 			p.gradient.Discharge()
 			p.flagMu.Lock()
-			WriteFlag(p.config.Continent, exp, "error", "failed", monolith.Remaining)
+			WriteFlag(p.config.Continent, exp, "error", "failed", "?")
 			p.flagMu.Unlock()
 			WriteJournal(p.config.Continent, &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
@@ -230,7 +257,6 @@ func (p *Paintress) Run(ctx context.Context) int {
 			p.totalFailed.Add(1)
 		} else {
 			report, status := ParseReport(output, exp)
-
 			switch status {
 			case StatusComplete:
 				releaseWorkDir()
@@ -238,20 +264,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
 				p.flagMu.Unlock()
-				p.printSummary()
-				return 0
-
+				return errComplete
 			case StatusParseError:
 				LogWarn("%s", Msg("report_parse_fail"))
 				LogWarn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
-
 			case StatusSuccess:
 				p.handleSuccess(report)
 				p.gradient.Charge()
-				// Review gate: run code review on the PR if review command is configured
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 					remaining := totalTimeout - expElapsed
@@ -265,7 +287,6 @@ func (p *Paintress) Run(ctx context.Context) int {
 				WriteJournal(p.config.Continent, report)
 				p.consecutiveFailures.Store(0)
 				p.totalSuccess.Add(1)
-
 			case StatusSkipped:
 				LogWarn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
@@ -274,7 +295,6 @@ func (p *Paintress) Run(ctx context.Context) int {
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.totalSkipped.Add(1)
-
 			case StatusFailed:
 				LogError("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
@@ -287,37 +307,26 @@ func (p *Paintress) Run(ctx context.Context) int {
 			}
 		}
 
-		// Gutter detection — Gommage
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
 			releaseWorkDir()
 			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
-			p.printSummary()
-			return 1
+			return errGommage
 		}
 
-		// Release worktree (resets state for next expedition)
 		releaseWorkDir()
 		if p.pool == nil {
-			// Return to base branch (no pool — direct execution)
 			gitCmd := exec.CommandContext(ctx, "git", "checkout", p.config.BaseBranch)
 			gitCmd.Dir = p.config.Continent
 			_ = gitCmd.Run()
 		}
 
-		// Cooldown
 		LogInfo("%s", Msg("cooldown"))
 		select {
 		case <-time.After(10 * time.Second):
 		case <-ctx.Done():
-			releaseWorkDir()
-			LogWarn("%s", Msg("interrupted"))
-			p.printSummary()
-			return 130
+			return nil
 		}
 	}
-
-	p.printSummary()
-	return 0
 }
 
 // runReviewLoop executes the code review command and, if comments are found,
