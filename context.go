@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,12 +15,16 @@ func ContextDir(continent string) string {
 
 // ReadContextFiles reads all .md files from .expedition/context/ and
 // concatenates them into a single string for prompt injection.
-// Returns empty string if the directory does not exist.
-func ReadContextFiles(continent string) string {
+// Returns ("", nil) if the directory does not exist.
+// Returns a non-nil error for other filesystem failures (e.g. permission denied).
+func ReadContextFiles(continent string) (string, error) {
 	dir := ContextDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return ""
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", fmt.Errorf("reading context directory: %w", err)
 	}
 
 	var buf strings.Builder
@@ -29,12 +34,12 @@ func ReadContextFiles(continent string) string {
 		}
 		content, err := os.ReadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
-			continue
+			return "", fmt.Errorf("reading context file %s: %w", e.Name(), err)
 		}
 		name := strings.TrimSuffix(e.Name(), ".md")
 		buf.WriteString(fmt.Sprintf("### %s\n\n", name))
 		buf.Write(content)
 		buf.WriteString("\n\n")
 	}
-	return buf.String()
+	return buf.String(), nil
 }
