@@ -230,7 +230,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
 			p.totalSuccess.Add(1)
 			releaseWorkDir()
-			return nil
+			continue
 		}
 
 		LogInfo("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))

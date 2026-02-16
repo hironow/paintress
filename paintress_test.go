@@ -599,9 +599,9 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 	logDir := filepath.Join(dir, ".expedition", ".logs")
 	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
 
-	// DryRun with Workers=1: worker writes 1 prompt and exits
-	if len(prompts) != 1 {
-		t.Errorf("expected 1 prompt file (DryRun + single worker), got %d", len(prompts))
+	// DryRun respects MaxExpeditions: single worker loops to create 2 prompts
+	if len(prompts) != 2 {
+		t.Errorf("expected 2 prompt files (MaxExpeditions=2), got %d", len(prompts))
 	}
 }
 
