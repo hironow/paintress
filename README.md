@@ -190,6 +190,9 @@ paintress --lang fr /path/to/repo
 # With Reserve Party
 paintress --model opus,sonnet /path/to/repo
 
+# Direct execution (no worktrees, run on repo directly)
+paintress --workers 0 /path/to/repo
+
 # Swarm Mode: 3 parallel workers with setup command
 paintress \
   --workers 3 \
@@ -246,7 +249,7 @@ paintress \
 | `--dev-dir` | repo path | Dev server working directory |
 | `--dev-url` | `http://localhost:3000` | Dev server URL |
 | `--review-cmd` | `codex review --base main` | Code review command after PR creation |
-| `--workers` | `1` | Number of parallel expedition workers (Swarm Mode) |
+| `--workers` | `1` | Number of parallel expedition workers (`0` = direct execution without worktrees, `1` = single worktree, `2+` = Swarm Mode) |
 | `--setup-cmd` | `""` | Command to run after worktree creation (e.g. `bun install`) |
 | `--dry-run` | `false` | Generate prompts without executing |
 | `--version` | — | Show version and exit |
