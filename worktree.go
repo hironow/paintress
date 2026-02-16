@@ -77,3 +77,23 @@ func (wp *WorktreePool) Init(ctx context.Context) error {
 
 	return nil
 }
+
+// Acquire returns the path to an available worktree. Blocks if none available.
+func (wp *WorktreePool) Acquire() string {
+	return <-wp.workers
+}
+
+// Release resets the worktree to a clean state and returns it to the pool.
+func (wp *WorktreePool) Release(ctx context.Context, path string) error {
+	if _, err := wp.git.Git(ctx, path, "checkout", "--detach", wp.baseBranch); err != nil {
+		return fmt.Errorf("checkout %s: %w", wp.baseBranch, err)
+	}
+	if _, err := wp.git.Git(ctx, path, "reset", "--hard", wp.baseBranch); err != nil {
+		return fmt.Errorf("reset: %w", err)
+	}
+	if _, err := wp.git.Git(ctx, path, "clean", "-fd"); err != nil {
+		return fmt.Errorf("clean: %w", err)
+	}
+	wp.workers <- path
+	return nil
+}
