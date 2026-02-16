@@ -249,7 +249,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 			p.gradient.Discharge()
 			p.flagMu.Lock()
-			WriteFlag(p.config.Continent, exp, "error", "failed", "?")
+			p.writeFlag(exp, "error", "failed", "?")
 			p.flagMu.Unlock()
 			WriteJournal(p.config.Continent, &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
@@ -265,7 +265,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				releaseWorkDir()
 				LogOK("%s", Msg("all_complete"))
 				p.flagMu.Lock()
-				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
+				p.writeFlag(exp, "all", "complete", "0")
 				p.flagMu.Unlock()
 				return errComplete
 			case StatusParseError:
@@ -285,7 +285,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 					}
 				}
 				p.flagMu.Lock()
-				WriteFlag(p.config.Continent, exp, report.IssueID, "success", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "success", report.Remaining)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.consecutiveFailures.Store(0)
@@ -294,7 +294,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				LogWarn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
 				p.flagMu.Lock()
-				WriteFlag(p.config.Continent, exp, report.IssueID, "skipped", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.totalSkipped.Add(1)
@@ -302,7 +302,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				LogError("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
 				p.flagMu.Lock()
-				WriteFlag(p.config.Continent, exp, report.IssueID, "failed", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "failed", report.Remaining)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.consecutiveFailures.Add(1)
@@ -502,6 +502,17 @@ func (p *Paintress) printBanner() {
 	fmt.Printf("%s║          The Paintress awakens               ║%s\n", colorCyan, colorReset)
 	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
 	fmt.Println()
+}
+
+// writeFlag writes the flag checkpoint only if expNum is greater than the
+// current checkpoint. This ensures monotonic progression when workers
+// complete out of order. Caller must hold p.flagMu.
+func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
+	current := ReadFlag(p.config.Continent)
+	if expNum <= current.LastExpedition {
+		return
+	}
+	WriteFlag(p.config.Continent, expNum, issueID, status, remaining)
 }
 
 func (p *Paintress) printSummary() {

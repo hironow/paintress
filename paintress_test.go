@@ -603,3 +603,33 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 			p.totalSuccess.Load(), p.totalFailed.Load(), p.totalSkipped.Load())
 	}
 }
+
+// TestSwarmMode_FlagMonotonic_NoRegression verifies that the flag checkpoint
+// is monotonic: a lower-numbered expedition completing after a higher one
+// must not overwrite the flag with a smaller expedition number.
+func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	// Directly test the monotonic guard via Paintress.writeFlag
+	cfg := Config{Continent: dir, BaseBranch: "main", Model: "opus"}
+	p := NewPaintress(cfg)
+
+	// Write flag for expedition 5
+	p.flagMu.Lock()
+	p.writeFlag(5, "ISS-5", "success", "10")
+	p.flagMu.Unlock()
+
+	// Attempt to write flag for expedition 3 (out-of-order completion)
+	p.flagMu.Lock()
+	p.writeFlag(3, "ISS-3", "success", "12")
+	p.flagMu.Unlock()
+
+	// Flag should still show expedition 5, not 3
+	flag := ReadFlag(dir)
+	if flag.LastExpedition != 5 {
+		t.Errorf("flag regressed: expected last_expedition=5, got %d", flag.LastExpedition)
+	}
+	if flag.LastIssue != "ISS-5" {
+		t.Errorf("flag regressed: expected last_issue=ISS-5, got %s", flag.LastIssue)
+	}
+}
