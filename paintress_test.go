@@ -299,6 +299,12 @@ func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 		t.Errorf("expected 3 prompt files, got %d: %v", len(prompts), prompts)
 	}
 
+	// Verify summary counters reflect DryRun expeditions
+	totalRan := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
+	if totalRan != 3 {
+		t.Errorf("expected totalRan=3 (DryRun expeditions counted), got %d", totalRan)
+	}
+
 	// Verify all expedition numbers are unique
 	seen := make(map[string]bool)
 	for _, p := range prompts {

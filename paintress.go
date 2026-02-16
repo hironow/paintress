@@ -226,6 +226,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
 			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
+			p.totalSuccess.Add(1)
 			releaseWorkDir()
 			return nil
 		}
@@ -264,6 +265,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
 				p.flagMu.Unlock()
+				p.totalSuccess.Add(1)
 				return errComplete
 			case StatusParseError:
 				LogWarn("%s", Msg("report_parse_fail"))
