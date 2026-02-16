@@ -116,7 +116,8 @@ Continent (Git repo)       <- Persistent world
          +-- mission.md    <- Rules of engagement (auto-generated, --lang aware)
          +-- lumina.md     <- Learned skills (auto-generated)
          +-- journal/
-              +-- 001.md, 002.md, ...
+         |    +-- 001.md, 002.md, ...
+         +-- context/      <- User-provided .md files injected into prompts
 ```
 
 ## Goroutines
@@ -256,7 +257,8 @@ just check          # fmt + vet + test (pre-commit check)
 +-- devserver.go         Dev server (goroutine)
 +-- flag.go              Flag read/write
 +-- journal.go           Journal read/write
-+-- report.go            Report parser
++-- report.go            Report parser (including failure_type)
++-- context.go           Context injection (.expedition/context/)
 +-- review.go            Code review gate (exec + parse)
 +-- mission.go           Mission writer (embed + template)
 +-- lang.go              i18n message map (en/ja/fr)
