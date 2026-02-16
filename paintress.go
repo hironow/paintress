@@ -2,16 +2,26 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const maxConsecutiveFailures = 3
 const gradientMax = 5
+
+var (
+	errGommage  = errors.New("gommage: consecutive failures exceeded threshold")
+	errComplete = errors.New("expedition complete: no remaining issues")
+)
 
 type Paintress struct {
 	config    Config
@@ -21,10 +31,17 @@ type Paintress struct {
 	reserve   *ReserveParty
 	pool      *WorktreePool // nil when --workers=0
 
-	totalSuccess int
-	totalSkipped int
-	totalFailed  int
-	totalBugs    int
+	// Swarm Mode: atomic counters for concurrent worker access
+	expCounter          atomic.Int64
+	totalAttempted      atomic.Int64
+	totalSuccess        atomic.Int64
+	totalSkipped        atomic.Int64
+	totalFailed         atomic.Int64
+	totalBugs           atomic.Int64
+	consecutiveFailures atomic.Int64
+
+	// Swarm Mode: mutex-protected shared resources
+	flagMu sync.Mutex
 }
 
 func NewPaintress(cfg Config) *Paintress {
@@ -121,38 +138,73 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}()
 	}
 
-	consecutiveFailures := 0
+	// === Swarm Mode: reset run-scoped counters and launch workers ===
+	p.totalAttempted.Store(0)
+	p.totalSuccess.Store(0)
+	p.totalSkipped.Store(0)
+	p.totalFailed.Store(0)
+	p.totalBugs.Store(0)
+	p.consecutiveFailures.Store(0)
+
 	startExp := monolith.LastExpedition + 1
+	p.expCounter.Store(int64(startExp))
 
-	for exp := startExp; exp < startExp+p.config.MaxExpeditions; exp++ {
-		select {
-		case <-ctx.Done():
-			LogWarn("%s", Msg("interrupted"))
-			p.printSummary(exp - startExp)
-			return 130
-		default:
+	// Pre-flight Lumina scan (once, before workers start)
+	luminas := ScanJournalsForLumina(p.config.Continent)
+	if len(luminas) > 0 {
+		LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
+		WriteLumina(p.config.Continent, luminas)
+	}
+
+	g, gCtx := errgroup.WithContext(ctx)
+	workerCount := max(p.config.Workers, 1)
+
+	for i := range workerCount {
+		g.Go(func() error {
+			return p.runWorker(gCtx, i, startExp, luminas)
+		})
+	}
+
+	err := g.Wait()
+
+	fmt.Println()
+	p.printSummary()
+
+	switch {
+	case errors.Is(err, errComplete):
+		return 0
+	case errors.Is(err, errGommage):
+		return 1
+	case ctx.Err() != nil:
+		return 130
+	case err != nil:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// runWorker is the expedition loop that each worker goroutine runs.
+// Each worker atomically claims expedition numbers and processes them
+// until MaxExpeditions is reached, context is cancelled, or a sentinel
+// error (errGommage/errComplete) terminates the group.
+func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, luminas []Lumina) error {
+	for {
+		if ctx.Err() != nil {
+			return nil
 		}
 
-		fmt.Println()
+		exp := int(p.expCounter.Add(1) - 1)
+		if exp >= startExp+p.config.MaxExpeditions {
+			return nil
+		}
+
+		p.totalAttempted.Add(1)
 		LogExp("%s", fmt.Sprintf(Msg("departing"), exp))
-
-		// === Rest at Flag: Lumina scan + Reserve recovery ===
-		// (goroutine-parallel journal scan happens here)
-		LogInfo("%s", Msg("resting_at_flag"))
-		luminas := ScanJournalsForLumina(p.config.Continent)
-		if len(luminas) > 0 {
-			LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
-			WriteLumina(p.config.Continent, luminas)
-		}
-
-		// Try to recover primary model
 		p.reserve.TryRecoverPrimary()
-
-		// Log current state
 		LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
 		LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 
-		// Acquire worktree for this expedition (if pool is active)
 		var workDir string
 		if p.pool != nil {
 			workDir = p.pool.Acquire()
@@ -183,64 +235,63 @@ func (p *Paintress) Run(ctx context.Context) int {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
 			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
+			p.totalSuccess.Add(1)
 			releaseWorkDir()
-			break
+			continue
 		}
 
-		// === Send Expeditioner ===
 		LogInfo("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
-
 		expStart := time.Now()
 		output, err := expedition.Run(ctx)
 		expElapsed := time.Since(expStart)
 
-		// === Process result ===
 		if err != nil {
-			if ctx.Err() == context.Canceled {
+			if ctx.Err() != nil {
 				releaseWorkDir()
-				LogWarn("%s", Msg("interrupted"))
-				p.printSummary(exp - startExp + 1)
-				return 130
+				return nil
 			}
-
 			LogError("%s", fmt.Sprintf(Msg("exp_failed"), exp, err))
-
-			// If timeout, might be rate limit — consider switching to reserve
 			if strings.Contains(err.Error(), "timeout") {
 				p.reserve.ForceReserve()
 			}
-
 			p.gradient.Discharge()
-			WriteFlag(p.config.Continent, exp, "error", "failed", monolith.Remaining)
+			p.flagMu.Lock()
+			p.writeFlag(exp, "error", "failed", "?")
+			p.flagMu.Unlock()
 			WriteJournal(p.config.Continent, &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
 				MissionType: "?", Status: "failed", Reason: err.Error(),
 				PRUrl: "none", BugIssues: "none",
 			})
-			consecutiveFailures++
-			p.totalFailed++
+			p.consecutiveFailures.Add(1)
+			p.totalFailed.Add(1)
 		} else {
 			report, status := ParseReport(output, exp)
-
 			switch status {
 			case StatusComplete:
 				releaseWorkDir()
 				LogOK("%s", Msg("all_complete"))
-				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
-				p.printSummary(exp - startExp + 1)
-				return 0
-
+				p.flagMu.Lock()
+				p.writeFlag(exp, "all", "complete", "0")
+				p.flagMu.Unlock()
+				return errComplete
 			case StatusParseError:
 				LogWarn("%s", Msg("report_parse_fail"))
 				LogWarn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
-				consecutiveFailures++
-				p.totalFailed++
-
+				p.flagMu.Lock()
+				p.writeFlag(exp, "?", "parse_error", "?")
+				p.flagMu.Unlock()
+				WriteJournal(p.config.Continent, &ExpeditionReport{
+					Expedition: exp, IssueID: "?", IssueTitle: "?",
+					MissionType: "?", Status: "parse_error", Reason: "report markers not found",
+					PRUrl: "none", BugIssues: "none",
+				})
+				p.consecutiveFailures.Add(1)
+				p.totalFailed.Add(1)
 			case StatusSuccess:
 				p.handleSuccess(report)
 				p.gradient.Charge()
-				// Review gate: run code review on the PR if review command is configured
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 					remaining := totalTimeout - expElapsed
@@ -248,59 +299,52 @@ func (p *Paintress) Run(ctx context.Context) int {
 						p.runReviewLoop(ctx, report, remaining, workDir)
 					}
 				}
-				WriteFlag(p.config.Continent, exp, report.IssueID, "success", report.Remaining)
+				p.flagMu.Lock()
+				p.writeFlag(exp, report.IssueID, "success", report.Remaining)
+				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
-				consecutiveFailures = 0
-				p.totalSuccess++
-
+				p.consecutiveFailures.Store(0)
+				p.totalSuccess.Add(1)
 			case StatusSkipped:
 				LogWarn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
-				WriteFlag(p.config.Continent, exp, report.IssueID, "skipped", report.Remaining)
+				p.flagMu.Lock()
+				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining)
+				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
-				p.totalSkipped++
-
+				p.totalSkipped.Add(1)
 			case StatusFailed:
 				LogError("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
-				WriteFlag(p.config.Continent, exp, report.IssueID, "failed", report.Remaining)
+				p.flagMu.Lock()
+				p.writeFlag(exp, report.IssueID, "failed", report.Remaining)
+				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
-				consecutiveFailures++
-				p.totalFailed++
+				p.consecutiveFailures.Add(1)
+				p.totalFailed.Add(1)
 			}
 		}
 
-		// Gutter detection — Gommage
-		if consecutiveFailures >= maxConsecutiveFailures {
+		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
 			releaseWorkDir()
 			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
-			p.printSummary(exp - startExp + 1)
-			return 1
+			return errGommage
 		}
 
-		// Release worktree (resets state for next expedition)
 		releaseWorkDir()
 		if p.pool == nil {
-			// Return to base branch (no pool — direct execution)
 			gitCmd := exec.CommandContext(ctx, "git", "checkout", p.config.BaseBranch)
 			gitCmd.Dir = p.config.Continent
 			_ = gitCmd.Run()
 		}
 
-		// Cooldown
 		LogInfo("%s", Msg("cooldown"))
 		select {
 		case <-time.After(10 * time.Second):
 		case <-ctx.Done():
-			releaseWorkDir()
-			LogWarn("%s", Msg("interrupted"))
-			p.printSummary(exp - startExp + 1)
-			return 130
+			return nil
 		}
 	}
-
-	p.printSummary(p.config.MaxExpeditions)
-	return 0
 }
 
 // runReviewLoop executes the code review command and, if comments are found,
@@ -452,7 +496,7 @@ func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 		LogQA("%s: %s", report.IssueID, report.IssueTitle)
 		if report.BugsFound > 0 {
 			LogQA("%s", fmt.Sprintf(Msg("qa_bugs"), report.BugsFound, report.BugIssues))
-			p.totalBugs += report.BugsFound
+			p.totalBugs.Add(int64(report.BugsFound))
 		} else {
 			LogQA("%s", Msg("qa_all_pass"))
 		}
@@ -475,18 +519,30 @@ func (p *Paintress) printBanner() {
 	fmt.Println()
 }
 
-func (p *Paintress) printSummary(expeditions int) {
+// writeFlag writes the flag checkpoint only if expNum is greater than the
+// current checkpoint. This ensures monotonic progression when workers
+// complete out of order. Caller must hold p.flagMu.
+func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
+	current := ReadFlag(p.config.Continent)
+	if expNum <= current.LastExpedition {
+		return
+	}
+	WriteFlag(p.config.Continent, expNum, issueID, status, remaining)
+}
+
+func (p *Paintress) printSummary() {
+	total := p.totalAttempted.Load()
 	fmt.Println()
 	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
 	fmt.Printf("%s║          The Paintress rests                 ║%s\n", colorCyan, colorReset)
 	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
 	fmt.Println()
-	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), expeditions))
-	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess))
-	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped))
-	LogError("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed))
-	if p.totalBugs > 0 {
-		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs))
+	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
+	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
+	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
+	LogError("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed.Load()))
+	if p.totalBugs.Load() > 0 {
+		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}
 	fmt.Println()
 	LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatLog()))

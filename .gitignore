@@ -1,8 +1,8 @@
 # build files
-paintress
+/paintress
 # test
 coverage.out
-# paintress
+# paintress runtime state on target repository
 .expedition/
 # claude local settings
 .claude/*.local.*
