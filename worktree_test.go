@@ -304,3 +304,45 @@ func TestWorktreePool_Init_PrunesStale(t *testing.T) {
 		t.Fatalf("Init failed: %v", err)
 	}
 }
+
+func TestWorktreePool_Init_RunsSetupCmd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-setup-repo"
+
+	// init a repo with an initial commit
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "touch .setup-done", 2)
+
+	// when
+	err = pool.Init(ctx)
+
+	// then
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// verify marker file .setup-done exists in each worktree
+	for i := 0; i < 2; i++ {
+		path := <-pool.workers
+		_, err := executor.Shell(ctx, path, "test -f .setup-done")
+		if err != nil {
+			t.Errorf("expected .setup-done in %s, but file does not exist", path)
+		}
+		pool.workers <- path // put back
+	}
+}
