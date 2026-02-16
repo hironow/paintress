@@ -279,6 +279,14 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				LogWarn("%s", Msg("report_parse_fail"))
 				LogWarn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
+				p.flagMu.Lock()
+				p.writeFlag(exp, "?", "parse_error", "?")
+				p.flagMu.Unlock()
+				WriteJournal(p.config.Continent, &ExpeditionReport{
+					Expedition: exp, IssueID: "?", IssueTitle: "?",
+					MissionType: "?", Status: "parse_error", Reason: "report markers not found",
+					PRUrl: "none", BugIssues: "none",
+				})
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
 			case StatusSuccess:

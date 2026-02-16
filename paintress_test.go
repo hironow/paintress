@@ -697,6 +697,54 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 // TestSwarmMode_FlagMonotonic_NoRegression verifies that the flag checkpoint
 // is monotonic: a lower-numbered expedition completing after a higher one
 // must not overwrite the flag with a smaller expedition number.
+// TestSwarmMode_StatusParseError_WritesJournalAndFlag verifies that when an
+// expedition output cannot be parsed (StatusParseError), a journal entry and
+// flag checkpoint are still written — matching the behavior of all other
+// failure paths (err != nil, StatusFailed).
+func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	// Script that outputs garbage (no expedition markers) → StatusParseError
+	badScript := filepath.Join(dir, "badreport.sh")
+	if err := os.WriteFile(badScript, []byte("#!/bin/bash\necho 'no markers here'\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 1,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      badScript,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	p.Run(context.Background())
+
+	// Journal entry should exist for expedition 1
+	journalPath := filepath.Join(dir, ".expedition", "journal", "001.md")
+	if _, err := os.Stat(journalPath); os.IsNotExist(err) {
+		t.Error("StatusParseError did not write journal entry")
+	}
+
+	// Flag should be updated to expedition 1
+	flag := ReadFlag(dir)
+	if flag.LastExpedition != 1 {
+		t.Errorf("StatusParseError did not update flag: expected last_expedition=1, got %d", flag.LastExpedition)
+	}
+	if flag.LastStatus != "parse_error" {
+		t.Errorf("flag status: expected 'parse_error', got %q", flag.LastStatus)
+	}
+}
+
 func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 	dir := setupTestRepo(t)
 
