@@ -40,12 +40,12 @@ repos:
   # pre-push hooks (slower checks, run only on git push)
   # ======================================================================
 
-  # Go: full test suite
+  # Go: full test suite (300s timeout for container-based tests)
   - repo: local
     hooks:
       - id: go-test
         name: go test
-        entry: bash -c 'go test ./... -count=1 -timeout=60s'
+        entry: bash -c 'go test ./... -count=1 -timeout=300s'
         language: system
         types: [go]
         pass_filenames: false

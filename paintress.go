@@ -19,6 +19,7 @@ type Paintress struct {
 	devServer *DevServer
 	gradient  *GradientGauge
 	reserve   *ReserveParty
+	pool      *WorktreePool // nil when --workers=0
 
 	totalSuccess int
 	totalSkipped int
@@ -100,6 +101,26 @@ func (p *Paintress) Run(ctx context.Context) int {
 		defer p.devServer.Stop()
 	}
 
+	// Initialize worktree pool if workers > 0
+	if p.config.Workers > 0 {
+		p.pool = NewWorktreePool(
+			&localGitExecutor{},
+			p.config.Continent,
+			p.config.BaseBranch,
+			p.config.SetupCmd,
+			p.config.Workers,
+		)
+		if err := p.pool.Init(ctx); err != nil {
+			LogError("worktree pool init failed: %v", err)
+			return 1
+		}
+		defer func() {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer shutdownCancel()
+			p.pool.Shutdown(shutdownCtx)
+		}()
+	}
+
 	consecutiveFailures := 0
 	startExp := monolith.LastExpedition + 1
 
@@ -131,9 +152,26 @@ func (p *Paintress) Run(ctx context.Context) int {
 		LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
 		LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 
+		// Acquire worktree for this expedition (if pool is active)
+		var workDir string
+		if p.pool != nil {
+			workDir = p.pool.Acquire()
+		}
+		releaseWorkDir := func() {
+			if p.pool != nil && workDir != "" {
+				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer rCancel()
+				if err := p.pool.Release(rCtx, workDir); err != nil {
+					LogWarn("worktree release: %v", err)
+				}
+				workDir = ""
+			}
+		}
+
 		expedition := &Expedition{
 			Number:    exp,
 			Continent: p.config.Continent,
+			WorkDir:   workDir,
 			Config:    p.config,
 			LogDir:    p.logDir,
 			Luminas:   luminas,
@@ -145,6 +183,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
 			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
+			releaseWorkDir()
 			break
 		}
 
@@ -158,6 +197,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		// === Process result ===
 		if err != nil {
 			if ctx.Err() == context.Canceled {
+				releaseWorkDir()
 				LogWarn("%s", Msg("interrupted"))
 				p.printSummary(exp - startExp + 1)
 				return 130
@@ -184,6 +224,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 			switch status {
 			case StatusComplete:
+				releaseWorkDir()
 				LogOK("%s", Msg("all_complete"))
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
 				p.printSummary(exp - startExp + 1)
@@ -204,7 +245,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 					remaining := totalTimeout - expElapsed
 					if remaining > 0 {
-						p.runReviewLoop(ctx, report, remaining)
+						p.runReviewLoop(ctx, report, remaining, workDir)
 					}
 				}
 				WriteFlag(p.config.Continent, exp, report.IssueID, "success", report.Remaining)
@@ -231,21 +272,27 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 		// Gutter detection — Gommage
 		if consecutiveFailures >= maxConsecutiveFailures {
+			releaseWorkDir()
 			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
 			p.printSummary(exp - startExp + 1)
 			return 1
 		}
 
-		// Return to base branch
-		gitCmd := exec.CommandContext(ctx, "git", "checkout", p.config.BaseBranch)
-		gitCmd.Dir = p.config.Continent
-		_ = gitCmd.Run()
+		// Release worktree (resets state for next expedition)
+		releaseWorkDir()
+		if p.pool == nil {
+			// Return to base branch (no pool — direct execution)
+			gitCmd := exec.CommandContext(ctx, "git", "checkout", p.config.BaseBranch)
+			gitCmd.Dir = p.config.Continent
+			_ = gitCmd.Run()
+		}
 
 		// Cooldown
 		LogInfo("%s", Msg("cooldown"))
 		select {
 		case <-time.After(10 * time.Second):
 		case <-ctx.Done():
+			releaseWorkDir()
 			LogWarn("%s", Msg("interrupted"))
 			p.printSummary(exp - startExp + 1)
 			return 130
@@ -263,7 +310,13 @@ func (p *Paintress) Run(ctx context.Context) int {
 // The timeout budget only counts time spent on Claude Code (reviewfix) phases.
 // Review command execution (e.g. codex) does not consume the budget, so slow
 // external review services do not eat into the fix time allowance.
-func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport, budget time.Duration) {
+func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport, budget time.Duration, workDir string) {
+	// Resolve execution directory: worktree path when pool is active, Continent otherwise.
+	reviewDir := workDir
+	if reviewDir == "" {
+		reviewDir = p.config.Continent
+	}
+
 	// budget tracks only Claude Code (fix phase) execution time.
 	// Review command time is excluded so slow external services
 	// do not eat into the fix allowance.
@@ -293,7 +346,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 
 		// Review phase — bounded by reviewTimeout, does NOT consume budget
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		result, err := RunReview(reviewCtx, p.config.ReviewCmd, p.config.Continent)
+		result, err := RunReview(reviewCtx, p.config.ReviewCmd, reviewDir)
 		reviewCancel()
 		if err != nil {
 			if lastComments != "" {
@@ -327,7 +380,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		// Ensure we are on the PR branch before applying fixes
 		gitCtx, gitCancel := context.WithTimeout(ctx, gitCmdTimeout)
 		gitCmd := exec.CommandContext(gitCtx, "git", "checkout", branch)
-		gitCmd.Dir = p.config.Continent
+		gitCmd.Dir = reviewDir
 		err = gitCmd.Run()
 		gitCancel()
 		if err != nil {
@@ -367,7 +420,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 			"--print",
 			"-p", prompt,
 		)
-		cmd.Dir = p.config.Continent
+		cmd.Dir = reviewDir
 		cmd.WaitDelay = 3 * time.Second
 
 		LogInfo("%s", fmt.Sprintf(Msg("reviewfix_running"), model))
