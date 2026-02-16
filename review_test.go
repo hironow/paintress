@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // === hasReviewComments ===
@@ -355,5 +356,27 @@ func TestRunReview_ContextCanceled(t *testing.T) {
 	// then
 	if err == nil {
 		t.Error("canceled context should return error")
+	}
+}
+
+// TestRunReview_CallerTimeoutPreventsHang verifies that RunReview
+// respects the caller-provided context deadline so a hanging review
+// command cannot block indefinitely.
+func TestRunReview_CallerTimeoutPreventsHang(t *testing.T) {
+	// given — caller provides a 2s timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// when — run a command that would hang for 999s
+	start := time.Now()
+	_, err := RunReview(ctx, "sleep 999", t.TempDir())
+	elapsed := time.Since(start)
+
+	// then — should timeout around 2s, not hang
+	if err == nil {
+		t.Fatal("hanging review command should return an error")
+	}
+	if elapsed > 5*time.Second {
+		t.Errorf("expected timeout around 2s, took %v", elapsed)
 	}
 }

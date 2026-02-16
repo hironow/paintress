@@ -151,7 +151,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 		// === Send Expeditioner ===
 		LogInfo("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
 
+		expStart := time.Now()
 		output, err := expedition.Run(ctx)
+		expElapsed := time.Since(expStart)
 
 		// === Process result ===
 		if err != nil {
@@ -199,7 +201,11 @@ func (p *Paintress) Run(ctx context.Context) int {
 				p.gradient.Charge()
 				// Review gate: run code review on the PR if review command is configured
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
-					p.runReviewLoop(ctx, report)
+					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
+					remaining := totalTimeout - expElapsed
+					if remaining > 0 {
+						p.runReviewLoop(ctx, report, remaining)
+					}
 				}
 				WriteFlag(p.config.Continent, exp, report.IssueID, "success", report.Remaining)
 				WriteJournal(p.config.Continent, report)
@@ -253,36 +259,49 @@ func (p *Paintress) Run(ctx context.Context) int {
 // runReviewLoop executes the code review command and, if comments are found,
 // runs a lightweight Claude Code session to fix them. Repeats up to maxReviewCycles.
 // Remaining review insights are appended to the report for journal recording.
-// The entire loop is bounded by the expedition timeout to prevent hangs.
-func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport) {
-	// Bound the entire review loop by the expedition timeout,
-	// but respect any existing deadline on the parent context.
-	timeout := time.Duration(p.config.TimeoutSec) * time.Second
-	if deadline, ok := ctx.Deadline(); ok {
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			LogWarn("%s", fmt.Sprintf(Msg("review_error"), context.DeadlineExceeded))
-			return
-		}
-		if remaining < timeout {
-			timeout = remaining
-		}
-	}
-	reviewCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+//
+// The timeout budget only counts time spent on Claude Code (reviewfix) phases.
+// Review command execution (e.g. codex) does not consume the budget, so slow
+// external review services do not eat into the fix time allowance.
+func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport, budget time.Duration) {
+	// budget tracks only Claude Code (fix phase) execution time.
+	// Review command time is excluded so slow external services
+	// do not eat into the fix allowance.
+	var consumed time.Duration
 
+	// Each review command gets timeout / maxReviewCycles, with a floor
+	// so that very short --timeout values don't instantly cancel reviews.
+	reviewTimeout := max(
+		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewCycles),
+		minReviewTimeout,
+	)
 	var lastComments string
 	for cycle := 1; cycle <= maxReviewCycles; cycle++ {
-		// Check context before starting each cycle
-		if reviewCtx.Err() != nil {
-			LogWarn("%s", fmt.Sprintf(Msg("review_error"), reviewCtx.Err()))
+		// Check parent context before starting each cycle
+		if ctx.Err() != nil {
+			if lastComments != "" {
+				if report.Insight != "" {
+					report.Insight += " | "
+				}
+				report.Insight += "Review interrupted: " + summarizeReview(lastComments)
+			}
+			LogWarn("%s", fmt.Sprintf(Msg("review_error"), ctx.Err()))
 			return
 		}
 
 		LogInfo("%s", fmt.Sprintf(Msg("review_running"), cycle, maxReviewCycles))
 
+		// Review phase — bounded by reviewTimeout, does NOT consume budget
+		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, p.config.ReviewCmd, p.config.Continent)
+		reviewCancel()
 		if err != nil {
+			if lastComments != "" {
+				if report.Insight != "" {
+					report.Insight += " | "
+				}
+				report.Insight += "Review interrupted: " + summarizeReview(lastComments)
+			}
 			LogWarn("%s", fmt.Sprintf(Msg("review_error"), err))
 			return
 		}
@@ -306,9 +325,12 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 		}
 
 		// Ensure we are on the PR branch before applying fixes
-		gitCmd := exec.CommandContext(reviewCtx, "git", "checkout", branch)
+		gitCtx, gitCancel := context.WithTimeout(ctx, gitCmdTimeout)
+		gitCmd := exec.CommandContext(gitCtx, "git", "checkout", branch)
 		gitCmd.Dir = p.config.Continent
-		if err := gitCmd.Run(); err != nil {
+		err = gitCmd.Run()
+		gitCancel()
+		if err != nil {
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
@@ -316,7 +338,20 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 			return
 		}
 
-		// Run a focused reviewfix session via Claude Code
+		// Check remaining budget before fix phase
+		remaining := budget - consumed
+		if remaining <= 0 {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
+			LogWarn("%s", Msg("review_limit"))
+			return
+		}
+
+		// Fix phase — bounded by remaining budget (only this phase consumes it)
+		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
+
 		prompt := BuildReviewFixPrompt(branch, result.Comments)
 
 		claudeCmd := p.config.ClaudeCmd
@@ -325,7 +360,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 		}
 
 		model := p.reserve.ActiveModel()
-		cmd := exec.CommandContext(reviewCtx, claudeCmd,
+		cmd := exec.CommandContext(fixCtx, claudeCmd,
 			"--model", model,
 			"--continue",
 			"--dangerously-skip-permissions",
@@ -333,9 +368,14 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport)
 			"-p", prompt,
 		)
 		cmd.Dir = p.config.Continent
+		cmd.WaitDelay = 3 * time.Second
 
 		LogInfo("%s", fmt.Sprintf(Msg("reviewfix_running"), model))
+		start := time.Now()
 		out, err := cmd.CombinedOutput()
+		consumed += time.Since(start)
+		fixCancel()
+
 		if err != nil {
 			LogWarn("%s", fmt.Sprintf(Msg("reviewfix_error"), err))
 			if report.Insight != "" {

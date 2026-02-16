@@ -5,9 +5,17 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 const maxReviewCycles = 3
+
+// minReviewTimeout is the floor for the per-cycle review timeout.
+// Prevents very short --timeout values from instantly cancelling reviews.
+var minReviewTimeout = 30 * time.Second
+
+// gitCmdTimeout is the per-call timeout for git operations in the review loop.
+var gitCmdTimeout = 30 * time.Second
 
 // ReviewResult holds the outcome of a code review execution.
 type ReviewResult struct {
@@ -26,6 +34,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", reviewCmd)
 	cmd.Dir = dir
+	cmd.WaitDelay = 1 * time.Second // force-close pipes if child processes linger after kill
 
 	out, err := cmd.CombinedOutput()
 	output := string(out)
