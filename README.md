@@ -127,6 +127,15 @@ Continent (Git repo)       <- Persistent world
          +-- worktrees/    <- Managed by WorktreePool (auto-created, gitignored)
 ```
 
+### WorktreePool Lifecycle (`--workers >= 1`)
+
+1. **Init** — `git worktree prune`, then for each worker: force-remove leftover → `git worktree add --detach` → run `--setup-cmd` if set
+2. **Acquire** — Worker claims a worktree from the pool (blocks if all in use)
+3. **Release** — After each expedition: `git checkout --detach <base-branch>` → `git reset --hard <base-branch>` → `git clean -fd` → return to pool
+4. **Shutdown** — On exit (30s timeout, independent of parent context): `git worktree remove -f` each → `git worktree prune`
+
+When `--workers 0`, no pool is created and expeditions run directly on the repository.
+
 ## Goroutines
 
 | Goroutine | Role | Game Concept |
