@@ -556,3 +556,46 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 		t.Errorf("expected 1 prompt file (DryRun + single worker), got %d", len(prompts))
 	}
 }
+
+// TestSwarmMode_StatusComplete_CountedInSummary verifies that an expedition
+// receiving StatusComplete is counted in the summary totals so printSummary
+// does not under-report executed expeditions.
+func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	// Create a script that outputs __EXPEDITION_COMPLETE__
+	completeScript := filepath.Join(dir, "complete.sh")
+	if err := os.WriteFile(completeScript, []byte("#!/bin/bash\necho '__EXPEDITION_COMPLETE__'\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 5,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      completeScript,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	// errComplete → exit code 0
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// The expedition ran (ClaudeCmd executed, output parsed) so it must be counted
+	totalRan := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
+	if totalRan == 0 {
+		t.Error("StatusComplete expedition not counted in summary totals")
+	}
+}
