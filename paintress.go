@@ -167,7 +167,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		return 0
 	case errors.Is(err, errGommage):
 		return 1
-	case ctx.Err() == context.Canceled:
+	case ctx.Err() != nil:
 		return 130
 	case err != nil:
 		return 1
@@ -265,7 +265,6 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.flagMu.Lock()
 				WriteFlag(p.config.Continent, exp, "all", "complete", "0")
 				p.flagMu.Unlock()
-				p.totalSuccess.Add(1)
 				return errComplete
 			case StatusParseError:
 				LogWarn("%s", Msg("report_parse_fail"))

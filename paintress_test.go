@@ -495,6 +495,39 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	}
 }
 
+// TestSwarmMode_DeadlineExceeded_ReturnsNonZero verifies that a context
+// timeout (DeadlineExceeded) is treated as interrupted, not success.
+func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 100,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      "sleep 0.5", // slow enough to be running when deadline fires
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     60,
+		Model:          "opus",
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	p := NewPaintress(cfg)
+	code := p.Run(ctx)
+
+	// DeadlineExceeded should return non-zero (130), not 0
+	if code == 0 {
+		t.Errorf("expected non-zero exit code for DeadlineExceeded, got 0")
+	}
+}
+
 func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 	dir := setupTestRepo(t)
 
