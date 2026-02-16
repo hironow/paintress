@@ -85,7 +85,7 @@ paintress --model opus,sonnet,haiku ./repo
 ```
 
 - Rate limit detected → immediate switch to reserve
-- After 33-min cooldown → attempt recovery to primary
+- After 30-min cooldown → attempt recovery to primary
 - Timeout also triggers reserve switch (possible rate limit)
 
 ## Architecture
@@ -95,7 +95,7 @@ Paintress (binary)         <- Outside the repository
     |
     |  Pre-flight:
     |  +-- goroutine: parallel journal scan -> Lumina extraction
-    |  +-- WorktreePool.Init (when --workers >= 2)
+    |  +-- WorktreePool.Init (when --workers >= 1)
     |
     |  Per Expedition:
     |  +-- Gradient Gauge check -> difficulty hint
