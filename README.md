@@ -2,7 +2,7 @@
 
 **An autonomous loop that sends AI agents to drain your Linear issues to zero.**
 
-Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues one by one — implementing code, running tests, creating PRs, running code reviews, verifying UI, and fixing bugs — with no human intervention, until every issue is done.
+Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues — implementing code, running tests, creating PRs, running code reviews, verifying UI, and fixing bugs — with no human intervention, until every issue is done. In Swarm Mode (`--workers N`), multiple expeditions run in parallel using git worktrees for isolation.
 
 ```bash
 paintress --model opus,sonnet ./your-repo
@@ -93,13 +93,19 @@ paintress --model opus,sonnet,haiku ./repo
 ```
 Paintress (binary)         <- Outside the repository
     |
-    |  Before each Expedition:
+    |  Pre-flight:
     |  +-- goroutine: parallel journal scan -> Lumina extraction
+    |  +-- WorktreePool.Init (when --workers >= 2)
+    |
+    |  Per Expedition:
     |  +-- Gradient Gauge check -> difficulty hint
     |  +-- Reserve Party check -> primary recovery attempt
     |
     v
 Monolith (Linear)          <- Fully external
+    |
+    v
+WorktreePool               <- Isolated worktrees for parallel workers (Swarm Mode)
     |
     v
 Expedition (Claude Code)   <- One session per issue
@@ -118,6 +124,7 @@ Continent (Git repo)       <- Persistent world
          +-- journal/
          |    +-- 001.md, 002.md, ...
          +-- context/      <- User-provided .md files injected into prompts
+         +-- worktrees/    <- Managed by WorktreePool (auto-created, gitignored)
 ```
 
 ## Goroutines
@@ -127,6 +134,7 @@ Continent (Git repo)       <- Persistent world
 | Signal handler | SIGINT/SIGTERM → context cancel | — |
 | Dev server | Background startup & monitoring | Camp |
 | Journal scanner | Parallel file reads → Lumina extraction | Resting at Flag |
+| Worker (N) | Expedition loop per worktree (Swarm Mode) | Expedition Party |
 | Output streaming | stdout tee + rate limit detection | Reserve Party standby |
 | Timeout watchdog | context.WithTimeout | Gommage (time's up) |
 
@@ -182,12 +190,21 @@ paintress --lang fr /path/to/repo
 # With Reserve Party
 paintress --model opus,sonnet /path/to/repo
 
+# Swarm Mode: 3 parallel workers with setup command
+paintress \
+  --workers 3 \
+  --setup-cmd "bun install" \
+  --model opus,sonnet \
+  /path/to/repo
+
 # All options
 paintress \
   --model opus,sonnet,haiku \
   --lang ja \
   --max-expeditions 20 \
   --timeout 1200 \
+  --workers 3 \
+  --setup-cmd "bun install" \
   --dev-cmd "pnpm dev" \
   --dev-dir /path/to/frontend \
   --dev-url "http://localhost:3000" \
@@ -229,7 +246,10 @@ paintress \
 | `--dev-dir` | repo path | Dev server working directory |
 | `--dev-url` | `http://localhost:3000` | Dev server URL |
 | `--review-cmd` | `codex review --base main` | Code review command after PR creation |
+| `--workers` | `1` | Number of parallel expedition workers (Swarm Mode) |
+| `--setup-cmd` | `""` | Command to run after worktree creation (e.g. `bun install`) |
 | `--dry-run` | `false` | Generate prompts without executing |
+| `--version` | — | Show version and exit |
 
 ## Development
 
@@ -241,8 +261,15 @@ just test           # Run all tests
 just test-v         # Verbose test output
 just test-race      # Tests with race detector
 just cover          # Coverage report
-just lint           # Format check + go vet
+just cover-html     # Open coverage in browser
+just fmt            # Format code (gofmt)
+just vet            # Run go vet
+just lint           # fmt check + go vet + markdown lint
+just lint-md        # Lint markdown files only
 just check          # fmt + vet + test (pre-commit check)
+just clean          # Clean build artifacts
+just prek-install   # Install prek hooks (pre-commit + pre-push)
+just prek-run       # Run all prek hooks on all files
 ```
 
 ## File Structure
@@ -259,6 +286,7 @@ just check          # fmt + vet + test (pre-commit check)
 +-- journal.go           Journal read/write
 +-- report.go            Report parser (including failure_type)
 +-- context.go           Context injection (.expedition/context/)
++-- worktree.go          WorktreePool for Swarm Mode
 +-- review.go            Code review gate (exec + parse)
 +-- mission.go           Mission writer (embed + template)
 +-- lang.go              i18n message map (en/ja/fr)
