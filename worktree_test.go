@@ -89,7 +89,7 @@ func (e *containerGitExecutor) Git(ctx context.Context, dir string, args ...stri
 }
 
 func (e *containerGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
-	cmd := []string{"sh", "-c", fmt.Sprintf("cd %s && %s", dir, command)}
+	cmd := []string{"sh", "-c", fmt.Sprintf("cd %q && %s", dir, command)}
 	exitCode, reader, err := e.ctr.Exec(ctx, cmd, tcexec.Multiplexed())
 	if err != nil {
 		return nil, fmt.Errorf("exec failed: %w", err)
@@ -953,5 +953,110 @@ func TestWorktreePool_Acquire_BlocksWhenExhausted(t *testing.T) {
 	}
 	if strings.TrimSpace(string(out)) != "true" {
 		t.Errorf("expected 'true', got %q", strings.TrimSpace(string(out)))
+	}
+}
+
+// TestWorktreePool_Init_SelfHeals_LeakedWorktrees verifies that Init
+// succeeds even when a previous run leaked worktrees (acquired but not released
+// before shutdown/crash). This is the regression test for the resource leak bug
+// where early returns in Paintress.Run skipped Release, leaving orphaned worktrees
+// that blocked the next Init's `git worktree add`.
+func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given — simulate a leaked worktree from a previous run
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-selfheal-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	// Run 1: init pool, acquire worker, shutdown WITHOUT releasing
+	pool1 := NewWorktreePool(executor, repoDir, "main", "", 1)
+	if err := pool1.Init(ctx); err != nil {
+		t.Fatalf("pool1 Init failed: %v", err)
+	}
+	_ = pool1.Acquire()     // acquire but DON'T release — simulates early return bug
+	_ = pool1.Shutdown(ctx) // drains channel (empty), prunes (no stale), worker-001 dir stays
+
+	// when — Run 2: new pool tries to Init on the same repo
+	pool2 := NewWorktreePool(executor, repoDir, "main", "", 1)
+	err = pool2.Init(ctx)
+
+	// then — Init should succeed (self-healing removes stale worktree before re-creating)
+	if err != nil {
+		t.Fatalf("pool2 Init should self-heal leaked worktrees, got error: %v", err)
+	}
+
+	// verify: worker is available and functional
+	path := pool2.Acquire()
+	if path == "" {
+		t.Fatal("Acquire returned empty path after self-healing Init")
+	}
+	out, err := executor.Git(ctx, path, "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		t.Fatalf("rev-parse failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "true" {
+		t.Errorf("expected 'true', got %q", strings.TrimSpace(string(out)))
+	}
+}
+
+// TestWorktreePool_Shutdown_CancelledContext_LeavesOrphans documents that
+// Shutdown with a cancelled context cannot remove worktrees. This motivates
+// the caller (Paintress.Run) to use context.Background() for deferred Shutdown.
+func TestWorktreePool_Shutdown_CancelledContext_LeavesOrphans(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-shutdown-cancelled-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 2)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// when — cancel context, then call Shutdown
+	cancelledCtx, cancel := context.WithCancel(ctx)
+	cancel()
+	err = pool.Shutdown(cancelledCtx)
+
+	// then — Shutdown should fail (cannot run git commands with cancelled context)
+	if err == nil {
+		t.Error("expected Shutdown with cancelled context to return error, got nil")
+	}
+
+	// worktrees should still exist (orphaned)
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) < 2 {
+		t.Errorf("expected orphaned worktrees (>1 entries), got %d:\n%s", len(lines), string(out))
 	}
 }
