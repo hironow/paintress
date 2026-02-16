@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
@@ -372,5 +374,146 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 	totalRan := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
 	if totalRan >= 20 {
 		t.Errorf("gommage should have stopped early, but ran all %d expeditions", totalRan)
+	}
+}
+
+func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        3,
+		MaxExpeditions: 2, // fewer than workers
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	logDir := filepath.Join(dir, ".expedition", ".logs")
+	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
+	if len(prompts) != 2 {
+		t.Errorf("expected 2 prompt files (MaxExpeditions=2), got %d: %v", len(prompts), prompts)
+	}
+}
+
+func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 100,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      "/bin/false",
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     60,
+		Model:          "opus",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(3 * time.Second)
+		cancel()
+	}()
+
+	p := NewPaintress(cfg)
+	code := p.Run(ctx)
+
+	// Workers fail fast with /bin/false, but cooldown is 10s.
+	// After ~3s cancel fires during cooldown, causing graceful exit.
+	// Exit code is 130 (interrupted) OR 1 (gommage, if 3 failures happen before cancel).
+	// Both are acceptable — the key is no deadlock.
+	if code != 130 && code != 1 {
+		t.Errorf("expected exit code 130 (interrupted) or 1 (gommage), got %d", code)
+	}
+
+	// Verify it didn't run all 100 expeditions
+	totalRan := p.totalSuccess.Load() + p.totalFailed.Load() + p.totalSkipped.Load()
+	if totalRan >= 100 {
+		t.Errorf("should have stopped early, but ran %d expeditions", totalRan)
+	}
+}
+
+func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	// Plant flag at expedition 4
+	WriteFlag(dir, 4, "AWE-10", "success", "10")
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        3,
+		MaxExpeditions: 3,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	logDir := filepath.Join(dir, ".expedition", ".logs")
+
+	// Should have prompts for expeditions 5, 6, 7 (not 1, 2, 3)
+	for _, expNum := range []int{5, 6, 7} {
+		promptFile := filepath.Join(logDir, fmt.Sprintf("expedition-%03d-prompt.md", expNum))
+		if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+			t.Errorf("expected prompt file for expedition %d, not found", expNum)
+		}
+	}
+
+	// Should NOT have prompts for expeditions 1-4
+	for _, expNum := range []int{1, 2, 3, 4} {
+		promptFile := filepath.Join(logDir, fmt.Sprintf("expedition-%03d-prompt.md", expNum))
+		if _, err := os.Stat(promptFile); !os.IsNotExist(err) {
+			t.Errorf("prompt file for expedition %d should not exist (resumed from 5)", expNum)
+		}
+	}
+}
+
+func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1, // single worker WITH worktree pool
+		MaxExpeditions: 2,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	logDir := filepath.Join(dir, ".expedition", ".logs")
+	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
+
+	// DryRun with Workers=1: worker writes 1 prompt and exits
+	if len(prompts) != 1 {
+		t.Errorf("expected 1 prompt file (DryRun + single worker), got %d", len(prompts))
 	}
 }
