@@ -97,3 +97,22 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	wp.workers <- path
 	return nil
 }
+
+// Shutdown removes all worktrees and cleans up the pool.
+func (wp *WorktreePool) Shutdown(ctx context.Context) error {
+	for {
+		select {
+		case path := <-wp.workers:
+			if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path); err != nil {
+				return fmt.Errorf("worktree remove %s: %w", path, err)
+			}
+		default:
+			goto done
+		}
+	}
+done:
+	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "prune"); err != nil {
+		return fmt.Errorf("worktree prune: %w", err)
+	}
+	return nil
+}

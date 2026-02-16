@@ -492,3 +492,58 @@ func TestWorktreePool_Release_ReturnsToPool(t *testing.T) {
 		t.Errorf("expected same path after release, got path1=%q path2=%q", path1, path2)
 	}
 }
+
+func TestWorktreePool_Shutdown_RemovesAll(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping container test in short mode")
+	}
+
+	// given
+	ctx := context.Background()
+	ctr := setupGitContainer(t, ctx)
+	executor := &containerGitExecutor{ctr: ctr}
+	repoDir := "/tmp/test-shutdown-repo"
+
+	_, err := executor.Git(ctx, repoDir, "init")
+	if err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
+	if err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 3)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// acquire all 3 and release all 3
+	paths := make([]string, 3)
+	for i := range 3 {
+		paths[i] = pool.Acquire()
+	}
+	for _, p := range paths {
+		if err := pool.Release(ctx, p); err != nil {
+			t.Fatalf("Release failed: %v", err)
+		}
+	}
+
+	// when
+	err = pool.Shutdown(ctx)
+
+	// then
+	if err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	// verify: git worktree list shows only 1 line (main repo)
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 worktree entry (main only), got %d:\n%s", len(lines), string(out))
+	}
+}
