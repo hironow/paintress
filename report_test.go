@@ -328,3 +328,176 @@ Goodbye.`
 		t.Errorf("IssueID = %q", report.IssueID)
 	}
 }
+
+func TestParseReport_MissingOptionalFields_Defaults(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 9
+issue_id: AWE-9
+issue_title: Minimal report
+mission_type: implement
+branch: feat/AWE-9
+pr_url: none
+status: success
+reason: ok
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 9)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.BugsFound != 0 {
+		t.Errorf("BugsFound = %d, want 0 when missing", report.BugsFound)
+	}
+	if report.BugIssues != "" {
+		t.Errorf("BugIssues = %q, want empty when missing", report.BugIssues)
+	}
+	if report.Remaining != "" {
+		t.Errorf("Remaining = %q, want empty when missing", report.Remaining)
+	}
+}
+
+func TestParseReport_BugsFoundWithoutBugIssues(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 10
+issue_id: AWE-10
+issue_title: Verify audit trail
+mission_type: verify
+branch: feat/AWE-10
+pr_url: none
+status: success
+reason: ok
+bugs_found: 3
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 10)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.BugsFound != 3 {
+		t.Errorf("BugsFound = %d, want 3", report.BugsFound)
+	}
+	if report.BugIssues != "" {
+		t.Errorf("BugIssues = %q, want empty when missing", report.BugIssues)
+	}
+}
+
+func TestParseReport_IgnoresUnknownFields(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 11
+issue_id: AWE-11
+issue_title: Unknown fields
+mission_type: implement
+branch: feat/AWE-11
+pr_url: none
+status: success
+reason: ok
+unknown_field: should be ignored
+another_unknown: 123
+remaining_issues: 4
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 11)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "AWE-11" {
+		t.Errorf("IssueID = %q", report.IssueID)
+	}
+	if report.Remaining != "4" {
+		t.Errorf("Remaining = %q", report.Remaining)
+	}
+}
+
+func TestParseReport_DuplicateKeys_LastWins(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 12
+issue_id: AWE-12
+issue_title: Duplicate keys
+mission_type: implement
+branch: feat/AWE-12
+pr_url: none
+status: success
+reason: first reason
+reason: final reason
+remaining_issues: 9
+remaining_issues: 8
+bugs_found: 1
+bugs_found: 2
+bug_issues: AWE-100
+bug_issues: AWE-101
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 12)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.Reason != "final reason" {
+		t.Errorf("Reason = %q, want %q", report.Reason, "final reason")
+	}
+	if report.Remaining != "8" {
+		t.Errorf("Remaining = %q, want %q", report.Remaining, "8")
+	}
+	if report.BugsFound != 2 {
+		t.Errorf("BugsFound = %d, want 2", report.BugsFound)
+	}
+	if report.BugIssues != "AWE-101" {
+		t.Errorf("BugIssues = %q, want %q", report.BugIssues, "AWE-101")
+	}
+}
+
+func TestParseReport_MultipleBlocks_FirstInvalid(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: unknown
+__EXPEDITION_END__
+__EXPEDITION_REPORT__
+expedition: 2
+issue_id: AWE-2
+status: success
+remaining_issues: 3
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+
+	_, status := ParseReport(output, 1)
+	if status != StatusParseError {
+		t.Fatalf("first invalid block should yield parse error, got %v", status)
+	}
+}
+
+func TestParseReport_MultipleBlocks_FirstSuccessWins(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: success
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__
+__EXPEDITION_REPORT__
+expedition: 2
+issue_id: AWE-2
+status: failed
+reason: later failure
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "AWE-1" {
+		t.Errorf("IssueID = %q, want %q", report.IssueID, "AWE-1")
+	}
+	if report.Remaining != "5" {
+		t.Errorf("Remaining = %q, want %q", report.Remaining, "5")
+	}
+}

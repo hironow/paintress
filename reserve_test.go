@@ -174,6 +174,29 @@ func TestReserve_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestReserve_NoFalsePositiveOnPartialMatches(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"})
+
+	// These should not trigger rate-limit detection.
+	noMatch := []string{
+		"corporate policy updated",
+		"separate module update",
+		"quota is mentioned without being exceeded",
+		"capacity planning meeting",
+		"usage is within limits",
+		"try again? later we will see",
+		"429th item processed",
+	}
+	for _, s := range noMatch {
+		if rp.CheckOutput(s) {
+			t.Errorf("should not detect rate limit for %q", s)
+		}
+	}
+	if rp.ActiveModel() != "opus" {
+		t.Errorf("should stay on opus, got %q", rp.ActiveModel())
+	}
+}
+
 func TestReserve_ConcurrentAccess(t *testing.T) {
 	rp := NewReserveParty("opus", []string{"sonnet"})
 	var wg sync.WaitGroup

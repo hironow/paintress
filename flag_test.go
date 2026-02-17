@@ -115,3 +115,64 @@ func TestWriteFlag_Overwrite(t *testing.T) {
 		t.Errorf("LastIssue = %q, want AWE-2", f.LastIssue)
 	}
 }
+
+func TestReadFlag_ValueWithColonAndSpaces(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	content := `last_expedition: 7
+remaining_issues: 10 (approx): 3 left
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+
+	f := ReadFlag(dir)
+	if f.LastExpedition != 7 {
+		t.Errorf("LastExpedition = %d, want 7", f.LastExpedition)
+	}
+	if f.Remaining != "10 (approx): 3 left" {
+		t.Errorf("Remaining = %q, want %q", f.Remaining, "10 (approx): 3 left")
+	}
+}
+
+func TestWriteFlag_IssueIDWithNewline_IsPreserved(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	issueID := "AWE-1\nAWE-2"
+	WriteFlag(dir, 1, issueID, "success", "5")
+
+	f := ReadFlag(dir)
+	// parseKV reads line-by-line, so newline truncates the value.
+	if f.LastIssue != "AWE-1" {
+		t.Errorf("LastIssue = %q, want %q", f.LastIssue, "AWE-1")
+	}
+}
+
+func TestReadFlag_InvalidAndNegativeExpedition(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	content := `last_expedition: not-a-number
+remaining_issues: 1
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+
+	f := ReadFlag(dir)
+	// fmt.Sscanf should leave LastExpedition at zero on parse failure.
+	if f.LastExpedition != 0 {
+		t.Errorf("LastExpedition = %d, want 0 on parse failure", f.LastExpedition)
+	}
+
+	content = `last_expedition: -5
+remaining_issues: 1
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+
+	f = ReadFlag(dir)
+	// Negative values are currently accepted by fmt.Sscanf.
+	if f.LastExpedition != -5 {
+		t.Errorf("LastExpedition = %d, want -5 for negative values", f.LastExpedition)
+	}
+}

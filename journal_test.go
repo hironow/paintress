@@ -113,6 +113,60 @@ func TestWriteJournal_IncludesFailureType(t *testing.T) {
 	}
 }
 
+func TestWriteJournal_EmptyInsightField(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	report := &ExpeditionReport{
+		Expedition:  2,
+		IssueID:     "AWE-12",
+		IssueTitle:  "No insight",
+		MissionType: "implement",
+		Status:      "success",
+		Reason:      "done",
+		PRUrl:       "none",
+		BugIssues:   "none",
+		Insight:     "",
+	}
+
+	WriteJournal(dir, report)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "002.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "**Insight**: ") {
+		t.Error("journal should include Insight field even when empty")
+	}
+}
+
+func TestWriteJournal_InsightNotSetDefaultsToEmptyLine(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	report := &ExpeditionReport{
+		Expedition:  3,
+		IssueID:     "AWE-13",
+		IssueTitle:  "Insight omitted",
+		MissionType: "implement",
+		Status:      "success",
+		Reason:      "done",
+		PRUrl:       "none",
+		BugIssues:   "none",
+		// Insight intentionally not set
+	}
+
+	WriteJournal(dir, report)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "003.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "**Insight**: ") {
+		t.Error("journal should include Insight field even when not set")
+	}
+}
+
 func TestWriteJournal_FilenamePadding(t *testing.T) {
 	dir := t.TempDir()
 
