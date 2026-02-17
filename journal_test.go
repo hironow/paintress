@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -81,6 +82,34 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 		if !containsStr(s, c) {
 			t.Errorf("journal missing %q", c)
 		}
+	}
+}
+
+func TestWriteJournal_IncludesFailureType(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	report := &ExpeditionReport{
+		Expedition:  1,
+		IssueID:     "AWE-99",
+		IssueTitle:  "Fix auth",
+		MissionType: "implement",
+		Status:      "failed",
+		Reason:      "dependency not available",
+		FailureType: "blocker",
+		PRUrl:       "none",
+		BugIssues:   "none",
+		Insight:     "External service was down",
+	}
+
+	WriteJournal(dir, report)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "001.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "**Failure type**: blocker") {
+		t.Error("journal should contain failure_type field")
 	}
 }
 

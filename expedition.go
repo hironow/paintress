@@ -32,6 +32,7 @@ type PromptData struct {
 	ReserveSection  string
 	BaseBranch      string
 	DevURL          string
+	ContextSection  string
 }
 
 // Expedition represents a single expedition into the Continent.
@@ -63,6 +64,7 @@ func (e *Expedition) BuildPrompt() string {
 		ReserveSection:  e.Reserve.FormatForPrompt(),
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
+		ContextSection:  e.loadContextSection(),
 	}
 
 	tmplName := "expedition_en.md.tmpl"
@@ -78,6 +80,15 @@ func (e *Expedition) BuildPrompt() string {
 		panic(fmt.Sprintf("prompt template execution failed: %v", err))
 	}
 	return buf.String()
+}
+
+func (e *Expedition) loadContextSection() string {
+	ctx, err := ReadContextFiles(e.Continent)
+	if err != nil {
+		LogWarn("context injection failed: %v", err)
+		return ""
+	}
+	return ctx
 }
 
 // Run executes the expedition with timeout and streaming output.

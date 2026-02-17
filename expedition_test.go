@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -231,6 +232,53 @@ func TestExpedition_BuildPrompt_OutputFormat(t *testing.T) {
 	}
 	if !containsStr(prompt, "__EXPEDITION_COMPLETE__") {
 		t.Error("prompt should contain complete marker")
+	}
+}
+
+func TestBuildPrompt_IncludesContextFiles(t *testing.T) {
+	dir := t.TempDir()
+	ctxDir := filepath.Join(dir, ".expedition", "context")
+	os.MkdirAll(ctxDir, 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	os.WriteFile(filepath.Join(ctxDir, "adr-001.md"), []byte("Use event sourcing for audit trail.\n"), 0644)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Luminas:   nil,
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := exp.BuildPrompt()
+
+	if !strings.Contains(prompt, "Use event sourcing for audit trail.") {
+		t.Error("expected prompt to contain context file content")
+	}
+	if !strings.Contains(prompt, "adr-001") {
+		t.Error("expected prompt to contain context file name as header")
+	}
+}
+
+func TestBuildPrompt_NoContextSection_WhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Luminas:   nil,
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := exp.BuildPrompt()
+
+	if strings.Contains(prompt, "Injected Context") {
+		t.Error("context section should not appear when no context files exist")
 	}
 }
 

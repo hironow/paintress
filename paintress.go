@@ -261,7 +261,8 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			WriteJournal(p.config.Continent, &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
 				MissionType: "?", Status: "failed", Reason: err.Error(),
-				PRUrl: "none", BugIssues: "none",
+				FailureType: "blocker",
+				PRUrl:       "none", BugIssues: "none",
 			})
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
@@ -285,7 +286,8 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				WriteJournal(p.config.Continent, &ExpeditionReport{
 					Expedition: exp, IssueID: "?", IssueTitle: "?",
 					MissionType: "?", Status: "parse_error", Reason: "report markers not found",
-					PRUrl: "none", BugIssues: "none",
+					FailureType: "blocker",
+					PRUrl:       "none", BugIssues: "none",
 				})
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
