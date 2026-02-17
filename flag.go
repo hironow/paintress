@@ -52,6 +52,9 @@ func ReadFlag(continent string) ExpeditionFlag {
 }
 
 func WriteFlag(continent string, expNum int, issueID, status, remaining string) error {
+	issueID = sanitizeFlagValue(issueID)
+	status = sanitizeFlagValue(status)
+	remaining = sanitizeFlagValue(remaining)
 	content := fmt.Sprintf(`# Expedition Flag
 # This checkpoint summarizes the previous Expedition's outcome.
 # Use it as context when starting your mission.
@@ -78,4 +81,9 @@ func parseKV(line string) (string, string, bool) {
 		return "", "", false
 	}
 	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]), true
+}
+
+func sanitizeFlagValue(value string) string {
+	replacer := strings.NewReplacer("\r", " ", "\n", " ")
+	return strings.TrimSpace(replacer.Replace(value))
 }

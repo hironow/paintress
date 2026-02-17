@@ -135,7 +135,7 @@ remaining_issues: 10 (approx): 3 left
 	}
 }
 
-func TestWriteFlag_IssueIDWithNewline_IsPreserved(t *testing.T) {
+func TestWriteFlag_IssueIDWithNewline_IsSanitized(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
@@ -143,9 +143,23 @@ func TestWriteFlag_IssueIDWithNewline_IsPreserved(t *testing.T) {
 	WriteFlag(dir, 1, issueID, "success", "5")
 
 	f := ReadFlag(dir)
-	// parseKV reads line-by-line, so newline truncates the value.
-	if f.LastIssue != "AWE-1" {
-		t.Errorf("LastIssue = %q, want %q", f.LastIssue, "AWE-1")
+	if f.LastIssue != "AWE-1 AWE-2" {
+		t.Errorf("LastIssue = %q, want %q", f.LastIssue, "AWE-1 AWE-2")
+	}
+}
+
+func TestWriteFlag_SanitizesStatusAndRemaining(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	WriteFlag(dir, 1, "AWE-1", "success\nextra", "5\r\nmore")
+	f := ReadFlag(dir)
+
+	if f.LastStatus != "success extra" {
+		t.Errorf("LastStatus = %q, want %q", f.LastStatus, "success extra")
+	}
+	if f.Remaining != "5  more" {
+		t.Errorf("Remaining = %q, want %q", f.Remaining, "5  more")
 	}
 }
 
