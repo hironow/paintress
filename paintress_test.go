@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -22,6 +23,20 @@ func TestMain(m *testing.M) {
 	os.Unsetenv("GIT_DIR")
 	os.Unsetenv("GIT_WORK_TREE")
 	os.Exit(m.Run())
+}
+
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skipping test: cannot bind local port: %v", err)
+	}
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Listener = ln
+	srv.Start()
+	return srv
 }
 
 func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
@@ -378,7 +393,7 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 	dir := setupTestRepo(t)
 
 	// Start a trivial HTTP server so DevServer.Start() succeeds immediately
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	cfg := Config{
@@ -444,7 +459,7 @@ func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
 func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	cfg := Config{
@@ -531,7 +546,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	cfg := Config{
@@ -565,7 +580,7 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	// Script that sleeps long enough for the deadline to fire mid-expedition.
@@ -642,7 +657,7 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	// Create a script that outputs __EXPEDITION_COMPLETE__
@@ -732,7 +747,7 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	// Script that outputs garbage (no expedition markers) → StatusParseError

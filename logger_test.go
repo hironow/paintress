@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -79,4 +80,41 @@ func TestLogFunctions_WithoutLogFile(t *testing.T) {
 	LogInfo("no file")
 	LogWarn("no file")
 	LogError("no file")
+}
+
+func TestLogFunctions_QuietMode_SuppressesStdout(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "quiet.log")
+	InitLogFile(path)
+	defer CloseLogFile()
+
+	t.Setenv("PAINTRESS_QUIET", "1")
+
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+
+	LogInfo("quiet mode")
+
+	_ = w.Close()
+	os.Stdout = origStdout
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stdout: %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("expected no stdout output, got %q", string(out))
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsStr(string(content), "quiet mode") {
+		t.Error("log file should still contain message in quiet mode")
+	}
 }

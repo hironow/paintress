@@ -46,7 +46,9 @@ func logLine(prefix, color, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
 	line := fmt.Sprintf("[%s] %s%s%s %s", ts, color, prefix, colorReset, msg)
-	fmt.Println(line)
+	if os.Getenv("PAINTRESS_QUIET") == "" {
+		fmt.Println(line)
+	}
 
 	logMu.Lock()
 	defer logMu.Unlock()
