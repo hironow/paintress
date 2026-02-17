@@ -555,14 +555,14 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 		MaxExpeditions: 100,
 		DryRun:         false,
 		BaseBranch:     "main",
-		ClaudeCmd:      "sleep 0.5", // slow enough to be running when deadline fires
+		ClaudeCmd:      "sleep 5", // ensure deadline fires mid-expedition
 		DevCmd:         "true",
 		DevURL:         srv.URL,
 		TimeoutSec:     60,
 		Model:          "opus",
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	p := NewPaintress(cfg)
@@ -592,8 +592,8 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 
 	cfg := Config{
 		Continent:      dir,
-		Workers:        3,
-		MaxExpeditions: 100,
+		Workers:        1,
+		MaxExpeditions: 1,
 		DryRun:         false,
 		BaseBranch:     "main",
 		ClaudeCmd:      sleepScript,
@@ -604,7 +604,7 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 	}
 
 	// Context deadline is short — fires while expeditions are running
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	p := NewPaintress(cfg)
