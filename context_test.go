@@ -85,3 +85,43 @@ func TestReadContextFiles_IgnoresNonMarkdown(t *testing.T) {
 		t.Error(".json files should be excluded")
 	}
 }
+
+func TestReadContextFiles_OrdersByFilename(t *testing.T) {
+	dir := t.TempDir()
+	ctxDir := filepath.Join(dir, ".expedition", "context")
+	os.MkdirAll(ctxDir, 0755)
+
+	os.WriteFile(filepath.Join(ctxDir, "b.md"), []byte("second\n"), 0644)
+	os.WriteFile(filepath.Join(ctxDir, "a.md"), []byte("first\n"), 0644)
+
+	result, err := ReadContextFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstIdx := strings.Index(result, "### a")
+	secondIdx := strings.Index(result, "### b")
+	if firstIdx == -1 || secondIdx == -1 {
+		t.Fatalf("expected headers for a.md and b.md, got: %q", result)
+	}
+	if firstIdx >= secondIdx {
+		t.Errorf("expected a.md before b.md, got indices %d >= %d", firstIdx, secondIdx)
+	}
+}
+
+func TestReadContextFiles_EmptyFileStillCreatesHeader(t *testing.T) {
+	dir := t.TempDir()
+	ctxDir := filepath.Join(dir, ".expedition", "context")
+	os.MkdirAll(ctxDir, 0755)
+
+	os.WriteFile(filepath.Join(ctxDir, "empty.md"), []byte(""), 0644)
+
+	result, err := ReadContextFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(result, "### empty") {
+		t.Error("expected header for empty.md even when file is empty")
+	}
+}

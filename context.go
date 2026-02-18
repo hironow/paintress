@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -26,6 +27,9 @@ func ReadContextFiles(continent string) (string, error) {
 		}
 		return "", fmt.Errorf("reading context directory: %w", err)
 	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
 
 	var buf strings.Builder
 	for _, e := range entries {

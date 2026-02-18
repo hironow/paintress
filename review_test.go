@@ -345,6 +345,64 @@ func TestRunReview_RateLimitInOutput(t *testing.T) {
 	}
 }
 
+func TestRunReview_CommentsTakePrecedenceOverRateLimit(t *testing.T) {
+	// given
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// when — output contains both review comments and rate-limit text
+	result, err := RunReview(ctx, "echo '[P2] Fix pagination; rate limit exceeded during analysis'", dir)
+
+	// then — should treat as comments, not rate-limited
+	if err != nil {
+		t.Fatalf("comments should take precedence over rate limit: %v", err)
+	}
+	if result.Passed {
+		t.Error("review with [P2] comments should not pass")
+	}
+	if result.Comments == "" {
+		t.Error("comments should not be empty")
+	}
+}
+
+func TestRunReview_RespectsWorkingDirectory(t *testing.T) {
+	// given
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// script is created in dir, so command must run with dir set
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'clean review'\n"), 0755)
+
+	// when — run script by name only, relying on cmd.Dir
+	result, err := RunReview(ctx, "./review.sh", dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("should not error: %v", err)
+	}
+	if !result.Passed {
+		t.Error("clean review should pass")
+	}
+}
+
+func TestRunReview_EmptyOutput_Passes(t *testing.T) {
+	// given
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// when — command exits 0 with no output
+	result, err := RunReview(ctx, "true", dir)
+
+	// then
+	if err != nil {
+		t.Fatalf("empty output should not error: %v", err)
+	}
+	if !result.Passed {
+		t.Error("empty output should pass")
+	}
+}
+
 func TestRunReview_ContextCanceled(t *testing.T) {
 	// given
 	ctx, cancel := context.WithCancel(context.Background())

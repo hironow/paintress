@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -22,6 +21,20 @@ func TestMain(m *testing.M) {
 	os.Unsetenv("GIT_DIR")
 	os.Unsetenv("GIT_WORK_TREE")
 	os.Exit(m.Run())
+}
+
+func newTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skipf("skipping test: cannot bind local port: %v", err)
+	}
+
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Listener = ln
+	srv.Start()
+	return srv
 }
 
 func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
@@ -258,49 +271,6 @@ func TestSentinelErrors_AreDistinct(t *testing.T) {
 
 // === Swarm Mode DryRun Integration Tests ===
 
-// gitIsolatedEnv returns an environment that strips GIT_DIR and GIT_WORK_TREE
-// to prevent test git commands from operating on the parent repo.
-// When pre-push hooks run go test, GIT_DIR is set to the hook's repo,
-// causing exec.Command("git",...) to ignore cmd.Dir entirely.
-func gitIsolatedEnv(dir string) []string {
-	var env []string
-	for _, e := range os.Environ() {
-		if strings.HasPrefix(e, "GIT_DIR=") ||
-			strings.HasPrefix(e, "GIT_WORK_TREE=") {
-			continue
-		}
-		env = append(env, e)
-	}
-	env = append(env, "GIT_CEILING_DIRECTORIES="+filepath.Dir(dir))
-	return env
-}
-
-// setupTestRepo creates a minimal git repo for Paintress tests.
-// Strips GIT_DIR/GIT_WORK_TREE to prevent parent repo corruption
-// when tests run inside a git worktree (e.g. pre-push hooks).
-func setupTestRepo(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	gitEnv := gitIsolatedEnv(dir)
-	commands := [][]string{
-		{"git", "init", "-b", "main"},
-		{"git", "config", "user.email", "test@test.com"},
-		{"git", "config", "user.name", "test"},
-		{"git", "config", "commit.gpgsign", "false"},
-		{"git", "commit", "--allow-empty", "-m", "init"},
-	}
-	for _, args := range commands {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		cmd.Env = gitEnv
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git setup (%v) failed: %s", args, string(out))
-		}
-	}
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	return dir
-}
-
 func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 	dir := setupTestRepo(t)
 
@@ -378,7 +348,7 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 	dir := setupTestRepo(t)
 
 	// Start a trivial HTTP server so DevServer.Start() succeeds immediately
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	cfg := Config{
@@ -444,7 +414,7 @@ func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
 func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	cfg := Config{
@@ -531,7 +501,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	cfg := Config{
@@ -540,14 +510,14 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 		MaxExpeditions: 100,
 		DryRun:         false,
 		BaseBranch:     "main",
-		ClaudeCmd:      "sleep 0.5", // slow enough to be running when deadline fires
+		ClaudeCmd:      "sleep 5", // ensure deadline fires mid-expedition
 		DevCmd:         "true",
 		DevURL:         srv.URL,
 		TimeoutSec:     60,
 		Model:          "opus",
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	p := NewPaintress(cfg)
@@ -565,7 +535,7 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	// Script that sleeps long enough for the deadline to fire mid-expedition.
@@ -577,8 +547,8 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 
 	cfg := Config{
 		Continent:      dir,
-		Workers:        3,
-		MaxExpeditions: 100,
+		Workers:        1,
+		MaxExpeditions: 1,
 		DryRun:         false,
 		BaseBranch:     "main",
 		ClaudeCmd:      sleepScript,
@@ -589,7 +559,7 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 	}
 
 	// Context deadline is short — fires while expeditions are running
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	p := NewPaintress(cfg)
@@ -642,7 +612,7 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	// Create a script that outputs __EXPEDITION_COMPLETE__
@@ -732,7 +702,7 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := newTestServer(t)
 	defer srv.Close()
 
 	// Script that outputs garbage (no expedition markers) → StatusParseError

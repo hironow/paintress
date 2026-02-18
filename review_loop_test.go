@@ -4,36 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
-
-// setupGitRepoWithBranch creates a git repo with a test branch.
-// Strips GIT_DIR/GIT_WORK_TREE to prevent parent repo corruption
-// when tests run inside a git worktree (e.g. pre-push hooks).
-func setupGitRepoWithBranch(t *testing.T, dir string, branch string) {
-	t.Helper()
-	gitEnv := gitIsolatedEnv(dir)
-	commands := [][]string{
-		{"git", "init", "-b", "main"},
-		{"git", "config", "user.email", "test@test.com"},
-		{"git", "config", "user.name", "test"},
-		{"git", "config", "commit.gpgsign", "false"},
-		{"git", "commit", "--allow-empty", "-m", "init"},
-		{"git", "checkout", "-b", branch},
-	}
-	for _, args := range commands {
-		cmd := exec.Command(args[0], args[1:]...)
-		cmd.Dir = dir
-		cmd.Env = gitEnv
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git setup (%v) failed: %s", args, string(out))
-		}
-	}
-}
 
 // writeScript creates an executable shell script.
 func writeScript(t *testing.T, path string, content string) {

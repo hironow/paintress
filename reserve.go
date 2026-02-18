@@ -50,11 +50,10 @@ func (rp *ReserveParty) CheckOutput(chunk string) bool {
 		"rate limit",
 		"rate_limit",
 		"too many requests",
-		"429",
 		"quota exceeded",
 		"usage limit",
 		"try again later",
-		"capacity",
+		"at capacity",
 	}
 
 	for _, signal := range rateLimitSignals {
@@ -62,6 +61,37 @@ func (rp *ReserveParty) CheckOutput(chunk string) bool {
 			rp.onRateLimitDetected()
 			return true
 		}
+	}
+	if hasHTTP429(lower) {
+		rp.onRateLimitDetected()
+		return true
+	}
+	return false
+}
+
+func hasHTTP429(text string) bool {
+	for i := 0; i+3 <= len(text); i++ {
+		if text[i:i+3] != "429" {
+			continue
+		}
+		prevOK := i == 0 || !isAlphaNum(text[i-1])
+		nextOK := i+3 == len(text) || !isAlphaNum(text[i+3])
+		if prevOK && nextOK {
+			return true
+		}
+	}
+	return false
+}
+
+func isAlphaNum(b byte) bool {
+	if b >= '0' && b <= '9' {
+		return true
+	}
+	if b >= 'a' && b <= 'z' {
+		return true
+	}
+	if b >= 'A' && b <= 'Z' {
+		return true
 	}
 	return false
 }
