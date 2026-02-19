@@ -49,6 +49,10 @@ func extractSubcommand(args []string) (subcmd, repoPath string, flagArgs []strin
 		arg := args[i]
 		if strings.HasPrefix(arg, "-") {
 			flagArgs = append(flagArgs, arg)
+			// --flag=value is self-contained; don't consume next arg
+			if strings.Contains(arg, "=") {
+				continue
+			}
 			// If this flag takes a value (next arg is not a flag), consume it
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				// Check if it's a boolean flag (no value needed)

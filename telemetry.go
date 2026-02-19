@@ -10,11 +10,13 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // tracer is the package-level tracer used by all instrumented code.
-// When OTEL_EXPORTER_OTLP_ENDPOINT is unset, this remains a noop tracer (zero cost).
-var tracer trace.Tracer
+// Initialized to a noop tracer so library consumers can call NewPaintress
+// without InitTracer. When InitTracer is called, this is replaced.
+var tracer trace.Tracer = noop.NewTracerProvider().Tracer("paintress")
 
 // InitTracer sets up the OpenTelemetry TracerProvider.
 // If OTEL_EXPORTER_OTLP_ENDPOINT is set, it creates an OTLP HTTP exporter
