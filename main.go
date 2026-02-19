@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 )
 
 // version is set at build time via ldflags.
@@ -34,6 +35,13 @@ type Config struct {
 
 func main() {
 	cfg := parseFlags()
+
+	shutdownTracer := InitTracer("paintress", version)
+	defer func() {
+		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
+		defer c()
+		shutdownTracer(shutdownCtx)
+	}()
 
 	if err := validateContinent(cfg.Continent); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

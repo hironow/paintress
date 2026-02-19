@@ -12,6 +12,9 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 //go:embed templates/expedition_*.md.tmpl
@@ -113,6 +116,15 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// Use the active model from Reserve Party
 	model := e.Reserve.ActiveModel()
 
+	expCtx, invokeSpan := tracer.Start(expCtx, "claude.invoke",
+		trace.WithAttributes(
+			attribute.String("model", model),
+			attribute.Int("expedition.number", e.Number),
+			attribute.Int("timeout_sec", e.Config.TimeoutSec),
+		),
+	)
+	defer invokeSpan.End()
+
 	newCmd := e.makeCmd
 	if newCmd == nil {
 		newCmd = exec.CommandContext
@@ -160,6 +172,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
 	go watchFlag(watchCtx, workDir, watchInterval, func(issue, title string) {
+		invokeSpan.AddEvent("issue.picked",
+			trace.WithAttributes(
+				attribute.String("issue_id", issue),
+				attribute.String("issue_title", title),
+			),
+		)
 		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
 	})
 
@@ -181,7 +199,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				output.Write(chunk)
 
 				// Reserve Party: scan for rate limit signals in real-time
-				e.Reserve.CheckOutput(string(chunk))
+				if e.Reserve.CheckOutput(string(chunk)) {
+					invokeSpan.AddEvent("rate_limit.detected")
+				}
 			}
 			if err != nil {
 				break
@@ -195,6 +215,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	fmt.Println()
 
 	if expCtx.Err() == context.DeadlineExceeded {
+		invokeSpan.AddEvent("expedition.timeout",
+			trace.WithAttributes(attribute.String("timeout", timeout.String())),
+		)
 		return output.String(), fmt.Errorf("timeout after %v", timeout)
 	}
 	if ctx.Err() == context.Canceled {

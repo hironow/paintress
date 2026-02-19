@@ -20,6 +20,8 @@ import (
 func TestMain(m *testing.M) {
 	os.Unsetenv("GIT_DIR")
 	os.Unsetenv("GIT_WORK_TREE")
+	os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	InitTracer("paintress-test", "test")
 	os.Exit(m.Run())
 }
 
