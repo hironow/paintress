@@ -8,3 +8,5 @@ coverage.out
 .claude/*.local.*
 # git worktrees
 .worktrees/
+# golang
+.gocache/
