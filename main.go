@@ -28,6 +28,7 @@ type Config struct {
 	ReviewCmd      string // Code review command (e.g. "codex review --base main")
 	Workers        int    // Number of worktrees in pool (0 = direct execution)
 	SetupCmd       string // Command to run after worktree creation (e.g. "bun install")
+	NoDev          bool   // Skip dev server startup entirely
 	DryRun         bool
 }
 
@@ -72,6 +73,7 @@ func parseFlags() Config {
 	flag.StringVar(&cfg.ReviewCmd, "review-cmd", "codex review --base main", "Code review command after PR creation")
 	flag.IntVar(&cfg.Workers, "workers", 1, "Number of worktrees in pool (0 = direct execution)")
 	flag.StringVar(&cfg.SetupCmd, "setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
+	flag.BoolVar(&cfg.NoDev, "no-dev", false, "Skip dev server startup")
 	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Generate prompts only")
 	flag.StringVar(&lang, "lang", "en", "Output language: en, ja, fr")
 

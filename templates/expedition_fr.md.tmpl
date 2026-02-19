@@ -11,6 +11,12 @@ Vous avez été envoyé dans le Continent (ce dépôt) pour accomplir votre miss
 2. Lire {{.Bt}}.expedition/mission.md{{.Bt}} — règles d'engagement
 3. Lire {{.Bt}}CLAUDE.md{{.Bt}} s'il existe — lois du Continent
 4. Lire la dernière entrée de {{.Bt}}.expedition/journal/{{.Bt}} s'il y en a — leçons du passé
+5. Après avoir sélectionné une issue dans Linear, mettez immédiatement à jour {{.Bt}}.expedition/flag.md{{.Bt}} — ajoutez ces lignes :
+   {{.Cb}}
+   current_issue: <identifiant de l'issue>
+   current_title: <titre de l'issue>
+   {{.Cb}}
+   Cela signale à l'orchestrateur sur quelle issue vous travaillez.
 
 ## Lumina (Compétences passives acquises)
 
@@ -25,7 +31,9 @@ Patterns extraits automatiquement des Expéditions passées. Appliquer comme con
 ## Environnement
 - {{.ReserveSection}}
 - Branche de base : {{.Bt}}{{.BaseBranch}}{{.Bt}}
+{{- if .DevURL}}
 - Serveur dev : {{.Bt}}{{.DevURL}}{{.Bt}} (utilisé pour les missions verify, déjà lancé)
+{{- end}}
 - GitHub : utiliser uniquement pour les Pull Requests (ne PAS utiliser les GitHub Issues)
 - Linear : utiliser uniquement pour les Issues (récupérer, mettre à jour le statut, commenter)
 - Note : les outils MCP sont en chargement différé — utiliser {{.Bt}}ToolSearch{{.Bt}} pour découvrir les outils disponibles avant utilisation

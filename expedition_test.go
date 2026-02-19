@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestHelperProcess is a test helper process used to mock exec.Command.
@@ -477,5 +478,137 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 	p := NewPaintress(cfg)
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
+	}
+}
+
+func TestExpedition_Run_WatcherLogsCurrentIssue(t *testing.T) {
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	// Shell script that writes flag.md then outputs a report
+	script := filepath.Join(dir, "write-flag.sh")
+	flagPath := filepath.Join(dir, ".expedition", "flag.md")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Write current_issue to flag.md
+cat > %s << 'FLAGEOF'
+current_issue: MY-239
+current_title: flag watcher test
+FLAGEOF
+# Wait for watcher to detect
+sleep 1
+echo "done"
+`, flagPath)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	logPath := filepath.Join(logDir, "test-watcher.log")
+	InitLogFile(logPath)
+	defer CloseLogFile()
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:            logDir,
+		Gradient:          NewGradientGauge(5),
+		Reserve:           NewReserveParty("opus", nil),
+		WatchFlagInterval: 100 * time.Millisecond,
+	}
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// Check log file for issue detection
+	logContent, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read log: %v", err)
+	}
+
+	if !containsStr(string(logContent), "MY-239") {
+		t.Errorf("log should contain issue ID 'MY-239', got:\n%s", string(logContent))
+	}
+}
+
+func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
+	dir := t.TempDir()
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			orig := Lang
+			defer func() { Lang = orig }()
+			Lang = lang
+
+			prompt := e.BuildPrompt()
+			if !containsStr(prompt, "current_issue") {
+				t.Errorf("[%s] prompt should contain 'current_issue' instruction", lang)
+			}
+			if !containsStr(prompt, "current_title") {
+				t.Errorf("[%s] prompt should contain 'current_title' instruction", lang)
+			}
+		})
+	}
+}
+
+func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
+	dir := t.TempDir()
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: ""},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	// Test all 3 languages
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			orig := Lang
+			defer func() { Lang = orig }()
+			Lang = lang
+
+			prompt := e.BuildPrompt()
+
+			if containsStr(prompt, "Dev server") || containsStr(prompt, "Serveur dev") {
+				t.Errorf("[%s] prompt should NOT contain dev server line when DevURL is empty", lang)
+			}
+			if containsStr(prompt, "already running") || containsStr(prompt, "既に起動済み") || containsStr(prompt, "déjà lancé") {
+				t.Errorf("[%s] prompt should NOT contain 'already running' when DevURL is empty", lang)
+			}
+		})
+	}
+}
+
+func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
+	dir := t.TempDir()
+	cfg := Config{
+		Continent: dir,
+		Model:     "opus",
+		DevCmd:    "npm run dev",
+		DevURL:    "http://localhost:3000",
+		NoDev:     true,
+	}
+
+	p := NewPaintress(cfg)
+
+	if p.devServer != nil {
+		t.Error("devServer should be nil when NoDev=true")
+	}
+	if p.config.DevURL != "" {
+		t.Errorf("DevURL should be cleared when NoDev=true, got %q", p.config.DevURL)
 	}
 }

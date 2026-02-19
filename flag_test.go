@@ -163,6 +163,45 @@ func TestWriteFlag_SanitizesStatusAndRemaining(t *testing.T) {
 	}
 }
 
+func TestReadFlag_CurrentIssueAndTitle(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	content := `last_expedition: 3
+current_issue: MY-239
+current_title: flag.md watcher
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+
+	f := ReadFlag(dir)
+	if f.CurrentIssue != "MY-239" {
+		t.Errorf("CurrentIssue = %q, want %q", f.CurrentIssue, "MY-239")
+	}
+	if f.CurrentTitle != "flag.md watcher" {
+		t.Errorf("CurrentTitle = %q, want %q", f.CurrentTitle, "flag.md watcher")
+	}
+}
+
+func TestReadFlag_CurrentIssueAbsent_DefaultsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	content := `last_expedition: 1
+remaining_issues: 5
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+
+	f := ReadFlag(dir)
+	if f.CurrentIssue != "" {
+		t.Errorf("CurrentIssue should default to empty, got %q", f.CurrentIssue)
+	}
+	if f.CurrentTitle != "" {
+		t.Errorf("CurrentTitle should default to empty, got %q", f.CurrentTitle)
+	}
+}
+
 func TestReadFlag_InvalidAndNegativeExpedition(t *testing.T) {
 	dir := t.TempDir()
 	expDir := filepath.Join(dir, ".expedition")

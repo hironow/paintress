@@ -65,16 +65,23 @@ func NewPaintress(cfg Config) *Paintress {
 		devDir = cfg.Continent
 	}
 
-	return &Paintress{
+	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
 		gradient: NewGradientGauge(gradientMax),
 		reserve:  NewReserveParty(primary, reserves),
-		devServer: NewDevServer(
+	}
+
+	if !cfg.NoDev {
+		p.devServer = NewDevServer(
 			cfg.DevCmd, cfg.DevURL, devDir,
 			filepath.Join(logDir, "dev-server.log"),
-		),
+		)
+	} else {
+		p.config.DevURL = ""
 	}
+
+	return p
 }
 
 func (p *Paintress) Run(ctx context.Context) int {
@@ -111,7 +118,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	fmt.Println()
 
 	// Start dev server (stays alive across expeditions)
-	if !p.config.DryRun {
+	if !p.config.DryRun && p.devServer != nil {
 		if err := p.devServer.Start(ctx); err != nil {
 			LogWarn("%s", fmt.Sprintf(Msg("devserver_warn"), err))
 		}

@@ -16,6 +16,8 @@ type ExpeditionFlag struct {
 	LastIssue      string
 	LastStatus     string
 	Remaining      string
+	CurrentIssue   string
+	CurrentTitle   string
 }
 
 func FlagPath(continent string) string {
@@ -45,6 +47,10 @@ func ReadFlag(continent string) ExpeditionFlag {
 				f.LastStatus = v
 			case "remaining_issues":
 				f.Remaining = v
+			case "current_issue":
+				f.CurrentIssue = v
+			case "current_title":
+				f.CurrentTitle = v
 			}
 		}
 	}

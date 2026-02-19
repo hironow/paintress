@@ -772,3 +772,30 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 		t.Errorf("flag regressed: expected last_issue=ISS-5, got %s", flag.LastIssue)
 	}
 }
+
+func TestPaintressRun_NoDev_SkipsDevServer(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	cfg := Config{
+		Continent:      dir,
+		MaxExpeditions: 1,
+		TimeoutSec:     30,
+		Model:          "opus",
+		BaseBranch:     "main",
+		NoDev:          true,
+		DryRun:         true,
+	}
+
+	p := NewPaintress(cfg)
+
+	// devServer should be nil — no panic during Run
+	if p.devServer != nil {
+		t.Fatal("devServer should be nil when NoDev=true")
+	}
+
+	code := p.Run(context.Background())
+	if code != 0 {
+		t.Fatalf("Run() = %d, want 0", code)
+	}
+}

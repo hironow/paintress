@@ -50,6 +50,10 @@ type Expedition struct {
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+
+	// WatchFlagInterval overrides the flag.md polling interval for testing.
+	// Zero means use the default (5s).
+	WatchFlagInterval time.Duration
 }
 
 // BuildPrompt generates the expedition prompt in the configured language.
@@ -147,6 +151,17 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("%s start failed: %w", claudeCmd, err)
 	}
+
+	// Start flag.md watcher to detect issue selection in real-time
+	watchInterval := e.WatchFlagInterval
+	if watchInterval == 0 {
+		watchInterval = 5 * time.Second
+	}
+	watchCtx, watchCancel := context.WithCancel(expCtx)
+	defer watchCancel()
+	go watchFlag(watchCtx, workDir, watchInterval, func(issue, title string) {
+		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
+	})
 
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
 	var output strings.Builder
