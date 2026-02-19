@@ -63,7 +63,11 @@ type Expedition struct {
 
 // BuildPrompt generates the expedition prompt in the configured language.
 func (e *Expedition) BuildPrompt() string {
-	projCfg, _ := LoadProjectConfig(e.Continent)
+	projCfg, err := LoadProjectConfig(e.Continent)
+	if err != nil {
+		LogWarn("project config load failed: %v", err)
+		projCfg = &ProjectConfig{}
+	}
 
 	data := PromptData{
 		Number:          e.Number,

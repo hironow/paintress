@@ -703,6 +703,36 @@ func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
 	}
 }
 
+func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// Write malformed YAML that will fail to parse
+	os.WriteFile(
+		filepath.Join(dir, ".expedition", "config.yaml"),
+		[]byte("{{invalid yaml\n\t::: broken"),
+		0644,
+	)
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	// Must not panic — should gracefully omit Linear scope
+	prompt := e.BuildPrompt()
+
+	if containsStr(prompt, "Linear Scope") {
+		t.Error("prompt should NOT contain Linear Scope for malformed config")
+	}
+	if !containsStr(prompt, "Expedition #1") {
+		t.Error("prompt should still be generated despite malformed config")
+	}
+}
+
 // TestLifecycle_Init_Then_Expedition verifies the full lifecycle:
 // paintress init (config.yaml) → expedition run → prompt file contains Linear scope.
 // External world (Claude) is stubbed via fakeMakeCmd.
