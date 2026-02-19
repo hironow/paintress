@@ -28,6 +28,17 @@ Patterns extraits automatiquement des Expéditions passées. Appliquer comme con
 
 {{.GradientSection}}
 
+{{- if .LinearTeam}}
+
+## Scope Linear
+
+- Équipe : {{.Bt}}{{.LinearTeam}}{{.Bt}}
+{{- if .LinearProject}}
+- Projet : {{.Bt}}{{.LinearProject}}{{.Bt}}
+{{- end}}
+- Ne traiter que les issues de cette équipe{{if .LinearProject}} et de ce projet{{end}}.
+{{- end}}
+
 ## Environnement
 - {{.ReserveSection}}
 - Branche de base : {{.Bt}}{{.BaseBranch}}{{.Bt}}

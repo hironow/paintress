@@ -652,6 +652,184 @@ func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
 	}
 }
 
+func TestBuildPrompt_WithLinearConfig(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// Write a config.yaml with Linear scope
+	cfg := &ProjectConfig{
+		Linear: LinearConfig{
+			Team:    "ENG",
+			Project: "backend",
+		},
+	}
+	if err := SaveProjectConfig(dir, cfg); err != nil {
+		t.Fatalf("SaveProjectConfig: %v", err)
+	}
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := e.BuildPrompt()
+
+	if !containsStr(prompt, "ENG") {
+		t.Error("prompt should contain Linear team key 'ENG'")
+	}
+	if !containsStr(prompt, "backend") {
+		t.Error("prompt should contain Linear project 'backend'")
+	}
+}
+
+func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := e.BuildPrompt()
+
+	if containsStr(prompt, "Linear Scope") {
+		t.Error("prompt should NOT contain Linear Scope when no config exists")
+	}
+}
+
+// TestLifecycle_Init_Then_Expedition verifies the full lifecycle:
+// paintress init (config.yaml) → expedition run → prompt file contains Linear scope.
+// External world (Claude) is stubbed via fakeMakeCmd.
+func TestLifecycle_Init_Then_Expedition(t *testing.T) {
+	dir := t.TempDir()
+	logDir := t.TempDir()
+
+	// Phase 1: simulate `paintress init` with stdin
+	input := "MY\npaintress\n"
+	if err := runInitWithReader(dir, strings.NewReader(input)); err != nil {
+		t.Fatalf("runInitWithReader: %v", err)
+	}
+
+	// Verify config was persisted
+	cfg, err := LoadProjectConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadProjectConfig: %v", err)
+	}
+	if cfg.Linear.Team != "MY" || cfg.Linear.Project != "paintress" {
+		t.Fatalf("unexpected config: team=%q project=%q", cfg.Linear.Team, cfg.Linear.Project)
+	}
+
+	// Phase 2: run expedition with fake Claude (outputs a valid report)
+	reportOutput := `Working on issue...
+
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: MY-100
+issue_title: lifecycle test
+mission_type: implement
+branch: feat/MY-100
+pr_url: https://github.com/org/repo/pull/99
+status: success
+reason: done
+failure_type: none
+insight: lifecycle works
+remaining_issues: 3
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+		},
+		LogDir:   logDir,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil),
+		makeCmd:  fakeMakeCmd(reportOutput, 0),
+	}
+
+	ctx := context.Background()
+	output, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// Phase 3: verify expedition output is valid
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "MY-100" {
+		t.Errorf("IssueID = %q, want MY-100", report.IssueID)
+	}
+
+	// Phase 4: verify the prompt file contains Linear scope from init
+	promptFile := filepath.Join(logDir, "expedition-001-prompt.md")
+	promptContent, err := os.ReadFile(promptFile)
+	if err != nil {
+		t.Fatalf("read prompt file: %v", err)
+	}
+	prompt := string(promptContent)
+
+	if !containsStr(prompt, "MY") {
+		t.Error("prompt file should contain Linear team 'MY' from init")
+	}
+	if !containsStr(prompt, "paintress") {
+		t.Error("prompt file should contain Linear project 'paintress' from init")
+	}
+	if !containsStr(prompt, "Linear Scope") {
+		t.Error("prompt file should contain 'Linear Scope' section")
+	}
+}
+
+// TestLifecycle_NoInit_Then_Expedition verifies that expedition works
+// without prior init — no Linear Scope section in prompt.
+func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+		},
+		LogDir:   logDir,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil),
+		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
+	}
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	promptFile := filepath.Join(logDir, "expedition-001-prompt.md")
+	promptContent, err := os.ReadFile(promptFile)
+	if err != nil {
+		t.Fatalf("read prompt file: %v", err)
+	}
+
+	if containsStr(string(promptContent), "Linear Scope") {
+		t.Error("prompt should NOT contain Linear Scope when no init was done")
+	}
+}
+
 func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 	dir := t.TempDir()
 	cfg := Config{

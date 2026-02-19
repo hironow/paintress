@@ -28,6 +28,17 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 {{.GradientSection}}
 
+{{- if .LinearTeam}}
+
+## Linear スコープ
+
+- チーム: {{.Bt}}{{.LinearTeam}}{{.Bt}}
+{{- if .LinearProject}}
+- プロジェクト: {{.Bt}}{{.LinearProject}}{{.Bt}}
+{{- end}}
+- このチーム{{if .LinearProject}}とプロジェクト{{end}}の issue のみを対象にすること。
+{{- end}}
+
 ## 環境情報
 - {{.ReserveSection}}
 - Base branch: {{.Bt}}{{.BaseBranch}}{{.Bt}}

@@ -36,6 +36,8 @@ type PromptData struct {
 	BaseBranch      string
 	DevURL          string
 	ContextSection  string
+	LinearTeam      string
+	LinearProject   string
 }
 
 // Expedition represents a single expedition into the Continent.
@@ -61,6 +63,8 @@ type Expedition struct {
 
 // BuildPrompt generates the expedition prompt in the configured language.
 func (e *Expedition) BuildPrompt() string {
+	projCfg, _ := LoadProjectConfig(e.Continent)
+
 	data := PromptData{
 		Number:          e.Number,
 		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
@@ -72,6 +76,8 @@ func (e *Expedition) BuildPrompt() string {
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection(),
+		LinearTeam:      projCfg.Linear.Team,
+		LinearProject:   projCfg.Linear.Project,
 	}
 
 	tmplName := "expedition_en.md.tmpl"

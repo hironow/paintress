@@ -34,6 +34,22 @@ type Config struct {
 }
 
 func main() {
+	// Subcommand routing: check before falling through to flag-based flow
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "init":
+			if len(os.Args) < 3 {
+				fmt.Fprintf(os.Stderr, "Usage: paintress init <repo-path>\n")
+				os.Exit(1)
+			}
+			runInit(os.Args[2])
+			return
+		case "doctor":
+			runDoctor()
+			return
+		}
+	}
+
 	cfg := parseFlags()
 
 	shutdownTracer := InitTracer("paintress", version)
@@ -88,11 +104,16 @@ func parseFlags() Config {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: paintress <repo-path> [options]\n\n")
 		fmt.Fprintf(os.Stderr, "The Paintress — drives the Expedition loop.\n\n")
+		fmt.Fprintf(os.Stderr, "Commands:\n")
+		fmt.Fprintf(os.Stderr, "  init <repo-path>   Initialize project configuration\n")
+		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
 		fmt.Fprintf(os.Stderr, "  <repo-path>    Target repository (The Continent)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nExamples:\n")
+		fmt.Fprintf(os.Stderr, "  paintress init ./my-repo\n")
+		fmt.Fprintf(os.Stderr, "  paintress doctor\n")
 		fmt.Fprintf(os.Stderr, "  paintress ./my-repo\n")
 		fmt.Fprintf(os.Stderr, "  paintress ./my-repo --model opus,sonnet --lang ja\n")
 		fmt.Fprintf(os.Stderr, "  paintress ./my-repo --dry-run\n")

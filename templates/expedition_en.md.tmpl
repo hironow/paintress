@@ -28,6 +28,17 @@ Patterns auto-extracted from past Expeditions. Apply these as constraints — av
 
 {{.GradientSection}}
 
+{{- if .LinearTeam}}
+
+## Linear Scope
+
+- Team: {{.Bt}}{{.LinearTeam}}{{.Bt}}
+{{- if .LinearProject}}
+- Project: {{.Bt}}{{.LinearProject}}{{.Bt}}
+{{- end}}
+- Only pick issues from this team{{if .LinearProject}} and project{{end}}.
+{{- end}}
+
 ## Environment
 - {{.ReserveSection}}
 - Base branch: {{.Bt}}{{.BaseBranch}}{{.Bt}}
