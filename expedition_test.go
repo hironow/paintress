@@ -537,6 +537,65 @@ echo "done"
 	}
 }
 
+// TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir verifies that
+// in worktree mode (WorkDir != Continent), the flag watcher polls
+// Continent/.expedition/flag.md — NOT WorkDir/.expedition/flag.md.
+func TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir(t *testing.T) {
+	continent := t.TempDir()
+	workDir := t.TempDir() // simulate worktree — different from continent
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(workDir, ".expedition"), 0755)
+
+	// Script writes flag.md to CONTINENT root (not workDir), then outputs
+	flagPath := filepath.Join(continent, ".expedition", "flag.md")
+	script := filepath.Join(workDir, "write-flag.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+cat > %s << 'FLAGEOF'
+current_issue: TREE-42
+current_title: worktree watcher test
+FLAGEOF
+sleep 1
+echo "done"
+`, flagPath)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
+	InitLogFile(logPath)
+	defer CloseLogFile()
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: continent,
+		WorkDir:   workDir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:            logDir,
+		Gradient:          NewGradientGauge(5),
+		Reserve:           NewReserveParty("opus", nil),
+		WatchFlagInterval: 100 * time.Millisecond,
+	}
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	logContent, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read log: %v", err)
+	}
+
+	if !containsStr(string(logContent), "TREE-42") {
+		t.Errorf("watcher should detect issue from CONTINENT flag.md, not workDir; log:\n%s", string(logContent))
+	}
+}
+
 func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
 	dir := t.TempDir()
 	e := &Expedition{

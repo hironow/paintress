@@ -171,7 +171,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
-	go watchFlag(watchCtx, workDir, watchInterval, func(issue, title string) {
+	go watchFlag(watchCtx, e.Continent, watchInterval, func(issue, title string) {
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
 				attribute.String("issue_id", issue),
