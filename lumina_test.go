@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"fmt"
@@ -43,14 +43,6 @@ func TestExtractValue_ValueWithColons(t *testing.T) {
 	}
 }
 
-func TestLuminaPath(t *testing.T) {
-	p := LuminaPath("/some/repo")
-	want := filepath.Join("/some/repo", ".expedition", "lumina.md")
-	if p != want {
-		t.Errorf("LuminaPath = %q, want %q", p, want)
-	}
-}
-
 func TestFormatLuminaForPrompt_Empty(t *testing.T) {
 	result := FormatLuminaForPrompt(nil)
 	if !containsStr(result, "No Lumina learned") {
@@ -76,50 +68,6 @@ func TestFormatLuminaForPrompt_WithLuminas(t *testing.T) {
 	}
 	if !containsStr(result, "implement") {
 		t.Errorf("should contain success pattern: %q", result)
-	}
-}
-
-func TestWriteLumina_Empty(t *testing.T) {
-	err := WriteLumina("/tmp/test", nil)
-	if err != nil {
-		t.Errorf("empty luminas should return nil, got %v", err)
-	}
-}
-
-func TestWriteLumina_WritesFile(t *testing.T) {
-	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
-
-	luminas := []Lumina{
-		{Pattern: "[WARN] Avoid — failed 2 times: timeout", Source: "failure-pattern", Uses: 2},
-		{Pattern: "[OK] Proven approach (3x successful): fix", Source: "success-pattern", Uses: 3},
-	}
-
-	err := WriteLumina(dir, luminas)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	content, err := os.ReadFile(LuminaPath(dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(content)
-
-	if !containsStr(s, "Learned Passive Skills") {
-		t.Error("should contain header")
-	}
-	if !containsStr(s, "Defensive") {
-		t.Error("should contain defensive section")
-	}
-	if !containsStr(s, "Offensive") {
-		t.Error("should contain offensive section")
-	}
-	if !containsStr(s, "timeout") {
-		t.Error("should contain failure pattern")
-	}
-	if !containsStr(s, "fix") {
-		t.Error("should contain success pattern")
 	}
 }
 

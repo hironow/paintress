@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	var mu sync.Mutex
 	var gotIssue, gotTitle string
@@ -34,7 +34,7 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 	// Write flag after watcher starts
 	time.Sleep(100 * time.Millisecond)
 	content := "current_issue: MY-239\ncurrent_title: flag watcher\n"
-	os.WriteFile(filepath.Join(dir, ".expedition", "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(dir, ".expedition", ".run", "flag.md"), []byte(content), 0644)
 
 	select {
 	case <-done:
@@ -54,7 +54,7 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 
 func TestWatchFlag_StopsOnContextCancel(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -76,12 +76,12 @@ func TestWatchFlag_StopsOnContextCancel(t *testing.T) {
 
 func TestWatchFlag_DoesNotFireOnSameIssue(t *testing.T) {
 	dir := t.TempDir()
-	expDir := filepath.Join(dir, ".expedition")
-	os.MkdirAll(expDir, 0755)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
 
 	// Pre-write flag before watcher starts
 	content := "current_issue: MY-239\ncurrent_title: same issue\n"
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	var callCount int
 	var mu sync.Mutex
@@ -104,8 +104,8 @@ func TestWatchFlag_DoesNotFireOnSameIssue(t *testing.T) {
 
 func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 	dir := t.TempDir()
-	expDir := filepath.Join(dir, ".expedition")
-	os.MkdirAll(expDir, 0755)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
 
 	var mu sync.Mutex
 	var issues []string
@@ -129,13 +129,13 @@ func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 
 	// First issue
 	time.Sleep(100 * time.Millisecond)
-	os.WriteFile(filepath.Join(expDir, "flag.md"),
+	os.WriteFile(filepath.Join(runDir, "flag.md"),
 		[]byte("current_issue: MY-239\ncurrent_title: first\n"), 0644)
 
 	time.Sleep(200 * time.Millisecond)
 
 	// Second issue
-	os.WriteFile(filepath.Join(expDir, "flag.md"),
+	os.WriteFile(filepath.Join(runDir, "flag.md"),
 		[]byte("current_issue: MY-240\ncurrent_title: second\n"), 0644)
 
 	select {

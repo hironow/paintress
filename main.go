@@ -1,21 +1,14 @@
-package main
+package paintress
 
 import (
-	"context"
-	"flag"
-	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
-	"time"
 )
 
-// version is set at build time via ldflags.
-var version = "dev"
+// DefaultClaudeCmd is the default CLI command name for Claude Code.
+const DefaultClaudeCmd = "claude"
 
-const defaultClaudeCmd = "claude"
-
+// Config holds the runtime configuration for a Paintress session.
 type Config struct {
 	Continent      string
 	MaxExpeditions int
@@ -33,139 +26,23 @@ type Config struct {
 	DryRun         bool
 }
 
-func main() {
-	// Subcommand routing: check before falling through to flag-based flow
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "init":
-			if len(os.Args) < 3 {
-				fmt.Fprintf(os.Stderr, "Usage: paintress init <repo-path>\n")
-				os.Exit(1)
-			}
-			runInit(os.Args[2])
-			return
-		case "doctor":
-			runDoctor()
-			return
-		}
-	}
-
-	cfg := parseFlags()
-
-	shutdownTracer := InitTracer("paintress", version)
-	defer func() {
-		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
-		defer c()
-		shutdownTracer(shutdownCtx)
-	}()
-
-	if err := validateContinent(cfg.Continent); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-sigCh
-		LogWarn("%s", fmt.Sprintf(Msg("signal_received"), sig))
-		cancel()
-	}()
-
-	p := NewPaintress(cfg)
-	os.Exit(p.Run(ctx))
-}
-
-func parseFlags() Config {
-	cfg := Config{}
-	var lang string
-	var showVersion bool
-
-	flag.BoolVar(&showVersion, "version", false, "Show version and exit")
-	flag.IntVar(&cfg.MaxExpeditions, "max-expeditions", 50, "Maximum number of expeditions")
-	flag.IntVar(&cfg.TimeoutSec, "timeout", 1980, "Timeout per expedition in seconds (default: 33min)")
-	flag.StringVar(&cfg.Model, "model", "opus", "Model(s) comma-separated for reserve: opus,sonnet,haiku")
-	flag.StringVar(&cfg.BaseBranch, "base-branch", "main", "Base branch")
-	flag.StringVar(&cfg.ClaudeCmd, "claude-cmd", defaultClaudeCmd, "Claude Code CLI command name")
-	flag.StringVar(&cfg.DevCmd, "dev-cmd", "npm run dev", "Dev server command")
-	flag.StringVar(&cfg.DevDir, "dev-dir", "", "Dev server working directory (defaults to repo path)")
-	flag.StringVar(&cfg.DevURL, "dev-url", "http://localhost:3000", "Dev server URL")
-	flag.StringVar(&cfg.ReviewCmd, "review-cmd", "codex review --base main", "Code review command after PR creation")
-	flag.IntVar(&cfg.Workers, "workers", 1, "Number of worktrees in pool (0 = direct execution)")
-	flag.StringVar(&cfg.SetupCmd, "setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
-	flag.BoolVar(&cfg.NoDev, "no-dev", false, "Skip dev server startup")
-	flag.BoolVar(&cfg.DryRun, "dry-run", false, "Generate prompts only")
-	flag.StringVar(&lang, "lang", "en", "Output language: en, ja, fr")
-
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: paintress <repo-path> [options]\n\n")
-		fmt.Fprintf(os.Stderr, "The Paintress — drives the Expedition loop.\n\n")
-		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "  init <repo-path>   Initialize project configuration\n")
-		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n\n")
-		fmt.Fprintf(os.Stderr, "Arguments:\n")
-		fmt.Fprintf(os.Stderr, "  <repo-path>    Target repository (The Continent)\n\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
-		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nExamples:\n")
-		fmt.Fprintf(os.Stderr, "  paintress init ./my-repo\n")
-		fmt.Fprintf(os.Stderr, "  paintress doctor\n")
-		fmt.Fprintf(os.Stderr, "  paintress ./my-repo\n")
-		fmt.Fprintf(os.Stderr, "  paintress ./my-repo --model opus,sonnet --lang ja\n")
-		fmt.Fprintf(os.Stderr, "  paintress ./my-repo --dry-run\n")
-	}
-
-	flag.Parse()
-
-	// Derive --review-cmd default from --base-branch when not explicitly set
-	reviewCmdExplicit := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "review-cmd" {
-			reviewCmdExplicit = true
-		}
-	})
-	if !reviewCmdExplicit {
-		cfg.ReviewCmd = fmt.Sprintf("codex review --base %s", cfg.BaseBranch)
-	}
-
-	if showVersion {
-		fmt.Printf("paintress %s\n", version)
-		os.Exit(0)
-	}
-
-	if lang == "ja" || lang == "en" || lang == "fr" {
-		Lang = lang
-	}
-
-	if flag.NArg() < 1 {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	continent, err := filepath.Abs(flag.Arg(0))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: invalid path: %v\n", err)
-		os.Exit(1)
-	}
-	cfg.Continent = continent
-
-	return cfg
-}
-
-func validateContinent(continent string) error {
+// ValidateContinent ensures the .expedition directory structure exists.
+func ValidateContinent(continent string) error {
 	journalDir := filepath.Join(continent, ".expedition", "journal")
 	if err := os.MkdirAll(journalDir, 0755); err != nil {
 		return err
 	}
 
-	// Ensure .logs/ is gitignored
+	// Ensure .run/ directory exists for ephemeral files (flag.md, logs/, worktrees/)
+	runDir := filepath.Join(continent, ".expedition", ".run")
+	if err := os.MkdirAll(runDir, 0755); err != nil {
+		return err
+	}
+
+	// Ensure .run/ is gitignored
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
 	if _, err := os.Stat(gitignore); os.IsNotExist(err) {
-		os.WriteFile(gitignore, []byte(".logs/\nworktrees/\n"), 0644)
+		os.WriteFile(gitignore, []byte(".run/\n"), 0644)
 	}
 	return nil
 }

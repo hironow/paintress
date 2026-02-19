@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"fmt"
@@ -90,27 +90,6 @@ func TestLumina_ConcurrentScan_CalledFromMultipleGoroutines(t *testing.T) {
 			t.Errorf("goroutine %d returned 0 luminas", i)
 		}
 	}
-}
-
-func TestLumina_WriteLumina_ConcurrentCalls(t *testing.T) {
-	// WriteLumina is called sequentially in production (Paintress loop),
-	// but verify concurrent calls don't panic or corrupt state.
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
-			dir := t.TempDir()
-			os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
-			luminas := []Lumina{
-				{Pattern: fmt.Sprintf("pattern %d", n), Source: "test", Uses: 1},
-			}
-			if err := WriteLumina(dir, luminas); err != nil {
-				t.Errorf("WriteLumina(%d) error: %v", n, err)
-			}
-		}(i)
-	}
-	wg.Wait()
 }
 
 // === DevServer: Start/Stop Race ===

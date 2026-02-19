@@ -7,11 +7,10 @@ Vous avez été envoyé dans le Continent (ce dépôt) pour accomplir votre miss
 
 ## Premières étapes (suivre cet ordre)
 
-1. Lire {{.Bt}}.expedition/flag.md{{.Bt}} s'il existe — checkpoint de l'Expédition précédente (absent au premier lancement)
-2. Lire {{.Bt}}.expedition/mission.md{{.Bt}} — règles d'engagement
-3. Lire {{.Bt}}CLAUDE.md{{.Bt}} s'il existe — lois du Continent
-4. Lire la dernière entrée de {{.Bt}}.expedition/journal/{{.Bt}} s'il y en a — leçons du passé
-5. Après avoir sélectionné une issue dans Linear, mettez immédiatement à jour {{.Bt}}.expedition/flag.md{{.Bt}} — ajoutez ces lignes :
+1. Lire {{.Bt}}.expedition/.run/flag.md{{.Bt}} s'il existe — checkpoint de l'Expédition précédente (absent au premier lancement)
+2. Lire {{.Bt}}CLAUDE.md{{.Bt}} s'il existe — lois du Continent
+3. Lire la dernière entrée de {{.Bt}}.expedition/journal/{{.Bt}} s'il y en a — leçons du passé
+4. Après avoir sélectionné une issue dans Linear, mettez immédiatement à jour {{.Bt}}.expedition/.run/flag.md{{.Bt}} — ajoutez ces lignes :
    {{.Cb}}
    current_issue: <identifiant de l'issue>
    current_title: <titre de l'issue>
@@ -56,6 +55,10 @@ Le contexte suivant a été fourni pour cette expédition. Traitez-le comme une 
 
 {{.ContextSection}}
 {{- end}}
+
+## Mission — Règles d'engagement
+
+{{.MissionSection}}
 
 ## Sortie requise
 

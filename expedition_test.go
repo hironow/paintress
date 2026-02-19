@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -87,8 +87,8 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 	if !containsStr(prompt, "flag.md") {
 		t.Error("prompt should reference flag.md")
 	}
-	if !containsStr(prompt, "mission.md") {
-		t.Error("prompt should reference mission.md")
+	if !containsStr(prompt, "Rules of Engagement") {
+		t.Error("prompt should contain mission rules of engagement")
 	}
 	if !containsStr(prompt, "CLAUDE.md") {
 		t.Error("prompt should reference CLAUDE.md")
@@ -485,10 +485,11 @@ func TestExpedition_Run_WatcherLogsCurrentIssue(t *testing.T) {
 	dir := t.TempDir()
 	logDir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Shell script that writes flag.md then outputs a report
 	script := filepath.Join(dir, "write-flag.sh")
-	flagPath := filepath.Join(dir, ".expedition", "flag.md")
+	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
 	scriptContent := fmt.Sprintf(`#!/bin/bash
 # Write current_issue to flag.md
 cat > %s << 'FLAGEOF'
@@ -539,16 +540,17 @@ echo "done"
 
 // TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir verifies that
 // in worktree mode (WorkDir != Continent), the flag watcher polls
-// Continent/.expedition/flag.md — NOT WorkDir/.expedition/flag.md.
+// Continent/.expedition/.run/flag.md — NOT WorkDir/.expedition/.run/flag.md.
 func TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir(t *testing.T) {
 	continent := t.TempDir()
 	workDir := t.TempDir() // simulate worktree — different from continent
 	logDir := t.TempDir()
 	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(workDir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
+	os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755)
 
 	// Script writes flag.md to CONTINENT root (not workDir), then outputs
-	flagPath := filepath.Join(continent, ".expedition", "flag.md")
+	flagPath := filepath.Join(continent, ".expedition", ".run", "flag.md")
 	script := filepath.Join(workDir, "write-flag.sh")
 	scriptContent := fmt.Sprintf(`#!/bin/bash
 cat > %s << 'FLAGEOF'
@@ -642,8 +644,8 @@ func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
 
 			prompt := e.BuildPrompt()
 
-			if containsStr(prompt, "Dev server") || containsStr(prompt, "Serveur dev") {
-				t.Errorf("[%s] prompt should NOT contain dev server line when DevURL is empty", lang)
+			if containsStr(prompt, "- Dev server:") || containsStr(prompt, "- Serveur dev :") {
+				t.Errorf("[%s] prompt should NOT contain dev server environment line when DevURL is empty", lang)
 			}
 			if containsStr(prompt, "already running") || containsStr(prompt, "既に起動済み") || containsStr(prompt, "déjà lancé") {
 				t.Errorf("[%s] prompt should NOT contain 'already running' when DevURL is empty", lang)
@@ -742,8 +744,8 @@ func TestLifecycle_Init_Then_Expedition(t *testing.T) {
 
 	// Phase 1: simulate `paintress init` with stdin
 	input := "MY\npaintress\n"
-	if err := runInitWithReader(dir, strings.NewReader(input)); err != nil {
-		t.Fatalf("runInitWithReader: %v", err)
+	if err := RunInitWithReader(dir, strings.NewReader(input)); err != nil {
+		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
 	// Verify config was persisted
@@ -857,6 +859,28 @@ func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
 
 	if containsStr(string(promptContent), "Linear Scope") {
 		t.Error("prompt should NOT contain Linear Scope when no init was done")
+	}
+}
+
+func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
+	dir := t.TempDir()
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := e.BuildPrompt()
+
+	// Mission content should be embedded directly in the prompt
+	if !containsStr(prompt, "Rules of Engagement") {
+		t.Error("prompt should contain mission 'Rules of Engagement' section")
+	}
+	if !containsStr(prompt, "implement") && !containsStr(prompt, "verify") {
+		t.Error("prompt should contain mission type descriptions")
 	}
 }
 

@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -76,6 +76,7 @@ func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
 func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Plant a flag indicating expedition 7 was the last
 	WriteFlag(dir, 7, "AWE-50", "success", "3")
@@ -120,6 +121,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 	dir := t.TempDir()
 	jDir := filepath.Join(dir, ".expedition", "journal")
 	os.MkdirAll(jDir, 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Simulate 3 previous expeditions with journals
 	for i := 1; i <= 3; i++ {
@@ -179,7 +181,7 @@ func TestReadFlag_ResumeExpeditionNumber(t *testing.T) {
 		{
 			name: "flag at expedition 5",
 			setup: func(dir string) {
-				os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+				os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 				WriteFlag(dir, 5, "AWE-10", "success", "8")
 			},
 			wantLastExp:   5,
@@ -189,7 +191,7 @@ func TestReadFlag_ResumeExpeditionNumber(t *testing.T) {
 		{
 			name: "flag at expedition 20",
 			setup: func(dir string) {
-				os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+				os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 				WriteFlag(dir, 20, "AWE-99", "failed", "2")
 			},
 			wantLastExp:   20,
@@ -293,7 +295,7 @@ func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 
-	logDir := filepath.Join(dir, ".expedition", ".logs")
+	logDir := filepath.Join(dir, ".expedition", ".run", "logs")
 	prompts, err := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
 	if err != nil {
 		t.Fatalf("glob error: %v", err)
@@ -339,7 +341,7 @@ func TestSwarmMode_DryRun_SingleWorker(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 
-	logDir := filepath.Join(dir, ".expedition", ".logs")
+	logDir := filepath.Join(dir, ".expedition", ".run", "logs")
 	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
 	if len(prompts) != 1 {
 		t.Errorf("expected 1 prompt file, got %d", len(prompts))
@@ -406,7 +408,7 @@ func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 
-	logDir := filepath.Join(dir, ".expedition", ".logs")
+	logDir := filepath.Join(dir, ".expedition", ".run", "logs")
 	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
 	if len(prompts) != 2 {
 		t.Errorf("expected 2 prompt files (MaxExpeditions=2), got %d: %v", len(prompts), prompts)
@@ -458,6 +460,7 @@ func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
 
 func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	dir := setupTestRepo(t)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Plant flag at expedition 4
 	WriteFlag(dir, 4, "AWE-10", "success", "10")
@@ -479,7 +482,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 
-	logDir := filepath.Join(dir, ".expedition", ".logs")
+	logDir := filepath.Join(dir, ".expedition", ".run", "logs")
 
 	// Should have prompts for expeditions 5, 6, 7 (not 1, 2, 3)
 	for _, expNum := range []int{5, 6, 7} {
@@ -599,7 +602,7 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 		t.Fatalf("expected exit code 0, got %d", code)
 	}
 
-	logDir := filepath.Join(dir, ".expedition", ".logs")
+	logDir := filepath.Join(dir, ".expedition", ".run", "logs")
 	prompts, _ := filepath.Glob(filepath.Join(logDir, "expedition-*-prompt.md"))
 
 	// DryRun respects MaxExpeditions: single worker loops to create 2 prompts

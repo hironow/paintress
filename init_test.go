@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"os"
@@ -14,8 +14,8 @@ func TestRunInit_WritesConfig(t *testing.T) {
 	input := "ENG\nbackend\n"
 	reader := strings.NewReader(input)
 
-	if err := runInitWithReader(dir, reader); err != nil {
-		t.Fatalf("runInitWithReader: %v", err)
+	if err := RunInitWithReader(dir, reader); err != nil {
+		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
 	// Verify config file was created
@@ -44,8 +44,8 @@ func TestRunInit_SkipOptionalProject(t *testing.T) {
 	input := "MY\n\n"
 	reader := strings.NewReader(input)
 
-	if err := runInitWithReader(dir, reader); err != nil {
-		t.Fatalf("runInitWithReader: %v", err)
+	if err := RunInitWithReader(dir, reader); err != nil {
+		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
 	cfg, err := LoadProjectConfig(dir)
@@ -66,8 +66,8 @@ func TestRunInit_CreatesExpeditionDir(t *testing.T) {
 	input := "MY\n\n"
 	reader := strings.NewReader(input)
 
-	if err := runInitWithReader(dir, reader); err != nil {
-		t.Fatalf("runInitWithReader: %v", err)
+	if err := RunInitWithReader(dir, reader); err != nil {
+		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
 	// .expedition directory should exist

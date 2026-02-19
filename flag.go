@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"bufio"
@@ -21,7 +21,7 @@ type ExpeditionFlag struct {
 }
 
 func FlagPath(continent string) string {
-	return filepath.Join(continent, ".expedition", "flag.md")
+	return filepath.Join(continent, ".expedition", ".run", "flag.md")
 }
 
 func ReadFlag(continent string) ExpeditionFlag {

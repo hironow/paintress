@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -145,7 +145,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".logs"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run", "logs"), 0755)
 
 	// Script that sleeps longer than the timeout
 	sleepScript := filepath.Join(dir, "slowclaude.sh")
@@ -171,7 +171,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			BaseBranch: "main",
 			Model:      "opus",
 		},
-		LogDir:   filepath.Join(dir, ".expedition", ".logs"),
+		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
 		Gradient: NewGradientGauge(5),
 		Reserve:  NewReserveParty("opus", nil),
 	}

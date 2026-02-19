@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -48,7 +48,7 @@ func NewWorktreePool(git GitExecutor, repoDir, baseBranch, setupCmd string, size
 		git:        git,
 		baseBranch: baseBranch,
 		repoDir:    repoDir,
-		poolDir:    filepath.Join(repoDir, ".expedition", "worktrees"),
+		poolDir:    filepath.Join(repoDir, ".expedition", ".run", "worktrees"),
 		setupCmd:   setupCmd,
 		workers:    make(chan string, size),
 		size:       size,

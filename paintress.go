@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -47,7 +47,7 @@ type Paintress struct {
 }
 
 func NewPaintress(cfg Config) *Paintress {
-	logDir := filepath.Join(cfg.Continent, ".expedition", ".logs")
+	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
 	// Reserve Party: parse model string for reserves
@@ -104,11 +104,6 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 	defer CloseLogFile()
 
-	// Write mission.md in the active language before expeditions start
-	if err := WriteMission(p.config.Continent); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: mission file: %v\n", err)
-	}
-
 	monolith := ReadFlag(p.config.Continent)
 
 	p.printBanner()
@@ -120,9 +115,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 	LogInfo("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
 	claudeCmd := p.config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = defaultClaudeCmd
+		claudeCmd = DefaultClaudeCmd
 	}
-	if claudeCmd != defaultClaudeCmd {
+	if claudeCmd != DefaultClaudeCmd {
 		LogInfo("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
 	}
 	if p.config.DryRun {
@@ -173,7 +168,6 @@ func (p *Paintress) Run(ctx context.Context) int {
 	luminas := ScanJournalsForLumina(p.config.Continent)
 	if len(luminas) > 0 {
 		LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
-		WriteLumina(p.config.Continent, luminas)
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -534,7 +528,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 
 		claudeCmd := p.config.ClaudeCmd
 		if claudeCmd == "" {
-			claudeCmd = defaultClaudeCmd
+			claudeCmd = DefaultClaudeCmd
 		}
 
 		model := p.reserve.ActiveModel()
@@ -602,9 +596,9 @@ func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 
 func (p *Paintress) printBanner() {
 	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
-	fmt.Printf("%s║          The Paintress awakens               ║%s\n", colorCyan, colorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
+	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
 	fmt.Println()
 }
 
@@ -622,9 +616,9 @@ func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
 func (p *Paintress) printSummary() {
 	total := p.totalAttempted.Load()
 	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
-	fmt.Printf("%s║          The Paintress rests                 ║%s\n", colorCyan, colorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
+	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
 	fmt.Println()
 	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
 	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
@@ -638,7 +632,6 @@ func (p *Paintress) printSummary() {
 	LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 	fmt.Println()
 	LogInfo("Flag:     %s", FlagPath(p.config.Continent))
-	LogInfo("Lumina:   %s", LuminaPath(p.config.Continent))
 	LogInfo("Journals: %s", JournalDir(p.config.Continent))
 	LogInfo("Logs:     %s", p.logDir)
 }

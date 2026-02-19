@@ -33,7 +33,7 @@ VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X main.version={{VERSION}}" -o paintress .
+    go build -ldflags "-X main.version={{VERSION}}" -o paintress ./cmd/paintress/
 
 # Build and install to /usr/local/bin
 install: build

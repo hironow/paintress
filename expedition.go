@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"bufio"
@@ -38,6 +38,7 @@ type PromptData struct {
 	ContextSection  string
 	LinearTeam      string
 	LinearProject   string
+	MissionSection  string
 }
 
 // Expedition represents a single expedition into the Continent.
@@ -82,6 +83,7 @@ func (e *Expedition) BuildPrompt() string {
 		ContextSection:  e.loadContextSection(),
 		LinearTeam:      projCfg.Linear.Team,
 		LinearProject:   projCfg.Linear.Project,
+		MissionSection:  MissionText(),
 	}
 
 	tmplName := "expedition_en.md.tmpl"
@@ -142,7 +144,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	claudeCmd := e.Config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = defaultClaudeCmd
+		claudeCmd = DefaultClaudeCmd
 	}
 
 	cmd := newCmd(expCtx, claudeCmd,

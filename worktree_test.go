@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -687,7 +687,7 @@ func TestWorktreePool_Init_SetupCmdFailure_PartialInit(t *testing.T) {
 	// verify self-healing: remove the partial worktree directories (simulating cleanup),
 	// then a SECOND pool with the same repoDir can Init successfully
 	// because prune cleans up the stale refs whose directories no longer exist
-	poolDir := repoDir + "/.expedition/worktrees"
+	poolDir := repoDir + "/.expedition/.run/worktrees"
 	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", poolDir))
 	if err != nil {
 		t.Fatalf("rm -rf poolDir failed: %v", err)
@@ -750,7 +750,7 @@ func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
 
 	// verify self-healing: remove the acquired worker's directory (simulating a crash),
 	// then a new pool calling Init prunes the orphaned worktree ref
-	poolDir := repoDir + "/.expedition/worktrees"
+	poolDir := repoDir + "/.expedition/.run/worktrees"
 	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", poolDir))
 	if err != nil {
 		t.Fatalf("rm -rf poolDir failed: %v", err)

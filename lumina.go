@@ -1,9 +1,8 @@
-package main
+package paintress
 
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -15,11 +14,6 @@ type Lumina struct {
 	Pattern string // The learned pattern / lesson
 	Source  string // Which journal(s) contributed
 	Uses    int    // How many times this pattern appeared
-}
-
-// LuminaPath returns the path to the lumina file on the Continent.
-func LuminaPath(continent string) string {
-	return filepath.Join(continent, ".expedition", "lumina.md")
 }
 
 // ScanJournalsForLumina reads all journal files in parallel goroutines,
@@ -130,36 +124,6 @@ func ScanJournalsForLumina(continent string) []Lumina {
 	}
 
 	return luminas
-}
-
-// WriteLumina writes the current Lumina state to the Continent.
-func WriteLumina(continent string, luminas []Lumina) error {
-	if len(luminas) == 0 {
-		return nil
-	}
-
-	var sb strings.Builder
-	sb.WriteString(Msg("lumina_header"))
-	sb.WriteString("\n")
-
-	sb.WriteString(Msg("lumina_defensive"))
-	sb.WriteString("\n")
-	for _, l := range luminas {
-		if l.Source == "failure-pattern" {
-			sb.WriteString(fmt.Sprintf("- %s\n", l.Pattern))
-		}
-	}
-
-	sb.WriteString("\n")
-	sb.WriteString(Msg("lumina_offensive"))
-	sb.WriteString("\n")
-	for _, l := range luminas {
-		if l.Source == "success-pattern" {
-			sb.WriteString(fmt.Sprintf("- %s\n", l.Pattern))
-		}
-	}
-
-	return os.WriteFile(LuminaPath(continent), []byte(sb.String()), 0644)
 }
 
 // FormatLuminaForPrompt formats Luminas for injection into the expedition prompt.

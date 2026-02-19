@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func writeScript(t *testing.T, path string, content string) {
 func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string, claudeCmd string) *Paintress {
 	t.Helper()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".logs"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run", "logs"), 0755)
 
 	cfg := Config{
 		Continent:  dir,

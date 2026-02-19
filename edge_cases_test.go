@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -372,9 +372,9 @@ func TestParseReport_ExpNumZero(t *testing.T) {
 
 func TestReadFlag_EmptyFile(t *testing.T) {
 	dir := t.TempDir()
-	expDir := filepath.Join(dir, ".expedition")
-	os.MkdirAll(expDir, 0755)
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(""), 0644)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(""), 0644)
 
 	f := ReadFlag(dir)
 	if f.Remaining != "?" {
@@ -387,11 +387,11 @@ func TestReadFlag_EmptyFile(t *testing.T) {
 
 func TestReadFlag_CorruptFile(t *testing.T) {
 	dir := t.TempDir()
-	expDir := filepath.Join(dir, ".expedition")
-	os.MkdirAll(expDir, 0755)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
 
 	content := "garbage data\n!!@#$%\nno_colon_here\n=== bad ===\n"
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	f := ReadFlag(dir)
 	// Should not panic, just return defaults
@@ -402,12 +402,12 @@ func TestReadFlag_CorruptFile(t *testing.T) {
 
 func TestReadFlag_PartialData(t *testing.T) {
 	dir := t.TempDir()
-	expDir := filepath.Join(dir, ".expedition")
-	os.MkdirAll(expDir, 0755)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
 
 	// Only some fields present
 	content := "last_expedition: 3\nremaining_issues: 7\n"
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	f := ReadFlag(dir)
 	if f.LastExpedition != 3 {
@@ -423,7 +423,7 @@ func TestReadFlag_PartialData(t *testing.T) {
 
 func TestWriteFlag_SpecialCharactersInIssueID(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	WriteFlag(dir, 1, "AWE-42/test<script>", "success", "5")
 	f := ReadFlag(dir)
@@ -553,14 +553,6 @@ func TestScanJournalsForLumina_EmptyMission(t *testing.T) {
 		}
 	}
 	// If no lumina was created, that's also acceptable for empty mission
-}
-
-func TestWriteLumina_EmptySlice(t *testing.T) {
-	// Empty slice (not nil) should also return nil
-	err := WriteLumina("/tmp/test", []Lumina{})
-	if err != nil {
-		t.Errorf("empty slice should return nil, got %v", err)
-	}
 }
 
 func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
