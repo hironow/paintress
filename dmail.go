@@ -3,10 +3,29 @@ package paintress
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// InboxDir returns the path to the d-mail inbox directory.
+func InboxDir(continent string) string {
+	return filepath.Join(continent, ".expedition", "inbox")
+}
+
+// OutboxDir returns the path to the d-mail outbox directory.
+func OutboxDir(continent string) string {
+	return filepath.Join(continent, ".expedition", "outbox")
+}
+
+// ArchiveDir returns the path to the d-mail archive directory.
+func ArchiveDir(continent string) string {
+	return filepath.Join(continent, ".expedition", "archive")
+}
 
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
 // The format uses Jekyll/Hugo-style frontmatter delimiters (---).
@@ -86,4 +105,85 @@ func (d DMail) Marshal() ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// SendDMail writes a d-mail to both outbox/ and archive/ simultaneously.
+// Creates directories if needed. Filename: <d.Name>.md
+func SendDMail(continent string, d DMail) error {
+	data, err := d.Marshal()
+	if err != nil {
+		return fmt.Errorf("dmail: marshal: %w", err)
+	}
+
+	filename := d.Name + ".md"
+
+	for _, dir := range []string{OutboxDir(continent), ArchiveDir(continent)} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("dmail: mkdir %s: %w", dir, err)
+		}
+		path := filepath.Join(dir, filename)
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			return fmt.Errorf("dmail: write %s: %w", path, err)
+		}
+	}
+
+	return nil
+}
+
+// ScanInbox reads all .md files in inbox/, parses each as DMail.
+// Returns parsed d-mails sorted by filename. Returns empty slice for empty
+// or non-existent directory. Skips non-.md files.
+func ScanInbox(continent string) ([]DMail, error) {
+	dir := InboxDir(continent)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return []DMail{}, nil
+		}
+		return nil, fmt.Errorf("dmail: read inbox: %w", err)
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	var dmails []DMail
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".md" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("dmail: read %s: %w", e.Name(), err)
+		}
+		dm, err := ParseDMail(data)
+		if err != nil {
+			return nil, fmt.Errorf("dmail: parse %s: %w", e.Name(), err)
+		}
+		dmails = append(dmails, dm)
+	}
+
+	if dmails == nil {
+		return []DMail{}, nil
+	}
+	return dmails, nil
+}
+
+// ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
+// Uses os.Rename for atomic move. Creates archive dir if needed.
+func ArchiveInboxDMail(continent, name string) error {
+	filename := name + ".md"
+	src := filepath.Join(InboxDir(continent), filename)
+	arcDir := ArchiveDir(continent)
+	dst := filepath.Join(arcDir, filename)
+
+	if err := os.MkdirAll(arcDir, 0755); err != nil {
+		return fmt.Errorf("dmail: mkdir archive: %w", err)
+	}
+
+	if err := os.Rename(src, dst); err != nil {
+		return fmt.Errorf("dmail: archive %s: %w", name, err)
+	}
+
+	return nil
 }
