@@ -467,23 +467,46 @@ func TestExtractSubcommand_ArchivePrune(t *testing.T) {
 }
 
 func TestParseDaysFlag_Default(t *testing.T) {
-	days := parseDaysFlag([]string{})
+	days, err := parseDaysFlag([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if days != 30 {
 		t.Errorf("days = %d, want 30", days)
 	}
 }
 
 func TestParseDaysFlag_Explicit(t *testing.T) {
-	days := parseDaysFlag([]string{"--days", "7"})
+	days, err := parseDaysFlag([]string{"--days", "7"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if days != 7 {
 		t.Errorf("days = %d, want 7", days)
 	}
 }
 
 func TestParseDaysFlag_Equals(t *testing.T) {
-	days := parseDaysFlag([]string{"--days=14"})
+	days, err := parseDaysFlag([]string{"--days=14"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if days != 14 {
 		t.Errorf("days = %d, want 14", days)
+	}
+}
+
+func TestParseDaysFlag_InvalidValue(t *testing.T) {
+	_, err := parseDaysFlag([]string{"--days", "foo"})
+	if err == nil {
+		t.Fatal("expected error for non-integer --days value")
+	}
+}
+
+func TestParseDaysFlag_InvalidEquals(t *testing.T) {
+	_, err := parseDaysFlag([]string{"--days=bar"})
+	if err == nil {
+		t.Fatal("expected error for non-integer --days= value")
 	}
 }
 

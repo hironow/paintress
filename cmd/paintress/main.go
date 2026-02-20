@@ -424,21 +424,28 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 	return 0
 }
 
-// parseDaysFlag extracts the --days value from flagArgs. Returns 30 when unspecified.
-func parseDaysFlag(flagArgs []string) int {
+// parseDaysFlag extracts the --days value from flagArgs.
+// Returns 30 when --days is not specified.
+// Returns an error when --days is present but the value is not a valid integer.
+func parseDaysFlag(flagArgs []string) (int, error) {
 	for i, arg := range flagArgs {
 		if arg == "--days" && i+1 < len(flagArgs) {
-			if v, err := strconv.Atoi(flagArgs[i+1]); err == nil {
-				return v
+			v, err := strconv.Atoi(flagArgs[i+1])
+			if err != nil {
+				return 0, fmt.Errorf("invalid --days value %q: must be an integer", flagArgs[i+1])
 			}
+			return v, nil
 		}
 		if strings.HasPrefix(arg, "--days=") {
-			if v, err := strconv.Atoi(strings.TrimPrefix(arg, "--days=")); err == nil {
-				return v
+			raw := strings.TrimPrefix(arg, "--days=")
+			v, err := strconv.Atoi(raw)
+			if err != nil {
+				return 0, fmt.Errorf("invalid --days value %q: must be an integer", raw)
 			}
+			return v, nil
 		}
 	}
-	return 30
+	return 30, nil
 }
 
 // parseExecuteFlag parses --execute from flagArgs.
@@ -473,7 +480,11 @@ func runArchivePrune(repoPath string, flagArgs []string) int {
 		return 1
 	}
 
-	days := parseDaysFlag(flagArgs)
+	days, err := parseDaysFlag(flagArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
 	execute := parseExecuteFlag(flagArgs)
 	outputFmt := parseOutputFlag(flagArgs)
 
