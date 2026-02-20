@@ -103,6 +103,37 @@ func parseOutputFlag(flagArgs []string) string {
 	return "text"
 }
 
+// parseStateFlag extracts the --state value from flagArgs.
+// Returns nil when unspecified (meaning no filter).
+func parseStateFlag(flagArgs []string) []string {
+	var raw string
+	for i, arg := range flagArgs {
+		if arg == "--state" && i+1 < len(flagArgs) {
+			raw = flagArgs[i+1]
+			break
+		}
+		if strings.HasPrefix(arg, "--state=") {
+			raw = strings.TrimPrefix(arg, "--state=")
+			break
+		}
+	}
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	states := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			states = append(states, p)
+		}
+	}
+	if len(states) == 0 {
+		return nil
+	}
+	return states
+}
+
 // isBoolFlag checks if a flag argument is a known boolean flag.
 func isBoolFlag(arg string) bool {
 	name := strings.TrimLeft(arg, "-")
@@ -138,11 +169,12 @@ func run() int {
 		return 0
 	case "issues":
 		if repoPath == "" {
-			fmt.Fprintf(os.Stderr, "Usage: paintress issues <repo-path> [--output json|text]\n")
+			fmt.Fprintf(os.Stderr, "Usage: paintress issues <repo-path> [--state todo,in-progress] [--output json|text]\n")
 			return 1
 		}
 		outputFmt := parseOutputFlag(flagArgs)
-		return runIssues(repoPath, outputFmt)
+		stateFilter := parseStateFlag(flagArgs)
+		return runIssues(repoPath, outputFmt, stateFilter)
 	}
 
 	// Default: "run" subcommand
@@ -325,7 +357,7 @@ func runDoctor(outputFmt string) {
 	fmt.Fprintln(os.Stderr, "All checks passed.")
 }
 
-func runIssues(repoPath, outputFmt string) int {
+func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: invalid path: %v\n", err)
@@ -355,6 +387,8 @@ func runIssues(repoPath, outputFmt string) int {
 		return 1
 	}
 
+	issues = paintress.FilterIssuesByState(issues, stateFilter)
+
 	paintress.LogInfo("fetched %d issues from %s", len(issues), cfg.Linear.Team)
 
 	switch outputFmt {
@@ -365,6 +399,8 @@ func runIssues(repoPath, outputFmt string) int {
 			return 1
 		}
 		fmt.Println(out)
+	case "text":
+		fmt.Println(paintress.FormatIssuesTable(issues))
 	default:
 		out := paintress.FormatIssuesJSONL(issues)
 		if out != "" {

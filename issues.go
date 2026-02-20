@@ -154,6 +154,35 @@ func FormatIssuesJSONL(issues []Issue) string {
 	return sb.String()
 }
 
+// FormatIssuesTable returns issues as a human-readable aligned table.
+func FormatIssuesTable(issues []Issue) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%-12s %4s  %-14s  %s", "ID", "PRI", "STATUS", "TITLE")
+	for _, issue := range issues {
+		fmt.Fprintf(&sb, "\n%-12s %4d  %-14s  %s", issue.ID, issue.Priority, issue.Status, issue.Title)
+	}
+	return sb.String()
+}
+
+// FilterIssuesByState returns issues matching any of the given state names.
+// Comparison is case-insensitive. If states is nil or empty, all issues are returned.
+func FilterIssuesByState(issues []Issue, states []string) []Issue {
+	if len(states) == 0 {
+		return issues
+	}
+	allowed := make(map[string]bool, len(states))
+	for _, s := range states {
+		allowed[strings.ToLower(s)] = true
+	}
+	var filtered []Issue
+	for _, issue := range issues {
+		if allowed[strings.ToLower(issue.Status)] {
+			filtered = append(filtered, issue)
+		}
+	}
+	return filtered
+}
+
 // FormatIssuesJSON returns issues as a JSON array string.
 func FormatIssuesJSON(issues []Issue) (string, error) {
 	data, err := json.Marshal(issues)
