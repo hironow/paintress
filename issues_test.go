@@ -338,6 +338,65 @@ func TestFetchIssues_ExcludesCompletedByDefault(t *testing.T) {
 	}
 }
 
+func TestFetchIssues_PaginatesMultiplePages(t *testing.T) {
+	// given — API returns 2 pages
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ := io.ReadAll(r.Body)
+		callCount++
+
+		w.Header().Set("Content-Type", "application/json")
+
+		if strings.Contains(string(capturedBody), `"after":"cursor-page1"`) {
+			// Second page — no more pages
+			w.Write([]byte(`{
+				"data": {
+					"issues": {
+						"nodes": [
+							{"identifier": "MY-3", "title": "Third issue", "priority": 3, "state": {"name": "Todo"}, "labels": {"nodes": []}}
+						],
+						"pageInfo": {"hasNextPage": false, "endCursor": "cursor-page2"}
+					}
+				}
+			}`))
+		} else {
+			// First page — has next page
+			w.Write([]byte(`{
+				"data": {
+					"issues": {
+						"nodes": [
+							{"identifier": "MY-1", "title": "First issue", "priority": 1, "state": {"name": "Todo"}, "labels": {"nodes": []}},
+							{"identifier": "MY-2", "title": "Second issue", "priority": 2, "state": {"name": "In Progress"}, "labels": {"nodes": []}}
+						],
+						"pageInfo": {"hasNextPage": true, "endCursor": "cursor-page1"}
+					}
+				}
+			}`))
+		}
+	}))
+	defer server.Close()
+
+	// when
+	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "", nil)
+	if err != nil {
+		t.Fatalf("FetchIssues: %v", err)
+	}
+
+	// then — all 3 issues from both pages
+	if len(issues) != 3 {
+		t.Fatalf("expected 3 issues across 2 pages, got %d", len(issues))
+	}
+	if issues[0].ID != "MY-1" {
+		t.Errorf("issues[0].ID = %q, want MY-1", issues[0].ID)
+	}
+	if issues[2].ID != "MY-3" {
+		t.Errorf("issues[2].ID = %q, want MY-3", issues[2].ID)
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls for pagination, got %d", callCount)
+	}
+}
+
 func TestFormatIssuesJSONL_EmptySlice(t *testing.T) {
 	// given
 	issues := []Issue{}
