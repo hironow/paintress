@@ -161,7 +161,8 @@ func (d DMail) Marshal() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// SendDMail writes a d-mail to both outbox/ and archive/ simultaneously.
+// SendDMail writes a d-mail to archive/ first, then outbox/.
+// Archive-first ensures the permanent record survives even if the outbox write fails.
 // Creates directories if needed. Filename: <d.Name>.md
 func SendDMail(continent string, d DMail) error {
 	data, err := d.Marshal()
@@ -171,7 +172,7 @@ func SendDMail(continent string, d DMail) error {
 
 	filename := d.Name + ".md"
 
-	for _, dir := range []string{OutboxDir(continent), ArchiveDir(continent)} {
+	for _, dir := range []string{ArchiveDir(continent), OutboxDir(continent)} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("dmail: mkdir %s: %w", dir, err)
 		}

@@ -499,6 +499,41 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 }
 
+func TestSendDMail_WritesArchiveBeforeOutbox(t *testing.T) {
+	// given
+	continent := t.TempDir()
+	dm := DMail{
+		Name:        "report-order-test",
+		Kind:        "report",
+		Description: "Verify archive-first write order",
+	}
+
+	// Pre-create both directories
+	outboxDir := OutboxDir(continent)
+	archiveDir := ArchiveDir(continent)
+	os.MkdirAll(outboxDir, 0755)
+	os.MkdirAll(archiveDir, 0755)
+
+	// Make outbox unwritable — if archive is written first, it succeeds;
+	// outbox write then fails. This proves the write order.
+	os.Chmod(outboxDir, 0555)
+	t.Cleanup(func() { os.Chmod(outboxDir, 0755) })
+
+	// when
+	err := SendDMail(continent, dm)
+
+	// then — error is expected (outbox write fails)
+	if err == nil {
+		t.Fatal("expected error when outbox is unwritable")
+	}
+
+	// Archive must exist — it was written first (archive-first invariant)
+	archivePath := filepath.Join(archiveDir, "report-order-test.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file should exist (written before outbox): %v", err)
+	}
+}
+
 // === ScanInbox Tests ===
 
 func TestScanInbox_ReadsAllMdFiles(t *testing.T) {
