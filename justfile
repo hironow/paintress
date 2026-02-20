@@ -79,11 +79,12 @@ check: fmt vet test
 doctor: build
     ./paintress doctor
 
-# Start Jaeger (OTel trace viewer) on http://localhost:16686
+# Start Jaeger v2 (OTel trace viewer + MCP) on http://localhost:16686
 jaeger:
     docker compose -f docker/compose.yaml up -d
-    @echo "Jaeger UI: http://localhost:16686"
-    @echo "OTLP endpoint: http://localhost:4318"
+    @echo "Jaeger UI:      http://localhost:16686"
+    @echo "OTLP endpoint:  http://localhost:4318"
+    @echo "MCP endpoint:   http://localhost:16687/mcp"
     @echo ""
     @echo "Run paintress with tracing:"
     @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo"
