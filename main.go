@@ -25,6 +25,7 @@ type Config struct {
 	SetupCmd       string // Command to run after worktree creation (e.g. "bun install")
 	NoDev          bool   // Skip dev server startup entirely
 	DryRun         bool
+	OutputFormat   string // "text" (default) or "json"
 }
 
 // ValidateContinent ensures the .expedition directory structure exists.

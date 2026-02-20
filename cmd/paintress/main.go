@@ -188,6 +188,7 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 	fs.StringVar(&cfg.SetupCmd, "setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
 	fs.BoolVar(&cfg.NoDev, "no-dev", false, "Skip dev server startup")
 	fs.BoolVar(&cfg.DryRun, "dry-run", false, "Generate prompts only")
+	fs.StringVar(&cfg.OutputFormat, "output", "text", "Output format: text, json")
 	fs.StringVar(&lang, "lang", "en", "Output language: en, ja, fr")
 
 	fs.Usage = func() {

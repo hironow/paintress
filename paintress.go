@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -618,8 +619,46 @@ func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
 	WriteFlag(p.config.Continent, expNum, issueID, status, remaining)
 }
 
+// RunSummary holds the results of a paintress loop run.
+type RunSummary struct {
+	Total    int64  `json:"total"`
+	Success  int64  `json:"success"`
+	Skipped  int64  `json:"skipped"`
+	Failed   int64  `json:"failed"`
+	Bugs     int64  `json:"bugs"`
+	Gradient string `json:"gradient"`
+}
+
+// FormatSummaryJSON returns the summary as a JSON string.
+func FormatSummaryJSON(s RunSummary) (string, error) {
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func (p *Paintress) printSummary() {
 	total := p.totalAttempted.Load()
+
+	if p.config.OutputFormat == "json" {
+		summary := RunSummary{
+			Total:    total,
+			Success:  p.totalSuccess.Load(),
+			Skipped:  p.totalSkipped.Load(),
+			Failed:   p.totalFailed.Load(),
+			Bugs:     p.totalBugs.Load(),
+			Gradient: p.gradient.FormatLog(),
+		}
+		out, err := FormatSummaryJSON(summary)
+		if err != nil {
+			LogError("json marshal: %v", err)
+			return
+		}
+		fmt.Println(out)
+		return
+	}
+
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
 	fmt.Fprintf(os.Stderr, "%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
