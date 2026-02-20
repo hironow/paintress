@@ -381,7 +381,7 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 		return 1
 	}
 
-	issues, err := paintress.FetchIssues(paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	issues, err := paintress.FetchIssues(context.Background(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
@@ -402,7 +402,11 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 	case "text":
 		fmt.Println(paintress.FormatIssuesTable(issues))
 	default:
-		out := paintress.FormatIssuesJSONL(issues)
+		out, err := paintress.FormatIssuesJSONL(issues)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
 		if out != "" {
 			fmt.Println(out)
 		}

@@ -2,11 +2,13 @@ package paintress
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // LinearAPIEndpoint is the default Linear GraphQL API URL.
@@ -25,7 +27,7 @@ type Issue struct {
 // endpoint can be overridden for testing; pass LinearAPIEndpoint for production.
 // When stateFilter is non-empty, completed/canceled issues are included in the
 // GraphQL query so that local filtering can match them.
-func FetchIssues(endpoint, apiKey, teamKey, project string, stateFilter []string) ([]Issue, error) {
+func FetchIssues(ctx context.Context, endpoint, apiKey, teamKey, project string, stateFilter []string) ([]Issue, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("LINEAR_API_KEY is required")
 	}
@@ -80,14 +82,15 @@ func FetchIssues(endpoint, apiKey, teamKey, project string, stateFilter []string
 			return nil, fmt.Errorf("marshal request: %w", err)
 		}
 
-		req, err := http.NewRequest("POST", endpoint, bytes.NewReader(reqBody))
+		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(reqBody))
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 
-		resp, err := http.DefaultClient.Do(req)
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("request: %w", err)
 		}
@@ -165,22 +168,22 @@ func FetchIssues(endpoint, apiKey, teamKey, project string, stateFilter []string
 }
 
 // FormatIssuesJSONL returns issues as JSONL (one JSON object per line).
-func FormatIssuesJSONL(issues []Issue) string {
+func FormatIssuesJSONL(issues []Issue) (string, error) {
 	if len(issues) == 0 {
-		return ""
+		return "", nil
 	}
 	var sb strings.Builder
 	for i, issue := range issues {
 		data, err := json.Marshal(issue)
 		if err != nil {
-			continue
+			return "", fmt.Errorf("marshal issue %q: %w", issue.ID, err)
 		}
 		if i > 0 {
 			sb.WriteByte('\n')
 		}
 		sb.Write(data)
 	}
-	return sb.String()
+	return sb.String(), nil
 }
 
 // FormatIssuesTable returns issues as a human-readable aligned table.

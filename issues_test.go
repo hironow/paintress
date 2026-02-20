@@ -1,6 +1,7 @@
 package paintress
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,7 +18,10 @@ func TestFormatIssuesJSONL(t *testing.T) {
 	}
 
 	// when
-	out := FormatIssuesJSONL(issues)
+	out, err := FormatIssuesJSONL(issues)
+	if err != nil {
+		t.Fatalf("FormatIssuesJSONL: %v", err)
+	}
 
 	// then — each line must be valid JSON
 	lines := strings.Split(strings.TrimSpace(out), "\n")
@@ -92,7 +96,7 @@ func TestFetchIssues_ParsesGraphQLResponse(t *testing.T) {
 	defer server.Close()
 
 	// when
-	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "", nil)
+	issues, err := FetchIssues(context.Background(), server.URL, "test-api-key", "MY", "", nil)
 	if err != nil {
 		t.Fatalf("FetchIssues: %v", err)
 	}
@@ -130,7 +134,7 @@ func TestFetchIssues_GraphQLErrorResponse(t *testing.T) {
 	defer server.Close()
 
 	// when
-	_, err := FetchIssues(server.URL, "test-api-key", "INVALID", "", nil)
+	_, err := FetchIssues(context.Background(), server.URL, "test-api-key", "INVALID", "", nil)
 
 	// then — must return an error, not silently succeed
 	if err == nil {
@@ -144,7 +148,7 @@ func TestFetchIssues_GraphQLErrorResponse(t *testing.T) {
 func TestFetchIssues_MissingAPIKey(t *testing.T) {
 	// given — empty API key
 	// when
-	_, err := FetchIssues("http://localhost:9999", "", "MY", "", nil)
+	_, err := FetchIssues(context.Background(), "http://localhost:9999", "", "MY", "", nil)
 	// then
 	if err == nil {
 		t.Fatal("expected error for empty API key")
@@ -297,7 +301,7 @@ func TestFetchIssues_IncludesCompletedWhenStateFilterRequests(t *testing.T) {
 	defer server.Close()
 
 	// when — state filter includes a completed state
-	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "", []string{"done"})
+	issues, err := FetchIssues(context.Background(), server.URL, "test-api-key", "MY", "", []string{"done"})
 	if err != nil {
 		t.Fatalf("FetchIssues: %v", err)
 	}
@@ -327,7 +331,7 @@ func TestFetchIssues_ExcludesCompletedByDefault(t *testing.T) {
 	defer server.Close()
 
 	// when — no state filter (default)
-	_, err := FetchIssues(server.URL, "test-api-key", "MY", "", nil)
+	_, err := FetchIssues(context.Background(), server.URL, "test-api-key", "MY", "", nil)
 	if err != nil {
 		t.Fatalf("FetchIssues: %v", err)
 	}
@@ -377,7 +381,7 @@ func TestFetchIssues_PaginatesMultiplePages(t *testing.T) {
 	defer server.Close()
 
 	// when
-	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "", nil)
+	issues, err := FetchIssues(context.Background(), server.URL, "test-api-key", "MY", "", nil)
 	if err != nil {
 		t.Fatalf("FetchIssues: %v", err)
 	}
@@ -402,7 +406,10 @@ func TestFormatIssuesJSONL_EmptySlice(t *testing.T) {
 	issues := []Issue{}
 
 	// when
-	out := FormatIssuesJSONL(issues)
+	out, err := FormatIssuesJSONL(issues)
+	if err != nil {
+		t.Fatalf("FormatIssuesJSONL: %v", err)
+	}
 
 	// then
 	if out != "" {
