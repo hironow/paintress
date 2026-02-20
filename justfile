@@ -93,6 +93,20 @@ jaeger:
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
+# Prune archived d-mails older than N days (default: 30)
+archive-prune repo days="30":
+    @echo "Files to prune in {{repo}}/.expedition/archive/ (older than {{days}} days):"
+    @find "{{repo}}/.expedition/archive" -name "*.md" -mtime +{{days}} -print 2>/dev/null || echo "(none)"
+    @read -p "Delete these files? [y/N] " confirm && [ "$$confirm" = "y" ] && \
+        find "{{repo}}/.expedition/archive" -name "*.md" -mtime +{{days}} -delete && \
+        echo "Pruned." || echo "Cancelled."
+
+# Dry-run: show what would be pruned (no deletion)
+archive-prune-dry repo days="30":
+    @echo "Dry-run: files older than {{days}} days in {{repo}}/.expedition/archive/:"
+    @find "{{repo}}/.expedition/archive" -name "*.md" -mtime +{{days}} -print 2>/dev/null || echo "(none)"
+    @echo "(dry-run — no files deleted)"
+
 # Clean build artifacts
 clean:
     rm -f paintress coverage.out
