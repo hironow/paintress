@@ -8,8 +8,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// watchInbox watches the inbox/ directory for new D-Mail files using filesystem
-// notifications and invokes onNewDMail when a new .md file is detected.
+// watchInbox watches the inbox/ directory for new or updated D-Mail files using
+// filesystem notifications and invokes onNewDMail when a valid .md file is detected.
 // Returns silently if the inbox directory does not exist.
 //
 // If ready is non-nil, a value is sent after the watcher is fully set up,
@@ -46,7 +46,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if filepath.Ext(event.Name) != ".md" {
 				continue
 			}
-			if event.Op&fsnotify.Create == 0 {
+			if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
 				continue
 			}
 			data, err := os.ReadFile(event.Name)

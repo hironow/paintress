@@ -202,26 +202,32 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
 	}, nil)
 
-	// Start inbox watcher to detect d-mails arriving mid-expedition
+	// Start inbox watcher to detect d-mails arriving mid-expedition.
+	// The goroutine is joined before Run() returns so that InboxDMails
+	// is stable when callers iterate it for archiving.
 	var inboxMu sync.Mutex
 	seenFiles := make(map[string]bool)
 	for _, dm := range e.InboxDMails {
 		seenFiles[dm.Name] = true
 	}
-	go watchInbox(watchCtx, e.Continent, func(dm DMail) {
-		inboxMu.Lock()
-		defer inboxMu.Unlock()
-		if seenFiles[dm.Name] {
-			return
-		}
-		seenFiles[dm.Name] = true
-		e.InboxDMails = append(e.InboxDMails, dm)
-		if dm.Severity == "high" {
-			LogWarn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
-		} else {
-			LogInfo("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
-		}
-	}, nil)
+	inboxDone := make(chan struct{})
+	go func() {
+		defer close(inboxDone)
+		watchInbox(watchCtx, e.Continent, func(dm DMail) {
+			inboxMu.Lock()
+			defer inboxMu.Unlock()
+			if seenFiles[dm.Name] {
+				return
+			}
+			seenFiles[dm.Name] = true
+			e.InboxDMails = append(e.InboxDMails, dm)
+			if dm.Severity == "high" {
+				LogWarn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
+			} else {
+				LogInfo("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
+			}
+		}, nil)
+	}()
 
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
 	var output strings.Builder
@@ -257,6 +263,11 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}()
 
 	<-done
+
+	// Stop watchers and join inbox watcher to ensure InboxDMails is
+	// stable before callers iterate the slice for archiving.
+	watchCancel()
+	<-inboxDone
 
 	err = cmd.Wait()
 	fmt.Fprintln(os.Stderr)

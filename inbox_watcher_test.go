@@ -117,6 +117,57 @@ func TestWatchInbox_IgnoresNonMdFiles(t *testing.T) {
 	}
 }
 
+func TestWatchInbox_DetectsWriteToExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	// Pre-create an empty file BEFORE watcher starts.
+	// This means no Create event will fire — only Write events when content is added.
+	filePath := filepath.Join(inboxDir, "spec-overwrite-42.md")
+	os.WriteFile(filePath, []byte{}, 0644)
+
+	var mu sync.Mutex
+	var got DMail
+	done := make(chan struct{}, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ready := make(chan struct{}, 1)
+	go watchInbox(ctx, dir, func(dm DMail) {
+		mu.Lock()
+		got = dm
+		mu.Unlock()
+		select {
+		case done <- struct{}{}:
+		default:
+		}
+	}, ready)
+
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for watcher ready")
+	}
+
+	// Overwrite with valid content — fires Write event only (no Create)
+	content := "---\nname: spec-overwrite-42\nkind: specification\ndescription: overwrite test\n---\n\nBody\n"
+	os.WriteFile(filePath, []byte(content), 0644)
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("timeout — Write event on existing file was not handled")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if got.Name != "spec-overwrite-42" {
+		t.Errorf("name = %q, want spec-overwrite-42", got.Name)
+	}
+}
+
 func TestWatchInbox_NoDirNoPanic(t *testing.T) {
 	dir := t.TempDir()
 	// No .expedition/inbox/ directory
