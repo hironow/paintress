@@ -54,6 +54,44 @@ func TestNewRootCommand_PersistentFlags_Lang(t *testing.T) {
 	}
 }
 
+func TestNewRootCommand_PersistentFlags_Verbose(t *testing.T) {
+	// given
+	cmd := NewRootCommand()
+
+	// when
+	f := cmd.PersistentFlags().Lookup("verbose")
+
+	// then
+	if f == nil {
+		t.Fatal("--verbose PersistentFlag not found")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--verbose default = %q, want %q", f.DefValue, "false")
+	}
+	if f.Shorthand != "v" {
+		t.Errorf("--verbose shorthand = %q, want %q", f.Shorthand, "v")
+	}
+}
+
+func TestNewRootCommand_PersistentFlags_Config(t *testing.T) {
+	// given
+	cmd := NewRootCommand()
+
+	// when
+	f := cmd.PersistentFlags().Lookup("config")
+
+	// then
+	if f == nil {
+		t.Fatal("--config PersistentFlag not found")
+	}
+	if f.DefValue != "" {
+		t.Errorf("--config default = %q, want %q", f.DefValue, "")
+	}
+	if f.Shorthand != "c" {
+		t.Errorf("--config shorthand = %q, want %q", f.Shorthand, "c")
+	}
+}
+
 func TestNewRootCommand_HasSubcommands(t *testing.T) {
 	// given
 	cmd := NewRootCommand()
@@ -61,12 +99,12 @@ func TestNewRootCommand_HasSubcommands(t *testing.T) {
 	// when
 	subs := cmd.Commands()
 
-	// then: expect 5 subcommands
+	// then: expect 6 subcommands
 	names := make(map[string]bool)
 	for _, s := range subs {
 		names[s.Name()] = true
 	}
-	want := []string{"run", "init", "doctor", "issues", "archive-prune"}
+	want := []string{"run", "init", "doctor", "issues", "archive-prune", "version"}
 	for _, name := range want {
 		if !names[name] {
 			t.Errorf("subcommand %q not registered", name)

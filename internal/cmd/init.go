@@ -12,8 +12,18 @@ func newInitCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init <repo-path>",
 		Short: "Initialize project configuration",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runInit,
+		Long: `Initialize a .expedition/ directory in the target repository.
+
+Creates config.yaml with Linear team key, project name, and
+default expedition settings. This must be run once before
+'paintress run' can operate on the repository.`,
+		Example: `  # Initialize a new project
+  paintress init /path/to/repo
+
+  # Initialize and then run
+  paintress init /path/to/repo && paintress run /path/to/repo`,
+		Args: cobra.ExactArgs(1),
+		RunE: runInit,
 	}
 }
 

@@ -11,8 +11,17 @@ func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Check external command availability",
-		Args:  cobra.NoArgs,
-		RunE:  runDoctor,
+		Long: `Check that all external commands required by paintress are installed.
+
+Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and
+docker. Reports version and path for each found command.`,
+		Example: `  # Check all dependencies
+  paintress doctor
+
+  # Machine-readable output
+  paintress doctor -o json`,
+		Args: cobra.NoArgs,
+		RunE: runDoctor,
 	}
 }
 

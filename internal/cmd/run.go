@@ -20,7 +20,24 @@ func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run <repo-path>",
 		Short: "Run the expedition loop",
-		Args:  cobra.ExactArgs(1),
+		Long: `Run the expedition loop against a target repository.
+
+Each expedition picks a Linear issue, creates a worktree branch,
+invokes Claude Code to implement the change, opens a pull request,
+and optionally runs a review cycle. The loop continues until
+max-expeditions is reached or the issue queue is empty.`,
+		Example: `  # Run with defaults (opus model, 50 expeditions, 33min timeout)
+  paintress run /path/to/repo
+
+  # Run with sonnet fallback and 3 parallel workers
+  paintress run --model opus,sonnet --workers 3 /path/to/repo
+
+  # Dry run (generate prompts only, no Claude invocation)
+  paintress run --dry-run /path/to/repo
+
+  # Skip dev server and use custom review command
+  paintress run --no-dev --review-cmd "pnpm lint" /path/to/repo`,
+		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Derive --review-cmd from --base-branch when not explicitly set
 			if !cmd.Flags().Changed("review-cmd") {

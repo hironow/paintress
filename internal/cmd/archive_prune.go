@@ -12,7 +12,20 @@ func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "archive-prune <repo-path>",
 		Short: "Prune old archived d-mails",
-		Args:  cobra.ExactArgs(1),
+		Long: `Prune archived d-mail files older than a specified number of days.
+
+By default runs in dry-run mode, listing candidates without deleting.
+Use --execute to perform actual deletion. The archive/ directory is
+git-tracked, so deletions should be reviewed and committed.`,
+		Example: `  # Dry run: list files older than 30 days
+  paintress archive-prune /path/to/repo
+
+  # Delete files older than 14 days
+  paintress archive-prune --days 14 --execute /path/to/repo
+
+  # JSON output for scripting
+  paintress archive-prune -o json /path/to/repo`,
+		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
 			if days <= 0 {

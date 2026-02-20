@@ -93,6 +93,10 @@ jaeger:
 jaeger-down:
     docker compose -f docker/compose.yaml down
 
+# Generate CLI documentation (docs/cli/)
+docgen:
+    go run ./internal/tools/docgen/
+
 # Clean build artifacts
 clean:
     rm -f paintress coverage.out

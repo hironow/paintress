@@ -15,8 +15,22 @@ func newIssuesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "issues <repo-path>",
 		Short: "List Linear issues",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runIssues,
+		Long: `List Linear issues assigned to the configured team and project.
+
+Reads the Linear API key from the LINEAR_API_KEY environment variable
+and the team/project from .expedition/config.yaml. Supports filtering
+by issue state (e.g. todo, in-progress). Hyphens in state names are
+converted to spaces automatically.`,
+		Example: `  # List all issues
+  paintress issues /path/to/repo
+
+  # Filter by state
+  paintress issues --state todo,in-progress /path/to/repo
+
+  # JSON output for scripting
+  paintress issues -o json /path/to/repo`,
+		Args: cobra.ExactArgs(1),
+		RunE: runIssues,
 	}
 
 	cmd.Flags().String("state", "", "Comma-separated state filter (e.g. todo,in-progress)")
