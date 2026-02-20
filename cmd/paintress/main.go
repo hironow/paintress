@@ -47,6 +47,15 @@ func extractSubcommand(args []string) (subcmd, repoPath string, flagArgs []strin
 	// Separate remaining args into flags and positional (repoPath)
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
+		// "--" terminates flag parsing; everything after is positional
+		if arg == "--" {
+			for _, rest := range args[i+1:] {
+				if repoPath == "" {
+					repoPath = rest
+				}
+			}
+			break
+		}
 		if strings.HasPrefix(arg, "-") {
 			flagArgs = append(flagArgs, arg)
 			// --flag=value is self-contained; don't consume next arg
