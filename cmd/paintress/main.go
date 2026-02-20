@@ -88,6 +88,20 @@ func extractSubcommand(args []string) (subcmd, repoPath string, flagArgs []strin
 	return subcmd, repoPath, flagArgs, nil
 }
 
+// parseOutputFlag extracts the --output value from flagArgs.
+// Returns "text" when unspecified.
+func parseOutputFlag(flagArgs []string) string {
+	for i, arg := range flagArgs {
+		if arg == "--output" && i+1 < len(flagArgs) {
+			return flagArgs[i+1]
+		}
+		if strings.HasPrefix(arg, "--output=") {
+			return strings.TrimPrefix(arg, "--output=")
+		}
+	}
+	return "text"
+}
+
 // isBoolFlag checks if a flag argument is a known boolean flag.
 func isBoolFlag(arg string) bool {
 	name := strings.TrimLeft(arg, "-")
@@ -118,7 +132,8 @@ func run() int {
 		runInit(repoPath)
 		return 0
 	case "doctor":
-		runDoctor()
+		outputFmt := parseOutputFlag(flagArgs)
+		runDoctor(outputFmt)
 		return 0
 	}
 
@@ -243,9 +258,19 @@ func runInit(repoPath string) {
 	}
 }
 
-func runDoctor() {
+func runDoctor(outputFmt string) {
 	claudeCmd := paintress.DefaultClaudeCmd
 	checks := paintress.RunDoctor(claudeCmd)
+
+	if outputFmt == "json" {
+		out, err := paintress.FormatDoctorJSON(checks)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(out)
+		return
+	}
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)

@@ -287,6 +287,90 @@ func TestExtractSubcommand_BoolFlagWithT(t *testing.T) {
 	}
 }
 
+func TestExtractSubcommand_DoctorWithOutputFlag(t *testing.T) {
+	// "doctor --output json" → subcmd="doctor", path="", flags=["--output", "json"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"doctor", "--output", "json"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "doctor" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "doctor")
+	}
+	if repoPath != "" {
+		t.Errorf("repoPath = %q, want empty", repoPath)
+	}
+	wantFlags := []string{"--output", "json"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_DoctorWithOutputEqualsFlag(t *testing.T) {
+	// "doctor --output=json" → subcmd="doctor", path="", flags=["--output=json"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"doctor", "--output=json"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "doctor" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "doctor")
+	}
+	if repoPath != "" {
+		t.Errorf("repoPath = %q, want empty", repoPath)
+	}
+	wantFlags := []string{"--output=json"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+}
+
+func TestParseOutputFlag_Default(t *testing.T) {
+	// given: no --output flag
+	// when
+	format := parseOutputFlag([]string{})
+	// then
+	if format != "text" {
+		t.Errorf("format = %q, want %q", format, "text")
+	}
+}
+
+func TestParseOutputFlag_Json(t *testing.T) {
+	// given
+	flagArgs := []string{"--output", "json"}
+	// when
+	format := parseOutputFlag(flagArgs)
+	// then
+	if format != "json" {
+		t.Errorf("format = %q, want %q", format, "json")
+	}
+}
+
+func TestParseOutputFlag_JsonEquals(t *testing.T) {
+	// given
+	flagArgs := []string{"--output=json"}
+	// when
+	format := parseOutputFlag(flagArgs)
+	// then
+	if format != "json" {
+		t.Errorf("format = %q, want %q", format, "json")
+	}
+}
+
+func TestParseOutputFlag_Text(t *testing.T) {
+	// given
+	flagArgs := []string{"--output", "text"}
+	// when
+	format := parseOutputFlag(flagArgs)
+	// then
+	if format != "text" {
+		t.Errorf("format = %q, want %q", format, "text")
+	}
+}
+
 func TestExtractSubcommand_Empty(t *testing.T) {
 	// No args → subcmd="run", path=""
 	subcmd, repoPath, flags, err := extractSubcommand([]string{})

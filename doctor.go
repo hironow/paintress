@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"context"
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"time"
@@ -9,11 +10,11 @@ import (
 
 // DoctorCheck represents the result of checking a single external command.
 type DoctorCheck struct {
-	Name     string
-	Required bool
-	Path     string // exec.LookPath result
-	Version  string // first line of --version output
-	OK       bool
+	Name     string `json:"name"`
+	Required bool   `json:"required"`
+	Path     string `json:"path"`
+	Version  string `json:"version"`
+	OK       bool   `json:"ok"`
 }
 
 // RunDoctor checks all required external commands and returns the results.
@@ -58,4 +59,13 @@ func RunDoctor(claudeCmd string) []DoctorCheck {
 	}
 
 	return checks
+}
+
+// FormatDoctorJSON returns the checks as a JSON array string.
+func FormatDoctorJSON(checks []DoctorCheck) (string, error) {
+	data, err := json.Marshal(checks)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
