@@ -2,25 +2,65 @@ package paintress
 
 import (
 	"context"
-	"time"
+	"os"
+	"path/filepath"
+
+	"github.com/fsnotify/fsnotify"
 )
 
-// watchFlag polls flag.md for current_issue changes and invokes onIssueChange
-// when a new issue is detected. It runs until ctx is cancelled.
-func watchFlag(ctx context.Context, continent string, interval time.Duration, onIssueChange func(issue, title string)) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+// watchFlag watches flag.md for current_issue changes using filesystem
+// notifications and invokes onIssueChange when a new issue is detected.
+// Performs an initial read to detect pre-existing flags, then watches
+// the parent directory (.expedition/.run/) for write events.
+// Returns silently if the directory does not exist.
+func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, title string)) {
+	runDir := filepath.Join(continent, ".expedition", ".run")
 
+	if _, err := os.Stat(runDir); err != nil {
+		return
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return
+	}
+	defer watcher.Close()
+
+	if err := watcher.Add(runDir); err != nil {
+		return
+	}
+
+	// Initial read: detect pre-existing flag
 	var lastIssue string
+	flag := ReadFlag(continent)
+	if flag.CurrentIssue != "" {
+		lastIssue = flag.CurrentIssue
+		onIssueChange(flag.CurrentIssue, flag.CurrentTitle)
+	}
+
+	flagName := filepath.Base(FlagPath(continent))
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			if filepath.Base(event.Name) != flagName {
+				continue
+			}
+			if event.Op&(fsnotify.Write|fsnotify.Create) == 0 {
+				continue
+			}
 			flag := ReadFlag(continent)
 			if flag.CurrentIssue != "" && flag.CurrentIssue != lastIssue {
 				lastIssue = flag.CurrentIssue
 				onIssueChange(flag.CurrentIssue, flag.CurrentTitle)
+			}
+		case _, ok := <-watcher.Errors:
+			if !ok {
+				return
 			}
 		}
 	}

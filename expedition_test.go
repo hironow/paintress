@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 // TestHelperProcess is a test helper process used to mock exec.Command.
@@ -515,10 +514,9 @@ echo "done"
 			TimeoutSec: 30,
 			ClaudeCmd:  script,
 		},
-		LogDir:            logDir,
-		Gradient:          NewGradientGauge(5),
-		Reserve:           NewReserveParty("opus", nil),
-		WatchFlagInterval: 100 * time.Millisecond,
+		LogDir:   logDir,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil),
 	}
 
 	ctx := context.Background()
@@ -576,10 +574,9 @@ echo "done"
 			TimeoutSec: 30,
 			ClaudeCmd:  script,
 		},
-		LogDir:            logDir,
-		Gradient:          NewGradientGauge(5),
-		Reserve:           NewReserveParty("opus", nil),
-		WatchFlagInterval: 100 * time.Millisecond,
+		LogDir:   logDir,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil),
 	}
 
 	ctx := context.Background()
