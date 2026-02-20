@@ -94,12 +94,20 @@ jaeger-down:
     docker compose -f docker/compose.yaml down
 
 # Prune archived d-mails older than N days (default: 30)
+# Note: archive/ is git-tracked; run `git status` after pruning to review and commit deletions.
 archive-prune repo days="30":
     @echo "Files to prune in {{repo}}/.expedition/archive/ (older than {{days}} days):"
     @find "{{repo}}/.expedition/archive" -name "*.md" -mtime +{{days}} -print 2>/dev/null || echo "(none)"
-    @read -p "Delete these files? [y/N] " confirm && [ "$$confirm" = "y" ] && \
-        find "{{repo}}/.expedition/archive" -name "*.md" -mtime +{{days}} -delete && \
-        echo "Pruned." || echo "Cancelled."
+    @read -p "Delete these files? [y/N] " confirm && \
+        if [ "$$confirm" = "y" ]; then \
+            if find "{{repo}}/.expedition/archive" -name "*.md" -mtime +{{days}} -delete; then \
+                echo "Pruned. Run 'git -C {{repo}} status' to review deletions."; \
+            else \
+                echo "Deletion failed."; \
+            fi; \
+        else \
+            echo "Cancelled."; \
+        fi
 
 # Dry-run: show what would be pruned (no deletion)
 archive-prune-dry repo days="30":
