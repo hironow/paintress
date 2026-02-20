@@ -146,6 +146,22 @@ func TestArchivePrune_AllRecent_NoCandidates(t *testing.T) {
 	}
 }
 
+func TestArchivePrune_NegativeDays_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	_, err := ArchivePrune(dir, -7, false)
+	if err == nil {
+		t.Fatal("expected error for negative days, got nil")
+	}
+}
+
+func TestArchivePrune_ZeroDays_ReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	_, err := ArchivePrune(dir, 0, false)
+	if err == nil {
+		t.Fatal("expected error for zero days, got nil")
+	}
+}
+
 func TestArchivePrune_CustomDays(t *testing.T) {
 	dir := t.TempDir()
 	archiveDir := filepath.Join(dir, ".expedition", "archive")

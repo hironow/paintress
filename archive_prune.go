@@ -1,6 +1,7 @@
 package paintress
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,9 @@ type PruneResult struct {
 // number of days. When execute is false (dry-run), it only lists candidates.
 // When execute is true, it deletes them and reports how many were removed.
 func ArchivePrune(continent string, days int, execute bool) (PruneResult, error) {
+	if days <= 0 {
+		return PruneResult{}, fmt.Errorf("days must be positive, got %d", days)
+	}
 	dir := ArchiveDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
