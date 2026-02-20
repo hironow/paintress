@@ -26,7 +26,7 @@ func RunDoctor(claudeCmd string) []DoctorCheck {
 		{"git", true},
 		{claudeCmd, true},
 		{"gh", true},
-		{"docker", true},
+		{"docker", false},
 	}
 
 	checks := make([]DoctorCheck, 0, len(commands))

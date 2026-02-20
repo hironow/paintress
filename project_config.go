@@ -48,5 +48,9 @@ func SaveProjectConfig(continent string, cfg *ProjectConfig) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(ProjectConfigPath(continent), data, 0644)
+	path := ProjectConfigPath(continent)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }

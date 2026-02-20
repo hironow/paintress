@@ -42,6 +42,28 @@ func TestSaveAndLoadProjectConfig(t *testing.T) {
 	}
 }
 
+func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
+	dir := t.TempDir()
+	// .expedition/ does NOT exist — SaveProjectConfig should create it
+
+	cfg := &ProjectConfig{
+		Linear: LinearConfig{Team: "TEST"},
+	}
+
+	if err := SaveProjectConfig(dir, cfg); err != nil {
+		t.Fatalf("SaveProjectConfig should create parent dir, got: %v", err)
+	}
+
+	// Verify file was written
+	loaded, err := LoadProjectConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadProjectConfig: %v", err)
+	}
+	if loaded.Linear.Team != "TEST" {
+		t.Errorf("Team = %q, want %q", loaded.Linear.Team, "TEST")
+	}
+}
+
 func TestLoadProjectConfig_FileNotFound(t *testing.T) {
 	dir := t.TempDir()
 

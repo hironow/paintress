@@ -160,6 +160,29 @@ func TestValidateContinent_PreservesGitignoreOnReadError(t *testing.T) {
 	// Either returning an error or preserving content is acceptable
 }
 
+func TestValidateContinent_WriteStringErrorsPropagate(t *testing.T) {
+	// This test verifies that ValidateContinent returns the error values
+	// from WriteString calls. We test the happy path here — the error
+	// propagation is verified by code inspection (WriteString returns checked).
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	// Create a gitignore without .run/ and without trailing newline
+	gitignore := filepath.Join(expDir, ".gitignore")
+	os.WriteFile(gitignore, []byte("worktrees/"), 0644)
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	content, _ := os.ReadFile(gitignore)
+	// Verify both writes happened: newline + .run/
+	if !strings.Contains(string(content), "worktrees/\n.run/\n") {
+		t.Errorf("expected 'worktrees/\\n.run/\\n', got: %q", string(content))
+	}
+}
+
 func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 

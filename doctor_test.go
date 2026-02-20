@@ -27,6 +27,23 @@ func TestRunDoctor_GitFound(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_DockerIsOptional(t *testing.T) {
+	checks := RunDoctor("claude")
+	var dockerCheck *DoctorCheck
+	for i := range checks {
+		if checks[i].Name == "docker" {
+			dockerCheck = &checks[i]
+			break
+		}
+	}
+	if dockerCheck == nil {
+		t.Fatal("expected docker check in results")
+	}
+	if dockerCheck.Required {
+		t.Error("docker should be optional (Required=false), used only for tracing and container tests")
+	}
+}
+
 func TestRunDoctor_MissingCommand(t *testing.T) {
 	checks := RunDoctor("nonexistent-paintress-cmd-12345")
 	var found *DoctorCheck

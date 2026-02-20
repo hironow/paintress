@@ -75,9 +75,9 @@ lint: vet lint-md
 # Format, vet, test — full check before commit
 check: fmt vet test
 
-# Run sightjack doctor (quick smoke test after build)
+# Run paintress doctor (quick smoke test after build)
 doctor: build
-    ./sightjack doctor
+    ./paintress doctor
 
 # Start Jaeger (OTel trace viewer) on http://localhost:16686
 jaeger:
@@ -94,5 +94,5 @@ jaeger-down:
 
 # Clean build artifacts
 clean:
-    rm -f coverage.out
+    rm -f paintress coverage.out
     go clean
