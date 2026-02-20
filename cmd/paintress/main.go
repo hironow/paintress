@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -65,9 +66,9 @@ func extractSubcommand(args []string) (subcmd, repoPath string, flagArgs []strin
 			// If this flag takes a value (next arg is not a flag), consume it
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				if isBoolFlag(arg) {
-					// Bool flags optionally accept "true"/"false" as explicit value
-					next := strings.ToLower(args[i+1])
-					if next == "true" || next == "false" {
+					// Bool flags optionally accept any strconv.ParseBool value
+					// (true/false/1/0/t/f/T/F/TRUE/FALSE)
+					if _, parseErr := strconv.ParseBool(args[i+1]); parseErr == nil {
 						i++
 						flagArgs = append(flagArgs, args[i])
 					}

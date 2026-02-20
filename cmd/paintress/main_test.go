@@ -245,6 +245,48 @@ func TestExtractSubcommand_BoolFlagWithoutValue(t *testing.T) {
 	}
 }
 
+func TestExtractSubcommand_BoolFlagWithNumericValue(t *testing.T) {
+	// "--no-dev 0 ./repo" → path="./repo", flags=["--no-dev", "0"]
+	// Go's strconv.ParseBool accepts 1/0/t/f/T/F in addition to true/false
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--no-dev", "0", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--no-dev", "0"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_BoolFlagWithT(t *testing.T) {
+	// "--dry-run T ./repo" → path="./repo", flags=["--dry-run", "T"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--dry-run", "T", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--dry-run", "T"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+}
+
 func TestExtractSubcommand_Empty(t *testing.T) {
 	// No args → subcmd="run", path=""
 	subcmd, repoPath, flags, err := extractSubcommand([]string{})
