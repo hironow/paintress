@@ -510,6 +510,9 @@ func runArchivePrune(repoPath string, flagArgs []string) int {
 			return 1
 		}
 		fmt.Println(string(data))
+		if execute && result.Deleted < len(result.Candidates) {
+			return 1
+		}
 		return 0
 	}
 
@@ -532,5 +535,12 @@ func runArchivePrune(repoPath string, flagArgs []string) int {
 	}
 	// Remind about git-tracked archive
 	fmt.Fprintf(os.Stderr, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.\n")
+
+	// Signal partial failure: some files could not be removed
+	if execute && result.Deleted < len(result.Candidates) {
+		failed := len(result.Candidates) - result.Deleted
+		fmt.Fprintf(os.Stderr, "Warning: %d file(s) could not be deleted (permission denied or locked).\n", failed)
+		return 1
+	}
 	return 0
 }

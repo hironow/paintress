@@ -146,6 +146,39 @@ func TestArchivePrune_AllRecent_NoCandidates(t *testing.T) {
 	}
 }
 
+func TestArchivePrune_Execute_ReportsPartialFailure(t *testing.T) {
+	dir := t.TempDir()
+	archiveDir := filepath.Join(dir, ".expedition", "archive")
+	os.MkdirAll(archiveDir, 0755)
+
+	// given: two old files, one in a read-only directory (simulated by removing dir write)
+	old1 := filepath.Join(archiveDir, "report-my-1.md")
+	old2 := filepath.Join(archiveDir, "report-my-2.md")
+	os.WriteFile(old1, []byte("old1"), 0644)
+	os.WriteFile(old2, []byte("old2"), 0644)
+	past := time.Now().Add(-40 * 24 * time.Hour)
+	os.Chtimes(old1, past, past)
+	os.Chtimes(old2, past, past)
+
+	// Remove write permission on archive dir → os.Remove will fail
+	os.Chmod(archiveDir, 0555)
+	defer os.Chmod(archiveDir, 0755) // restore for cleanup
+
+	// when: execute
+	result, err := ArchivePrune(dir, 30, true)
+
+	// then: no error from function, but Deleted < Candidates
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Candidates) != 2 {
+		t.Errorf("candidates = %d, want 2", len(result.Candidates))
+	}
+	if result.Deleted != 0 {
+		t.Errorf("deleted = %d, want 0 (all removals should fail)", result.Deleted)
+	}
+}
+
 func TestArchivePrune_NegativeDays_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	_, err := ArchivePrune(dir, -7, false)
