@@ -510,6 +510,22 @@ func TestParseDaysFlag_InvalidEquals(t *testing.T) {
 	}
 }
 
+func TestParseDaysFlag_MissingValue(t *testing.T) {
+	// --days is last arg with no value
+	_, err := parseDaysFlag([]string{"--days"})
+	if err == nil {
+		t.Fatal("expected error for --days without value")
+	}
+}
+
+func TestParseDaysFlag_EmptyEquals(t *testing.T) {
+	// --days= with no value
+	_, err := parseDaysFlag([]string{"--days="})
+	if err == nil {
+		t.Fatal("expected error for --days= without value")
+	}
+}
+
 func TestParseExecuteFlag_Absent(t *testing.T) {
 	if parseExecuteFlag([]string{}) {
 		t.Error("execute should be false when flag absent")

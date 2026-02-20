@@ -429,7 +429,10 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 // Returns an error when --days is present but the value is not a valid integer.
 func parseDaysFlag(flagArgs []string) (int, error) {
 	for i, arg := range flagArgs {
-		if arg == "--days" && i+1 < len(flagArgs) {
+		if arg == "--days" {
+			if i+1 >= len(flagArgs) || strings.HasPrefix(flagArgs[i+1], "-") {
+				return 0, fmt.Errorf("--days requires a value")
+			}
 			v, err := strconv.Atoi(flagArgs[i+1])
 			if err != nil {
 				return 0, fmt.Errorf("invalid --days value %q: must be an integer", flagArgs[i+1])
