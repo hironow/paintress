@@ -272,6 +272,14 @@ func runDoctor(outputFmt string) {
 	claudeCmd := paintress.DefaultClaudeCmd
 	checks := paintress.RunDoctor(claudeCmd)
 
+	allRequired := true
+	for _, c := range checks {
+		if c.Required && !c.OK {
+			allRequired = false
+			break
+		}
+	}
+
 	if outputFmt == "json" {
 		out, err := paintress.FormatDoctorJSON(checks)
 		if err != nil {
@@ -279,6 +287,9 @@ func runDoctor(outputFmt string) {
 			os.Exit(1)
 		}
 		fmt.Println(out)
+		if !allRequired {
+			os.Exit(1)
+		}
 		return
 	}
 

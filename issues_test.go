@@ -113,6 +113,32 @@ func TestFetchIssues_ParsesGraphQLResponse(t *testing.T) {
 	}
 }
 
+func TestFetchIssues_GraphQLErrorResponse(t *testing.T) {
+	// given — API returns 200 but with errors array
+	graphqlResponse := `{
+		"data": null,
+		"errors": [
+			{"message": "You do not have access to this team", "extensions": {"code": "FORBIDDEN"}}
+		]
+	}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(graphqlResponse))
+	}))
+	defer server.Close()
+
+	// when
+	_, err := FetchIssues(server.URL, "test-api-key", "INVALID", "")
+
+	// then — must return an error, not silently succeed
+	if err == nil {
+		t.Fatal("expected error for GraphQL error response, got nil")
+	}
+	if !strings.Contains(err.Error(), "You do not have access to this team") {
+		t.Errorf("error should contain GraphQL message, got: %v", err)
+	}
+}
+
 func TestFetchIssues_MissingAPIKey(t *testing.T) {
 	// given — empty API key
 	// when

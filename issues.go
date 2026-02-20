@@ -100,10 +100,21 @@ func FetchIssues(endpoint, apiKey, teamKey, project string) ([]Issue, error) {
 				} `json:"nodes"`
 			} `json:"issues"`
 		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
 	}
 
 	if err := json.Unmarshal(body, &gqlResp); err != nil {
 		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	if len(gqlResp.Errors) > 0 {
+		msgs := make([]string, 0, len(gqlResp.Errors))
+		for _, e := range gqlResp.Errors {
+			msgs = append(msgs, e.Message)
+		}
+		return nil, fmt.Errorf("GraphQL errors: %s", strings.Join(msgs, "; "))
 	}
 
 	issues := make([]Issue, 0, len(gqlResp.Data.Issues.Nodes))
