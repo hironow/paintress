@@ -58,6 +58,10 @@ func ValidateContinent(continent string) error {
 			return err
 		}
 		defer f.Close()
+		// Ensure .run/ starts on its own line
+		if len(content) > 0 && content[len(content)-1] != '\n' {
+			f.WriteString("\n")
+		}
 		f.WriteString(".run/\n")
 	}
 	return nil

@@ -73,6 +73,39 @@ func TestValidateContinent_AppendsRunToExistingGitignore(t *testing.T) {
 	}
 }
 
+func TestValidateContinent_AppendsRunWithMissingTrailingNewline(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	// Legacy .gitignore WITHOUT trailing newline
+	gitignore := filepath.Join(expDir, ".gitignore")
+	os.WriteFile(gitignore, []byte("worktrees/"), 0644)
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	content, err := os.ReadFile(gitignore)
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	// .run/ must be on its own line, not appended to previous entry
+	lines := strings.Split(string(content), "\n")
+	found := false
+	for _, line := range lines {
+		if strings.TrimSpace(line) == ".run/" {
+			found = true
+		}
+		if strings.Contains(line, "worktrees/.run/") {
+			t.Errorf(".run/ was appended to previous line: %q", string(content))
+		}
+	}
+	if !found {
+		t.Errorf(".run/ should appear on its own line, got: %q", string(content))
+	}
+}
+
 func TestValidateContinent_DoesNotDuplicateRunInGitignore(t *testing.T) {
 	dir := t.TempDir()
 	expDir := filepath.Join(dir, ".expedition")
