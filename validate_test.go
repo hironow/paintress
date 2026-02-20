@@ -103,6 +103,30 @@ func TestValidateContinent_DoesNotDuplicateRunInGitignore(t *testing.T) {
 	}
 }
 
+func TestValidateContinent_PreservesGitignoreOnReadError(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	// Create .gitignore with legacy content, then make it unreadable
+	gitignore := filepath.Join(expDir, ".gitignore")
+	os.WriteFile(gitignore, []byte(".logs/\nworktrees/\n"), 0644)
+	os.Chmod(gitignore, 0000)
+	defer os.Chmod(gitignore, 0644) // restore for cleanup
+
+	// ValidateContinent should return an error, not silently overwrite
+	err := ValidateContinent(dir)
+	if err == nil {
+		// If no error, the file must not have been overwritten
+		os.Chmod(gitignore, 0644)
+		content, _ := os.ReadFile(gitignore)
+		if !containsStr(string(content), ".logs/") {
+			t.Error("existing .gitignore content was overwritten on read error")
+		}
+	}
+	// Either returning an error or preserving content is acceptable
+}
+
 func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 

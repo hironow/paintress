@@ -26,9 +26,15 @@ func FlagPath(continent string) string {
 
 func ReadFlag(continent string) ExpeditionFlag {
 	f := ExpeditionFlag{Remaining: "?"}
-	file, err := os.Open(FlagPath(continent))
+	path := FlagPath(continent)
+	file, err := os.Open(path)
 	if err != nil {
-		return f
+		// Fall back to legacy path (.expedition/flag.md) for upgrade compatibility
+		legacyPath := filepath.Join(continent, ".expedition", "flag.md")
+		file, err = os.Open(legacyPath)
+		if err != nil {
+			return f
+		}
 	}
 	defer file.Close()
 

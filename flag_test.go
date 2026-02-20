@@ -202,6 +202,47 @@ remaining_issues: 5
 	}
 }
 
+func TestReadFlag_MigratesLegacyPath(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	// Legacy flag.md at old path (before .run/ restructure)
+	legacyContent := `last_expedition: 42
+last_issue: MY-100
+last_status: success
+remaining_issues: 3
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(legacyContent), 0644)
+
+	// New .run/ path does NOT have flag.md
+	os.MkdirAll(filepath.Join(expDir, ".run"), 0755)
+
+	f := ReadFlag(dir)
+	if f.LastExpedition != 42 {
+		t.Errorf("LastExpedition = %d, want 42 (should read from legacy path)", f.LastExpedition)
+	}
+	if f.LastIssue != "MY-100" {
+		t.Errorf("LastIssue = %q, want MY-100", f.LastIssue)
+	}
+}
+
+func TestReadFlag_PrefersNewPathOverLegacy(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	runDir := filepath.Join(expDir, ".run")
+	os.MkdirAll(runDir, 0755)
+
+	// Both paths have flag.md — new path should win
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte("last_expedition: 1\n"), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte("last_expedition: 99\n"), 0644)
+
+	f := ReadFlag(dir)
+	if f.LastExpedition != 99 {
+		t.Errorf("LastExpedition = %d, want 99 (new path should take priority)", f.LastExpedition)
+	}
+}
+
 func TestReadFlag_InvalidAndNegativeExpedition(t *testing.T) {
 	dir := t.TempDir()
 	runDir := filepath.Join(dir, ".expedition", ".run")

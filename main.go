@@ -44,8 +44,13 @@ func ValidateContinent(continent string) error {
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
 	content, err := os.ReadFile(gitignore)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
 		// File doesn't exist — create with .run/
-		os.WriteFile(gitignore, []byte(".run/\n"), 0644)
+		if err := os.WriteFile(gitignore, []byte(".run/\n"), 0644); err != nil {
+			return err
+		}
 	} else if !strings.Contains(string(content), ".run/") {
 		// Existing file from older version — append .run/
 		f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_WRONLY, 0644)
