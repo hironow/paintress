@@ -64,8 +64,13 @@ func extractSubcommand(args []string) (subcmd, repoPath string, flagArgs []strin
 			}
 			// If this flag takes a value (next arg is not a flag), consume it
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				// Check if it's a boolean flag (no value needed)
 				if isBoolFlag(arg) {
+					// Bool flags optionally accept "true"/"false" as explicit value
+					next := strings.ToLower(args[i+1])
+					if next == "true" || next == "false" {
+						i++
+						flagArgs = append(flagArgs, args[i])
+					}
 					continue
 				}
 				i++
