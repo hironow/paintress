@@ -443,6 +443,62 @@ func TestExtractSubcommand_IssuesWithStateFlag(t *testing.T) {
 	}
 }
 
+func TestExtractSubcommand_ArchivePrune(t *testing.T) {
+	// "archive-prune ./repo --days 7 --execute" → subcmd="archive-prune", path="./repo", flags
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"archive-prune", "./repo", "--days", "7", "--execute"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "archive-prune" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "archive-prune")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--days", "7", "--execute"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestParseDaysFlag_Default(t *testing.T) {
+	days := parseDaysFlag([]string{})
+	if days != 30 {
+		t.Errorf("days = %d, want 30", days)
+	}
+}
+
+func TestParseDaysFlag_Explicit(t *testing.T) {
+	days := parseDaysFlag([]string{"--days", "7"})
+	if days != 7 {
+		t.Errorf("days = %d, want 7", days)
+	}
+}
+
+func TestParseDaysFlag_Equals(t *testing.T) {
+	days := parseDaysFlag([]string{"--days=14"})
+	if days != 14 {
+		t.Errorf("days = %d, want 14", days)
+	}
+}
+
+func TestParseExecuteFlag_Absent(t *testing.T) {
+	if parseExecuteFlag([]string{}) {
+		t.Error("execute should be false when flag absent")
+	}
+}
+
+func TestParseExecuteFlag_Present(t *testing.T) {
+	if !parseExecuteFlag([]string{"--execute"}) {
+		t.Error("execute should be true when flag present")
+	}
+}
+
 func TestExtractSubcommand_Empty(t *testing.T) {
 	// No args → subcmd="run", path=""
 	subcmd, repoPath, flags, err := extractSubcommand([]string{})

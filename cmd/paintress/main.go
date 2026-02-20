@@ -19,9 +19,10 @@ var version = "dev"
 
 // knownSubcommands lists all recognized subcommands.
 var knownSubcommands = map[string]bool{
-	"init":   true,
-	"doctor": true,
-	"issues": true,
+	"init":          true,
+	"doctor":        true,
+	"issues":        true,
+	"archive-prune": true,
 }
 
 // extractSubcommand separates args (os.Args[1:]) into a subcommand, a repo
@@ -139,7 +140,7 @@ func parseStateFlag(flagArgs []string) []string {
 func isBoolFlag(arg string) bool {
 	name := strings.TrimLeft(arg, "-")
 	switch name {
-	case "version", "dry-run", "no-dev":
+	case "version", "dry-run", "no-dev", "execute":
 		return true
 	}
 	return false
@@ -176,6 +177,12 @@ func run() int {
 		outputFmt := parseOutputFlag(flagArgs)
 		stateFilter := parseStateFlag(flagArgs)
 		return runIssues(repoPath, outputFmt, stateFilter)
+	case "archive-prune":
+		if repoPath == "" {
+			fmt.Fprintf(os.Stderr, "Usage: paintress archive-prune <repo-path> [--days 30] [--execute] [--output json|text]\n")
+			return 1
+		}
+		return runArchivePrune(repoPath, flagArgs)
 	}
 
 	// Default: "run" subcommand
@@ -236,9 +243,10 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 		fmt.Fprintf(os.Stderr, "Usage: paintress <repo-path> [options]\n\n")
 		fmt.Fprintf(os.Stderr, "The Paintress — drives the Expedition loop.\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "  init <repo-path>   Initialize project configuration\n")
-		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n")
-		fmt.Fprintf(os.Stderr, "  issues <repo-path> List Linear issues (table, --output json for JSON)\n\n")
+		fmt.Fprintf(os.Stderr, "  init <repo-path>          Initialize project configuration\n")
+		fmt.Fprintf(os.Stderr, "  doctor                    Check external command availability\n")
+		fmt.Fprintf(os.Stderr, "  issues <repo-path>        List Linear issues (table, --output json for JSON)\n")
+		fmt.Fprintf(os.Stderr, "  archive-prune <repo-path> Prune old archived d-mails [--days 30] [--execute]\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
 		fmt.Fprintf(os.Stderr, "  <repo-path>    Target repository (The Continent)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
@@ -412,5 +420,83 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 			fmt.Println(out)
 		}
 	}
+	return 0
+}
+
+// parseDaysFlag extracts the --days value from flagArgs. Returns 30 when unspecified.
+func parseDaysFlag(flagArgs []string) int {
+	for i, arg := range flagArgs {
+		if arg == "--days" && i+1 < len(flagArgs) {
+			if v, err := strconv.Atoi(flagArgs[i+1]); err == nil {
+				return v
+			}
+		}
+		if strings.HasPrefix(arg, "--days=") {
+			if v, err := strconv.Atoi(strings.TrimPrefix(arg, "--days=")); err == nil {
+				return v
+			}
+		}
+	}
+	return 30
+}
+
+// parseExecuteFlag checks if --execute is present in flagArgs.
+func parseExecuteFlag(flagArgs []string) bool {
+	for _, arg := range flagArgs {
+		if arg == "--execute" {
+			return true
+		}
+	}
+	return false
+}
+
+func runArchivePrune(repoPath string, flagArgs []string) int {
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: invalid path: %v\n", err)
+		return 1
+	}
+
+	days := parseDaysFlag(flagArgs)
+	execute := parseExecuteFlag(flagArgs)
+	outputFmt := parseOutputFlag(flagArgs)
+
+	result, err := paintress.ArchivePrune(absPath, days, execute)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	if outputFmt == "json" {
+		fmt.Printf("{\"candidates\":%d,\"deleted\":%d,\"files\":[", len(result.Candidates), result.Deleted)
+		for i, f := range result.Candidates {
+			if i > 0 {
+				fmt.Print(",")
+			}
+			fmt.Printf("%q", f)
+		}
+		fmt.Println("]}")
+		return 0
+	}
+
+	// text output
+	if len(result.Candidates) == 0 {
+		fmt.Println("No files older than", days, "days.")
+		return 0
+	}
+
+	if execute {
+		fmt.Printf("Deleted %d file(s):\n", result.Deleted)
+	} else {
+		fmt.Printf("Files older than %d days (%d file(s), dry-run):\n", days, len(result.Candidates))
+	}
+	for _, f := range result.Candidates {
+		fmt.Println("  " + f)
+	}
+	if !execute {
+		fmt.Println("\nRun with --execute to delete.")
+	}
+	// Remind about git-tracked archive
+	fmt.Fprintf(os.Stderr, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.\n")
 	return 0
 }
