@@ -31,6 +31,25 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		return
 	}
 
+	// Initial scan: catch files that already exist before the event loop starts.
+	// The watcher is already registered, so any file created during this scan
+	// will also produce an event — duplicates are handled by the caller's dedup.
+	entries, _ := os.ReadDir(inboxDir)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(inboxDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		dm, err := ParseDMail(data)
+		if err != nil {
+			continue
+		}
+		onNewDMail(dm)
+	}
+
 	if ready != nil {
 		ready <- struct{}{}
 	}
