@@ -192,7 +192,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	go func() {
 		defer close(done)
 		reader := bufio.NewReader(stdout)
-		writer := io.MultiWriter(os.Stdout, outFile)
+		// In JSON output mode, stream to stderr so stdout stays machine-readable
+		streamDest := io.Writer(os.Stdout)
+		if e.Config.OutputFormat == "json" {
+			streamDest = os.Stderr
+		}
+		writer := io.MultiWriter(streamDest, outFile)
 
 		buf := make([]byte, 4096)
 		for {
