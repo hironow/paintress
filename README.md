@@ -30,7 +30,7 @@ This structure maps directly to AI agent loop design:
 | **Paintress** | This binary | External force that drives the loop |
 | **Monolith** | Linear backlog | The remaining issue count is inscribed |
 | **Expedition** | One Claude Code execution | Departs with fresh context each time |
-| **Expedition Flag** | `.expedition/flag.md` | Checkpoint passed to the next run |
+| **Expedition Flag** | `.expedition/.run/flag.md` | Checkpoint passed to the next run |
 | **Journal** | `.expedition/journal/` | Record of past decisions and lessons |
 | **Canvas** | LLM context window | Beautiful but temporary — destroyed each run |
 | **Lumina** | Auto-extracted patterns | Patterns learned from past failures/successes |
@@ -67,7 +67,7 @@ Consecutive successes fill the gauge, unlocking higher-difficulty issues.
 ### Lumina (Learned Passive Skills)
 
 Past journals are scanned in parallel goroutines to extract recurring patterns.
-Saved to `.expedition/lumina.md` and injected into the next Expedition's prompt.
+Injected directly into the next Expedition's prompt.
 
 - **Defensive**: Insights from failed expeditions that appear 2+ times → "Avoid — failed N times: ..." (falls back to failure reason if no insight)
 - **Offensive**: Insights from successful expeditions that appear 3+ times → "Proven approach (Nx successful): ..." (falls back to mission type if no insight)
@@ -118,13 +118,14 @@ Continent (Git repo)       <- Persistent world
     +-- src/
     +-- CLAUDE.md
     +-- .expedition/
-         +-- flag.md       <- Checkpoint (auto-generated)
-         +-- mission.md    <- Rules of engagement (auto-generated, --lang aware)
-         +-- lumina.md     <- Learned skills (auto-generated)
+         +-- config.yaml   <- Project config (paintress init)
          +-- journal/
          |    +-- 001.md, 002.md, ...
          +-- context/      <- User-provided .md files injected into prompts
-         +-- worktrees/    <- Managed by WorktreePool (auto-created, gitignored)
+         +-- .run/         <- Ephemeral (gitignored)
+              +-- flag.md       <- Checkpoint (auto-generated)
+              +-- logs/         <- Expedition logs
+              +-- worktrees/    <- Managed by WorktreePool
 ```
 
 ### WorktreePool Lifecycle (`--workers >= 1`)
@@ -169,23 +170,21 @@ just install
 paintress /path/to/your/repo
 ```
 
-Paintress creates `.expedition/` and all files (`flag.md`, `mission.md`,
-`lumina.md`, journal entries) automatically at runtime.
+Paintress creates `.expedition/` with config, journal entries, and ephemeral
+runtime state under `.run/` automatically. Mission and Lumina content are
+embedded directly in the expedition prompt (no separate files on disk).
 Git worktrees for Swarm Mode are also fully managed — Paintress creates them
 on startup and removes them on shutdown. No manual `git worktree` commands needed.
 
 ## Usage
 
-**Important:** The repo path (`<repo-path>`) must come **after** all flags.
-Go's `flag` package stops parsing at the first non-flag argument, so flags
-placed after the repo path will be ignored.
+Flags and repo path can be placed in any order:
 
 ```bash
-# OK  — flags first, repo path (or ".") last
-paintress --lang ja .
-
-# BAD — flags after repo path are ignored
-paintress . --lang ja
+paintress --lang ja .          # flags before path
+paintress . --lang ja          # flags after path
+paintress --model=opus .       # --flag=value form
+paintress -- ./my-repo         # -- terminates flags
 ```
 
 ```bash

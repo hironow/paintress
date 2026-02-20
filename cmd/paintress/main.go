@@ -98,23 +98,27 @@ func isBoolFlag(arg string) bool {
 }
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	subcmd, repoPath, flagArgs, err := extractSubcommand(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	switch subcmd {
 	case "init":
 		if repoPath == "" {
 			fmt.Fprintf(os.Stderr, "Usage: paintress init <repo-path>\n")
-			os.Exit(1)
+			return 1
 		}
 		runInit(repoPath)
-		return
+		return 0
 	case "doctor":
 		runDoctor()
-		return
+		return 0
 	}
 
 	// Default: "run" subcommand
@@ -129,7 +133,7 @@ func main() {
 
 	if err := paintress.ValidateContinent(cfg.Continent); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -145,7 +149,7 @@ func main() {
 	}()
 
 	p := paintress.NewPaintress(cfg)
-	os.Exit(p.Run(ctx))
+	return p.Run(ctx)
 }
 
 func parseFlags(repoPath string, args []string) paintress.Config {
