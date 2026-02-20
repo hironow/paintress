@@ -123,7 +123,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	if p.config.DryRun {
 		LogWarn("%s", Msg("dry_run"))
 	}
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 
 	// Start dev server (stays alive across expeditions)
 	if !p.config.DryRun && p.devServer != nil {
@@ -181,7 +181,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	err := g.Wait()
 
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	p.printSummary()
 
 	switch {
@@ -600,11 +600,11 @@ func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 }
 
 func (p *Paintress) printBanner() {
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
+	fmt.Fprintln(os.Stderr)
 }
 
 // writeFlag writes the flag checkpoint only if expNum is greater than the
@@ -620,11 +620,11 @@ func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
 
 func (p *Paintress) printSummary() {
 	total := p.totalAttempted.Load()
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
+	fmt.Fprintln(os.Stderr)
 	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
 	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
 	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
@@ -632,10 +632,10 @@ func (p *Paintress) printSummary() {
 	if p.totalBugs.Load() > 0 {
 		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatLog()))
 	LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	LogInfo("Flag:     %s", FlagPath(p.config.Continent))
 	LogInfo("Journals: %s", JournalDir(p.config.Continent))
 	LogInfo("Logs:     %s", p.logDir)

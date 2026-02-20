@@ -82,14 +82,35 @@ func TestLogFunctions_WithoutLogFile(t *testing.T) {
 	LogError("no file")
 }
 
-func TestLogFunctions_QuietMode_SuppressesStdout(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "quiet.log")
-	InitLogFile(path)
-	defer CloseLogFile()
+func TestLogFunctions_WritesToStderr(t *testing.T) {
+	CloseLogFile()
 
-	t.Setenv("PAINTRESS_QUIET", "1")
+	// Capture stderr
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stderr = w
 
+	LogInfo("stderr test message")
+
+	_ = w.Close()
+	os.Stderr = origStderr
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	if !containsStr(string(out), "stderr test message") {
+		t.Errorf("expected log output on stderr, got %q", string(out))
+	}
+}
+
+func TestLogFunctions_DoesNotWriteToStdout(t *testing.T) {
+	CloseLogFile()
+
+	// Capture stdout — should be empty
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
 	if err != nil {
@@ -97,7 +118,7 @@ func TestLogFunctions_QuietMode_SuppressesStdout(t *testing.T) {
 	}
 	os.Stdout = w
 
-	LogInfo("quiet mode")
+	LogInfo("should not appear on stdout")
 
 	_ = w.Close()
 	os.Stdout = origStdout
@@ -107,7 +128,64 @@ func TestLogFunctions_QuietMode_SuppressesStdout(t *testing.T) {
 		t.Fatalf("read stdout: %v", err)
 	}
 	if len(out) != 0 {
-		t.Errorf("expected no stdout output, got %q", string(out))
+		t.Errorf("expected no stdout output from LogInfo, got %q", string(out))
+	}
+}
+
+func TestLogFunctions_NoColorWhenNotTTY(t *testing.T) {
+	CloseLogFile()
+
+	// Pipe is not a TTY, so output should have no ANSI escape codes
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stderr = w
+
+	LogInfo("no color test")
+
+	_ = w.Close()
+	os.Stderr = origStderr
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	if containsStr(string(out), "\033[") {
+		t.Errorf("expected no ANSI color codes when stderr is a pipe, got %q", string(out))
+	}
+	if !containsStr(string(out), "no color test") {
+		t.Errorf("expected message content, got %q", string(out))
+	}
+}
+
+func TestLogFunctions_QuietMode_SuppressesStderr(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "quiet.log")
+	InitLogFile(path)
+	defer CloseLogFile()
+
+	t.Setenv("PAINTRESS_QUIET", "1")
+
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stderr = w
+
+	LogInfo("quiet mode")
+
+	_ = w.Close()
+	os.Stderr = origStderr
+
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("expected no stderr output in quiet mode, got %q", string(out))
 	}
 
 	content, err := os.ReadFile(path)

@@ -224,7 +224,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	<-done
 
 	err = cmd.Wait()
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",

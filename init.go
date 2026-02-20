@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -22,7 +23,7 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 
 	scanner := bufio.NewScanner(r)
 
-	fmt.Print("Linear team key (e.g. MY): ")
+	fmt.Fprint(os.Stderr, "Linear team key (e.g. MY): ")
 	var team string
 	if scanner.Scan() {
 		team = strings.TrimSpace(scanner.Text())
@@ -34,7 +35,7 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 		return fmt.Errorf("team key is required")
 	}
 
-	fmt.Print("Linear project name (optional, press Enter to skip): ")
+	fmt.Fprint(os.Stderr, "Linear project name (optional, press Enter to skip): ")
 	var project string
 	if scanner.Scan() {
 		project = strings.TrimSpace(scanner.Text())
@@ -54,10 +55,10 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Printf("\nConfig saved to %s\n", ProjectConfigPath(absPath))
-	fmt.Printf("  Linear team:    %s\n", team)
+	fmt.Fprintf(os.Stderr, "\nConfig saved to %s\n", ProjectConfigPath(absPath))
+	fmt.Fprintf(os.Stderr, "  Linear team:    %s\n", team)
 	if project != "" {
-		fmt.Printf("  Linear project: %s\n", project)
+		fmt.Fprintf(os.Stderr, "  Linear project: %s\n", project)
 	}
 	return nil
 }

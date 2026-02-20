@@ -231,11 +231,11 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 }
 
 func runInit(repoPath string) {
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s║          Paintress Init                      ║%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          Paintress Init                      ║%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintln(os.Stderr)
 
 	if err := paintress.RunInitWithReader(repoPath, os.Stdin); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -247,16 +247,16 @@ func runDoctor() {
 	claudeCmd := paintress.DefaultClaudeCmd
 	checks := paintress.RunDoctor(claudeCmd)
 
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s║          Paintress Doctor                    ║%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          Paintress Doctor                    ║%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintln(os.Stderr)
 
 	allOK := true
 	for _, c := range checks {
 		if c.OK {
-			fmt.Printf("  %s✓%s  %-12s %s (%s)\n", paintress.ColorGreen, paintress.ColorReset, c.Name, c.Version, c.Path)
+			fmt.Fprintf(os.Stderr, "  %s✓%s  %-12s %s (%s)\n", paintress.ColorGreen, paintress.ColorReset, c.Name, c.Version, c.Path)
 		} else {
 			marker := "✗"
 			color := paintress.ColorRed
@@ -267,14 +267,14 @@ func runDoctor() {
 			} else {
 				allOK = false
 			}
-			fmt.Printf("  %s%s%s  %-12s %s\n", color, marker, paintress.ColorReset, c.Name, label)
+			fmt.Fprintf(os.Stderr, "  %s%s%s  %-12s %s\n", color, marker, paintress.ColorReset, c.Name, label)
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 
 	if !allOK {
 		fmt.Fprintf(os.Stderr, "Some required commands are missing. Install them and try again.\n")
 		os.Exit(1)
 	}
-	fmt.Println("All checks passed.")
+	fmt.Fprintln(os.Stderr, "All checks passed.")
 }
