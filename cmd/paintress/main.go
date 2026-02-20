@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -440,10 +441,25 @@ func parseDaysFlag(flagArgs []string) int {
 	return 30
 }
 
-// parseExecuteFlag checks if --execute is present in flagArgs.
+// parseExecuteFlag parses --execute from flagArgs.
+// Supports: --execute, --execute true/false, --execute=true/false.
 func parseExecuteFlag(flagArgs []string) bool {
-	for _, arg := range flagArgs {
+	for i, arg := range flagArgs {
+		if strings.HasPrefix(arg, "--execute=") {
+			val := strings.TrimPrefix(arg, "--execute=")
+			v, err := strconv.ParseBool(val)
+			if err != nil {
+				return true // unparseable value → treat presence as true
+			}
+			return v
+		}
 		if arg == "--execute" {
+			// Check if next arg is an explicit bool value
+			if i+1 < len(flagArgs) {
+				if v, err := strconv.ParseBool(flagArgs[i+1]); err == nil {
+					return v
+				}
+			}
 			return true
 		}
 	}
@@ -468,14 +484,21 @@ func runArchivePrune(repoPath string, flagArgs []string) int {
 	}
 
 	if outputFmt == "json" {
-		fmt.Printf("{\"candidates\":%d,\"deleted\":%d,\"files\":[", len(result.Candidates), result.Deleted)
-		for i, f := range result.Candidates {
-			if i > 0 {
-				fmt.Print(",")
-			}
-			fmt.Printf("%q", f)
+		out := struct {
+			Candidates int      `json:"candidates"`
+			Deleted    int      `json:"deleted"`
+			Files      []string `json:"files"`
+		}{
+			Candidates: len(result.Candidates),
+			Deleted:    result.Deleted,
+			Files:      result.Candidates,
 		}
-		fmt.Println("]}")
+		data, err := json.Marshal(out)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
+		fmt.Println(string(data))
 		return 0
 	}
 

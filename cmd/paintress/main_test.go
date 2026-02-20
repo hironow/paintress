@@ -499,6 +499,24 @@ func TestParseExecuteFlag_Present(t *testing.T) {
 	}
 }
 
+func TestParseExecuteFlag_ExplicitFalse(t *testing.T) {
+	if parseExecuteFlag([]string{"--execute", "false"}) {
+		t.Error("execute should be false when --execute false")
+	}
+}
+
+func TestParseExecuteFlag_EqualsFalse(t *testing.T) {
+	if parseExecuteFlag([]string{"--execute=false"}) {
+		t.Error("execute should be false when --execute=false")
+	}
+}
+
+func TestParseExecuteFlag_EqualsTrue(t *testing.T) {
+	if !parseExecuteFlag([]string{"--execute=true"}) {
+		t.Error("execute should be true when --execute=true")
+	}
+}
+
 func TestExtractSubcommand_Empty(t *testing.T) {
 	// No args → subcmd="run", path=""
 	subcmd, repoPath, flags, err := extractSubcommand([]string{})
