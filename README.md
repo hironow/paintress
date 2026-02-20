@@ -88,6 +88,18 @@ paintress --model opus,sonnet,haiku ./repo
 - After 30-min cooldown → attempt recovery to primary
 - Timeout also triggers reserve switch (possible rate limit)
 
+## D-Mail Protocol
+
+Paintress communicates with external tools (phonewave, sightjack, courier) via the D-Mail protocol — markdown files exchanged through `inbox/` and `outbox/` directories.
+
+**Inbound** (inbox/ → prompt): External tools write specification or feedback d-mails to `.expedition/inbox/`. Paintress scans them at expedition start (`ScanInbox`) and embeds them in the prompt. A real-time `watchInbox` goroutine (fsnotify) also detects d-mails arriving mid-expedition (logged but not processed until the next expedition).
+
+**Outbound** (report → outbox/): After a successful expedition, Paintress generates a report d-mail and writes it to `archive/` first, then `outbox/` (archive-first for durability). The courier tool picks up outbox/ files for delivery.
+
+**Lifecycle**: inbox/ → prompt injection → expedition → archive/ (processed). Mid-expedition arrivals stay in inbox/ for the next expedition. Only d-mails that were embedded in the prompt are archived.
+
+**Skills**: Agent skill manifests (`SKILL.md`) in `.expedition/skills/` declare D-Mail capabilities (`dmail-readable`: consumes specification/feedback, `dmail-sendable`: produces reports).
+
 ## Architecture
 
 ```
@@ -122,6 +134,10 @@ Continent (Git repo)       <- Persistent world
          +-- journal/
          |    +-- 001.md, 002.md, ...
          +-- context/      <- User-provided .md files injected into prompts
+         +-- skills/       <- Agent skill manifests (SKILL.md)
+         +-- inbox/        <- Incoming d-mails (gitignored, transient)
+         +-- outbox/       <- Outgoing d-mails (gitignored, transient)
+         +-- archive/      <- Processed d-mails (tracked, audit trail)
          +-- .run/         <- Ephemeral (gitignored)
               +-- flag.md       <- Checkpoint (auto-generated)
               +-- logs/         <- Expedition logs
@@ -146,6 +162,8 @@ When `--workers 0`, no pool is created and expeditions run directly on the repos
 | Journal scanner | Parallel file reads → Lumina extraction | Resting at Flag |
 | Worker (N) | Expedition loop per worktree (Swarm Mode) | Expedition Party |
 | Output streaming | stdout tee + rate limit detection | Reserve Party standby |
+| Flag watcher | fsnotify: detect issue selection in real-time | Expedition Flag |
+| Inbox watcher | fsnotify: detect d-mails arriving mid-expedition | D-Mail courier |
 | Timeout watchdog | context.WithTimeout | Gommage (time's up) |
 
 ## Code Review Gate
@@ -189,6 +207,7 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 | `paintress <repo-path>` | Run expedition loop (default) |
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
 | `paintress doctor` | Check required external commands (git, claude, gh, docker) |
+| `paintress issues <repo-path>` | List Linear issues (`--output json` for JSON, `--state` to filter) |
 | `paintress --version` | Show version and exit |
 
 ## Usage
@@ -281,6 +300,7 @@ paintress \
 | `--setup-cmd` | `""` | Command to run after worktree creation (e.g. `bun install`) |
 | `--no-dev` | `false` | Skip dev server startup entirely |
 | `--dry-run` | `false` | Generate prompts without executing |
+| `--output` | `text` | Output format: `text` or `json` (streaming goes to stderr in JSON mode) |
 | `--version` | — | Show version and exit |
 
 ## Tracing (OpenTelemetry)
@@ -337,10 +357,13 @@ just jaeger-down    # Stop Jaeger
 +-- reserve.go               Reserve Party (goroutine)
 +-- devserver.go             Dev server (goroutine)
 +-- flag.go                  Flag read/write
-+-- flag_watcher.go          Real-time issue selection watcher
++-- flag_watcher.go          Real-time issue selection watcher (fsnotify)
++-- inbox_watcher.go         Real-time inbox d-mail watcher (fsnotify)
 +-- journal.go               Journal read/write
 +-- report.go                Report parser (including failure_type)
 +-- context.go               Context injection (.expedition/context/)
++-- dmail.go                 D-Mail protocol (scan, send, archive, parse)
++-- issues.go                Linear issue fetcher (API + formatting)
 +-- worktree.go              WorktreePool for Swarm Mode
 +-- review.go                Code review gate (exec + parse)
 +-- mission.go               Mission text (prompt-embedded)
@@ -357,6 +380,9 @@ just jaeger-down    # Stop Jaeger
 +-- templates/
     +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
     +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
+    +-- skills/              Agent skill manifests (copied to .expedition/skills/)
+        +-- dmail-sendable/SKILL.md
+        +-- dmail-readable/SKILL.md
 ```
 
 ## Prerequisites

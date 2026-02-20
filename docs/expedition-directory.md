@@ -88,6 +88,7 @@ The expedition prompt template embeds some content inline and references other f
 ### Dual-Use: Journals
 
 Journals serve two purposes simultaneously:
+
 1. **Pre-processed** -> Lumina extraction (aggregated patterns injected inline)
 2. **Direct read** -> Template instructs Claude Code to read the latest entry
 
@@ -114,8 +115,10 @@ Journals serve two purposes simultaneously:
 ```
 
 - **inbox/** -> prompt injection -> **archive/** (after success)
-- **report** -> **outbox/** + **archive/** (dual-write on send)
+- **report** -> **archive/** first, then **outbox/** (archive-first for durability)
 - `SendDMail` and `ArchiveInboxDMail` are best-effort (LogWarn on failure, never block success)
+- `watchInbox` (fsnotify) performs an initial scan of existing files on startup, then monitors for Create/Write events
+- D-mails arriving mid-expedition are logged but NOT archived — they stay in inbox/ for the next expedition's `ScanInbox`
 
 ## File Creators
 
