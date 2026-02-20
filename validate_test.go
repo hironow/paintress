@@ -341,6 +341,26 @@ func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 	}
 }
 
+func TestValidateContinent_SkillStatErrorPropagates(t *testing.T) {
+	dir := t.TempDir()
+
+	// First call creates the skill directory and file
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+
+	// Make the skill directory unreadable so os.Stat returns permission error
+	skillDir := filepath.Join(dir, ".expedition", "skills", "dmail-sendable")
+	os.Chmod(skillDir, 0000)
+	defer os.Chmod(skillDir, 0755)
+
+	// ValidateContinent should propagate the stat error, not silently skip
+	err := ValidateContinent(dir)
+	if err == nil {
+		t.Error("expected error when skill directory is unreadable, got nil")
+	}
+}
+
 func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 

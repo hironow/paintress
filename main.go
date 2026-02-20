@@ -69,7 +69,10 @@ func ValidateContinent(continent string) error {
 			return err
 		}
 		skillFile := filepath.Join(skillDir, "SKILL.md")
-		if _, err := os.Stat(skillFile); os.IsNotExist(err) {
+		if _, err := os.Stat(skillFile); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
 			if err := os.WriteFile(skillFile, []byte(s.content), 0644); err != nil {
 				return err
 			}
