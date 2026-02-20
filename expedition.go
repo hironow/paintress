@@ -196,7 +196,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			),
 		)
 		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
-	})
+	}, nil)
 
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
 	var output strings.Builder

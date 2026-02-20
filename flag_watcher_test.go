@@ -21,6 +21,7 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	ready := make(chan struct{}, 1)
 	go watchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock()
 		gotIssue = issue
@@ -30,10 +31,15 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 		case done <- struct{}{}:
 		default:
 		}
-	})
+	}, ready)
 
-	// Wait for watcher.Add() to complete before writing
-	time.Sleep(50 * time.Millisecond)
+	// Wait for watcher to be fully set up before writing
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for watcher ready")
+	}
+
 	content := "current_issue: MY-239\ncurrent_title: flag watcher\n"
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
@@ -61,7 +67,7 @@ func TestWatchFlag_StopsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		watchFlag(ctx, dir, func(issue, title string) {})
+		watchFlag(ctx, dir, func(issue, title string) {}, nil)
 		close(done)
 	}()
 
@@ -94,7 +100,7 @@ func TestWatchFlag_DoesNotFireOnSameIssue(t *testing.T) {
 		mu.Lock()
 		callCount++
 		mu.Unlock()
-	})
+	}, nil)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -110,32 +116,49 @@ func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 
 	var mu sync.Mutex
 	var issues []string
+	firstFired := make(chan struct{}, 1)
 	secondFired := make(chan struct{}, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	ready := make(chan struct{}, 1)
 	go watchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock()
 		issues = append(issues, issue)
 		count := len(issues)
 		mu.Unlock()
+		if count == 1 {
+			select {
+			case firstFired <- struct{}{}:
+			default:
+			}
+		}
 		if count >= 2 {
 			select {
 			case secondFired <- struct{}{}:
 			default:
 			}
 		}
-	})
+	}, ready)
 
-	// Wait for watcher.Add() to complete
-	time.Sleep(50 * time.Millisecond)
+	// Wait for watcher to be fully set up
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for watcher ready")
+	}
 
 	// First issue
 	os.WriteFile(filepath.Join(runDir, "flag.md"),
 		[]byte("current_issue: MY-239\ncurrent_title: first\n"), 0644)
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for first callback before writing second
+	select {
+	case <-firstFired:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for first callback")
+	}
 
 	// Second issue
 	os.WriteFile(filepath.Join(runDir, "flag.md"),
@@ -167,5 +190,5 @@ func TestWatchFlag_NoFlagFile_NoPanic(t *testing.T) {
 	// Should not panic — returns immediately because runDir doesn't exist
 	watchFlag(ctx, dir, func(issue, title string) {
 		t.Error("callback should not fire when no flag file exists")
-	})
+	}, nil)
 }
