@@ -23,7 +23,9 @@ type Issue struct {
 
 // FetchIssues queries Linear GraphQL API and returns issues for the given team.
 // endpoint can be overridden for testing; pass LinearAPIEndpoint for production.
-func FetchIssues(endpoint, apiKey, teamKey, project string) ([]Issue, error) {
+// When stateFilter is non-empty, completed/canceled issues are included in the
+// GraphQL query so that local filtering can match them.
+func FetchIssues(endpoint, apiKey, teamKey, project string, stateFilter []string) ([]Issue, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("LINEAR_API_KEY is required")
 	}
@@ -42,9 +44,11 @@ func FetchIssues(endpoint, apiKey, teamKey, project string) ([]Issue, error) {
 
 	filter := map[string]any{
 		"team": map[string]any{"key": map[string]any{"eq": teamKey}},
-		"state": map[string]any{
+	}
+	if len(stateFilter) == 0 {
+		filter["state"] = map[string]any{
 			"type": map[string]any{"nin": []string{"completed", "canceled"}},
-		},
+		}
 	}
 	if project != "" {
 		filter["project"] = map[string]any{

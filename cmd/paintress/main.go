@@ -381,7 +381,7 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 		return 1
 	}
 
-	issues, err := paintress.FetchIssues(paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project)
+	issues, err := paintress.FetchIssues(paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1

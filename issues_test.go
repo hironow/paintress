@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -91,7 +92,7 @@ func TestFetchIssues_ParsesGraphQLResponse(t *testing.T) {
 	defer server.Close()
 
 	// when
-	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "")
+	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "", nil)
 	if err != nil {
 		t.Fatalf("FetchIssues: %v", err)
 	}
@@ -129,7 +130,7 @@ func TestFetchIssues_GraphQLErrorResponse(t *testing.T) {
 	defer server.Close()
 
 	// when
-	_, err := FetchIssues(server.URL, "test-api-key", "INVALID", "")
+	_, err := FetchIssues(server.URL, "test-api-key", "INVALID", "", nil)
 
 	// then — must return an error, not silently succeed
 	if err == nil {
@@ -143,7 +144,7 @@ func TestFetchIssues_GraphQLErrorResponse(t *testing.T) {
 func TestFetchIssues_MissingAPIKey(t *testing.T) {
 	// given — empty API key
 	// when
-	_, err := FetchIssues("http://localhost:9999", "", "MY", "")
+	_, err := FetchIssues("http://localhost:9999", "", "MY", "", nil)
 	// then
 	if err == nil {
 		t.Fatal("expected error for empty API key")
@@ -266,6 +267,74 @@ func TestFilterIssuesByState_EmptyFilter(t *testing.T) {
 	// then
 	if len(filtered) != 2 {
 		t.Fatalf("expected 2 issues (no filter), got %d", len(filtered))
+	}
+}
+
+func TestFetchIssues_IncludesCompletedWhenStateFilterRequests(t *testing.T) {
+	// given — API returns a completed issue
+	graphqlResponse := `{
+		"data": {
+			"issues": {
+				"nodes": [
+					{
+						"identifier": "MY-50",
+						"title": "Already done",
+						"priority": 3,
+						"state": {"name": "Done"},
+						"labels": {"nodes": []}
+					}
+				]
+			}
+		}
+	}`
+
+	var capturedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(graphqlResponse))
+	}))
+	defer server.Close()
+
+	// when — state filter includes a completed state
+	issues, err := FetchIssues(server.URL, "test-api-key", "MY", "", []string{"done"})
+	if err != nil {
+		t.Fatalf("FetchIssues: %v", err)
+	}
+
+	// then — completed issue is returned (not excluded by GraphQL filter)
+	if len(issues) != 1 {
+		t.Fatalf("expected 1 issue, got %d", len(issues))
+	}
+	if issues[0].ID != "MY-50" {
+		t.Errorf("issues[0].ID = %q, want MY-50", issues[0].ID)
+	}
+
+	// then — GraphQL filter should NOT contain "nin" for state.type
+	if strings.Contains(string(capturedBody), "nin") {
+		t.Error("GraphQL filter should not exclude completed/canceled when stateFilter is provided")
+	}
+}
+
+func TestFetchIssues_ExcludesCompletedByDefault(t *testing.T) {
+	// given
+	var capturedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"data":{"issues":{"nodes":[]}}}`))
+	}))
+	defer server.Close()
+
+	// when — no state filter (default)
+	_, err := FetchIssues(server.URL, "test-api-key", "MY", "", nil)
+	if err != nil {
+		t.Fatalf("FetchIssues: %v", err)
+	}
+
+	// then — GraphQL filter SHOULD contain "nin" to exclude completed/canceled
+	if !strings.Contains(string(capturedBody), "nin") {
+		t.Error("GraphQL filter should exclude completed/canceled by default")
 	}
 }
 
