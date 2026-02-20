@@ -27,6 +27,9 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 	if scanner.Scan() {
 		team = strings.TrimSpace(scanner.Text())
 	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("reading input: %w", err)
+	}
 	if team == "" {
 		return fmt.Errorf("team key is required")
 	}
@@ -35,6 +38,9 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 	var project string
 	if scanner.Scan() {
 		project = strings.TrimSpace(scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("reading input: %w", err)
 	}
 
 	cfg := &ProjectConfig{

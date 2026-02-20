@@ -260,7 +260,12 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		if p.config.DryRun {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
-			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
+			if err := os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644); err != nil {
+				LogError("failed to write dry-run prompt: %v", err)
+				releaseWorkDir()
+				expSpan.End()
+				continue
+			}
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
 			p.totalSuccess.Add(1)
 			releaseWorkDir()
