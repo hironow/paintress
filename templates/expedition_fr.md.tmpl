@@ -55,6 +55,14 @@ Le contexte suivant a été fourni pour cette expédition. Traitez-le comme une 
 
 {{.ContextSection}}
 {{- end}}
+{{- if .InboxSection}}
+
+## Boîte de réception D-Mail
+
+Les d-mails suivants ont été livrés dans votre boîte de réception. Lisez-les et agissez selon leur type (specification = implémentez-le, feedback = intégrez la leçon) :
+
+{{.InboxSection}}
+{{- end}}
 
 ## Mission — Règles d'engagement
 

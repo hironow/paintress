@@ -12,6 +12,60 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// FormatDMailForPrompt formats d-mails as a human-readable Markdown section
+// for injection into expedition prompts. Returns empty string for empty input.
+func FormatDMailForPrompt(dmails []DMail) string {
+	if len(dmails) == 0 {
+		return ""
+	}
+	var buf strings.Builder
+	for _, dm := range dmails {
+		fmt.Fprintf(&buf, "### %s (%s)\n\n", dm.Name, dm.Kind)
+		fmt.Fprintf(&buf, "**Description:** %s\n", dm.Description)
+		if len(dm.Issues) > 0 {
+			fmt.Fprintf(&buf, "**Issues:** %s\n", strings.Join(dm.Issues, ", "))
+		}
+		if dm.Severity != "" {
+			fmt.Fprintf(&buf, "**Severity:** %s\n", dm.Severity)
+		}
+		if dm.Body != "" {
+			buf.WriteString("\n")
+			buf.WriteString(dm.Body)
+			if !strings.HasSuffix(dm.Body, "\n") {
+				buf.WriteString("\n")
+			}
+		}
+		buf.WriteString("\n")
+	}
+	return buf.String()
+}
+
+// NewReportDMail creates a report d-mail from an ExpeditionReport.
+// The name is normalized to lowercase (e.g., "MY-42" → "report-my-42").
+func NewReportDMail(report *ExpeditionReport) DMail {
+	name := "report-" + strings.ToLower(report.IssueID)
+
+	var body strings.Builder
+	fmt.Fprintf(&body, "# Expedition #%d Report: %s\n\n", report.Expedition, report.IssueTitle)
+	fmt.Fprintf(&body, "- **Issue:** %s\n", report.IssueID)
+	fmt.Fprintf(&body, "- **Mission:** %s\n", report.MissionType)
+	fmt.Fprintf(&body, "- **Status:** %s\n", report.Status)
+	if report.PRUrl != "" && report.PRUrl != "none" {
+		fmt.Fprintf(&body, "- **PR:** %s\n", report.PRUrl)
+	}
+	if report.Reason != "" {
+		fmt.Fprintf(&body, "\n## Summary\n\n%s\n", report.Reason)
+	}
+
+	return DMail{
+		Name:        name,
+		Kind:        "report",
+		Description: fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
+		Issues:      []string{report.IssueID},
+		Body:        body.String(),
+	}
+}
+
 // InboxDir returns the path to the d-mail inbox directory.
 func InboxDir(continent string) string {
 	return filepath.Join(continent, ".expedition", "inbox")

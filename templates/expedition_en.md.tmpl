@@ -55,6 +55,14 @@ The following context has been provided for this expedition. Treat it as authori
 
 {{.ContextSection}}
 {{- end}}
+{{- if .InboxSection}}
+
+## D-Mail Inbox
+
+The following d-mails have been delivered to your inbox. Read and act on them according to their kind (specification = implement it, feedback = incorporate the lesson):
+
+{{.InboxSection}}
+{{- end}}
 
 ## Mission — Rules of Engagement
 

@@ -55,6 +55,14 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 {{.ContextSection}}
 {{- end}}
+{{- if .InboxSection}}
+
+## D-Mail 受信箱
+
+以下のD-Mailが受信箱に届いている。種別に応じて行動すること（specification = 仕様に従い実装、feedback = 教訓を取り入れる）：
+
+{{.InboxSection}}
+{{- end}}
 
 ## ミッション — 行動規範
 

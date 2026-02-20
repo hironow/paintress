@@ -36,6 +36,7 @@ type PromptData struct {
 	BaseBranch      string
 	DevURL          string
 	ContextSection  string
+	InboxSection    string
 	LinearTeam      string
 	LinearProject   string
 	MissionSection  string
@@ -50,9 +51,10 @@ type Expedition struct {
 	LogDir    string
 
 	// Game mechanics
-	Luminas  []Lumina
-	Gradient *GradientGauge
-	Reserve  *ReserveParty
+	Luminas     []Lumina
+	Gradient    *GradientGauge
+	Reserve     *ReserveParty
+	InboxDMails []DMail // d-mails from inbox (for archiving after expedition)
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -77,6 +79,7 @@ func (e *Expedition) BuildPrompt() string {
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection(),
+		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.Linear.Team,
 		LinearProject:   projCfg.Linear.Project,
 		MissionSection:  MissionText(),
@@ -95,6 +98,16 @@ func (e *Expedition) BuildPrompt() string {
 		panic(fmt.Sprintf("prompt template execution failed: %v", err))
 	}
 	return buf.String()
+}
+
+func (e *Expedition) loadInboxSection() string {
+	dmails, err := ScanInbox(e.Continent)
+	if err != nil {
+		LogWarn("inbox scan failed: %v", err)
+		return ""
+	}
+	e.InboxDMails = dmails
+	return FormatDMailForPrompt(dmails)
 }
 
 func (e *Expedition) loadContextSection() string {
