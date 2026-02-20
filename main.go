@@ -49,6 +49,33 @@ func ValidateContinent(continent string) error {
 		}
 	}
 
+	// Ensure Agent Skills SKILL.md files exist for phonewave discovery
+	skills := []struct {
+		dir     string
+		content string
+	}{
+		{
+			dir:     "dmail-sendable",
+			content: "---\nname: dmail-sendable\ndescription: Produces D-Mail report messages to outbox/ after expedition completion.\nproduces:\n  - report\n---\n\nD-Mail send capability for paintress.\n",
+		},
+		{
+			dir:     "dmail-readable",
+			content: "---\nname: dmail-readable\ndescription: Consumes D-Mail specifications and feedback from inbox/.\nconsumes:\n  - specification\n  - feedback\n---\n\nD-Mail receive capability for paintress.\n",
+		},
+	}
+	for _, s := range skills {
+		skillDir := filepath.Join(continent, ".expedition", "skills", s.dir)
+		if err := os.MkdirAll(skillDir, 0755); err != nil {
+			return err
+		}
+		skillFile := filepath.Join(skillDir, "SKILL.md")
+		if _, err := os.Stat(skillFile); os.IsNotExist(err) {
+			if err := os.WriteFile(skillFile, []byte(s.content), 0644); err != nil {
+				return err
+			}
+		}
+	}
+
 	// Ensure .run/, inbox/, outbox/ are gitignored (handles both fresh and upgrade scenarios)
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
 	content, err := os.ReadFile(gitignore)

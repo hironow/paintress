@@ -281,6 +281,66 @@ func TestValidateContinent_DoesNotDuplicateInboxOutboxInGitignore(t *testing.T) 
 	}
 }
 
+func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	skills := []struct {
+		dir      string
+		contains string
+	}{
+		{"dmail-sendable", "produces:"},
+		{"dmail-readable", "consumes:"},
+	}
+
+	for _, s := range skills {
+		path := filepath.Join(dir, ".expedition", "skills", s.dir, "SKILL.md")
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("SKILL.md not created at %s: %v", path, err)
+		}
+		str := string(content)
+		if !strings.Contains(str, "name: "+s.dir) {
+			t.Errorf("%s/SKILL.md should contain 'name: %s', got: %q", s.dir, s.dir, str)
+		}
+		if !strings.Contains(str, s.contains) {
+			t.Errorf("%s/SKILL.md should contain %q, got: %q", s.dir, s.contains, str)
+		}
+	}
+}
+
+func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+
+	// Read content after first call
+	path := filepath.Join(dir, ".expedition", "skills", "dmail-sendable", "SKILL.md")
+	first, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read SKILL.md: %v", err)
+	}
+
+	// Second call should not error and should not overwrite
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+
+	second, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read SKILL.md after second call: %v", err)
+	}
+
+	if string(first) != string(second) {
+		t.Errorf("SKILL.md content changed between calls")
+	}
+}
+
 func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 
