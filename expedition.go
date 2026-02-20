@@ -202,10 +202,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
 	}, nil)
 
-	// Start inbox watcher to detect d-mails arriving mid-expedition.
-	// The goroutine is joined before Run() returns so that InboxDMails
-	// is stable when callers iterate it for archiving.
-	var inboxMu sync.Mutex
+	// Start inbox watcher to log d-mails arriving mid-expedition.
+	// Mid-expedition arrivals are NOT appended to InboxDMails — they stay
+	// in inbox/ and will be picked up by the next expedition's ScanInbox.
+	// Only d-mails included in the prompt (initial scan) are archived.
 	seenFiles := make(map[string]bool)
 	for _, dm := range e.InboxDMails {
 		seenFiles[dm.Name] = true
@@ -214,13 +214,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	go func() {
 		defer close(inboxDone)
 		watchInbox(watchCtx, e.Continent, func(dm DMail) {
-			inboxMu.Lock()
-			defer inboxMu.Unlock()
 			if seenFiles[dm.Name] {
 				return
 			}
 			seenFiles[dm.Name] = true
-			e.InboxDMails = append(e.InboxDMails, dm)
 			if dm.Severity == "high" {
 				LogWarn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
 			} else {
