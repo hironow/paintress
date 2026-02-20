@@ -3,6 +3,7 @@ package paintress
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // DefaultClaudeCmd is the default CLI command name for Claude Code.
@@ -39,10 +40,20 @@ func ValidateContinent(continent string) error {
 		return err
 	}
 
-	// Ensure .run/ is gitignored
+	// Ensure .run/ is gitignored (handles both fresh and upgrade scenarios)
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
-	if _, err := os.Stat(gitignore); os.IsNotExist(err) {
+	content, err := os.ReadFile(gitignore)
+	if err != nil {
+		// File doesn't exist — create with .run/
 		os.WriteFile(gitignore, []byte(".run/\n"), 0644)
+	} else if !strings.Contains(string(content), ".run/") {
+		// Existing file from older version — append .run/
+		f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		f.WriteString(".run/\n")
 	}
 	return nil
 }
