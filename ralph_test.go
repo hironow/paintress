@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"fmt"
@@ -77,7 +77,7 @@ func TestParseReport_ParseError(t *testing.T) {
 
 func TestReadWriteFlag(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	WriteFlag(dir, 5, "AWE-42", "success", "3")
 	f := ReadFlag(dir)

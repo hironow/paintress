@@ -8,3 +8,7 @@ coverage.out
 .claude/*.local.*
 # git worktrees
 .worktrees/
+# plan drafts (ephemeral)
+docs/plans/
+# golang
+.gocache/

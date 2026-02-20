@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"bufio"
@@ -12,6 +12,9 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 //go:embed templates/expedition_*.md.tmpl
@@ -33,6 +36,9 @@ type PromptData struct {
 	BaseBranch      string
 	DevURL          string
 	ContextSection  string
+	LinearTeam      string
+	LinearProject   string
+	MissionSection  string
 }
 
 // Expedition represents a single expedition into the Continent.
@@ -50,10 +56,20 @@ type Expedition struct {
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+
+	// WatchFlagInterval overrides the flag.md polling interval for testing.
+	// Zero means use the default (5s).
+	WatchFlagInterval time.Duration
 }
 
 // BuildPrompt generates the expedition prompt in the configured language.
 func (e *Expedition) BuildPrompt() string {
+	projCfg, err := LoadProjectConfig(e.Continent)
+	if err != nil {
+		LogWarn("project config load failed: %v", err)
+		projCfg = &ProjectConfig{}
+	}
+
 	data := PromptData{
 		Number:          e.Number,
 		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
@@ -65,6 +81,9 @@ func (e *Expedition) BuildPrompt() string {
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection(),
+		LinearTeam:      projCfg.Linear.Team,
+		LinearProject:   projCfg.Linear.Project,
+		MissionSection:  MissionText(),
 	}
 
 	tmplName := "expedition_en.md.tmpl"
@@ -109,6 +128,15 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// Use the active model from Reserve Party
 	model := e.Reserve.ActiveModel()
 
+	expCtx, invokeSpan := tracer.Start(expCtx, "claude.invoke",
+		trace.WithAttributes(
+			attribute.String("model", model),
+			attribute.Int("expedition.number", e.Number),
+			attribute.Int("timeout_sec", e.Config.TimeoutSec),
+		),
+	)
+	defer invokeSpan.End()
+
 	newCmd := e.makeCmd
 	if newCmd == nil {
 		newCmd = exec.CommandContext
@@ -116,7 +144,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	claudeCmd := e.Config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = defaultClaudeCmd
+		claudeCmd = DefaultClaudeCmd
 	}
 
 	cmd := newCmd(expCtx, claudeCmd,
@@ -148,6 +176,23 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("%s start failed: %w", claudeCmd, err)
 	}
 
+	// Start flag.md watcher to detect issue selection in real-time
+	watchInterval := e.WatchFlagInterval
+	if watchInterval == 0 {
+		watchInterval = 5 * time.Second
+	}
+	watchCtx, watchCancel := context.WithCancel(expCtx)
+	defer watchCancel()
+	go watchFlag(watchCtx, e.Continent, watchInterval, func(issue, title string) {
+		invokeSpan.AddEvent("issue.picked",
+			trace.WithAttributes(
+				attribute.String("issue_id", issue),
+				attribute.String("issue_title", title),
+			),
+		)
+		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
+	})
+
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
 	var output strings.Builder
 	done := make(chan struct{})
@@ -166,7 +211,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				output.Write(chunk)
 
 				// Reserve Party: scan for rate limit signals in real-time
-				e.Reserve.CheckOutput(string(chunk))
+				if e.Reserve.CheckOutput(string(chunk)) {
+					invokeSpan.AddEvent("rate_limit.detected")
+				}
 			}
 			if err != nil {
 				break
@@ -180,6 +227,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	fmt.Println()
 
 	if expCtx.Err() == context.DeadlineExceeded {
+		invokeSpan.AddEvent("expedition.timeout",
+			trace.WithAttributes(attribute.String("timeout", timeout.String())),
+		)
 		return output.String(), fmt.Errorf("timeout after %v", timeout)
 	}
 	if ctx.Err() == context.Canceled {

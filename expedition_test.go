@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestHelperProcess is a test helper process used to mock exec.Command.
@@ -86,8 +87,8 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 	if !containsStr(prompt, "flag.md") {
 		t.Error("prompt should reference flag.md")
 	}
-	if !containsStr(prompt, "mission.md") {
-		t.Error("prompt should reference mission.md")
+	if !containsStr(prompt, "Rules of Engagement") {
+		t.Error("prompt should contain mission rules of engagement")
 	}
 	if !containsStr(prompt, "CLAUDE.md") {
 		t.Error("prompt should reference CLAUDE.md")
@@ -477,5 +478,428 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 	p := NewPaintress(cfg)
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
+	}
+}
+
+func TestExpedition_Run_WatcherLogsCurrentIssue(t *testing.T) {
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+
+	// Shell script that writes flag.md then outputs a report
+	script := filepath.Join(dir, "write-flag.sh")
+	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Write current_issue to flag.md
+cat > %s << 'FLAGEOF'
+current_issue: MY-239
+current_title: flag watcher test
+FLAGEOF
+# Wait for watcher to detect
+sleep 1
+echo "done"
+`, flagPath)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	logPath := filepath.Join(logDir, "test-watcher.log")
+	InitLogFile(logPath)
+	defer CloseLogFile()
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:            logDir,
+		Gradient:          NewGradientGauge(5),
+		Reserve:           NewReserveParty("opus", nil),
+		WatchFlagInterval: 100 * time.Millisecond,
+	}
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// Check log file for issue detection
+	logContent, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read log: %v", err)
+	}
+
+	if !containsStr(string(logContent), "MY-239") {
+		t.Errorf("log should contain issue ID 'MY-239', got:\n%s", string(logContent))
+	}
+}
+
+// TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir verifies that
+// in worktree mode (WorkDir != Continent), the flag watcher polls
+// Continent/.expedition/.run/flag.md — NOT WorkDir/.expedition/.run/flag.md.
+func TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir(t *testing.T) {
+	continent := t.TempDir()
+	workDir := t.TempDir() // simulate worktree — different from continent
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
+	os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755)
+
+	// Script writes flag.md to CONTINENT root (not workDir), then outputs
+	flagPath := filepath.Join(continent, ".expedition", ".run", "flag.md")
+	script := filepath.Join(workDir, "write-flag.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+cat > %s << 'FLAGEOF'
+current_issue: TREE-42
+current_title: worktree watcher test
+FLAGEOF
+sleep 1
+echo "done"
+`, flagPath)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
+	InitLogFile(logPath)
+	defer CloseLogFile()
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: continent,
+		WorkDir:   workDir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:            logDir,
+		Gradient:          NewGradientGauge(5),
+		Reserve:           NewReserveParty("opus", nil),
+		WatchFlagInterval: 100 * time.Millisecond,
+	}
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	logContent, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read log: %v", err)
+	}
+
+	if !containsStr(string(logContent), "TREE-42") {
+		t.Errorf("watcher should detect issue from CONTINENT flag.md, not workDir; log:\n%s", string(logContent))
+	}
+}
+
+func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
+	dir := t.TempDir()
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			orig := Lang
+			defer func() { Lang = orig }()
+			Lang = lang
+
+			prompt := e.BuildPrompt()
+			if !containsStr(prompt, "current_issue") {
+				t.Errorf("[%s] prompt should contain 'current_issue' instruction", lang)
+			}
+			if !containsStr(prompt, "current_title") {
+				t.Errorf("[%s] prompt should contain 'current_title' instruction", lang)
+			}
+		})
+	}
+}
+
+func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
+	dir := t.TempDir()
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: ""},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	// Test all 3 languages
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			orig := Lang
+			defer func() { Lang = orig }()
+			Lang = lang
+
+			prompt := e.BuildPrompt()
+
+			if containsStr(prompt, "- Dev server:") || containsStr(prompt, "- Serveur dev :") {
+				t.Errorf("[%s] prompt should NOT contain dev server environment line when DevURL is empty", lang)
+			}
+			if containsStr(prompt, "already running") || containsStr(prompt, "既に起動済み") || containsStr(prompt, "déjà lancé") {
+				t.Errorf("[%s] prompt should NOT contain 'already running' when DevURL is empty", lang)
+			}
+		})
+	}
+}
+
+func TestBuildPrompt_WithLinearConfig(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// Write a config.yaml with Linear scope
+	cfg := &ProjectConfig{
+		Linear: LinearConfig{
+			Team:    "ENG",
+			Project: "backend",
+		},
+	}
+	if err := SaveProjectConfig(dir, cfg); err != nil {
+		t.Fatalf("SaveProjectConfig: %v", err)
+	}
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := e.BuildPrompt()
+
+	if !containsStr(prompt, "ENG") {
+		t.Error("prompt should contain Linear team key 'ENG'")
+	}
+	if !containsStr(prompt, "backend") {
+		t.Error("prompt should contain Linear project 'backend'")
+	}
+}
+
+func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
+	dir := t.TempDir()
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := e.BuildPrompt()
+
+	if containsStr(prompt, "Linear Scope") {
+		t.Error("prompt should NOT contain Linear Scope when no config exists")
+	}
+}
+
+func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// Write malformed YAML that will fail to parse
+	os.WriteFile(
+		filepath.Join(dir, ".expedition", "config.yaml"),
+		[]byte("{{invalid yaml\n\t::: broken"),
+		0644,
+	)
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	// Must not panic — should gracefully omit Linear scope
+	prompt := e.BuildPrompt()
+
+	if containsStr(prompt, "Linear Scope") {
+		t.Error("prompt should NOT contain Linear Scope for malformed config")
+	}
+	if !containsStr(prompt, "Expedition #1") {
+		t.Error("prompt should still be generated despite malformed config")
+	}
+}
+
+// TestLifecycle_Init_Then_Expedition verifies the full lifecycle:
+// paintress init (config.yaml) → expedition run → prompt file contains Linear scope.
+// External world (Claude) is stubbed via fakeMakeCmd.
+func TestLifecycle_Init_Then_Expedition(t *testing.T) {
+	dir := t.TempDir()
+	logDir := t.TempDir()
+
+	// Phase 1: simulate `paintress init` with stdin
+	input := "MY\npaintress\n"
+	if err := RunInitWithReader(dir, strings.NewReader(input)); err != nil {
+		t.Fatalf("RunInitWithReader: %v", err)
+	}
+
+	// Verify config was persisted
+	cfg, err := LoadProjectConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadProjectConfig: %v", err)
+	}
+	if cfg.Linear.Team != "MY" || cfg.Linear.Project != "paintress" {
+		t.Fatalf("unexpected config: team=%q project=%q", cfg.Linear.Team, cfg.Linear.Project)
+	}
+
+	// Phase 2: run expedition with fake Claude (outputs a valid report)
+	reportOutput := `Working on issue...
+
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: MY-100
+issue_title: lifecycle test
+mission_type: implement
+branch: feat/MY-100
+pr_url: https://github.com/org/repo/pull/99
+status: success
+reason: done
+failure_type: none
+insight: lifecycle works
+remaining_issues: 3
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+		},
+		LogDir:   logDir,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil),
+		makeCmd:  fakeMakeCmd(reportOutput, 0),
+	}
+
+	ctx := context.Background()
+	output, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// Phase 3: verify expedition output is valid
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "MY-100" {
+		t.Errorf("IssueID = %q, want MY-100", report.IssueID)
+	}
+
+	// Phase 4: verify the prompt file contains Linear scope from init
+	promptFile := filepath.Join(logDir, "expedition-001-prompt.md")
+	promptContent, err := os.ReadFile(promptFile)
+	if err != nil {
+		t.Fatalf("read prompt file: %v", err)
+	}
+	prompt := string(promptContent)
+
+	if !containsStr(prompt, "MY") {
+		t.Error("prompt file should contain Linear team 'MY' from init")
+	}
+	if !containsStr(prompt, "paintress") {
+		t.Error("prompt file should contain Linear project 'paintress' from init")
+	}
+	if !containsStr(prompt, "Linear Scope") {
+		t.Error("prompt file should contain 'Linear Scope' section")
+	}
+}
+
+// TestLifecycle_NoInit_Then_Expedition verifies that expedition works
+// without prior init — no Linear Scope section in prompt.
+func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+		},
+		LogDir:   logDir,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil),
+		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
+	}
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	promptFile := filepath.Join(logDir, "expedition-001-prompt.md")
+	promptContent, err := os.ReadFile(promptFile)
+	if err != nil {
+		t.Fatalf("read prompt file: %v", err)
+	}
+
+	if containsStr(string(promptContent), "Linear Scope") {
+		t.Error("prompt should NOT contain Linear Scope when no init was done")
+	}
+}
+
+func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
+	dir := t.TempDir()
+
+	e := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Gradient:  NewGradientGauge(5),
+		Reserve:   NewReserveParty("opus", nil),
+	}
+
+	prompt := e.BuildPrompt()
+
+	// Mission content should be embedded directly in the prompt
+	if !containsStr(prompt, "Rules of Engagement") {
+		t.Error("prompt should contain mission 'Rules of Engagement' section")
+	}
+	if !containsStr(prompt, "implement") && !containsStr(prompt, "verify") {
+		t.Error("prompt should contain mission type descriptions")
+	}
+}
+
+func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
+	dir := t.TempDir()
+	cfg := Config{
+		Continent: dir,
+		Model:     "opus",
+		DevCmd:    "npm run dev",
+		DevURL:    "http://localhost:3000",
+		NoDev:     true,
+	}
+
+	p := NewPaintress(cfg)
+
+	if p.devServer != nil {
+		t.Error("devServer should be nil when NoDev=true")
+	}
+	if p.config.DevURL != "" {
+		t.Errorf("DevURL should be cleared when NoDev=true, got %q", p.config.DevURL)
 	}
 }

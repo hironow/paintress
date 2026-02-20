@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"bufio"
@@ -16,17 +16,25 @@ type ExpeditionFlag struct {
 	LastIssue      string
 	LastStatus     string
 	Remaining      string
+	CurrentIssue   string
+	CurrentTitle   string
 }
 
 func FlagPath(continent string) string {
-	return filepath.Join(continent, ".expedition", "flag.md")
+	return filepath.Join(continent, ".expedition", ".run", "flag.md")
 }
 
 func ReadFlag(continent string) ExpeditionFlag {
 	f := ExpeditionFlag{Remaining: "?"}
-	file, err := os.Open(FlagPath(continent))
+	path := FlagPath(continent)
+	file, err := os.Open(path)
 	if err != nil {
-		return f
+		// Fall back to legacy path (.expedition/flag.md) for upgrade compatibility
+		legacyPath := filepath.Join(continent, ".expedition", "flag.md")
+		file, err = os.Open(legacyPath)
+		if err != nil {
+			return f
+		}
 	}
 	defer file.Close()
 
@@ -45,6 +53,10 @@ func ReadFlag(continent string) ExpeditionFlag {
 				f.LastStatus = v
 			case "remaining_issues":
 				f.Remaining = v
+			case "current_issue":
+				f.CurrentIssue = v
+			case "current_title":
+				f.CurrentTitle = v
 			}
 		}
 	}

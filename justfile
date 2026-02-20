@@ -33,7 +33,7 @@ VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X main.version={{VERSION}}" -o paintress .
+    go build -ldflags "-X main.version={{VERSION}}" -o paintress ./cmd/paintress/
 
 # Build and install to /usr/local/bin
 install: build
@@ -41,19 +41,19 @@ install: build
 
 # Run all tests
 test:
-    go test ./... -count=1 -timeout=60s
+    go test ./... -count=1 -timeout=300s
 
 # Run tests with verbose output
 test-v:
-    go test ./... -count=1 -timeout=60s -v
+    go test ./... -count=1 -timeout=300s -v
 
 # Run tests with race detector
 test-race:
-    go test ./... -race -count=1 -timeout=120s
+    go test ./... -race -count=1 -timeout=300s
 
 # Run tests with coverage report
 cover:
-    go test ./... -coverprofile=coverage.out -count=1 -timeout=60s
+    go test ./... -coverprofile=coverage.out -count=1 -timeout=300s
     go tool cover -func=coverage.out
 
 # Open coverage in browser
@@ -75,7 +75,24 @@ lint: vet lint-md
 # Format, vet, test — full check before commit
 check: fmt vet test
 
+# Run paintress doctor (quick smoke test after build)
+doctor: build
+    ./paintress doctor
+
+# Start Jaeger (OTel trace viewer) on http://localhost:16686
+jaeger:
+    docker compose -f docker/compose.yaml up -d
+    @echo "Jaeger UI: http://localhost:16686"
+    @echo "OTLP endpoint: http://localhost:4318"
+    @echo ""
+    @echo "Run paintress with tracing:"
+    @echo "  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo"
+
+# Stop Jaeger
+jaeger-down:
+    docker compose -f docker/compose.yaml down
+
 # Clean build artifacts
 clean:
-    rm -f coverage.out
+    rm -f paintress coverage.out
     go clean

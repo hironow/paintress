@@ -7,10 +7,15 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 ## 最初にやること（必ずこの順番で）
 
-1. {{.Bt}}.expedition/flag.md{{.Bt}} があれば読む — 前回の Expedition の checkpoint（初回は存在しない）
-2. {{.Bt}}.expedition/mission.md{{.Bt}} を読む — 行動規範
-3. {{.Bt}}CLAUDE.md{{.Bt}} があれば読む — Continent の法則
-4. {{.Bt}}.expedition/journal/{{.Bt}} にエントリがあれば直近を読む — 過去の教訓
+1. {{.Bt}}.expedition/.run/flag.md{{.Bt}} があれば読む — 前回の Expedition の checkpoint（初回は存在しない）
+2. {{.Bt}}CLAUDE.md{{.Bt}} があれば読む — Continent の法則
+3. {{.Bt}}.expedition/journal/{{.Bt}} にエントリがあれば直近を読む — 過去の教訓
+4. Linear で issue を選択したら、直ちに {{.Bt}}.expedition/.run/flag.md{{.Bt}} を更新 — 以下の行を追加:
+   {{.Cb}}
+   current_issue: <issue identifier>
+   current_title: <issue title>
+   {{.Cb}}
+   これはオーケストレーターにどの issue を作業中かを通知する。
 
 ## Lumina（学習済みパッシブスキル）
 
@@ -22,10 +27,23 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 {{.GradientSection}}
 
+{{- if .LinearTeam}}
+
+## Linear スコープ
+
+- チーム: {{.Bt}}{{.LinearTeam}}{{.Bt}}
+{{- if .LinearProject}}
+- プロジェクト: {{.Bt}}{{.LinearProject}}{{.Bt}}
+{{- end}}
+- このチーム{{if .LinearProject}}とプロジェクト{{end}}の issue のみを対象にすること。
+{{- end}}
+
 ## 環境情報
 - {{.ReserveSection}}
 - Base branch: {{.Bt}}{{.BaseBranch}}{{.Bt}}
+{{- if .DevURL}}
 - Dev server: {{.Bt}}{{.DevURL}}{{.Bt}}（verify mission で使用、既に起動済み）
+{{- end}}
 - GitHub: Pull Request 専用で使用する（GitHub Issues は使わないこと）
 - Linear: Issue 専用で使用する（取得・ステータス更新・コメント）
 - 注意: MCP ツールは遅延ロード — 使用前に {{.Bt}}ToolSearch{{.Bt}} で利用可能なツールを検索すること
@@ -37,6 +55,10 @@ Continent（このリポジトリ）に送り込まれ、使命を果たして�
 
 {{.ContextSection}}
 {{- end}}
+
+## ミッション — 行動規範
+
+{{.MissionSection}}
 
 ## 完了時の出力
 

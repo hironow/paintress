@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -9,6 +9,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type DevServer struct {
@@ -27,9 +30,18 @@ func NewDevServer(cmd, url, dir, logPath string) *DevServer {
 }
 
 func (ds *DevServer) Start(ctx context.Context) error {
+	ctx, span := tracer.Start(ctx, "devserver.start",
+		trace.WithAttributes(
+			attribute.String("cmd", ds.cmd),
+			attribute.String("url", ds.url),
+		),
+	)
+	defer span.End()
+
 	ds.mu.Lock()
 	if ds.running {
 		ds.mu.Unlock()
+		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
 		return nil
 	}
 	ds.mu.Unlock()
@@ -41,6 +53,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 		ds.mu.Lock()
 		ds.running = true
 		ds.mu.Unlock()
+		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", true)))
 		LogOK("%s", fmt.Sprintf(Msg("devserver_already"), ds.url))
 		return nil
 	}
@@ -78,6 +91,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	ds.mu.Lock()
 	ds.running = true
 	ds.mu.Unlock()
+	span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
 	LogOK("%s", fmt.Sprintf(Msg("devserver_ready"), ds.url))
 	return nil
 }

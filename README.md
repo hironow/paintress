@@ -30,7 +30,7 @@ This structure maps directly to AI agent loop design:
 | **Paintress** | This binary | External force that drives the loop |
 | **Monolith** | Linear backlog | The remaining issue count is inscribed |
 | **Expedition** | One Claude Code execution | Departs with fresh context each time |
-| **Expedition Flag** | `.expedition/flag.md` | Checkpoint passed to the next run |
+| **Expedition Flag** | `.expedition/.run/flag.md` | Checkpoint passed to the next run |
 | **Journal** | `.expedition/journal/` | Record of past decisions and lessons |
 | **Canvas** | LLM context window | Beautiful but temporary — destroyed each run |
 | **Lumina** | Auto-extracted patterns | Patterns learned from past failures/successes |
@@ -67,7 +67,7 @@ Consecutive successes fill the gauge, unlocking higher-difficulty issues.
 ### Lumina (Learned Passive Skills)
 
 Past journals are scanned in parallel goroutines to extract recurring patterns.
-Saved to `.expedition/lumina.md` and injected into the next Expedition's prompt.
+Injected directly into the next Expedition's prompt.
 
 - **Defensive**: Insights from failed expeditions that appear 2+ times → "Avoid — failed N times: ..." (falls back to failure reason if no insight)
 - **Offensive**: Insights from successful expeditions that appear 3+ times → "Proven approach (Nx successful): ..." (falls back to mission type if no insight)
@@ -118,13 +118,14 @@ Continent (Git repo)       <- Persistent world
     +-- src/
     +-- CLAUDE.md
     +-- .expedition/
-         +-- flag.md       <- Checkpoint (auto-generated)
-         +-- mission.md    <- Rules of engagement (auto-generated, --lang aware)
-         +-- lumina.md     <- Learned skills (auto-generated)
+         +-- config.yaml   <- Project config (paintress init)
          +-- journal/
          |    +-- 001.md, 002.md, ...
          +-- context/      <- User-provided .md files injected into prompts
-         +-- worktrees/    <- Managed by WorktreePool (auto-created, gitignored)
+         +-- .run/         <- Ephemeral (gitignored)
+              +-- flag.md       <- Checkpoint (auto-generated)
+              +-- logs/         <- Expedition logs
+              +-- worktrees/    <- Managed by WorktreePool
 ```
 
 ### WorktreePool Lifecycle (`--workers >= 1`)
@@ -165,27 +166,40 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 # Build and install
 just install
 
+# Initialize project config (Linear team key, etc.)
+paintress init /path/to/your/repo
+
+# Check external command availability
+paintress doctor
+
 # Run — .expedition/ is created automatically
 paintress /path/to/your/repo
 ```
 
-Paintress creates `.expedition/` and all files (`flag.md`, `mission.md`,
-`lumina.md`, journal entries) automatically at runtime.
+Paintress creates `.expedition/` with config, journal entries, and ephemeral
+runtime state under `.run/` automatically. Mission and Lumina content are
+embedded directly in the expedition prompt (no separate files on disk).
 Git worktrees for Swarm Mode are also fully managed — Paintress creates them
 on startup and removes them on shutdown. No manual `git worktree` commands needed.
 
+## Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `paintress <repo-path>` | Run expedition loop (default) |
+| `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
+| `paintress doctor` | Check required external commands (git, claude, gh, docker) |
+| `paintress --version` | Show version and exit |
+
 ## Usage
 
-**Important:** The repo path (`<repo-path>`) must come **after** all flags.
-Go's `flag` package stops parsing at the first non-flag argument, so flags
-placed after the repo path will be ignored.
+Flags and repo path can be placed in any order:
 
 ```bash
-# OK  — flags first, repo path (or ".") last
-paintress --lang ja .
-
-# BAD — flags after repo path are ignored
-paintress . --lang ja
+paintress --lang ja .          # flags before path
+paintress . --lang ja          # flags after path
+paintress --model=opus .       # --flag=value form
+paintress -- ./my-repo         # -- terminates flags
 ```
 
 ```bash
@@ -225,6 +239,9 @@ paintress \
   --review-cmd "codex review --base main" \
   /path/to/repo
 
+# Skip dev server (CLI tools, backend-only repos)
+paintress --no-dev /path/to/repo
+
 # Skip code review gate
 paintress --review-cmd "" /path/to/repo
 
@@ -262,8 +279,26 @@ paintress \
 | `--review-cmd` | `codex review --base main` | Code review command after PR creation |
 | `--workers` | `1` | Number of parallel expedition workers (`0` = direct execution without worktrees, `1` = single worktree, `2+` = Swarm Mode) |
 | `--setup-cmd` | `""` | Command to run after worktree creation (e.g. `bun install`) |
+| `--no-dev` | `false` | Skip dev server startup entirely |
 | `--dry-run` | `false` | Generate prompts without executing |
 | `--version` | — | Show version and exit |
+
+## Tracing (OpenTelemetry)
+
+Paintress instruments key operations (expedition, review loop, worktree pool, dev server) with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+```bash
+# Start Jaeger (all-in-one trace viewer)
+just jaeger
+
+# Run paintress with tracing enabled
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
+
+# View traces at http://localhost:16686
+
+# Stop Jaeger
+just jaeger-down
+```
 
 ## Development
 
@@ -284,40 +319,53 @@ just check          # fmt + vet + test (pre-commit check)
 just clean          # Clean build artifacts
 just prek-install   # Install prek hooks (pre-commit + pre-push)
 just prek-run       # Run all prek hooks on all files
+just jaeger         # Start Jaeger trace viewer (docker)
+just jaeger-down    # Stop Jaeger
 ```
 
 ## File Structure
 
 ```
-+-- main.go              CLI + signal handling
-+-- paintress.go         Gommage loop
-+-- expedition.go        Single Expedition + prompt generation
-+-- gradient.go          Gradient Gauge
-+-- lumina.go            Lumina scanning (goroutines)
-+-- reserve.go           Reserve Party (goroutine)
-+-- devserver.go         Dev server (goroutine)
-+-- flag.go              Flag read/write
-+-- journal.go           Journal read/write
-+-- report.go            Report parser (including failure_type)
-+-- context.go           Context injection (.expedition/context/)
-+-- worktree.go          WorktreePool for Swarm Mode
-+-- review.go            Code review gate (exec + parse)
-+-- mission.go           Mission writer (embed + template)
-+-- lang.go              i18n message map (en/ja/fr)
-+-- logger.go            Colored logging
-+-- *_test.go            Tests
-+-- justfile             Task runner
++-- cmd/paintress/
+|   +-- main.go              CLI entry point + flag parsing
+|   +-- main_test.go         CLI arg parsing tests
++-- main.go                  Config struct + ValidateContinent (library)
++-- paintress.go             Gommage loop
++-- expedition.go            Single Expedition + prompt generation
++-- gradient.go              Gradient Gauge
++-- lumina.go                Lumina scanning (goroutines)
++-- reserve.go               Reserve Party (goroutine)
++-- devserver.go             Dev server (goroutine)
++-- flag.go                  Flag read/write
++-- flag_watcher.go          Real-time issue selection watcher
++-- journal.go               Journal read/write
++-- report.go                Report parser (including failure_type)
++-- context.go               Context injection (.expedition/context/)
++-- worktree.go              WorktreePool for Swarm Mode
++-- review.go                Code review gate (exec + parse)
++-- mission.go               Mission text (prompt-embedded)
++-- project_config.go        Project config (.expedition/config.yaml)
++-- init.go                  Interactive init flow
++-- doctor.go                External command checker
++-- telemetry.go             OpenTelemetry tracer setup
++-- lang.go                  i18n message map (en/ja/fr)
++-- logger.go                Colored logging
++-- *_test.go                Tests
++-- justfile                 Task runner
++-- docker/
+|   +-- compose.yaml         Jaeger all-in-one for trace viewing
 +-- templates/
-    +-- expedition_*.md.tmpl  Expedition prompt (en/ja/fr)
-    +-- mission_*.md.tmpl     Mission rules (en/ja/fr)
+    +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
+    +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
 ```
 
 ## Prerequisites
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - A code review CLI (for code review gate, customizable via `--review-cmd`, e.g. tools that output `[P0]`–`[P4]` priorities)
-- GitHub: accessible for Pull Request operations (e.g. [GitHub CLI](https://cli.github.com/))
+- [GitHub CLI](https://cli.github.com/) for Pull Request operations
 - Linear: accessible for Issue operations (e.g. Linear MCP)
+- [Docker](https://www.docker.com/) for tracing (Jaeger) and container tests
 - Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
 
 ## License

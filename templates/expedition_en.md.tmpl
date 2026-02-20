@@ -7,10 +7,15 @@ You have been sent into the Continent (this repository) to fulfill your mission.
 
 ## First Steps (follow this order)
 
-1. Read {{.Bt}}.expedition/flag.md{{.Bt}} if it exists — checkpoint from the previous Expedition (absent on first run)
-2. Read {{.Bt}}.expedition/mission.md{{.Bt}} — rules of engagement
-3. Read {{.Bt}}CLAUDE.md{{.Bt}} if it exists — laws of the Continent
-4. Read the latest entry in {{.Bt}}.expedition/journal/{{.Bt}} if any — lessons from the past
+1. Read {{.Bt}}.expedition/.run/flag.md{{.Bt}} if it exists — checkpoint from the previous Expedition (absent on first run)
+2. Read {{.Bt}}CLAUDE.md{{.Bt}} if it exists — laws of the Continent
+3. Read the latest entry in {{.Bt}}.expedition/journal/{{.Bt}} if any — lessons from the past
+4. After selecting an issue from Linear, immediately update {{.Bt}}.expedition/.run/flag.md{{.Bt}} — add these lines:
+   {{.Cb}}
+   current_issue: <issue identifier>
+   current_title: <issue title>
+   {{.Cb}}
+   This signals the orchestrator which issue you are working on.
 
 ## Lumina (Learned Passive Skills)
 
@@ -22,10 +27,23 @@ Patterns auto-extracted from past Expeditions. Apply these as constraints — av
 
 {{.GradientSection}}
 
+{{- if .LinearTeam}}
+
+## Linear Scope
+
+- Team: {{.Bt}}{{.LinearTeam}}{{.Bt}}
+{{- if .LinearProject}}
+- Project: {{.Bt}}{{.LinearProject}}{{.Bt}}
+{{- end}}
+- Only pick issues from this team{{if .LinearProject}} and project{{end}}.
+{{- end}}
+
 ## Environment
 - {{.ReserveSection}}
 - Base branch: {{.Bt}}{{.BaseBranch}}{{.Bt}}
+{{- if .DevURL}}
 - Dev server: {{.Bt}}{{.DevURL}}{{.Bt}} (used for verify missions, already running)
+{{- end}}
 - GitHub: use for Pull Requests only (do NOT use GitHub Issues)
 - Linear: use for Issues only (retrieve, update status, comment)
 - Note: MCP tools are lazy-loaded — use {{.Bt}}ToolSearch{{.Bt}} to discover available tools before use
@@ -37,6 +55,10 @@ The following context has been provided for this expedition. Treat it as authori
 
 {{.ContextSection}}
 {{- end}}
+
+## Mission — Rules of Engagement
+
+{{.MissionSection}}
 
 ## Required Output
 

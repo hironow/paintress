@@ -1,0 +1,305 @@
+package main
+
+import (
+	"testing"
+)
+
+func TestExtractSubcommand_Default(t *testing.T) {
+	// Path only → subcmd="run", path="./repo"
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	if len(flags) != 0 {
+		t.Errorf("flags = %v, want empty", flags)
+	}
+}
+
+func TestExtractSubcommand_Init(t *testing.T) {
+	// "init ./repo" → subcmd="init", path="./repo"
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"init", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "init" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "init")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	if len(flags) != 0 {
+		t.Errorf("flags = %v, want empty", flags)
+	}
+}
+
+func TestExtractSubcommand_FlagsBeforePath(t *testing.T) {
+	// "--model opus ./repo" → subcmd="run", path="./repo", flags=["--model", "opus"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--model", "opus", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--model", "opus"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_Doctor(t *testing.T) {
+	// "doctor" → subcmd="doctor", path=""
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"doctor"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "doctor" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "doctor")
+	}
+	if repoPath != "" {
+		t.Errorf("repoPath = %q, want empty", repoPath)
+	}
+	if len(flags) != 0 {
+		t.Errorf("flags = %v, want empty", flags)
+	}
+}
+
+func TestExtractSubcommand_VersionFlag(t *testing.T) {
+	// "--version" → subcmd="run", path="", flags=["--version"]
+	subcmd, _, flags, err := extractSubcommand([]string{"--version"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	hasVersion := false
+	for _, f := range flags {
+		if f == "--version" {
+			hasVersion = true
+		}
+	}
+	if !hasVersion {
+		t.Errorf("flags should contain --version, got %v", flags)
+	}
+}
+
+func TestExtractSubcommand_FlagsAfterPath(t *testing.T) {
+	// "./repo --model opus --dry-run" → subcmd="run", path="./repo", flags=["--model", "opus", "--dry-run"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"./repo", "--model", "opus", "--dry-run"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--model", "opus", "--dry-run"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_FlagEqualsValue(t *testing.T) {
+	// "--model=opus ./repo" → subcmd="run", path="./repo", flags=["--model=opus"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--model=opus", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--model=opus"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_BoolFlagEqualsValue(t *testing.T) {
+	// "--no-dev=false ./repo" → subcmd="run", path="./repo", flags=["--no-dev=false"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--no-dev=false", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--no-dev=false"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+}
+
+func TestExtractSubcommand_DoubleDashTerminator(t *testing.T) {
+	// "-- ./repo" → subcmd="run", path="./repo", flags=[]
+	// "--" signals end of flags; everything after is positional
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	if len(flags) != 0 {
+		t.Errorf("flags = %v, want empty", flags)
+	}
+}
+
+func TestExtractSubcommand_FlagsBeforeDoubleDash(t *testing.T) {
+	// "--model opus -- ./repo" → subcmd="run", path="./repo", flags=["--model", "opus"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--model", "opus", "--", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--model", "opus"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_BoolFlagWithExplicitValue(t *testing.T) {
+	// "--no-dev false ./repo" → subcmd="run", path="./repo", flags=["--no-dev", "false"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--no-dev", "false", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--no-dev", "false"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_BoolFlagWithoutValue(t *testing.T) {
+	// "--dry-run ./repo" → subcmd="run", path="./repo", flags=["--dry-run"]
+	// "true"/"false" not following, so path should be "./repo"
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--dry-run", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--dry-run"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+}
+
+func TestExtractSubcommand_BoolFlagWithNumericValue(t *testing.T) {
+	// "--no-dev 0 ./repo" → path="./repo", flags=["--no-dev", "0"]
+	// Go's strconv.ParseBool accepts 1/0/t/f/T/F in addition to true/false
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--no-dev", "0", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--no-dev", "0"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_BoolFlagWithT(t *testing.T) {
+	// "--dry-run T ./repo" → path="./repo", flags=["--dry-run", "T"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"--dry-run", "T", "./repo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--dry-run", "T"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+}
+
+func TestExtractSubcommand_Empty(t *testing.T) {
+	// No args → subcmd="run", path=""
+	subcmd, repoPath, flags, err := extractSubcommand([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "run" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "run")
+	}
+	if repoPath != "" {
+		t.Errorf("repoPath = %q, want empty", repoPath)
+	}
+	if len(flags) != 0 {
+		t.Errorf("flags = %v, want empty", flags)
+	}
+}

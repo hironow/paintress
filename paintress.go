@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -45,7 +47,7 @@ type Paintress struct {
 }
 
 func NewPaintress(cfg Config) *Paintress {
-	logDir := filepath.Join(cfg.Continent, ".expedition", ".logs")
+	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
 	// Reserve Party: parse model string for reserves
@@ -65,29 +67,42 @@ func NewPaintress(cfg Config) *Paintress {
 		devDir = cfg.Continent
 	}
 
-	return &Paintress{
+	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
 		gradient: NewGradientGauge(gradientMax),
 		reserve:  NewReserveParty(primary, reserves),
-		devServer: NewDevServer(
+	}
+
+	if !cfg.NoDev {
+		p.devServer = NewDevServer(
 			cfg.DevCmd, cfg.DevURL, devDir,
 			filepath.Join(logDir, "dev-server.log"),
-		),
+		)
+	} else {
+		p.config.DevURL = ""
 	}
+
+	return p
 }
 
 func (p *Paintress) Run(ctx context.Context) int {
+	ctx, rootSpan := tracer.Start(ctx, "paintress.run",
+		trace.WithAttributes(
+			attribute.String("continent", p.config.Continent),
+			attribute.Int("max_expeditions", p.config.MaxExpeditions),
+			attribute.Int("workers", p.config.Workers),
+			attribute.String("model", p.config.Model),
+			attribute.Bool("dry_run", p.config.DryRun),
+		),
+	)
+	defer rootSpan.End()
+
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
 	if err := InitLogFile(logPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: log file: %v\n", err)
 	}
 	defer CloseLogFile()
-
-	// Write mission.md in the active language before expeditions start
-	if err := WriteMission(p.config.Continent); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: mission file: %v\n", err)
-	}
 
 	monolith := ReadFlag(p.config.Continent)
 
@@ -100,9 +115,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 	LogInfo("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
 	claudeCmd := p.config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = defaultClaudeCmd
+		claudeCmd = DefaultClaudeCmd
 	}
-	if claudeCmd != defaultClaudeCmd {
+	if claudeCmd != DefaultClaudeCmd {
 		LogInfo("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
 	}
 	if p.config.DryRun {
@@ -111,7 +126,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	fmt.Println()
 
 	// Start dev server (stays alive across expeditions)
-	if !p.config.DryRun {
+	if !p.config.DryRun && p.devServer != nil {
 		if err := p.devServer.Start(ctx); err != nil {
 			LogWarn("%s", fmt.Sprintf(Msg("devserver_warn"), err))
 		}
@@ -153,7 +168,6 @@ func (p *Paintress) Run(ctx context.Context) int {
 	luminas := ScanJournalsForLumina(p.config.Continent)
 	if len(luminas) > 0 {
 		LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
-		WriteLumina(p.config.Continent, luminas)
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -205,18 +219,31 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
 		LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 
+		model := p.reserve.ActiveModel()
+		expCtx, expSpan := tracer.Start(ctx, "expedition",
+			trace.WithAttributes(
+				attribute.Int("expedition.number", exp),
+				attribute.Int("worker.id", workerID),
+				attribute.String("model", model),
+			),
+		)
+
 		var workDir string
 		if p.pool != nil {
+			_, acqSpan := tracer.Start(expCtx, "worktree.acquire")
 			workDir = p.pool.Acquire()
+			acqSpan.End()
 		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
+				_, relSpan := tracer.Start(expCtx, "worktree.release")
 				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
 					LogWarn("worktree release: %v", err)
 				}
 				workDir = ""
+				relSpan.End()
 			}
 		}
 
@@ -233,26 +260,43 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		if p.config.DryRun {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
-			os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644)
+			if err := os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644); err != nil {
+				LogError("failed to write dry-run prompt: %v", err)
+				releaseWorkDir()
+				expSpan.End()
+				continue
+			}
 			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
 			p.totalSuccess.Add(1)
 			releaseWorkDir()
+			expSpan.End()
 			continue
 		}
 
 		LogInfo("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
 		expStart := time.Now()
-		output, err := expedition.Run(ctx)
+		output, err := expedition.Run(expCtx)
 		expElapsed := time.Since(expStart)
 
 		if err != nil {
 			if ctx.Err() != nil {
 				releaseWorkDir()
+				expSpan.End()
 				return nil
 			}
 			LogError("%s", fmt.Sprintf(Msg("exp_failed"), exp, err))
 			if strings.Contains(err.Error(), "timeout") {
+				prevModel := p.reserve.ActiveModel()
 				p.reserve.ForceReserve()
+				newModel := p.reserve.ActiveModel()
+				if newModel != prevModel {
+					expSpan.AddEvent("model.switched",
+						trace.WithAttributes(
+							attribute.String("from", prevModel),
+							attribute.String("to", newModel),
+						),
+					)
+				}
 			}
 			p.gradient.Discharge()
 			p.flagMu.Lock()
@@ -267,10 +311,17 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
 		} else {
+			_, parseSpan := tracer.Start(expCtx, "report.parse")
 			report, status := ParseReport(output, exp)
+			parseSpan.End()
+
 			switch status {
 			case StatusComplete:
+				expSpan.AddEvent("expedition.complete",
+					trace.WithAttributes(attribute.String("status", "all_complete")),
+				)
 				releaseWorkDir()
+				expSpan.End()
 				LogOK("%s", Msg("all_complete"))
 				p.flagMu.Lock()
 				p.writeFlag(exp, "all", "complete", "0")
@@ -292,6 +343,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
 			case StatusSuccess:
+				expSpan.AddEvent("expedition.complete",
+					trace.WithAttributes(
+						attribute.String("status", "success"),
+						attribute.String("issue_id", report.IssueID),
+						attribute.String("mission_type", report.MissionType),
+					),
+				)
 				p.handleSuccess(report)
 				p.gradient.Charge()
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
@@ -328,12 +386,17 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
+			expSpan.AddEvent("gommage",
+				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
+			)
 			releaseWorkDir()
+			expSpan.End()
 			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
 			return errGommage
 		}
 
 		releaseWorkDir()
+		expSpan.End()
 		if p.pool == nil {
 			gitCmd := exec.CommandContext(ctx, "git", "checkout", p.config.BaseBranch)
 			gitCmd.Dir = p.config.Continent
@@ -357,6 +420,14 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 // Review command execution (e.g. codex) does not consume the budget, so slow
 // external review services do not eat into the fix time allowance.
 func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport, budget time.Duration, workDir string) {
+	ctx, loopSpan := tracer.Start(ctx, "review.loop",
+		trace.WithAttributes(
+			attribute.String("pr_url", report.PRUrl),
+			attribute.String("branch", report.Branch),
+		),
+	)
+	defer loopSpan.End()
+
 	// Resolve execution directory: worktree path when pool is active, Continent otherwise.
 	reviewDir := workDir
 	if reviewDir == "" {
@@ -391,10 +462,14 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		LogInfo("%s", fmt.Sprintf(Msg("review_running"), cycle, maxReviewCycles))
 
 		// Review phase — bounded by reviewTimeout, does NOT consume budget
+		_, revSpan := tracer.Start(ctx, "review.command",
+			trace.WithAttributes(attribute.Int("cycle", cycle)),
+		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
 		result, err := RunReview(reviewCtx, p.config.ReviewCmd, reviewDir)
 		reviewCancel()
 		if err != nil {
+			revSpan.End()
 			if lastComments != "" {
 				if report.Insight != "" {
 					report.Insight += " | "
@@ -404,6 +479,9 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 			LogWarn("%s", fmt.Sprintf(Msg("review_error"), err))
 			return
 		}
+
+		revSpan.SetAttributes(attribute.Bool("passed", result.Passed))
+		revSpan.End()
 
 		if result.Passed {
 			LogOK("%s", Msg("review_passed"))
@@ -455,10 +533,17 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 
 		claudeCmd := p.config.ClaudeCmd
 		if claudeCmd == "" {
-			claudeCmd = defaultClaudeCmd
+			claudeCmd = DefaultClaudeCmd
 		}
 
 		model := p.reserve.ActiveModel()
+		_, fixSpan := tracer.Start(fixCtx, "reviewfix.claude",
+			trace.WithAttributes(
+				attribute.Int("cycle", cycle),
+				attribute.String("model", model),
+			),
+		)
+
 		cmd := exec.CommandContext(fixCtx, claudeCmd,
 			"--model", model,
 			"--continue",
@@ -473,6 +558,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		start := time.Now()
 		out, err := cmd.CombinedOutput()
 		consumed += time.Since(start)
+		fixSpan.End()
 		fixCancel()
 
 		if err != nil {
@@ -515,9 +601,9 @@ func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 
 func (p *Paintress) printBanner() {
 	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
-	fmt.Printf("%s║          The Paintress awakens               ║%s\n", colorCyan, colorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
+	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
 	fmt.Println()
 }
 
@@ -535,9 +621,9 @@ func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
 func (p *Paintress) printSummary() {
 	total := p.totalAttempted.Load()
 	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", colorCyan, colorReset)
-	fmt.Printf("%s║          The Paintress rests                 ║%s\n", colorCyan, colorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", colorCyan, colorReset)
+	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
+	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
 	fmt.Println()
 	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
 	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
@@ -551,7 +637,6 @@ func (p *Paintress) printSummary() {
 	LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 	fmt.Println()
 	LogInfo("Flag:     %s", FlagPath(p.config.Continent))
-	LogInfo("Lumina:   %s", LuminaPath(p.config.Continent))
 	LogInfo("Journals: %s", JournalDir(p.config.Continent))
 	LogInfo("Logs:     %s", p.logDir)
 }

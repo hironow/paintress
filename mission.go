@@ -1,10 +1,8 @@
-package main
+package paintress
 
 import (
 	"embed"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -15,11 +13,6 @@ var missionFS embed.FS
 var missionTemplates = template.Must(
 	template.ParseFS(missionFS, "templates/mission_*.md.tmpl"),
 )
-
-// MissionPath returns the path to the mission file on the Continent.
-func MissionPath(continent string) string {
-	return filepath.Join(continent, ".expedition", "mission.md")
-}
 
 // MissionText returns the mission rules of engagement in the active language.
 func MissionText() string {
@@ -36,9 +29,4 @@ func MissionText() string {
 		panic(fmt.Sprintf("mission template execution failed: %v", err))
 	}
 	return buf.String()
-}
-
-// WriteMission writes the mission file to the Continent in the active language.
-func WriteMission(continent string) error {
-	return os.WriteFile(MissionPath(continent), []byte(MissionText()), 0644)
 }

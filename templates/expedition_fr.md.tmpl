@@ -7,10 +7,15 @@ Vous avez été envoyé dans le Continent (ce dépôt) pour accomplir votre miss
 
 ## Premières étapes (suivre cet ordre)
 
-1. Lire {{.Bt}}.expedition/flag.md{{.Bt}} s'il existe — checkpoint de l'Expédition précédente (absent au premier lancement)
-2. Lire {{.Bt}}.expedition/mission.md{{.Bt}} — règles d'engagement
-3. Lire {{.Bt}}CLAUDE.md{{.Bt}} s'il existe — lois du Continent
-4. Lire la dernière entrée de {{.Bt}}.expedition/journal/{{.Bt}} s'il y en a — leçons du passé
+1. Lire {{.Bt}}.expedition/.run/flag.md{{.Bt}} s'il existe — checkpoint de l'Expédition précédente (absent au premier lancement)
+2. Lire {{.Bt}}CLAUDE.md{{.Bt}} s'il existe — lois du Continent
+3. Lire la dernière entrée de {{.Bt}}.expedition/journal/{{.Bt}} s'il y en a — leçons du passé
+4. Après avoir sélectionné une issue dans Linear, mettez immédiatement à jour {{.Bt}}.expedition/.run/flag.md{{.Bt}} — ajoutez ces lignes :
+   {{.Cb}}
+   current_issue: <identifiant de l'issue>
+   current_title: <titre de l'issue>
+   {{.Cb}}
+   Cela signale à l'orchestrateur sur quelle issue vous travaillez.
 
 ## Lumina (Compétences passives acquises)
 
@@ -22,10 +27,23 @@ Patterns extraits automatiquement des Expéditions passées. Appliquer comme con
 
 {{.GradientSection}}
 
+{{- if .LinearTeam}}
+
+## Scope Linear
+
+- Équipe : {{.Bt}}{{.LinearTeam}}{{.Bt}}
+{{- if .LinearProject}}
+- Projet : {{.Bt}}{{.LinearProject}}{{.Bt}}
+{{- end}}
+- Ne traiter que les issues de cette équipe{{if .LinearProject}} et de ce projet{{end}}.
+{{- end}}
+
 ## Environnement
 - {{.ReserveSection}}
 - Branche de base : {{.Bt}}{{.BaseBranch}}{{.Bt}}
+{{- if .DevURL}}
 - Serveur dev : {{.Bt}}{{.DevURL}}{{.Bt}} (utilisé pour les missions verify, déjà lancé)
+{{- end}}
 - GitHub : utiliser uniquement pour les Pull Requests (ne PAS utiliser les GitHub Issues)
 - Linear : utiliser uniquement pour les Issues (récupérer, mettre à jour le statut, commenter)
 - Note : les outils MCP sont en chargement différé — utiliser {{.Bt}}ToolSearch{{.Bt}} pour découvrir les outils disponibles avant utilisation
@@ -37,6 +55,10 @@ Le contexte suivant a été fourni pour cette expédition. Traitez-le comme une 
 
 {{.ContextSection}}
 {{- end}}
+
+## Mission — Règles d'engagement
+
+{{.MissionSection}}
 
 ## Sortie requise
 

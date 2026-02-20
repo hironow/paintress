@@ -1,10 +1,13 @@
-package main
+package paintress
 
 import (
 	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // GitExecutor abstracts git command execution for testability.
@@ -45,7 +48,7 @@ func NewWorktreePool(git GitExecutor, repoDir, baseBranch, setupCmd string, size
 		git:        git,
 		baseBranch: baseBranch,
 		repoDir:    repoDir,
-		poolDir:    filepath.Join(repoDir, ".expedition", "worktrees"),
+		poolDir:    filepath.Join(repoDir, ".expedition", ".run", "worktrees"),
 		setupCmd:   setupCmd,
 		workers:    make(chan string, size),
 		size:       size,
@@ -54,6 +57,11 @@ func NewWorktreePool(git GitExecutor, repoDir, baseBranch, setupCmd string, size
 
 // Init prunes stale worktree references and creates fresh worktrees for each worker.
 func (wp *WorktreePool) Init(ctx context.Context) error {
+	ctx, span := tracer.Start(ctx, "worktree_pool.init",
+		trace.WithAttributes(attribute.Int("pool.size", wp.size)),
+	)
+	defer span.End()
+
 	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "prune"); err != nil {
 		return fmt.Errorf("worktree prune: %w", err)
 	}

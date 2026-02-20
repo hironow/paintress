@@ -1,4 +1,4 @@
-package main
+package paintress
 
 import (
 	"os"
@@ -70,7 +70,7 @@ func TestReadFlag_NonexistentFile(t *testing.T) {
 
 func TestFlagPath(t *testing.T) {
 	p := FlagPath("/some/repo")
-	want := filepath.Join("/some/repo", ".expedition", "flag.md")
+	want := filepath.Join("/some/repo", ".expedition", ".run", "flag.md")
 	if p != want {
 		t.Errorf("FlagPath = %q, want %q", p, want)
 	}
@@ -78,7 +78,7 @@ func TestFlagPath(t *testing.T) {
 
 func TestWriteFlag_AllFields(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	WriteFlag(dir, 10, "AWE-99", "success", "0")
 	f := ReadFlag(dir)
@@ -102,7 +102,7 @@ func TestWriteFlag_AllFields(t *testing.T) {
 
 func TestWriteFlag_Overwrite(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	WriteFlag(dir, 1, "AWE-1", "success", "10")
 	WriteFlag(dir, 2, "AWE-2", "failed", "9")
@@ -118,13 +118,13 @@ func TestWriteFlag_Overwrite(t *testing.T) {
 
 func TestReadFlag_ValueWithColonAndSpaces(t *testing.T) {
 	dir := t.TempDir()
-	expDir := filepath.Join(dir, ".expedition")
-	os.MkdirAll(expDir, 0755)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
 
 	content := `last_expedition: 7
 remaining_issues: 10 (approx): 3 left
 `
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	f := ReadFlag(dir)
 	if f.LastExpedition != 7 {
@@ -137,7 +137,7 @@ remaining_issues: 10 (approx): 3 left
 
 func TestWriteFlag_IssueIDWithNewline_IsSanitized(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	issueID := "AWE-1\nAWE-2"
 	WriteFlag(dir, 1, issueID, "success", "5")
@@ -150,7 +150,7 @@ func TestWriteFlag_IssueIDWithNewline_IsSanitized(t *testing.T) {
 
 func TestWriteFlag_SanitizesStatusAndRemaining(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	WriteFlag(dir, 1, "AWE-1", "success\nextra", "5\r\nmore")
 	f := ReadFlag(dir)
@@ -163,15 +163,95 @@ func TestWriteFlag_SanitizesStatusAndRemaining(t *testing.T) {
 	}
 }
 
-func TestReadFlag_InvalidAndNegativeExpedition(t *testing.T) {
+func TestReadFlag_CurrentIssueAndTitle(t *testing.T) {
+	dir := t.TempDir()
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
+
+	content := `last_expedition: 3
+current_issue: MY-239
+current_title: flag.md watcher
+`
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
+
+	f := ReadFlag(dir)
+	if f.CurrentIssue != "MY-239" {
+		t.Errorf("CurrentIssue = %q, want %q", f.CurrentIssue, "MY-239")
+	}
+	if f.CurrentTitle != "flag.md watcher" {
+		t.Errorf("CurrentTitle = %q, want %q", f.CurrentTitle, "flag.md watcher")
+	}
+}
+
+func TestReadFlag_CurrentIssueAbsent_DefaultsEmpty(t *testing.T) {
+	dir := t.TempDir()
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
+
+	content := `last_expedition: 1
+remaining_issues: 5
+`
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
+
+	f := ReadFlag(dir)
+	if f.CurrentIssue != "" {
+		t.Errorf("CurrentIssue should default to empty, got %q", f.CurrentIssue)
+	}
+	if f.CurrentTitle != "" {
+		t.Errorf("CurrentTitle should default to empty, got %q", f.CurrentTitle)
+	}
+}
+
+func TestReadFlag_MigratesLegacyPath(t *testing.T) {
 	dir := t.TempDir()
 	expDir := filepath.Join(dir, ".expedition")
 	os.MkdirAll(expDir, 0755)
 
+	// Legacy flag.md at old path (before .run/ restructure)
+	legacyContent := `last_expedition: 42
+last_issue: MY-100
+last_status: success
+remaining_issues: 3
+`
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(legacyContent), 0644)
+
+	// New .run/ path does NOT have flag.md
+	os.MkdirAll(filepath.Join(expDir, ".run"), 0755)
+
+	f := ReadFlag(dir)
+	if f.LastExpedition != 42 {
+		t.Errorf("LastExpedition = %d, want 42 (should read from legacy path)", f.LastExpedition)
+	}
+	if f.LastIssue != "MY-100" {
+		t.Errorf("LastIssue = %q, want MY-100", f.LastIssue)
+	}
+}
+
+func TestReadFlag_PrefersNewPathOverLegacy(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	runDir := filepath.Join(expDir, ".run")
+	os.MkdirAll(runDir, 0755)
+
+	// Both paths have flag.md — new path should win
+	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte("last_expedition: 1\n"), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte("last_expedition: 99\n"), 0644)
+
+	f := ReadFlag(dir)
+	if f.LastExpedition != 99 {
+		t.Errorf("LastExpedition = %d, want 99 (new path should take priority)", f.LastExpedition)
+	}
+}
+
+func TestReadFlag_InvalidAndNegativeExpedition(t *testing.T) {
+	dir := t.TempDir()
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
+
 	content := `last_expedition: not-a-number
 remaining_issues: 1
 `
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	f := ReadFlag(dir)
 	// fmt.Sscanf should leave LastExpedition at zero on parse failure.
@@ -182,7 +262,7 @@ remaining_issues: 1
 	content = `last_expedition: -5
 remaining_issues: 1
 `
-	os.WriteFile(filepath.Join(expDir, "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	f = ReadFlag(dir)
 	// Negative values are currently accepted by fmt.Sscanf.
