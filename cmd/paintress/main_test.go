@@ -397,12 +397,12 @@ func TestParseStateFlag_CommaSeparated(t *testing.T) {
 	flagArgs := []string{"--state", "todo,in-progress"}
 	// when
 	states := parseStateFlag(flagArgs)
-	// then
+	// then — hyphens normalized to spaces for Linear state name matching
 	if len(states) != 2 {
 		t.Fatalf("states = %v, want 2 elements", states)
 	}
-	if states[0] != "todo" || states[1] != "in-progress" {
-		t.Errorf("states = %v, want [todo, in-progress]", states)
+	if states[0] != "todo" || states[1] != "in progress" {
+		t.Errorf("states = %v, want [todo, in progress]", states)
 	}
 }
 

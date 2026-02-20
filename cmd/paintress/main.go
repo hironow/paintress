@@ -124,6 +124,7 @@ func parseStateFlag(flagArgs []string) []string {
 	states := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
+		p = strings.ReplaceAll(p, "-", " ")
 		if p != "" {
 			states = append(states, p)
 		}
@@ -237,7 +238,7 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 		fmt.Fprintf(os.Stderr, "Commands:\n")
 		fmt.Fprintf(os.Stderr, "  init <repo-path>   Initialize project configuration\n")
 		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n")
-		fmt.Fprintf(os.Stderr, "  issues <repo-path> List Linear issues (JSONL to stdout)\n\n")
+		fmt.Fprintf(os.Stderr, "  issues <repo-path> List Linear issues (table, --output json for JSON)\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
 		fmt.Fprintf(os.Stderr, "  <repo-path>    Target repository (The Continent)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
