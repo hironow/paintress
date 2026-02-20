@@ -443,6 +443,119 @@ func TestExtractSubcommand_IssuesWithStateFlag(t *testing.T) {
 	}
 }
 
+func TestExtractSubcommand_ArchivePrune(t *testing.T) {
+	// "archive-prune ./repo --days 7 --execute" → subcmd="archive-prune", path="./repo", flags
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"archive-prune", "./repo", "--days", "7", "--execute"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "archive-prune" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "archive-prune")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--days", "7", "--execute"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestParseDaysFlag_Default(t *testing.T) {
+	days, err := parseDaysFlag([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if days != 30 {
+		t.Errorf("days = %d, want 30", days)
+	}
+}
+
+func TestParseDaysFlag_Explicit(t *testing.T) {
+	days, err := parseDaysFlag([]string{"--days", "7"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if days != 7 {
+		t.Errorf("days = %d, want 7", days)
+	}
+}
+
+func TestParseDaysFlag_Equals(t *testing.T) {
+	days, err := parseDaysFlag([]string{"--days=14"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if days != 14 {
+		t.Errorf("days = %d, want 14", days)
+	}
+}
+
+func TestParseDaysFlag_InvalidValue(t *testing.T) {
+	_, err := parseDaysFlag([]string{"--days", "foo"})
+	if err == nil {
+		t.Fatal("expected error for non-integer --days value")
+	}
+}
+
+func TestParseDaysFlag_InvalidEquals(t *testing.T) {
+	_, err := parseDaysFlag([]string{"--days=bar"})
+	if err == nil {
+		t.Fatal("expected error for non-integer --days= value")
+	}
+}
+
+func TestParseDaysFlag_MissingValue(t *testing.T) {
+	// --days is last arg with no value
+	_, err := parseDaysFlag([]string{"--days"})
+	if err == nil {
+		t.Fatal("expected error for --days without value")
+	}
+}
+
+func TestParseDaysFlag_EmptyEquals(t *testing.T) {
+	// --days= with no value
+	_, err := parseDaysFlag([]string{"--days="})
+	if err == nil {
+		t.Fatal("expected error for --days= without value")
+	}
+}
+
+func TestParseExecuteFlag_Absent(t *testing.T) {
+	if parseExecuteFlag([]string{}) {
+		t.Error("execute should be false when flag absent")
+	}
+}
+
+func TestParseExecuteFlag_Present(t *testing.T) {
+	if !parseExecuteFlag([]string{"--execute"}) {
+		t.Error("execute should be true when flag present")
+	}
+}
+
+func TestParseExecuteFlag_ExplicitFalse(t *testing.T) {
+	if parseExecuteFlag([]string{"--execute", "false"}) {
+		t.Error("execute should be false when --execute false")
+	}
+}
+
+func TestParseExecuteFlag_EqualsFalse(t *testing.T) {
+	if parseExecuteFlag([]string{"--execute=false"}) {
+		t.Error("execute should be false when --execute=false")
+	}
+}
+
+func TestParseExecuteFlag_EqualsTrue(t *testing.T) {
+	if !parseExecuteFlag([]string{"--execute=true"}) {
+		t.Error("execute should be true when --execute=true")
+	}
+}
+
 func TestExtractSubcommand_Empty(t *testing.T) {
 	// No args → subcmd="run", path=""
 	subcmd, repoPath, flags, err := extractSubcommand([]string{})

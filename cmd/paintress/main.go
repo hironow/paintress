@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -19,9 +20,10 @@ var version = "dev"
 
 // knownSubcommands lists all recognized subcommands.
 var knownSubcommands = map[string]bool{
-	"init":   true,
-	"doctor": true,
-	"issues": true,
+	"init":          true,
+	"doctor":        true,
+	"issues":        true,
+	"archive-prune": true,
 }
 
 // extractSubcommand separates args (os.Args[1:]) into a subcommand, a repo
@@ -139,7 +141,7 @@ func parseStateFlag(flagArgs []string) []string {
 func isBoolFlag(arg string) bool {
 	name := strings.TrimLeft(arg, "-")
 	switch name {
-	case "version", "dry-run", "no-dev":
+	case "version", "dry-run", "no-dev", "execute":
 		return true
 	}
 	return false
@@ -176,6 +178,12 @@ func run() int {
 		outputFmt := parseOutputFlag(flagArgs)
 		stateFilter := parseStateFlag(flagArgs)
 		return runIssues(repoPath, outputFmt, stateFilter)
+	case "archive-prune":
+		if repoPath == "" {
+			fmt.Fprintf(os.Stderr, "Usage: paintress archive-prune <repo-path> [--days 30] [--execute] [--output json|text]\n")
+			return 1
+		}
+		return runArchivePrune(repoPath, flagArgs)
 	}
 
 	// Default: "run" subcommand
@@ -236,9 +244,10 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 		fmt.Fprintf(os.Stderr, "Usage: paintress <repo-path> [options]\n\n")
 		fmt.Fprintf(os.Stderr, "The Paintress — drives the Expedition loop.\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "  init <repo-path>   Initialize project configuration\n")
-		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n")
-		fmt.Fprintf(os.Stderr, "  issues <repo-path> List Linear issues (table, --output json for JSON)\n\n")
+		fmt.Fprintf(os.Stderr, "  init <repo-path>          Initialize project configuration\n")
+		fmt.Fprintf(os.Stderr, "  doctor                    Check external command availability\n")
+		fmt.Fprintf(os.Stderr, "  issues <repo-path>        List Linear issues (table, --output json for JSON)\n")
+		fmt.Fprintf(os.Stderr, "  archive-prune <repo-path> Prune old archived d-mails [--days 30] [--execute]\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
 		fmt.Fprintf(os.Stderr, "  <repo-path>    Target repository (The Continent)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
@@ -411,6 +420,130 @@ func runIssues(repoPath, outputFmt string, stateFilter []string) int {
 		if out != "" {
 			fmt.Println(out)
 		}
+	}
+	return 0
+}
+
+// parseDaysFlag extracts the --days value from flagArgs.
+// Returns 30 when --days is not specified.
+// Returns an error when --days is present but the value is not a valid integer.
+func parseDaysFlag(flagArgs []string) (int, error) {
+	for i, arg := range flagArgs {
+		if arg == "--days" {
+			if i+1 >= len(flagArgs) || strings.HasPrefix(flagArgs[i+1], "-") {
+				return 0, fmt.Errorf("--days requires a value")
+			}
+			v, err := strconv.Atoi(flagArgs[i+1])
+			if err != nil {
+				return 0, fmt.Errorf("invalid --days value %q: must be an integer", flagArgs[i+1])
+			}
+			return v, nil
+		}
+		if strings.HasPrefix(arg, "--days=") {
+			raw := strings.TrimPrefix(arg, "--days=")
+			v, err := strconv.Atoi(raw)
+			if err != nil {
+				return 0, fmt.Errorf("invalid --days value %q: must be an integer", raw)
+			}
+			return v, nil
+		}
+	}
+	return 30, nil
+}
+
+// parseExecuteFlag parses --execute from flagArgs.
+// Supports: --execute, --execute true/false, --execute=true/false.
+func parseExecuteFlag(flagArgs []string) bool {
+	for i, arg := range flagArgs {
+		if strings.HasPrefix(arg, "--execute=") {
+			val := strings.TrimPrefix(arg, "--execute=")
+			v, err := strconv.ParseBool(val)
+			if err != nil {
+				return true // unparseable value → treat presence as true
+			}
+			return v
+		}
+		if arg == "--execute" {
+			// Check if next arg is an explicit bool value
+			if i+1 < len(flagArgs) {
+				if v, err := strconv.ParseBool(flagArgs[i+1]); err == nil {
+					return v
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
+func runArchivePrune(repoPath string, flagArgs []string) int {
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: invalid path: %v\n", err)
+		return 1
+	}
+
+	days, err := parseDaysFlag(flagArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+	execute := parseExecuteFlag(flagArgs)
+	outputFmt := parseOutputFlag(flagArgs)
+
+	result, err := paintress.ArchivePrune(absPath, days, execute)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	if outputFmt == "json" {
+		out := struct {
+			Candidates int      `json:"candidates"`
+			Deleted    int      `json:"deleted"`
+			Files      []string `json:"files"`
+		}{
+			Candidates: len(result.Candidates),
+			Deleted:    result.Deleted,
+			Files:      result.Candidates,
+		}
+		data, err := json.Marshal(out)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
+		fmt.Println(string(data))
+		if execute && result.Deleted < len(result.Candidates) {
+			return 1
+		}
+		return 0
+	}
+
+	// text output
+	if len(result.Candidates) == 0 {
+		fmt.Println("No files older than", days, "days.")
+		return 0
+	}
+
+	if execute {
+		fmt.Printf("Deleted %d file(s):\n", result.Deleted)
+	} else {
+		fmt.Printf("Files older than %d days (%d file(s), dry-run):\n", days, len(result.Candidates))
+	}
+	for _, f := range result.Candidates {
+		fmt.Println("  " + f)
+	}
+	if !execute {
+		fmt.Println("\nRun with --execute to delete.")
+	}
+	// Remind about git-tracked archive
+	fmt.Fprintf(os.Stderr, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.\n")
+
+	// Signal partial failure: some files could not be removed
+	if execute && result.Deleted < len(result.Candidates) {
+		failed := len(result.Candidates) - result.Deleted
+		fmt.Fprintf(os.Stderr, "Warning: %d file(s) could not be deleted (permission denied or locked).\n", failed)
+		return 1
 	}
 	return 0
 }

@@ -208,6 +208,7 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
 | `paintress doctor` | Check required external commands (git, claude, gh, docker) |
 | `paintress issues <repo-path>` | List Linear issues (`--output json` for JSON, `--state` to filter) |
+| `paintress archive-prune <repo-path>` | Prune old archived d-mails (`--days 30`, `--execute` to delete) |
 | `paintress --version` | Show version and exit |
 
 ## Usage
@@ -260,6 +261,12 @@ paintress \
 
 # Skip dev server (CLI tools, backend-only repos)
 paintress --no-dev /path/to/repo
+
+# Prune archived d-mails older than 30 days (dry-run)
+paintress archive-prune /path/to/repo
+
+# Prune with custom threshold and actually delete
+paintress archive-prune /path/to/repo --days 14 --execute
 
 # Skip code review gate
 paintress --review-cmd "" /path/to/repo
