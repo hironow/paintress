@@ -166,6 +166,12 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 # Build and install
 just install
 
+# Initialize project config (Linear team key, etc.)
+paintress init /path/to/your/repo
+
+# Check external command availability
+paintress doctor
+
 # Run — .expedition/ is created automatically
 paintress /path/to/your/repo
 ```
@@ -175,6 +181,15 @@ runtime state under `.run/` automatically. Mission and Lumina content are
 embedded directly in the expedition prompt (no separate files on disk).
 Git worktrees for Swarm Mode are also fully managed — Paintress creates them
 on startup and removes them on shutdown. No manual `git worktree` commands needed.
+
+## Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `paintress <repo-path>` | Run expedition loop (default) |
+| `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
+| `paintress doctor` | Check required external commands (git, claude, gh, docker) |
+| `paintress --version` | Show version and exit |
 
 ## Usage
 
@@ -224,6 +239,9 @@ paintress \
   --review-cmd "codex review --base main" \
   /path/to/repo
 
+# Skip dev server (CLI tools, backend-only repos)
+paintress --no-dev /path/to/repo
+
 # Skip code review gate
 paintress --review-cmd "" /path/to/repo
 
@@ -261,8 +279,26 @@ paintress \
 | `--review-cmd` | `codex review --base main` | Code review command after PR creation |
 | `--workers` | `1` | Number of parallel expedition workers (`0` = direct execution without worktrees, `1` = single worktree, `2+` = Swarm Mode) |
 | `--setup-cmd` | `""` | Command to run after worktree creation (e.g. `bun install`) |
+| `--no-dev` | `false` | Skip dev server startup entirely |
 | `--dry-run` | `false` | Generate prompts without executing |
 | `--version` | — | Show version and exit |
+
+## Tracing (OpenTelemetry)
+
+Paintress instruments key operations (expedition, review loop, worktree pool, dev server) with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+```bash
+# Start Jaeger (all-in-one trace viewer)
+just jaeger
+
+# Run paintress with tracing enabled
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
+
+# View traces at http://localhost:16686
+
+# Stop Jaeger
+just jaeger-down
+```
 
 ## Development
 
@@ -283,40 +319,53 @@ just check          # fmt + vet + test (pre-commit check)
 just clean          # Clean build artifacts
 just prek-install   # Install prek hooks (pre-commit + pre-push)
 just prek-run       # Run all prek hooks on all files
+just jaeger         # Start Jaeger trace viewer (docker)
+just jaeger-down    # Stop Jaeger
 ```
 
 ## File Structure
 
 ```
-+-- main.go              CLI + signal handling
-+-- paintress.go         Gommage loop
-+-- expedition.go        Single Expedition + prompt generation
-+-- gradient.go          Gradient Gauge
-+-- lumina.go            Lumina scanning (goroutines)
-+-- reserve.go           Reserve Party (goroutine)
-+-- devserver.go         Dev server (goroutine)
-+-- flag.go              Flag read/write
-+-- journal.go           Journal read/write
-+-- report.go            Report parser (including failure_type)
-+-- context.go           Context injection (.expedition/context/)
-+-- worktree.go          WorktreePool for Swarm Mode
-+-- review.go            Code review gate (exec + parse)
-+-- mission.go           Mission writer (embed + template)
-+-- lang.go              i18n message map (en/ja/fr)
-+-- logger.go            Colored logging
-+-- *_test.go            Tests
-+-- justfile             Task runner
++-- cmd/paintress/
+|   +-- main.go              CLI entry point + flag parsing
+|   +-- main_test.go         CLI arg parsing tests
++-- main.go                  Config struct + ValidateContinent (library)
++-- paintress.go             Gommage loop
++-- expedition.go            Single Expedition + prompt generation
++-- gradient.go              Gradient Gauge
++-- lumina.go                Lumina scanning (goroutines)
++-- reserve.go               Reserve Party (goroutine)
++-- devserver.go             Dev server (goroutine)
++-- flag.go                  Flag read/write
++-- flag_watcher.go          Real-time issue selection watcher
++-- journal.go               Journal read/write
++-- report.go                Report parser (including failure_type)
++-- context.go               Context injection (.expedition/context/)
++-- worktree.go              WorktreePool for Swarm Mode
++-- review.go                Code review gate (exec + parse)
++-- mission.go               Mission text (prompt-embedded)
++-- project_config.go        Project config (.expedition/config.yaml)
++-- init.go                  Interactive init flow
++-- doctor.go                External command checker
++-- telemetry.go             OpenTelemetry tracer setup
++-- lang.go                  i18n message map (en/ja/fr)
++-- logger.go                Colored logging
++-- *_test.go                Tests
++-- justfile                 Task runner
++-- docker/
+|   +-- compose.yaml         Jaeger all-in-one for trace viewing
 +-- templates/
-    +-- expedition_*.md.tmpl  Expedition prompt (en/ja/fr)
-    +-- mission_*.md.tmpl     Mission rules (en/ja/fr)
+    +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
+    +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
 ```
 
 ## Prerequisites
 
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - A code review CLI (for code review gate, customizable via `--review-cmd`, e.g. tools that output `[P0]`–`[P4]` priorities)
-- GitHub: accessible for Pull Request operations (e.g. [GitHub CLI](https://cli.github.com/))
+- [GitHub CLI](https://cli.github.com/) for Pull Request operations
 - Linear: accessible for Issue operations (e.g. Linear MCP)
+- [Docker](https://www.docker.com/) for tracing (Jaeger) and container tests
 - Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
 
 ## License
