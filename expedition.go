@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -55,6 +56,7 @@ type Expedition struct {
 	Gradient    *GradientGauge
 	Reserve     *ReserveParty
 	InboxDMails []DMail // d-mails from inbox (for archiving after expedition)
+	inboxOnce   sync.Once
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -101,13 +103,15 @@ func (e *Expedition) BuildPrompt() string {
 }
 
 func (e *Expedition) loadInboxSection() string {
-	dmails, err := ScanInbox(e.Continent)
-	if err != nil {
-		LogWarn("inbox scan failed: %v", err)
-		return ""
-	}
-	e.InboxDMails = dmails
-	return FormatDMailForPrompt(dmails)
+	e.inboxOnce.Do(func() {
+		dmails, err := ScanInbox(e.Continent)
+		if err != nil {
+			LogWarn("inbox scan failed: %v", err)
+			return
+		}
+		e.InboxDMails = dmails
+	})
+	return FormatDMailForPrompt(e.InboxDMails)
 }
 
 func (e *Expedition) loadContextSection() string {
@@ -196,6 +200,27 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			),
 		)
 		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
+	}, nil)
+
+	// Start inbox watcher to detect d-mails arriving mid-expedition
+	var inboxMu sync.Mutex
+	seenFiles := make(map[string]bool)
+	for _, dm := range e.InboxDMails {
+		seenFiles[dm.Name] = true
+	}
+	go watchInbox(watchCtx, e.Continent, func(dm DMail) {
+		inboxMu.Lock()
+		defer inboxMu.Unlock()
+		if seenFiles[dm.Name] {
+			return
+		}
+		seenFiles[dm.Name] = true
+		e.InboxDMails = append(e.InboxDMails, dm)
+		if dm.Severity == "high" {
+			LogWarn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
+		} else {
+			LogInfo("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
+		}
 	}, nil)
 
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
