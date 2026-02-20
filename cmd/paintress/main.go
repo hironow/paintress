@@ -21,6 +21,7 @@ var version = "dev"
 var knownSubcommands = map[string]bool{
 	"init":   true,
 	"doctor": true,
+	"issues": true,
 }
 
 // extractSubcommand separates args (os.Args[1:]) into a subcommand, a repo
@@ -88,6 +89,52 @@ func extractSubcommand(args []string) (subcmd, repoPath string, flagArgs []strin
 	return subcmd, repoPath, flagArgs, nil
 }
 
+// parseOutputFlag extracts the --output value from flagArgs.
+// Returns "text" when unspecified.
+func parseOutputFlag(flagArgs []string) string {
+	for i, arg := range flagArgs {
+		if arg == "--output" && i+1 < len(flagArgs) {
+			return flagArgs[i+1]
+		}
+		if strings.HasPrefix(arg, "--output=") {
+			return strings.TrimPrefix(arg, "--output=")
+		}
+	}
+	return "text"
+}
+
+// parseStateFlag extracts the --state value from flagArgs.
+// Returns nil when unspecified (meaning no filter).
+func parseStateFlag(flagArgs []string) []string {
+	var raw string
+	for i, arg := range flagArgs {
+		if arg == "--state" && i+1 < len(flagArgs) {
+			raw = flagArgs[i+1]
+			break
+		}
+		if strings.HasPrefix(arg, "--state=") {
+			raw = strings.TrimPrefix(arg, "--state=")
+			break
+		}
+	}
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	states := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		p = strings.ReplaceAll(p, "-", " ")
+		if p != "" {
+			states = append(states, p)
+		}
+	}
+	if len(states) == 0 {
+		return nil
+	}
+	return states
+}
+
 // isBoolFlag checks if a flag argument is a known boolean flag.
 func isBoolFlag(arg string) bool {
 	name := strings.TrimLeft(arg, "-")
@@ -118,8 +165,17 @@ func run() int {
 		runInit(repoPath)
 		return 0
 	case "doctor":
-		runDoctor()
+		outputFmt := parseOutputFlag(flagArgs)
+		runDoctor(outputFmt)
 		return 0
+	case "issues":
+		if repoPath == "" {
+			fmt.Fprintf(os.Stderr, "Usage: paintress issues <repo-path> [--state todo,in-progress] [--output json|text]\n")
+			return 1
+		}
+		outputFmt := parseOutputFlag(flagArgs)
+		stateFilter := parseStateFlag(flagArgs)
+		return runIssues(repoPath, outputFmt, stateFilter)
 	}
 
 	// Default: "run" subcommand
@@ -173,6 +229,7 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 	fs.StringVar(&cfg.SetupCmd, "setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
 	fs.BoolVar(&cfg.NoDev, "no-dev", false, "Skip dev server startup")
 	fs.BoolVar(&cfg.DryRun, "dry-run", false, "Generate prompts only")
+	fs.StringVar(&cfg.OutputFormat, "output", "text", "Output format: text, json")
 	fs.StringVar(&lang, "lang", "en", "Output language: en, ja, fr")
 
 	fs.Usage = func() {
@@ -180,7 +237,8 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 		fmt.Fprintf(os.Stderr, "The Paintress — drives the Expedition loop.\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
 		fmt.Fprintf(os.Stderr, "  init <repo-path>   Initialize project configuration\n")
-		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n\n")
+		fmt.Fprintf(os.Stderr, "  doctor             Check external command availability\n")
+		fmt.Fprintf(os.Stderr, "  issues <repo-path> List Linear issues (table, --output json for JSON)\n\n")
 		fmt.Fprintf(os.Stderr, "Arguments:\n")
 		fmt.Fprintf(os.Stderr, "  <repo-path>    Target repository (The Continent)\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
@@ -231,11 +289,11 @@ func parseFlags(repoPath string, args []string) paintress.Config {
 }
 
 func runInit(repoPath string) {
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s║          Paintress Init                      ║%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          Paintress Init                      ║%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintln(os.Stderr)
 
 	if err := paintress.RunInitWithReader(repoPath, os.Stdin); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -243,20 +301,41 @@ func runInit(repoPath string) {
 	}
 }
 
-func runDoctor() {
+func runDoctor(outputFmt string) {
 	claudeCmd := paintress.DefaultClaudeCmd
 	checks := paintress.RunDoctor(claudeCmd)
 
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s║          Paintress Doctor                    ║%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Println()
+	allRequired := true
+	for _, c := range checks {
+		if c.Required && !c.OK {
+			allRequired = false
+			break
+		}
+	}
+
+	if outputFmt == "json" {
+		out, err := paintress.FormatDoctorJSON(checks)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println(out)
+		if !allRequired {
+			os.Exit(1)
+		}
+		return
+	}
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          Paintress Doctor                    ║%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintln(os.Stderr)
 
 	allOK := true
 	for _, c := range checks {
 		if c.OK {
-			fmt.Printf("  %s✓%s  %-12s %s (%s)\n", paintress.ColorGreen, paintress.ColorReset, c.Name, c.Version, c.Path)
+			fmt.Fprintf(os.Stderr, "  %s✓%s  %-12s %s (%s)\n", paintress.ColorGreen, paintress.ColorReset, c.Name, c.Version, c.Path)
 		} else {
 			marker := "✗"
 			color := paintress.ColorRed
@@ -267,14 +346,71 @@ func runDoctor() {
 			} else {
 				allOK = false
 			}
-			fmt.Printf("  %s%s%s  %-12s %s\n", color, marker, paintress.ColorReset, c.Name, label)
+			fmt.Fprintf(os.Stderr, "  %s%s%s  %-12s %s\n", color, marker, paintress.ColorReset, c.Name, label)
 		}
 	}
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 
 	if !allOK {
 		fmt.Fprintf(os.Stderr, "Some required commands are missing. Install them and try again.\n")
 		os.Exit(1)
 	}
-	fmt.Println("All checks passed.")
+	fmt.Fprintln(os.Stderr, "All checks passed.")
+}
+
+func runIssues(repoPath, outputFmt string, stateFilter []string) int {
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: invalid path: %v\n", err)
+		return 1
+	}
+
+	cfg, err := paintress.LoadProjectConfig(absPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: load config: %v\n", err)
+		return 1
+	}
+	if cfg.Linear.Team == "" {
+		fmt.Fprintf(os.Stderr, "Error: linear.team not set in %s\n", paintress.ProjectConfigPath(absPath))
+		fmt.Fprintf(os.Stderr, "Run 'paintress init %s' first.\n", repoPath)
+		return 1
+	}
+
+	apiKey := os.Getenv("LINEAR_API_KEY")
+	if apiKey == "" {
+		fmt.Fprintf(os.Stderr, "Error: LINEAR_API_KEY environment variable is required\n")
+		return 1
+	}
+
+	issues, err := paintress.FetchIssues(context.Background(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	issues = paintress.FilterIssuesByState(issues, stateFilter)
+
+	paintress.LogInfo("fetched %d issues from %s", len(issues), cfg.Linear.Team)
+
+	switch outputFmt {
+	case "json":
+		out, err := paintress.FormatIssuesJSON(issues)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
+		fmt.Println(out)
+	case "text":
+		fmt.Println(paintress.FormatIssuesTable(issues))
+	default:
+		out, err := paintress.FormatIssuesJSONL(issues)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
+		if out != "" {
+			fmt.Println(out)
+		}
+	}
+	return 0
 }

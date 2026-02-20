@@ -287,6 +287,162 @@ func TestExtractSubcommand_BoolFlagWithT(t *testing.T) {
 	}
 }
 
+func TestExtractSubcommand_DoctorWithOutputFlag(t *testing.T) {
+	// "doctor --output json" → subcmd="doctor", path="", flags=["--output", "json"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"doctor", "--output", "json"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "doctor" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "doctor")
+	}
+	if repoPath != "" {
+		t.Errorf("repoPath = %q, want empty", repoPath)
+	}
+	wantFlags := []string{"--output", "json"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
+func TestExtractSubcommand_DoctorWithOutputEqualsFlag(t *testing.T) {
+	// "doctor --output=json" → subcmd="doctor", path="", flags=["--output=json"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"doctor", "--output=json"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "doctor" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "doctor")
+	}
+	if repoPath != "" {
+		t.Errorf("repoPath = %q, want empty", repoPath)
+	}
+	wantFlags := []string{"--output=json"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+}
+
+func TestParseOutputFlag_Default(t *testing.T) {
+	// given: no --output flag
+	// when
+	format := parseOutputFlag([]string{})
+	// then
+	if format != "text" {
+		t.Errorf("format = %q, want %q", format, "text")
+	}
+}
+
+func TestParseOutputFlag_Json(t *testing.T) {
+	// given
+	flagArgs := []string{"--output", "json"}
+	// when
+	format := parseOutputFlag(flagArgs)
+	// then
+	if format != "json" {
+		t.Errorf("format = %q, want %q", format, "json")
+	}
+}
+
+func TestParseOutputFlag_JsonEquals(t *testing.T) {
+	// given
+	flagArgs := []string{"--output=json"}
+	// when
+	format := parseOutputFlag(flagArgs)
+	// then
+	if format != "json" {
+		t.Errorf("format = %q, want %q", format, "json")
+	}
+}
+
+func TestParseOutputFlag_Text(t *testing.T) {
+	// given
+	flagArgs := []string{"--output", "text"}
+	// when
+	format := parseOutputFlag(flagArgs)
+	// then
+	if format != "text" {
+		t.Errorf("format = %q, want %q", format, "text")
+	}
+}
+
+func TestParseStateFlag_Default(t *testing.T) {
+	// given: no --state flag
+	// when
+	states := parseStateFlag([]string{})
+	// then — nil means no filter
+	if states != nil {
+		t.Errorf("states = %v, want nil", states)
+	}
+}
+
+func TestParseStateFlag_Single(t *testing.T) {
+	// given
+	flagArgs := []string{"--state", "todo"}
+	// when
+	states := parseStateFlag(flagArgs)
+	// then
+	if len(states) != 1 || states[0] != "todo" {
+		t.Errorf("states = %v, want [todo]", states)
+	}
+}
+
+func TestParseStateFlag_CommaSeparated(t *testing.T) {
+	// given
+	flagArgs := []string{"--state", "todo,in-progress"}
+	// when
+	states := parseStateFlag(flagArgs)
+	// then — hyphens normalized to spaces for Linear state name matching
+	if len(states) != 2 {
+		t.Fatalf("states = %v, want 2 elements", states)
+	}
+	if states[0] != "todo" || states[1] != "in progress" {
+		t.Errorf("states = %v, want [todo, in progress]", states)
+	}
+}
+
+func TestParseStateFlag_EqualsForm(t *testing.T) {
+	// given
+	flagArgs := []string{"--state=todo,done"}
+	// when
+	states := parseStateFlag(flagArgs)
+	// then
+	if len(states) != 2 {
+		t.Fatalf("states = %v, want 2 elements", states)
+	}
+	if states[0] != "todo" || states[1] != "done" {
+		t.Errorf("states = %v, want [todo, done]", states)
+	}
+}
+
+func TestExtractSubcommand_IssuesWithStateFlag(t *testing.T) {
+	// "issues ./repo --state todo" → subcmd="issues", path="./repo", flags=["--state", "todo"]
+	subcmd, repoPath, flags, err := extractSubcommand([]string{"issues", "./repo", "--state", "todo"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if subcmd != "issues" {
+		t.Errorf("subcmd = %q, want %q", subcmd, "issues")
+	}
+	if repoPath != "./repo" {
+		t.Errorf("repoPath = %q, want %q", repoPath, "./repo")
+	}
+	wantFlags := []string{"--state", "todo"}
+	if len(flags) != len(wantFlags) {
+		t.Fatalf("flags = %v, want %v", flags, wantFlags)
+	}
+	for i, f := range flags {
+		if f != wantFlags[i] {
+			t.Errorf("flags[%d] = %q, want %q", i, f, wantFlags[i])
+		}
+	}
+}
+
 func TestExtractSubcommand_Empty(t *testing.T) {
 	// No args → subcmd="run", path=""
 	subcmd, repoPath, flags, err := extractSubcommand([]string{})

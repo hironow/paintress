@@ -11,7 +11,8 @@ import (
 
 func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
 
 	var mu sync.Mutex
 	var gotIssue, gotTitle string
@@ -20,7 +21,7 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go watchFlag(ctx, dir, 50*time.Millisecond, func(issue, title string) {
+	go watchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock()
 		gotIssue = issue
 		gotTitle = title
@@ -31,10 +32,10 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 		}
 	})
 
-	// Write flag after watcher starts
-	time.Sleep(100 * time.Millisecond)
+	// Wait for watcher.Add() to complete before writing
+	time.Sleep(50 * time.Millisecond)
 	content := "current_issue: MY-239\ncurrent_title: flag watcher\n"
-	os.WriteFile(filepath.Join(dir, ".expedition", ".run", "flag.md"), []byte(content), 0644)
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	select {
 	case <-done:
@@ -60,7 +61,7 @@ func TestWatchFlag_StopsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		watchFlag(ctx, dir, 50*time.Millisecond, func(issue, title string) {})
+		watchFlag(ctx, dir, func(issue, title string) {})
 		close(done)
 	}()
 
@@ -89,7 +90,7 @@ func TestWatchFlag_DoesNotFireOnSameIssue(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	watchFlag(ctx, dir, 50*time.Millisecond, func(issue, title string) {
+	watchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock()
 		callCount++
 		mu.Unlock()
@@ -114,7 +115,7 @@ func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go watchFlag(ctx, dir, 50*time.Millisecond, func(issue, title string) {
+	go watchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock()
 		issues = append(issues, issue)
 		count := len(issues)
@@ -127,12 +128,14 @@ func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 		}
 	})
 
+	// Wait for watcher.Add() to complete
+	time.Sleep(50 * time.Millisecond)
+
 	// First issue
-	time.Sleep(100 * time.Millisecond)
 	os.WriteFile(filepath.Join(runDir, "flag.md"),
 		[]byte("current_issue: MY-239\ncurrent_title: first\n"), 0644)
 
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// Second issue
 	os.WriteFile(filepath.Join(runDir, "flag.md"),
@@ -161,8 +164,8 @@ func TestWatchFlag_NoFlagFile_NoPanic(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
-	// Should not panic — just silently poll and find nothing
-	watchFlag(ctx, dir, 50*time.Millisecond, func(issue, title string) {
+	// Should not panic — returns immediately because runDir doesn't exist
+	watchFlag(ctx, dir, func(issue, title string) {
 		t.Error("callback should not fire when no flag file exists")
 	})
 }

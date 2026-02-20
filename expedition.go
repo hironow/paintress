@@ -56,10 +56,6 @@ type Expedition struct {
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
-
-	// WatchFlagInterval overrides the flag.md polling interval for testing.
-	// Zero means use the default (5s).
-	WatchFlagInterval time.Duration
 }
 
 // BuildPrompt generates the expedition prompt in the configured language.
@@ -177,13 +173,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 
 	// Start flag.md watcher to detect issue selection in real-time
-	watchInterval := e.WatchFlagInterval
-	if watchInterval == 0 {
-		watchInterval = 5 * time.Second
-	}
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
-	go watchFlag(watchCtx, e.Continent, watchInterval, func(issue, title string) {
+	go watchFlag(watchCtx, e.Continent, func(issue, title string) {
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
 				attribute.String("issue_id", issue),
@@ -224,7 +216,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	<-done
 
 	err = cmd.Wait()
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",

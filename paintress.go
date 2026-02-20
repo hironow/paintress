@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -123,7 +124,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	if p.config.DryRun {
 		LogWarn("%s", Msg("dry_run"))
 	}
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 
 	// Start dev server (stays alive across expeditions)
 	if !p.config.DryRun && p.devServer != nil {
@@ -181,7 +182,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	err := g.Wait()
 
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	p.printSummary()
 
 	switch {
@@ -600,11 +601,11 @@ func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 }
 
 func (p *Paintress) printBanner() {
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
+	fmt.Fprintln(os.Stderr)
 }
 
 // writeFlag writes the flag checkpoint only if expNum is greater than the
@@ -618,13 +619,51 @@ func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
 	WriteFlag(p.config.Continent, expNum, issueID, status, remaining)
 }
 
+// RunSummary holds the results of a paintress loop run.
+type RunSummary struct {
+	Total    int64  `json:"total"`
+	Success  int64  `json:"success"`
+	Skipped  int64  `json:"skipped"`
+	Failed   int64  `json:"failed"`
+	Bugs     int64  `json:"bugs"`
+	Gradient string `json:"gradient"`
+}
+
+// FormatSummaryJSON returns the summary as a JSON string.
+func FormatSummaryJSON(s RunSummary) (string, error) {
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
 func (p *Paintress) printSummary() {
 	total := p.totalAttempted.Load()
-	fmt.Println()
-	fmt.Printf("%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
-	fmt.Printf("%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
-	fmt.Println()
+
+	if p.config.OutputFormat == "json" {
+		summary := RunSummary{
+			Total:    total,
+			Success:  p.totalSuccess.Load(),
+			Skipped:  p.totalSkipped.Load(),
+			Failed:   p.totalFailed.Load(),
+			Bugs:     p.totalBugs.Load(),
+			Gradient: p.gradient.FormatLog(),
+		}
+		out, err := FormatSummaryJSON(summary)
+		if err != nil {
+			LogError("json marshal: %v", err)
+			return
+		}
+		fmt.Println(out)
+		return
+	}
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
+	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
+	fmt.Fprintln(os.Stderr)
 	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
 	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
 	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
@@ -632,10 +671,10 @@ func (p *Paintress) printSummary() {
 	if p.totalBugs.Load() > 0 {
 		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatLog()))
 	LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
-	fmt.Println()
+	fmt.Fprintln(os.Stderr)
 	LogInfo("Flag:     %s", FlagPath(p.config.Continent))
 	LogInfo("Journals: %s", JournalDir(p.config.Continent))
 	LogInfo("Logs:     %s", p.logDir)

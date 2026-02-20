@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -802,5 +803,41 @@ func TestPaintressRun_NoDev_SkipsDevServer(t *testing.T) {
 	code := p.Run(context.Background())
 	if code != 0 {
 		t.Fatalf("Run() = %d, want 0", code)
+	}
+}
+
+func TestFormatSummaryJSON(t *testing.T) {
+	// given
+	summary := RunSummary{
+		Total:    5,
+		Success:  4,
+		Skipped:  0,
+		Failed:   1,
+		Bugs:     0,
+		Gradient: "3/5",
+	}
+
+	// when
+	out, err := FormatSummaryJSON(summary)
+	if err != nil {
+		t.Fatalf("FormatSummaryJSON: %v", err)
+	}
+
+	// then — must be valid JSON
+	var parsed RunSummary
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\nraw: %s", err, out)
+	}
+	if parsed.Total != 5 {
+		t.Errorf("total = %d, want 5", parsed.Total)
+	}
+	if parsed.Success != 4 {
+		t.Errorf("success = %d, want 4", parsed.Success)
+	}
+	if parsed.Failed != 1 {
+		t.Errorf("failed = %d, want 1", parsed.Failed)
+	}
+	if parsed.Gradient != "3/5" {
+		t.Errorf("gradient = %q, want %q", parsed.Gradient, "3/5")
 	}
 }
