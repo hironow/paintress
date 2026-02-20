@@ -81,8 +81,9 @@ func TestFetchIssues_ParsesGraphQLResponse(t *testing.T) {
 		}
 	}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") == "" {
-			t.Error("expected Authorization header")
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-api-key" {
+			t.Errorf("Authorization header = %q, want %q", auth, "Bearer test-api-key")
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(graphqlResponse))
