@@ -3,6 +3,7 @@ package paintress
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -237,6 +238,144 @@ func TestDMailMarshal_EmptyBody(t *testing.T) {
 	}
 }
 
+// === FormatDMailForPrompt Tests ===
+
+func TestFormatDMailForPrompt_EmptySlice(t *testing.T) {
+	// given
+	var dmails []DMail
+
+	// when
+	result := FormatDMailForPrompt(dmails)
+
+	// then
+	if result != "" {
+		t.Errorf("expected empty string, got %q", result)
+	}
+}
+
+func TestFormatDMailForPrompt_SingleDMail(t *testing.T) {
+	// given
+	dmails := []DMail{
+		{
+			Name:        "spec-my-42",
+			Kind:        "specification",
+			Description: "Issue MY-42 implementation spec",
+			Issues:      []string{"MY-42"},
+			Body:        "# DoD\n- Token bucket algorithm\n",
+		},
+	}
+
+	// when
+	result := FormatDMailForPrompt(dmails)
+
+	// then
+	if !strings.Contains(result, "spec-my-42") {
+		t.Errorf("should contain name, got %q", result)
+	}
+	if !strings.Contains(result, "specification") {
+		t.Errorf("should contain kind, got %q", result)
+	}
+	if !strings.Contains(result, "Issue MY-42 implementation spec") {
+		t.Errorf("should contain description, got %q", result)
+	}
+	if !strings.Contains(result, "Token bucket algorithm") {
+		t.Errorf("should contain body content, got %q", result)
+	}
+}
+
+func TestFormatDMailForPrompt_MultipleDMails(t *testing.T) {
+	// given
+	dmails := []DMail{
+		{Name: "spec-my-10", Kind: "specification", Description: "First"},
+		{Name: "feedback-d-071", Kind: "feedback", Description: "Second", Severity: "medium"},
+	}
+
+	// when
+	result := FormatDMailForPrompt(dmails)
+
+	// then
+	if !strings.Contains(result, "spec-my-10") {
+		t.Errorf("should contain first d-mail name, got %q", result)
+	}
+	if !strings.Contains(result, "feedback-d-071") {
+		t.Errorf("should contain second d-mail name, got %q", result)
+	}
+	if !strings.Contains(result, "medium") {
+		t.Errorf("should contain severity, got %q", result)
+	}
+}
+
+func TestFormatDMailForPrompt_BodylessDMail(t *testing.T) {
+	// given — d-mail with no body (frontmatter only)
+	dmails := []DMail{
+		{Name: "report-my-99", Kind: "report", Description: "Minimal report"},
+	}
+
+	// when
+	result := FormatDMailForPrompt(dmails)
+
+	// then — should still contain name and description
+	if !strings.Contains(result, "report-my-99") {
+		t.Errorf("should contain name, got %q", result)
+	}
+	if !strings.Contains(result, "Minimal report") {
+		t.Errorf("should contain description, got %q", result)
+	}
+}
+
+// === NewReportDMail Tests ===
+
+func TestNewReportDMail_BasicFields(t *testing.T) {
+	// given
+	report := &ExpeditionReport{
+		Expedition:  3,
+		IssueID:     "MY-42",
+		IssueTitle:  "Add rate limiting",
+		MissionType: "implement",
+		PRUrl:       "https://github.com/org/repo/pull/123",
+		Status:      "success",
+		Reason:      "Implemented token bucket algorithm",
+	}
+
+	// when
+	dm := NewReportDMail(report)
+
+	// then
+	if dm.Kind != "report" {
+		t.Errorf("Kind = %q, want %q", dm.Kind, "report")
+	}
+	if dm.Name != "report-my-42" {
+		t.Errorf("Name = %q, want %q", dm.Name, "report-my-42")
+	}
+	if len(dm.Issues) != 1 || dm.Issues[0] != "MY-42" {
+		t.Errorf("Issues = %v, want [MY-42]", dm.Issues)
+	}
+	if !strings.Contains(dm.Body, "https://github.com/org/repo/pull/123") {
+		t.Errorf("Body should contain PR URL, got %q", dm.Body)
+	}
+	if !strings.Contains(dm.Body, "Implemented token bucket algorithm") {
+		t.Errorf("Body should contain reason, got %q", dm.Body)
+	}
+}
+
+func TestNewReportDMail_NameNormalization(t *testing.T) {
+	// given — issue ID with uppercase
+	report := &ExpeditionReport{
+		IssueID:     "MY-100",
+		IssueTitle:  "Some issue",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when
+	dm := NewReportDMail(report)
+
+	// then — name should be lowercase
+	if dm.Name != "report-my-100" {
+		t.Errorf("Name = %q, want %q", dm.Name, "report-my-100")
+	}
+}
+
 // === Path Function Tests ===
 
 func TestInboxDir(t *testing.T) {
@@ -357,6 +496,41 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file not found: %v", err)
+	}
+}
+
+func TestSendDMail_WritesArchiveBeforeOutbox(t *testing.T) {
+	// given
+	continent := t.TempDir()
+	dm := DMail{
+		Name:        "report-order-test",
+		Kind:        "report",
+		Description: "Verify archive-first write order",
+	}
+
+	// Pre-create both directories
+	outboxDir := OutboxDir(continent)
+	archiveDir := ArchiveDir(continent)
+	os.MkdirAll(outboxDir, 0755)
+	os.MkdirAll(archiveDir, 0755)
+
+	// Make outbox unwritable — if archive is written first, it succeeds;
+	// outbox write then fails. This proves the write order.
+	os.Chmod(outboxDir, 0555)
+	t.Cleanup(func() { os.Chmod(outboxDir, 0755) })
+
+	// when
+	err := SendDMail(continent, dm)
+
+	// then — error is expected (outbox write fails)
+	if err == nil {
+		t.Fatal("expected error when outbox is unwritable")
+	}
+
+	// Archive must exist — it was written first (archive-first invariant)
+	archivePath := filepath.Join(archiveDir, "report-order-test.md")
+	if _, err := os.Stat(archivePath); err != nil {
+		t.Errorf("archive file should exist (written before outbox): %v", err)
 	}
 }
 

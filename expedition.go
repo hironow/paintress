@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -36,6 +37,7 @@ type PromptData struct {
 	BaseBranch      string
 	DevURL          string
 	ContextSection  string
+	InboxSection    string
 	LinearTeam      string
 	LinearProject   string
 	MissionSection  string
@@ -50,9 +52,11 @@ type Expedition struct {
 	LogDir    string
 
 	// Game mechanics
-	Luminas  []Lumina
-	Gradient *GradientGauge
-	Reserve  *ReserveParty
+	Luminas     []Lumina
+	Gradient    *GradientGauge
+	Reserve     *ReserveParty
+	InboxDMails []DMail // d-mails from inbox (for archiving after expedition)
+	inboxOnce   sync.Once
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -77,6 +81,7 @@ func (e *Expedition) BuildPrompt() string {
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection(),
+		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.Linear.Team,
 		LinearProject:   projCfg.Linear.Project,
 		MissionSection:  MissionText(),
@@ -95,6 +100,18 @@ func (e *Expedition) BuildPrompt() string {
 		panic(fmt.Sprintf("prompt template execution failed: %v", err))
 	}
 	return buf.String()
+}
+
+func (e *Expedition) loadInboxSection() string {
+	e.inboxOnce.Do(func() {
+		dmails, err := ScanInbox(e.Continent)
+		if err != nil {
+			LogWarn("inbox scan failed: %v", err)
+			return
+		}
+		e.InboxDMails = dmails
+	})
+	return FormatDMailForPrompt(e.InboxDMails)
 }
 
 func (e *Expedition) loadContextSection() string {
@@ -183,7 +200,31 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			),
 		)
 		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
-	})
+	}, nil)
+
+	// Start inbox watcher to log d-mails arriving mid-expedition.
+	// Mid-expedition arrivals are NOT appended to InboxDMails — they stay
+	// in inbox/ and will be picked up by the next expedition's ScanInbox.
+	// Only d-mails included in the prompt (initial scan) are archived.
+	seenFiles := make(map[string]bool)
+	for _, dm := range e.InboxDMails {
+		seenFiles[dm.Name] = true
+	}
+	inboxDone := make(chan struct{})
+	go func() {
+		defer close(inboxDone)
+		watchInbox(watchCtx, e.Continent, func(dm DMail) {
+			if seenFiles[dm.Name] {
+				return
+			}
+			seenFiles[dm.Name] = true
+			if dm.Severity == "high" {
+				LogWarn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
+			} else {
+				LogInfo("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
+			}
+		}, nil)
+	}()
 
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
 	var output strings.Builder
@@ -192,7 +233,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	go func() {
 		defer close(done)
 		reader := bufio.NewReader(stdout)
-		writer := io.MultiWriter(os.Stdout, outFile)
+		// In JSON output mode, stream to stderr so stdout stays machine-readable
+		streamDest := io.Writer(os.Stdout)
+		if e.Config.OutputFormat == "json" {
+			streamDest = os.Stderr
+		}
+		writer := io.MultiWriter(streamDest, outFile)
 
 		buf := make([]byte, 4096)
 		for {
@@ -214,6 +260,11 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}()
 
 	<-done
+
+	// Stop watchers and join inbox watcher to ensure InboxDMails is
+	// stable before callers iterate the slice for archiving.
+	watchCancel()
+	<-inboxDone
 
 	err = cmd.Wait()
 	fmt.Fprintln(os.Stderr)

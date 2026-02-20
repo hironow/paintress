@@ -364,6 +364,17 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.writeFlag(exp, report.IssueID, "success", report.Remaining)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
+				// D-Mail: send report and archive processed inbox d-mails (best-effort)
+				if dm := NewReportDMail(report); dm.Name != "" {
+					if err := SendDMail(p.config.Continent, dm); err != nil {
+						LogWarn("dmail send: %v", err)
+					}
+				}
+				for _, dm := range expedition.InboxDMails {
+					if err := ArchiveInboxDMail(p.config.Continent, dm.Name); err != nil {
+						LogWarn("dmail archive: %v", err)
+					}
+				}
 				p.consecutiveFailures.Store(0)
 				p.totalSuccess.Add(1)
 			case StatusSkipped:

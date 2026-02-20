@@ -13,7 +13,10 @@ import (
 // Performs an initial read to detect pre-existing flags, then watches
 // the parent directory (.expedition/.run/) for write events.
 // Returns silently if the directory does not exist.
-func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, title string)) {
+//
+// If ready is non-nil, a value is sent after the watcher is fully set up,
+// allowing callers to synchronize without time.Sleep.
+func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, title string), ready chan<- struct{}) {
 	runDir := filepath.Join(continent, ".expedition", ".run")
 
 	if _, err := os.Stat(runDir); err != nil {
@@ -28,6 +31,11 @@ func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, 
 
 	if err := watcher.Add(runDir); err != nil {
 		return
+	}
+
+	// Signal that the watcher is fully set up
+	if ready != nil {
+		ready <- struct{}{}
 	}
 
 	// Initial read: detect pre-existing flag

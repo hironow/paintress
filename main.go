@@ -1,10 +1,16 @@
 package paintress
 
 import (
+	"embed"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+//go:embed templates/skills/*/SKILL.md
+var skillsFS embed.FS
 
 // DefaultClaudeCmd is the default CLI command name for Claude Code.
 const DefaultClaudeCmd = "claude"
@@ -46,6 +52,28 @@ func ValidateContinent(continent string) error {
 		d := filepath.Join(continent, ".expedition", sub)
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return err
+		}
+	}
+
+	// Ensure Agent Skills SKILL.md files exist for phonewave discovery
+	skillDirs := []string{"dmail-sendable", "dmail-readable"}
+	for _, dir := range skillDirs {
+		skillDir := filepath.Join(continent, ".expedition", "skills", dir)
+		if err := os.MkdirAll(skillDir, 0755); err != nil {
+			return err
+		}
+		skillFile := filepath.Join(skillDir, "SKILL.md")
+		if _, err := os.Stat(skillFile); err != nil {
+			if !os.IsNotExist(err) {
+				return err
+			}
+			content, err := fs.ReadFile(skillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
+			if err != nil {
+				return fmt.Errorf("read embedded skill %s: %w", dir, err)
+			}
+			if err := os.WriteFile(skillFile, content, 0644); err != nil {
+				return err
+			}
 		}
 	}
 

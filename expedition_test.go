@@ -378,6 +378,33 @@ func TestExpedition_Run_WritesOutputFile(t *testing.T) {
 	}
 }
 
+func TestExpedition_Run_JsonOutputStillWritesFile(t *testing.T) {
+	// given — OutputFormat is "json" (streaming should go to stderr, not stdout)
+	exp := newTestExpedition(t, "json mode output", 0)
+	exp.Config.OutputFormat = "json"
+	ctx := context.Background()
+
+	// when
+	out, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — output file must still contain the data
+	outputFile := filepath.Join(exp.LogDir, "expedition-001-output.txt")
+	data, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("read output file: %v", err)
+	}
+	if !strings.Contains(string(data), "json mode output") {
+		t.Errorf("output file should contain streaming data, got %q", string(data))
+	}
+	// returned output should also contain the data
+	if !strings.Contains(out, "json mode output") {
+		t.Errorf("returned output should contain data, got %q", out)
+	}
+}
+
 func TestExpedition_Run_UsesActiveModel(t *testing.T) {
 	exp := newTestExpedition(t, "output", 0)
 	exp.Reserve.CheckOutput("rate limit") // Switch to sonnet
