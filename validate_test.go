@@ -183,6 +183,104 @@ func TestValidateContinent_WriteStringErrorsPropagate(t *testing.T) {
 	}
 }
 
+func TestValidateContinent_CreatesDMailDirs(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	for _, sub := range []string{"inbox", "outbox", "archive"} {
+		path := filepath.Join(dir, ".expedition", sub)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			t.Errorf(".expedition/%s directory should be created", sub)
+		}
+	}
+}
+
+func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", ".gitignore"))
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	for _, entry := range []string{"inbox/", "outbox/"} {
+		if !strings.Contains(string(content), entry) {
+			t.Errorf(".gitignore should contain %q, got: %q", entry, string(content))
+		}
+	}
+}
+
+func TestValidateContinent_ArchiveIsNotGitignored(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", ".gitignore"))
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	if strings.Contains(string(content), "archive/") {
+		t.Errorf(".gitignore should NOT contain archive/, got: %q", string(content))
+	}
+}
+
+func TestValidateContinent_AppendsInboxOutboxToExistingGitignore(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	// Simulate existing .gitignore that only has .run/ (pre-dmail version)
+	gitignore := filepath.Join(expDir, ".gitignore")
+	os.WriteFile(gitignore, []byte(".run/\n"), 0644)
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	content, err := os.ReadFile(gitignore)
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	for _, entry := range []string{"inbox/", "outbox/"} {
+		if !strings.Contains(string(content), entry) {
+			t.Errorf(".gitignore should contain %q after upgrade, got: %q", entry, string(content))
+		}
+	}
+}
+
+func TestValidateContinent_DoesNotDuplicateInboxOutboxInGitignore(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0755)
+
+	// Already has all entries
+	gitignore := filepath.Join(expDir, ".gitignore")
+	os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n"), 0644)
+
+	if err := ValidateContinent(dir); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	content, err := os.ReadFile(gitignore)
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	for _, entry := range []string{"inbox/", "outbox/"} {
+		count := strings.Count(string(content), entry)
+		if count != 1 {
+			t.Errorf("%q should appear exactly once, got %d times in: %q", entry, count, string(content))
+		}
+	}
+}
+
 func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 

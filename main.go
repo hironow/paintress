@@ -41,32 +41,51 @@ func ValidateContinent(continent string) error {
 		return err
 	}
 
-	// Ensure .run/ is gitignored (handles both fresh and upgrade scenarios)
+	// Ensure d-mail directories exist (inbox, outbox, archive)
+	for _, sub := range []string{"inbox", "outbox", "archive"} {
+		d := filepath.Join(continent, ".expedition", sub)
+		if err := os.MkdirAll(d, 0755); err != nil {
+			return err
+		}
+	}
+
+	// Ensure .run/, inbox/, outbox/ are gitignored (handles both fresh and upgrade scenarios)
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
 	content, err := os.ReadFile(gitignore)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		// File doesn't exist — create with .run/
-		if err := os.WriteFile(gitignore, []byte(".run/\n"), 0644); err != nil {
+		// File doesn't exist — create with all entries
+		if err := os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n"), 0644); err != nil {
 			return err
 		}
-	} else if !strings.Contains(string(content), ".run/") {
-		// Existing file from older version — append .run/
-		f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		// Ensure .run/ starts on its own line
-		if len(content) > 0 && content[len(content)-1] != '\n' {
-			if _, err := f.WriteString("\n"); err != nil {
-				return err
+	} else {
+		// Existing file — append any missing entries
+		entries := []string{".run/", "inbox/", "outbox/"}
+		var missing []string
+		for _, entry := range entries {
+			if !strings.Contains(string(content), entry) {
+				missing = append(missing, entry)
 			}
 		}
-		if _, err := f.WriteString(".run/\n"); err != nil {
-			return err
+		if len(missing) > 0 {
+			f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			// Ensure first entry starts on its own line
+			if len(content) > 0 && content[len(content)-1] != '\n' {
+				if _, err := f.WriteString("\n"); err != nil {
+					return err
+				}
+			}
+			for _, entry := range missing {
+				if _, err := f.WriteString(entry + "\n"); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
