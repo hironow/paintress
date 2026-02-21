@@ -264,6 +264,43 @@ func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
 	}
 }
 
+// TestHighSeverityGate_ScanError_FailsClosed verifies that when the inbox
+// cannot be read (e.g. permission denied), the run aborts with exit code 1
+// rather than silently skipping the gate.
+func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
+	dir := setupTestRepo(t)
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	// Place a valid d-mail, then make the inbox unreadable
+	content := "---\nname: alert-perm\nkind: alert\ndescription: test\nseverity: high\n---\n"
+	os.WriteFile(filepath.Join(inboxDir, "alert-perm.md"), []byte(content), 0644)
+	os.Chmod(inboxDir, 0000) // make inbox unreadable
+	t.Cleanup(func() { os.Chmod(inboxDir, 0755) })
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 1,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p.approver = &failApprover{t: t}
+	p.notifier = &NopNotifier{}
+
+	code := p.Run(context.Background())
+	if code != 1 {
+		t.Fatalf("Run() = %d, want 1 (fail-closed on scan error)", code)
+	}
+	if p.totalAttempted.Load() != 0 {
+		t.Errorf("totalAttempted = %d, want 0 (no expeditions should run)", p.totalAttempted.Load())
+	}
+}
+
 // countingApprover counts how many times RequestApproval is called.
 type countingApprover struct {
 	count   *atomic.Int32

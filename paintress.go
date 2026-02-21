@@ -202,7 +202,12 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	// Pre-flight HIGH severity gate (once, before workers start).
 	// This prevents concurrent StdinApprover reads when workers > 1.
-	preflightInbox, _ := ScanInbox(p.config.Continent)
+	// Fail closed: if inbox cannot be read, abort rather than skip the gate.
+	preflightInbox, scanErr := ScanInbox(p.config.Continent)
+	if scanErr != nil {
+		p.Logger.Error("inbox scan failed (fail-closed): %v", scanErr)
+		return 1
+	}
 	if highDMails := FilterHighSeverity(preflightInbox); len(highDMails) > 0 {
 		names := make([]string, len(highDMails))
 		for i, dm := range highDMails {
@@ -302,9 +307,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
-		// Pre-scan inbox for HIGH severity gate (before expedition creation
-		// would trigger loadInboxSection via BuildPrompt)
-		inboxDMails, _ := ScanInbox(p.config.Continent)
+		// Scan inbox for expedition prompt data (gate already ran in pre-flight)
+		inboxDMails, scanErr := ScanInbox(p.config.Continent)
+		if scanErr != nil {
+			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
+		}
 
 		expedition := &Expedition{
 			Number:      exp,
