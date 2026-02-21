@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,6 +31,8 @@ type Paintress struct {
 	config    Config
 	logDir    string
 	Logger    *Logger
+	DataOut   io.Writer // stdout-equivalent for data output
+	StdinIn   io.Reader // stdin-equivalent for interactive input
 	devServer *DevServer
 	gradient  *GradientGauge
 	reserve   *ReserveParty
@@ -50,9 +53,15 @@ type Paintress struct {
 	flagMu sync.Mutex
 }
 
-func NewPaintress(cfg Config, logger *Logger) *Paintress {
+func NewPaintress(cfg Config, logger *Logger, dataOut io.Writer, stdinIn io.Reader) *Paintress {
 	if logger == nil {
 		logger = NewLogger(nil, false)
+	}
+	if dataOut == nil {
+		dataOut = os.Stdout
+	}
+	if stdinIn == nil {
+		stdinIn = os.Stdin
 	}
 	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -90,13 +99,15 @@ func NewPaintress(cfg Config, logger *Logger) *Paintress {
 	case cfg.ApproveCmd != "":
 		approver = NewCmdApprover(cfg.ApproveCmd)
 	default:
-		approver = NewStdinApprover()
+		approver = NewStdinApprover(stdinIn, logger.Writer())
 	}
 
 	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
 		Logger:   logger,
+		DataOut:  dataOut,
+		StdinIn:  stdinIn,
 		gradient: NewGradientGauge(gradientMax),
 		reserve:  NewReserveParty(primary, reserves, logger),
 		notifier: notifier,
@@ -130,7 +141,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
 	if err := p.Logger.SetLogFile(logPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: log file: %v\n", err)
+		p.Logger.Warn("log file: %v", err)
 	}
 	defer p.Logger.CloseLogFile()
 
@@ -321,6 +332,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			Config:      p.config,
 			LogDir:      p.logDir,
 			Logger:      p.Logger,
+			DataOut:     p.DataOut,
 			Luminas:     luminas,
 			Gradient:    p.gradient,
 			Reserve:     p.reserve,
@@ -736,7 +748,7 @@ func (p *Paintress) printSummary() {
 			p.Logger.Error("json marshal: %v", err)
 			return
 		}
-		fmt.Println(out)
+		fmt.Fprintln(p.DataOut, out)
 		return
 	}
 

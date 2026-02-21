@@ -1,6 +1,7 @@
 package paintress
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,7 @@ func TestRunInit_WritesConfig(t *testing.T) {
 	input := "ENG\nbackend\n"
 	reader := strings.NewReader(input)
 
-	if err := RunInitWithReader(dir, reader); err != nil {
+	if err := RunInitWithReader(dir, reader, io.Discard); err != nil {
 		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
@@ -44,7 +45,7 @@ func TestRunInit_SkipOptionalProject(t *testing.T) {
 	input := "MY\n\n"
 	reader := strings.NewReader(input)
 
-	if err := RunInitWithReader(dir, reader); err != nil {
+	if err := RunInitWithReader(dir, reader, io.Discard); err != nil {
 		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
@@ -66,7 +67,7 @@ func TestRunInit_CreatesExpeditionDir(t *testing.T) {
 	input := "MY\n\n"
 	reader := strings.NewReader(input)
 
-	if err := RunInitWithReader(dir, reader); err != nil {
+	if err := RunInitWithReader(dir, reader, io.Discard); err != nil {
 		t.Fatalf("RunInitWithReader: %v", err)
 	}
 

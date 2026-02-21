@@ -51,7 +51,8 @@ type Expedition struct {
 	Config    Config
 	LogDir    string
 	Logger    *Logger
-	Notifier  Notifier // for mid-expedition HIGH severity notifications
+	DataOut   io.Writer // stdout-equivalent for streaming Claude output
+	Notifier  Notifier  // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
 	Luminas     []Lumina
@@ -132,6 +133,9 @@ func (e *Expedition) loadContextSection() string {
 // The output streaming goroutine also feeds chunks to ReserveParty
 // for rate-limit detection.
 func (e *Expedition) Run(ctx context.Context) (string, error) {
+	if e.DataOut == nil {
+		e.DataOut = os.Stdout
+	}
 	prompt := e.BuildPrompt()
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
@@ -242,9 +246,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		defer close(done)
 		reader := bufio.NewReader(stdout)
 		// In JSON output mode, stream to stderr so stdout stays machine-readable
-		streamDest := io.Writer(os.Stdout)
+		streamDest := e.DataOut
 		if e.Config.OutputFormat == "json" {
-			streamDest = os.Stderr
+			streamDest = e.Logger.Writer()
 		}
 		writer := io.MultiWriter(streamDest, outFile)
 
@@ -275,7 +279,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	<-inboxDone
 
 	err = cmd.Wait()
-	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(e.Logger.Writer())
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",

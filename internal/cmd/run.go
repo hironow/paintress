@@ -145,7 +145,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	p := paintress.NewPaintress(cfg, logger)
+	p := paintress.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin())
 	exitCode := p.Run(ctx)
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
