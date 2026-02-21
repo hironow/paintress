@@ -17,11 +17,17 @@ type Logger struct {
 }
 
 func NewLogger(out io.Writer, verbose bool) *Logger {
+	if out == nil {
+		out = io.Discard
+	}
 	return &Logger{out: out, verbose: verbose}
 }
 
 // NewQuietLogger creates a Logger that suppresses console output but still writes to log files.
 func NewQuietLogger(out io.Writer) *Logger {
+	if out == nil {
+		out = io.Discard
+	}
 	return &Logger{out: out, quiet: true}
 }
 
