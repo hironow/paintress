@@ -259,7 +259,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	go func() {
 		defer close(done)
 		reader := bufio.NewReader(stdout)
-		// In JSON output mode, stream to stderr so stdout stays machine-readable
+		// In JSON output mode, stream to Logger (stderr) so DataOut (stdout)
+		// stays machine-readable.
+		// NOTE: This assumes Logger writes to a stream distinct from DataOut,
+		// which is guaranteed by the CLI layer (NewLogger uses cmd.ErrOrStderr,
+		// DataOut uses cmd.OutOrStdout). If a caller configures both to the
+		// same writer, streaming output will interleave with JSON summary.
 		streamDest := e.DataOut
 		if e.Config.OutputFormat == "json" {
 			streamDest = e.Logger.Writer()
