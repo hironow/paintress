@@ -81,7 +81,7 @@ func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Plant a flag indicating expedition 7 was the last
-	WriteFlag(dir, 7, "AWE-50", "success", "3")
+	WriteFlag(dir, 7, "AWE-50", "success", "3", 0)
 
 	cfg := Config{
 		Continent:      dir,
@@ -133,7 +133,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 			Status: "success", Reason: "done", PRUrl: "none", BugIssues: "none",
 		})
 	}
-	WriteFlag(dir, 3, "AWE-3", "success", "5")
+	WriteFlag(dir, 3, "AWE-3", "success", "5", 0)
 
 	// Capture original content of journal 001
 	original001, err := os.ReadFile(filepath.Join(jDir, "001.md"))
@@ -184,7 +184,7 @@ func TestReadFlag_ResumeExpeditionNumber(t *testing.T) {
 			name: "flag at expedition 5",
 			setup: func(dir string) {
 				os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-				WriteFlag(dir, 5, "AWE-10", "success", "8")
+				WriteFlag(dir, 5, "AWE-10", "success", "8", 0)
 			},
 			wantLastExp:   5,
 			wantStartExp:  6,
@@ -194,7 +194,7 @@ func TestReadFlag_ResumeExpeditionNumber(t *testing.T) {
 			name: "flag at expedition 20",
 			setup: func(dir string) {
 				os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-				WriteFlag(dir, 20, "AWE-99", "failed", "2")
+				WriteFlag(dir, 20, "AWE-99", "failed", "2", 0)
 			},
 			wantLastExp:   20,
 			wantStartExp:  21,
@@ -465,7 +465,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Plant flag at expedition 4
-	WriteFlag(dir, 4, "AWE-10", "success", "10")
+	WriteFlag(dir, 4, "AWE-10", "success", "10", 0)
 
 	cfg := Config{
 		Continent:      dir,
@@ -762,12 +762,12 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 
 	// Write flag for expedition 5
 	p.flagMu.Lock()
-	p.writeFlag(5, "ISS-5", "success", "10")
+	p.writeFlag(5, "ISS-5", "success", "10", 0)
 	p.flagMu.Unlock()
 
 	// Attempt to write flag for expedition 3 (out-of-order completion)
 	p.flagMu.Lock()
-	p.writeFlag(3, "ISS-3", "success", "12")
+	p.writeFlag(3, "ISS-3", "success", "12", 0)
 	p.flagMu.Unlock()
 
 	// Flag should still show expedition 5, not 3
@@ -840,5 +840,31 @@ func TestFormatSummaryJSON(t *testing.T) {
 	}
 	if parsed.Gradient != "3/5" {
 		t.Errorf("gradient = %q, want %q", parsed.Gradient, "3/5")
+	}
+}
+
+func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
+	// given
+	summary := RunSummary{
+		Total:           3,
+		Success:         2,
+		Failed:          1,
+		MidHighSeverity: 4,
+		Gradient:        "2/3",
+	}
+
+	// when
+	out, err := FormatSummaryJSON(summary)
+	if err != nil {
+		t.Fatalf("FormatSummaryJSON: %v", err)
+	}
+
+	// then — mid_high_severity must appear in JSON
+	var parsed RunSummary
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\nraw: %s", err, out)
+	}
+	if parsed.MidHighSeverity != 4 {
+		t.Errorf("mid_high_severity = %d, want 4", parsed.MidHighSeverity)
 	}
 }

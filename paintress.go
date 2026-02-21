@@ -383,7 +383,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 			p.gradient.Discharge()
 			p.flagMu.Lock()
-			p.writeFlag(exp, "error", "failed", "?")
+			p.writeFlag(exp, "error", "failed", "?", 0)
 			p.flagMu.Unlock()
 			WriteJournal(p.config.Continent, &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
@@ -400,9 +400,10 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 			// Attach mid-expedition HIGH severity D-Mail names to the report
 			midHighNames := expedition.MidHighSeverityDMails()
-			if len(midHighNames) > 0 {
+			midHighCount := len(midHighNames)
+			if midHighCount > 0 {
 				report.HighSeverityDMails = strings.Join(midHighNames, ", ")
-				p.totalMidHighSeverity.Add(int64(len(midHighNames)))
+				p.totalMidHighSeverity.Add(int64(midHighCount))
 			}
 
 			switch status {
@@ -414,7 +415,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				expSpan.End()
 				p.Logger.OK("%s", Msg("all_complete"))
 				p.flagMu.Lock()
-				p.writeFlag(exp, "all", "complete", "0")
+				p.writeFlag(exp, "all", "complete", "0", midHighCount)
 				p.flagMu.Unlock()
 				return errComplete
 			case StatusParseError:
@@ -422,7 +423,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
 				p.flagMu.Lock()
-				p.writeFlag(exp, "?", "parse_error", "?")
+				p.writeFlag(exp, "?", "parse_error", "?", midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, &ExpeditionReport{
 					Expedition: exp, IssueID: "?", IssueTitle: "?",
@@ -450,7 +451,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 					}
 				}
 				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "success", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "success", report.Remaining, midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				// D-Mail: send report and archive processed inbox d-mails (best-effort)
@@ -470,7 +471,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
 				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.totalSkipped.Add(1)
@@ -478,11 +479,15 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Error("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
 				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "failed", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "failed", report.Remaining, midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
+			}
+
+			if midHighCount > 0 {
+				p.Logger.Warn("Expedition #%d: %d HIGH severity D-Mail received mid-expedition", exp, midHighCount)
 			}
 		}
 
@@ -712,12 +717,12 @@ func (p *Paintress) printBanner() {
 // writeFlag writes the flag checkpoint only if expNum is greater than the
 // current checkpoint. This ensures monotonic progression when workers
 // complete out of order. Caller must hold p.flagMu.
-func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
+func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string, midHighSeverity int) {
 	current := ReadFlag(p.config.Continent)
 	if expNum <= current.LastExpedition {
 		return
 	}
-	WriteFlag(p.config.Continent, expNum, issueID, status, remaining)
+	WriteFlag(p.config.Continent, expNum, issueID, status, remaining, midHighSeverity)
 }
 
 // RunSummary holds the results of a paintress loop run.

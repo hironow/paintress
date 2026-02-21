@@ -426,7 +426,7 @@ func TestWriteFlag_SpecialCharactersInIssueID(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 1, "AWE-42/test<script>", "success", "5")
+	WriteFlag(dir, 1, "AWE-42/test<script>", "success", "5", 0)
 	f := ReadFlag(dir)
 	if f.LastIssue != "AWE-42/test<script>" {
 		t.Errorf("LastIssue = %q, should preserve special chars", f.LastIssue)
