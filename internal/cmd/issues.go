@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -73,7 +72,7 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("LINEAR_API_KEY environment variable is required")
 	}
 
-	issues, err := paintress.FetchIssues(context.Background(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	issues, err := paintress.FetchIssues(cmd.Context(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
 	if err != nil {
 		return err
 	}

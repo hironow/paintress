@@ -104,11 +104,83 @@ func TestNewRootCommand_HasSubcommands(t *testing.T) {
 	for _, s := range subs {
 		names[s.Name()] = true
 	}
-	want := []string{"run", "init", "doctor", "issues", "archive-prune", "version"}
+	want := []string{"run", "init", "doctor", "issues", "archive-prune", "version", "update"}
 	for _, name := range want {
 		if !names[name] {
 			t.Errorf("subcommand %q not registered", name)
 		}
+	}
+}
+
+func TestNewRootCommand_BarePathDelegatesToRun(t *testing.T) {
+	// given — a bare repo path (no "run" subcommand), using NeedsDefaultRun
+	args := []string{"/nonexistent/repo"}
+	root := NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+
+	if NeedsDefaultRun(root, args) {
+		root.SetArgs(append([]string{"run"}, args...))
+	} else {
+		root.SetArgs(args)
+	}
+
+	// when
+	err := root.Execute()
+
+	// then — should fail with a run-related error, NOT "unknown command"
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), "unknown command") {
+		t.Errorf("got 'unknown command' error, expected delegation to run: %v", err)
+	}
+}
+
+func TestNewRootCommand_RunFlagsWithoutSubcommand(t *testing.T) {
+	// given — run-specific flags without "run" subcommand
+	args := []string{"--model", "opus", "/nonexistent/repo"}
+	root := NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+
+	if NeedsDefaultRun(root, args) {
+		root.SetArgs(append([]string{"run"}, args...))
+	} else {
+		root.SetArgs(args)
+	}
+
+	// when
+	err := root.Execute()
+
+	// then — should fail with a run-related error, NOT "unknown flag"
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), "unknown flag") {
+		t.Errorf("got 'unknown flag' error, expected delegation to run: %v", err)
+	}
+}
+
+func TestNewRootCommand_NoArgShowsHelp(t *testing.T) {
+	// given — no args at all
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{})
+
+	// when
+	err := cmd.Execute()
+
+	// then — should show help (no error)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "paintress") {
+		t.Errorf("help output = %q, want to contain 'paintress'", out)
 	}
 }
 

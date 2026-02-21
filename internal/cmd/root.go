@@ -4,11 +4,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	cobra.EnableTraverseRunHooks = true
+}
+
 // NewRootCommand creates and returns the root cobra command for paintress.
 // Exported for testability (SetArgs/SetOut) and future docgen.
 func NewRootCommand() *cobra.Command {
-	cobra.EnableTraverseRunHooks = true
-
 	rootCmd := &cobra.Command{
 		Use:     "paintress",
 		Short:   "Claude Code expedition orchestrator",
@@ -30,6 +32,7 @@ func NewRootCommand() *cobra.Command {
 		newIssuesCommand(),
 		newArchivePruneCommand(),
 		newVersionCommand(),
+		newUpdateCommand(),
 	)
 
 	return rootCmd

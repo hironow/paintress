@@ -13,8 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is set at build time via -ldflags.
-var Version = "dev"
+// Version, Commit, and Date are set at build time via -ldflags.
+var (
+	Version = "dev"
+	Commit  = "dev"
+	Date    = "dev"
+)
 
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -118,17 +122,21 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
 
 	go func() {
-		sig := <-sigCh
-		paintress.LogWarn("%s", fmt.Sprintf(paintress.Msg("signal_received"), sig))
-		cancel()
+		select {
+		case sig := <-sigCh:
+			paintress.LogWarn("%s", fmt.Sprintf(paintress.Msg("signal_received"), sig))
+			cancel()
+		case <-ctx.Done():
+		}
 	}()
 
 	p := paintress.NewPaintress(cfg)
 	exitCode := p.Run(ctx)
 	if exitCode != 0 {
-		return fmt.Errorf("expedition exited with code %d", exitCode)
+		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
 	}
 	return nil
 }

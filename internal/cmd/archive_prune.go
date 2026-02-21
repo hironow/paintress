@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	"github.com/hironow/paintress"
 	"github.com/spf13/cobra"
@@ -43,7 +44,10 @@ git-tracked, so deletions should be reviewed and committed.`,
 }
 
 func runArchivePrune(cmd *cobra.Command, args []string) error {
-	repoPath := args[0]
+	repoPath, err := filepath.Abs(args[0])
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
 	days, _ := cmd.Flags().GetInt("days")
 	execute, _ := cmd.Flags().GetBool("execute")
 	outputFmt, _ := cmd.Flags().GetString("output")

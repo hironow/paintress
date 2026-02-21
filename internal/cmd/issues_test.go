@@ -45,7 +45,10 @@ func TestIssuesCommand_StateFlagDefault(t *testing.T) {
 func TestIssuesCommand_OutputFlagInherited(t *testing.T) {
 	// given: --output is a PersistentFlag on root, issues should inherit it
 	root := NewRootCommand()
-	root.SetArgs([]string{"issues", "--output", "json", "/tmp/test"})
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"issues", "--output", "json", t.TempDir()})
 
 	// when
 	err := root.Execute()

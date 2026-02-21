@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/hironow/paintress"
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(w, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
 	fmt.Fprintln(w)
 
-	if err := paintress.RunInitWithReader(repoPath, os.Stdin); err != nil {
+	if err := paintress.RunInitWithReader(repoPath, cmd.InOrStdin()); err != nil {
 		return err
 	}
 	return nil
