@@ -17,12 +17,9 @@ func main() {
 
 	rootCmd := cmd.NewRootCommand()
 
-	// Normalise bool flags: `--dry-run false` → `--dry-run=false`
-	// (pflag's NoOptDefVal prevents space-separated bool values).
-	args := cmd.RewriteBoolFlags(os.Args[1:])
-
 	// Preserve old `paintress [flags] <repo>` shorthand:
 	// prepend "run" when no subcommand is specified.
+	args := os.Args[1:]
 	if cmd.NeedsDefaultRun(rootCmd, args) {
 		args = append([]string{"run"}, args...)
 	}
