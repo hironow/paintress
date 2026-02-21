@@ -31,15 +31,18 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		return
 	}
 
+	// Track seen files to deduplicate: fsnotify may fire CREATE + WRITE
+	// for the same file, and initial-scan files may also produce events.
+	seen := make(map[string]bool)
+
 	// Initial scan: catch files that already exist before the event loop starts.
-	// The watcher is already registered, so any file created during this scan
-	// will also produce an event — duplicates are handled by the caller's dedup.
 	entries, _ := os.ReadDir(inboxDir)
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(inboxDir, entry.Name()))
+		fullPath := filepath.Join(inboxDir, entry.Name())
+		data, err := os.ReadFile(fullPath)
 		if err != nil {
 			continue
 		}
@@ -47,6 +50,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		if err != nil {
 			continue
 		}
+		seen[fullPath] = true
 		onNewDMail(dm)
 	}
 
@@ -68,6 +72,9 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
 				continue
 			}
+			if seen[event.Name] {
+				continue
+			}
 			data, err := os.ReadFile(event.Name)
 			if err != nil {
 				continue
@@ -76,6 +83,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if err != nil {
 				continue
 			}
+			seen[event.Name] = true
 			onNewDMail(dm)
 		case _, ok := <-watcher.Errors:
 			if !ok {

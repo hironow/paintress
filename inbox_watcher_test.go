@@ -278,10 +278,12 @@ func TestWatchInbox_MultipleFilesInSequence(t *testing.T) {
 		t.Fatal("timeout waiting for watcher ready")
 	}
 
-	// Write 3 files in quick succession
+	// Write 3 files with a small gap between each to avoid kqueue event
+	// coalescing on macOS, which can drop events during rapid writes.
 	for _, name := range []string{"first", "second", "third"} {
 		content := "---\nname: " + name + "\nkind: report\ndescription: " + name + "\n---\n"
 		os.WriteFile(filepath.Join(inboxDir, name+".md"), []byte(content), 0644)
+		time.Sleep(50 * time.Millisecond)
 	}
 
 	// Wait for all callbacks to fire
