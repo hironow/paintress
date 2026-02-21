@@ -100,7 +100,13 @@ func NewPaintress(cfg Config, logger *Logger, dataOut io.Writer, stdinIn io.Read
 	case cfg.ApproveCmd != "":
 		approver = NewCmdApprover(cfg.ApproveCmd)
 	default:
-		approver = NewStdinApprover(stdinIn, logger.Writer())
+		// StdinApprover needs a visible output for approval prompts.
+		// Fall back to os.Stderr if Logger is discarding output.
+		promptOut := logger.Writer()
+		if promptOut == io.Discard {
+			promptOut = os.Stderr
+		}
+		approver = NewStdinApprover(stdinIn, promptOut)
 	}
 
 	p := &Paintress{
