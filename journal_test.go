@@ -266,6 +266,60 @@ func TestListJournalFiles_SkipsNonMdFiles(t *testing.T) {
 	}
 }
 
+func TestWriteJournal_HighSeverityDMailField(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	report := &ExpeditionReport{
+		Expedition:         1,
+		IssueID:            "AWE-50",
+		IssueTitle:         "Fix login",
+		MissionType:        "implement",
+		Status:             "success",
+		Reason:             "done",
+		PRUrl:              "https://example.com/pr/50",
+		BugIssues:          "none",
+		HighSeverityDMails: "alert-critical, alert-deploy",
+	}
+
+	WriteJournal(dir, report)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "001.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(content)
+
+	if !strings.Contains(s, "**HIGH severity D-Mail**: alert-critical, alert-deploy") {
+		t.Errorf("journal should contain HIGH severity D-Mail field, got:\n%s", s)
+	}
+}
+
+func TestWriteJournal_HighSeverityDMailEmpty(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+
+	report := &ExpeditionReport{
+		Expedition:  2,
+		IssueID:     "AWE-51",
+		IssueTitle:  "No alerts",
+		MissionType: "implement",
+		Status:      "success",
+		PRUrl:       "none",
+		BugIssues:   "none",
+	}
+
+	WriteJournal(dir, report)
+
+	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "002.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "**HIGH severity D-Mail**: ") {
+		t.Error("journal should include HIGH severity D-Mail field even when empty")
+	}
+}
+
 func TestListJournalFiles_NoDirectory(t *testing.T) {
 	dir := t.TempDir()
 	_, err := ListJournalFiles(dir)

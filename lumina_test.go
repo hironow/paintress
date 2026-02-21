@@ -306,3 +306,82 @@ func TestScanJournalsForLumina_FallbackToMissionWhenNoInsight(t *testing.T) {
 		t.Error("should fall back to mission when insight is empty")
 	}
 }
+
+func TestScanJournalsForLumina_HighSeverityAlert(t *testing.T) {
+	// given — 1 journal with HIGH severity D-Mail recorded (threshold = 1)
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	content := `# Expedition #1 — Journal
+
+- **Status**: success
+- **Mission**: implement
+- **HIGH severity D-Mail**: alert-critical, alert-deploy
+`
+	os.WriteFile(filepath.Join(jDir, "001.md"), []byte(content), 0644)
+
+	// when
+	luminas := ScanJournalsForLumina(dir)
+
+	// then
+	hasAlert := false
+	for _, l := range luminas {
+		if l.Source == "high-severity-alert" {
+			hasAlert = true
+			if !containsStr(l.Pattern, "alert-critical, alert-deploy") {
+				t.Errorf("alert lumina should contain d-mail names, got: %q", l.Pattern)
+			}
+		}
+	}
+	if !hasAlert {
+		t.Errorf("expected high-severity-alert lumina, got: %v", luminas)
+	}
+}
+
+func TestScanJournalsForLumina_NoHighSeverity(t *testing.T) {
+	// given — journals without HIGH severity D-Mail
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	content := `# Expedition #1 — Journal
+
+- **Status**: success
+- **Mission**: implement
+- **HIGH severity D-Mail**:
+`
+	os.WriteFile(filepath.Join(jDir, "001.md"), []byte(content), 0644)
+
+	// when
+	luminas := ScanJournalsForLumina(dir)
+
+	// then
+	for _, l := range luminas {
+		if l.Source == "high-severity-alert" {
+			t.Errorf("empty HIGH severity D-Mail should not create alert lumina, got: %v", l)
+		}
+	}
+}
+
+func TestFormatLuminaForPrompt_WithAlert(t *testing.T) {
+	// given
+	luminas := []Lumina{
+		{Pattern: "[ALERT] HIGH severity D-Mail in past expedition: alert-critical", Source: "high-severity-alert", Uses: 1},
+		{Pattern: "[WARN] Avoid — failed 2 times: lint error", Source: "failure-pattern", Uses: 2},
+	}
+
+	// when
+	result := FormatLuminaForPrompt(luminas)
+
+	// then
+	if !containsStr(result, "Alert") {
+		t.Errorf("should contain Alert section header, got: %q", result)
+	}
+	if !containsStr(result, "alert-critical") {
+		t.Errorf("should contain alert d-mail name, got: %q", result)
+	}
+	if !containsStr(result, "Defensive") {
+		t.Errorf("should still contain Defensive section, got: %q", result)
+	}
+}

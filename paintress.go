@@ -41,13 +41,14 @@ type Paintress struct {
 	approver  Approver
 
 	// Swarm Mode: atomic counters for concurrent worker access
-	expCounter          atomic.Int64
-	totalAttempted      atomic.Int64
-	totalSuccess        atomic.Int64
-	totalSkipped        atomic.Int64
-	totalFailed         atomic.Int64
-	totalBugs           atomic.Int64
-	consecutiveFailures atomic.Int64
+	expCounter           atomic.Int64
+	totalAttempted       atomic.Int64
+	totalSuccess         atomic.Int64
+	totalSkipped         atomic.Int64
+	totalFailed          atomic.Int64
+	totalBugs            atomic.Int64
+	totalMidHighSeverity atomic.Int64
+	consecutiveFailures  atomic.Int64
 
 	// Swarm Mode: mutex-protected shared resources
 	flagMu sync.Mutex
@@ -397,6 +398,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			report, status := ParseReport(output, exp)
 			parseSpan.End()
 
+			// Attach mid-expedition HIGH severity D-Mail names to the report
+			midHighNames := expedition.MidHighSeverityDMails()
+			if len(midHighNames) > 0 {
+				report.HighSeverityDMails = strings.Join(midHighNames, ", ")
+				p.totalMidHighSeverity.Add(int64(len(midHighNames)))
+			}
+
 			switch status {
 			case StatusComplete:
 				expSpan.AddEvent("expedition.complete",
@@ -714,12 +722,13 @@ func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
 
 // RunSummary holds the results of a paintress loop run.
 type RunSummary struct {
-	Total    int64  `json:"total"`
-	Success  int64  `json:"success"`
-	Skipped  int64  `json:"skipped"`
-	Failed   int64  `json:"failed"`
-	Bugs     int64  `json:"bugs"`
-	Gradient string `json:"gradient"`
+	Total           int64  `json:"total"`
+	Success         int64  `json:"success"`
+	Skipped         int64  `json:"skipped"`
+	Failed          int64  `json:"failed"`
+	Bugs            int64  `json:"bugs"`
+	MidHighSeverity int64  `json:"mid_high_severity"`
+	Gradient        string `json:"gradient"`
 }
 
 // FormatSummaryJSON returns the summary as a JSON string.
@@ -736,12 +745,13 @@ func (p *Paintress) printSummary() {
 
 	if p.config.OutputFormat == "json" {
 		summary := RunSummary{
-			Total:    total,
-			Success:  p.totalSuccess.Load(),
-			Skipped:  p.totalSkipped.Load(),
-			Failed:   p.totalFailed.Load(),
-			Bugs:     p.totalBugs.Load(),
-			Gradient: p.gradient.FormatLog(),
+			Total:           total,
+			Success:         p.totalSuccess.Load(),
+			Skipped:         p.totalSkipped.Load(),
+			Failed:          p.totalFailed.Load(),
+			Bugs:            p.totalBugs.Load(),
+			MidHighSeverity: p.totalMidHighSeverity.Load(),
+			Gradient:        p.gradient.FormatLog(),
 		}
 		out, err := FormatSummaryJSON(summary)
 		if err != nil {
@@ -762,6 +772,9 @@ func (p *Paintress) printSummary() {
 	p.Logger.OK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
 	p.Logger.Warn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
 	p.Logger.Error("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed.Load()))
+	if p.totalMidHighSeverity.Load() > 0 {
+		p.Logger.Warn("Mid-expedition HIGH severity D-Mail: %d", p.totalMidHighSeverity.Load())
+	}
 	if p.totalBugs.Load() > 0 {
 		p.Logger.QA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}

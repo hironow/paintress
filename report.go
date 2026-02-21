@@ -16,19 +16,20 @@ const (
 )
 
 type ExpeditionReport struct {
-	Expedition  int
-	IssueID     string
-	IssueTitle  string
-	MissionType string
-	Branch      string
-	PRUrl       string
-	Status      string
-	Reason      string
-	Remaining   string
-	BugsFound   int
-	BugIssues   string
-	Insight     string
-	FailureType string
+	Expedition         int
+	IssueID            string
+	IssueTitle         string
+	MissionType        string
+	Branch             string
+	PRUrl              string
+	Status             string
+	Reason             string
+	Remaining          string
+	BugsFound          int
+	BugIssues          string
+	Insight            string
+	FailureType        string
+	HighSeverityDMails string // comma-separated names of mid-expedition HIGH severity d-mails
 }
 
 func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {

@@ -61,8 +61,19 @@ type Expedition struct {
 	InboxDMails []DMail // d-mails from inbox (for archiving after expedition)
 	inboxOnce   sync.Once
 
+	// Mid-expedition HIGH severity D-Mail tracking
+	midHighMu    sync.Mutex
+	midHighNames []string
+
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+}
+
+// MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
+func (e *Expedition) MidHighSeverityDMails() []string {
+	e.midHighMu.Lock()
+	defer e.midHighMu.Unlock()
+	return append([]string(nil), e.midHighNames...)
 }
 
 // BuildPrompt generates the expedition prompt in the configured language.
@@ -228,6 +239,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			}
 			seenFiles[dm.Name] = true
 			if dm.Severity == "high" {
+				e.midHighMu.Lock()
+				e.midHighNames = append(e.midHighNames, dm.Name)
+				e.midHighMu.Unlock()
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
 				if e.Notifier != nil {
 					_ = e.Notifier.Notify(watchCtx, "Paintress", fmt.Sprintf("HIGH severity D-Mail mid-expedition: %s", dm.Name))
