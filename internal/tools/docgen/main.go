@@ -1,31 +1,30 @@
+// Command docgen generates markdown CLI documentation from cobra commands.
+// Output goes to docs/cli/ for LLM consumption and llms.txt aggregation.
 package main
 
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/hironow/paintress/internal/cmd"
+	cmd "github.com/hironow/paintress/internal/cmd"
 	"github.com/spf13/cobra/doc"
 )
 
 func main() {
-	dir := "docs/cli"
-	if len(os.Args) > 1 {
-		dir = os.Args[1]
-	}
-
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "mkdir %s: %v\n", dir, err)
+	outDir := filepath.Join("docs", "cli")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "mkdir: %v\n", err)
 		os.Exit(1)
 	}
 
 	rootCmd := cmd.NewRootCommand()
 	rootCmd.DisableAutoGenTag = true
 
-	if err := doc.GenMarkdownTree(rootCmd, dir); err != nil {
+	if err := doc.GenMarkdownTree(rootCmd, outDir); err != nil {
 		fmt.Fprintf(os.Stderr, "docgen: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(os.Stderr, "Generated CLI docs in %s/\n", dir)
+	fmt.Fprintf(os.Stderr, "docs generated in %s/\n", outDir)
 }

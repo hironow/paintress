@@ -1,13 +1,20 @@
 version: 2
 
+project_name: paintress
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./... -count=1 -short
+
 builds:
-  - main: ./cmd/paintress
+  - main: ./cmd/paintress/
     binary: paintress
     env:
       - CGO_ENABLED=0
     goos:
-      - linux
       - darwin
+      - linux
       - windows
     goarch:
       - amd64
@@ -51,3 +58,16 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^ci:"
+      - "^chore:"
+
+brews:
+  - repository:
+      owner: hironow
+      name: homebrew-tap
+    homepage: "https://github.com/hironow/paintress"
+    description: "Claude Code expedition orchestrator"
+    license: "Apache-2.0"
+    install: |
+      bin.install "paintress"
+    test: |
+      system "#{bin}/paintress", "version"
