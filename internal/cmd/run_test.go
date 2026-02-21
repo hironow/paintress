@@ -48,6 +48,9 @@ func TestRunCommand_AllFlagsExist(t *testing.T) {
 		{"setup-cmd", ""},
 		{"no-dev", "false"},
 		{"dry-run", "false"},
+		{"notify-cmd", ""},
+		{"approve-cmd", ""},
+		{"auto-approve", "false"},
 	}
 
 	for _, tc := range flags {
@@ -90,6 +93,27 @@ func TestRunCommand_ShortAliases(t *testing.T) {
 		}
 		if f.Shorthand != tc.shorthand {
 			t.Errorf("--%s shorthand = %q, want %q", tc.name, f.Shorthand, tc.shorthand)
+		}
+	}
+}
+
+func TestRunCommand_NotifyApproveFlagsLongOnly(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	runCmd, _, err := root.Find([]string{"run"})
+	if err != nil {
+		t.Fatalf("find run command: %v", err)
+	}
+
+	// then: notify/approve flags must be long-only (no short aliases)
+	for _, name := range []string{"notify-cmd", "approve-cmd", "auto-approve"} {
+		f := runCmd.Flags().Lookup(name)
+		if f == nil {
+			t.Errorf("--%s flag not found", name)
+			continue
+		}
+		if f.Shorthand != "" {
+			t.Errorf("--%s has shorthand %q, want long-only", name, f.Shorthand)
 		}
 	}
 }

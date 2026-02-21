@@ -34,6 +34,8 @@ paintress run <repo-path> [flags]
 ### Options
 
 ```
+      --approve-cmd string    Approval command ({message} placeholder, exit 0 = approve)
+      --auto-approve          Skip approval gate for HIGH severity D-Mail
   -b, --base-branch string    Base branch (default "main")
       --claude-cmd string     Claude Code CLI command name (default "claude")
       --dev-cmd string        Dev server command (default "npm run dev")
@@ -44,6 +46,7 @@ paintress run <repo-path> [flags]
       --max-expeditions int   Maximum number of expeditions (default 50)
   -m, --model string          Model(s) comma-separated for reserve: opus,sonnet,haiku (default "opus")
       --no-dev                Skip dev server startup
+      --notify-cmd string     Notification command ({title}, {message} placeholders)
       --review-cmd string     Code review command after PR creation
       --setup-cmd string      Command to run after worktree creation (e.g. 'bun install')
   -t, --timeout int           Timeout per expedition in seconds (default: 33min) (default 1980)

@@ -34,6 +34,8 @@ type Paintress struct {
 	gradient  *GradientGauge
 	reserve   *ReserveParty
 	pool      *WorktreePool // nil when --workers=0
+	notifier  Notifier
+	approver  Approver
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter          atomic.Int64
@@ -72,12 +74,33 @@ func NewPaintress(cfg Config, logger *Logger) *Paintress {
 		devDir = cfg.Continent
 	}
 
+	// Wire notifier based on config
+	var notifier Notifier
+	if cfg.NotifyCmd != "" {
+		notifier = NewCmdNotifier(cfg.NotifyCmd)
+	} else {
+		notifier = &LocalNotifier{}
+	}
+
+	// Wire approver based on config
+	var approver Approver
+	switch {
+	case cfg.AutoApprove:
+		approver = &AutoApprover{}
+	case cfg.ApproveCmd != "":
+		approver = NewCmdApprover(cfg.ApproveCmd)
+	default:
+		approver = NewStdinApprover()
+	}
+
 	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
 		Logger:   logger,
 		gradient: NewGradientGauge(gradientMax),
 		reserve:  NewReserveParty(primary, reserves, logger),
+		notifier: notifier,
+		approver: approver,
 	}
 
 	if !cfg.NoDev {
@@ -254,16 +277,59 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
+		// Pre-scan inbox for HIGH severity gate (before expedition creation
+		// would trigger loadInboxSection via BuildPrompt)
+		inboxDMails, _ := ScanInbox(p.config.Continent)
+
 		expedition := &Expedition{
-			Number:    exp,
-			Continent: p.config.Continent,
-			WorkDir:   workDir,
-			Config:    p.config,
-			LogDir:    p.logDir,
-			Logger:    p.Logger,
-			Luminas:   luminas,
-			Gradient:  p.gradient,
-			Reserve:   p.reserve,
+			Number:      exp,
+			Continent:   p.config.Continent,
+			WorkDir:     workDir,
+			Config:      p.config,
+			LogDir:      p.logDir,
+			Logger:      p.Logger,
+			Luminas:     luminas,
+			Gradient:    p.gradient,
+			Reserve:     p.reserve,
+			InboxDMails: inboxDMails,
+			Notifier:    p.notifier,
+		}
+
+		// HIGH severity D-Mail gate: notify human and request approval
+		if highDMails := FilterHighSeverity(inboxDMails); len(highDMails) > 0 {
+			names := make([]string, len(highDMails))
+			for i, dm := range highDMails {
+				names[i] = dm.Name
+			}
+			msg := fmt.Sprintf("HIGH severity D-Mail detected: %s", strings.Join(names, ", "))
+			p.Logger.Warn("%s", msg)
+
+			if err := p.notifier.Notify(expCtx, "Paintress", msg); err != nil {
+				p.Logger.Warn("notification failed: %v", err)
+			}
+
+			approved, err := p.approver.RequestApproval(expCtx, msg)
+			if err != nil {
+				p.Logger.Warn("approval request failed: %v", err)
+			}
+			if !approved {
+				p.Logger.Warn("expedition #%d skipped: HIGH severity D-Mail denied", exp)
+				p.gradient.Decay()
+				p.flagMu.Lock()
+				p.writeFlag(exp, "?", "skipped", "?")
+				p.flagMu.Unlock()
+				WriteJournal(p.config.Continent, &ExpeditionReport{
+					Expedition: exp, IssueID: "?", IssueTitle: "?",
+					MissionType: "?", Status: "skipped",
+					Reason:      "HIGH severity D-Mail denied by human",
+					FailureType: "none",
+					PRUrl:       "none", BugIssues: "none",
+				})
+				p.totalSkipped.Add(1)
+				releaseWorkDir()
+				expSpan.End()
+				continue
+			}
 		}
 
 		if p.config.DryRun {

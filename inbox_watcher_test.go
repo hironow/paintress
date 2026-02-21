@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -431,4 +432,74 @@ func TestWatchInbox_ParsesCorrectly(t *testing.T) {
 	if got.Body == "" {
 		t.Error("body should not be empty")
 	}
+}
+
+func TestWatchInbox_HighSeverity_TriggersNotifier(t *testing.T) {
+	dir := t.TempDir()
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	var notified bool
+	var notifiedMsg string
+	notifier := &callbackNotifier{
+		fn: func(title, msg string) {
+			notified = true
+			notifiedMsg = msg
+		},
+	}
+
+	// Simulate the Expedition mid-expedition callback pattern
+	seenFiles := make(map[string]bool)
+	done := make(chan struct{}, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	ready := make(chan struct{}, 1)
+	go watchInbox(ctx, dir, func(dm DMail) {
+		if seenFiles[dm.Name] {
+			return
+		}
+		seenFiles[dm.Name] = true
+		if dm.Severity == "high" && notifier != nil {
+			_ = notifier.Notify(ctx, "Paintress", "HIGH severity D-Mail mid-expedition: "+dm.Name)
+		}
+		select {
+		case done <- struct{}{}:
+		default:
+		}
+	}, ready)
+
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for watcher ready")
+	}
+
+	// Write a HIGH severity d-mail
+	content := "---\nname: alert-mid-1\nkind: alert\ndescription: mid expedition alert\nseverity: high\n---\n"
+	os.WriteFile(filepath.Join(inboxDir, "alert-mid-1.md"), []byte(content), 0644)
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for callback")
+	}
+
+	if !notified {
+		t.Error("Notifier.Notify should have been called for HIGH severity d-mail")
+	}
+	if !strings.Contains(notifiedMsg, "alert-mid-1") {
+		t.Errorf("notification message should contain d-mail name, got: %q", notifiedMsg)
+	}
+}
+
+// callbackNotifier calls fn on Notify for testing.
+type callbackNotifier struct {
+	fn func(title, msg string)
+}
+
+func (n *callbackNotifier) Notify(_ context.Context, title, msg string) error {
+	n.fn(title, msg)
+	return nil
 }

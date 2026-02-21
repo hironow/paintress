@@ -33,6 +33,9 @@ type Config struct {
 	NoDev          bool   // Skip dev server startup entirely
 	DryRun         bool
 	OutputFormat   string // "text" (default) or "json"
+	NotifyCmd      string // External notification command ({title}, {message} placeholders)
+	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
+	AutoApprove    bool   // Skip approval gate for HIGH severity D-Mail
 }
 
 // ValidateContinent ensures the .expedition directory structure exists.
