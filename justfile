@@ -75,6 +75,10 @@ vet:
 lint: vet lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
+# Run semgrep with cobra/pflag rules
+semgrep:
+    semgrep scan --config .semgrep/ --no-git-ignore
+
 # Format, vet, test — full check before commit
 check: fmt vet test
 
