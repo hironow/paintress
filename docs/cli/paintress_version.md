@@ -4,7 +4,10 @@ Show version information
 
 ### Synopsis
 
-Show the paintress version string set at build time via ldflags.
+Print version, commit hash, build date, and Go version.
+
+By default outputs a human-readable single line. Use --json
+for structured output suitable for scripts and CI.
 
 ```
 paintress version [flags]
@@ -13,14 +16,18 @@ paintress version [flags]
 ### Examples
 
 ```
-  # Show version
+  # Print version info
   paintress version
+
+  # JSON output for scripts
+  paintress version --json
 ```
 
 ### Options
 
 ```
   -h, --help   help for version
+      --json   Output version info as JSON
 ```
 
 ### Options inherited from parent commands
