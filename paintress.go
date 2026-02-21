@@ -389,15 +389,30 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 			}
 			p.gradient.Discharge()
+
+			// Collect mid-expedition HIGH severity D-Mails even on error
+			midHighNames := expedition.MidHighSeverityDMails()
+			midHighCount := len(midHighNames)
+			if midHighCount > 0 {
+				p.totalMidHighSeverity.Add(int64(midHighCount))
+			}
+
 			p.flagMu.Lock()
-			p.writeFlag(exp, "error", "failed", "?", 0)
+			p.writeFlag(exp, "error", "failed", "?", midHighCount)
 			p.flagMu.Unlock()
-			WriteJournal(p.config.Continent, &ExpeditionReport{
+			errReport := &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
 				MissionType: "?", Status: "failed", Reason: err.Error(),
 				FailureType: "blocker",
 				PRUrl:       "none", BugIssues: "none",
-			})
+			}
+			if midHighCount > 0 {
+				errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
+			}
+			WriteJournal(p.config.Continent, errReport)
+			if midHighCount > 0 {
+				p.Logger.Warn("Expedition #%d: %d HIGH severity D-Mail received mid-expedition", exp, midHighCount)
+			}
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
 		} else {
