@@ -181,7 +181,10 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 ## Setup
 
 ```bash
-# Install from source
+# Install via Homebrew
+brew install hironow/tap/paintress
+
+# Or install from source
 go install github.com/hironow/paintress/cmd/paintress@latest
 
 # Initialize project config (Linear team key, etc.)
@@ -218,6 +221,7 @@ Flags and repo path can be placed in any order. Both short (`-m`) and long (`--m
 
 ```bash
 paintress -l ja .              # short flags
+paintress -lja .               # short flag with inline value
 paintress --lang ja .          # long flags
 paintress --model=opus .       # --flag=value form
 paintress -- ./my-repo         # -- terminates flags
@@ -319,12 +323,13 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 |   +-- doctor.go            Doctor subcommand
 |   +-- issues.go            Issues subcommand
 |   +-- archive_prune.go     Archive-prune subcommand
-|   +-- version.go           Version subcommand (--json)
+|   +-- version.go           Version subcommand (-j for JSON)
 |   +-- update.go            Self-update subcommand (go-selfupdate)
 |   +-- default_run.go       NeedsDefaultRun (bare path → run delegation)
 |   +-- errors.go            ExitError type
 |   +-- *_test.go            Tests
-+-- main.go                  Config struct + ValidateContinent (library)
++-- config.go                Config struct + ValidateContinent
++-- project_config.go        ProjectConfig (LoadProjectConfig, .expedition/config.yaml)
 +-- paintress.go             Gommage loop
 +-- expedition.go            Single Expedition + prompt generation
 +-- gradient.go              Gradient Gauge
@@ -335,15 +340,29 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- review.go                Code review gate (exec + parse)
 +-- dmail.go                 D-Mail protocol (scan, send, archive, parse)
 +-- issues.go                Linear issue fetcher (API + formatting)
++-- mission.go               Mission type detection + prompt templates
++-- journal.go               Journal read/write
++-- report.go                Expedition report generation (D-Mail outbound)
++-- context.go               Context file scanner (.expedition/context/)
++-- flag.go                  Flag file read/write (.expedition/.run/flag.md)
++-- flag_watcher.go          fsnotify: real-time flag change detection
++-- inbox_watcher.go         fsnotify: real-time inbox d-mail detection
++-- logger.go                Structured logger (verbose/quiet modes)
 +-- telemetry.go             OpenTelemetry tracer setup
 +-- lang.go                  i18n message map (en/ja/fr)
 +-- *_test.go                Tests
++-- internal/tools/docgen/
+|   +-- main.go              CLI documentation generator (docs/cli/)
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
 +-- templates/
-    +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
-    +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
-    +-- skills/              Agent skill manifests (copied to .expedition/skills/)
+|   +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
+|   +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
+|   +-- skills/              Agent skill manifests (copied to .expedition/skills/)
++-- .goreleaser.yaml         GoReleaser v2 config (multi-platform + Homebrew)
++-- .github/workflows/
+    +-- ci.yaml              CI (test + vet)
+    +-- release.yaml         Release on tag push (GoReleaser)
 ```
 
 ## Prerequisites
