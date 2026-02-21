@@ -34,20 +34,20 @@ paintress run <repo-path> [flags]
 ### Options
 
 ```
-      --base-branch string    Base branch (default "main")
+  -b, --base-branch string    Base branch (default "main")
       --claude-cmd string     Claude Code CLI command name (default "claude")
       --dev-cmd string        Dev server command (default "npm run dev")
       --dev-dir string        Dev server working directory (defaults to repo path)
       --dev-url string        Dev server URL (default "http://localhost:3000")
-      --dry-run               Generate prompts only
+  -n, --dry-run               Generate prompts only
   -h, --help                  help for run
       --max-expeditions int   Maximum number of expeditions (default 50)
-      --model string          Model(s) comma-separated for reserve: opus,sonnet,haiku (default "opus")
+  -m, --model string          Model(s) comma-separated for reserve: opus,sonnet,haiku (default "opus")
       --no-dev                Skip dev server startup
       --review-cmd string     Code review command after PR creation
       --setup-cmd string      Command to run after worktree creation (e.g. 'bun install')
-      --timeout int           Timeout per expedition in seconds (default: 33min) (default 1980)
-      --workers int           Number of worktrees in pool (0 = direct execution) (default 1)
+  -t, --timeout int           Timeout per expedition in seconds (default: 33min) (default 1980)
+  -w, --workers int           Number of worktrees in pool (0 = direct execution) (default 1)
 ```
 
 ### Options inherited from parent commands

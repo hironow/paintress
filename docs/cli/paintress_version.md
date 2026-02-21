@@ -27,7 +27,7 @@ paintress version [flags]
 
 ```
   -h, --help   help for version
-      --json   Output version info as JSON
+  -j, --json   Output version info as JSON
 ```
 
 ### Options inherited from parent commands
