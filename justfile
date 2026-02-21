@@ -30,10 +30,13 @@ lint-md:
 
 # Version from git tags
 VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "dev"`
+DATE := `date -u +%Y-%m-%dT%H:%M:%SZ`
+LDFLAGS := "-s -w -X github.com/hironow/paintress/internal/cmd.Version=" + VERSION + " -X github.com/hironow/paintress/internal/cmd.Commit=" + COMMIT + " -X github.com/hironow/paintress/internal/cmd.Date=" + DATE
 
 # Build the binary with version info
 build:
-    go build -ldflags "-X main.version={{VERSION}}" -o paintress ./cmd/paintress/
+    go build -ldflags "{{LDFLAGS}}" -o paintress ./cmd/paintress/
 
 # Build and install to /usr/local/bin
 install: build
@@ -72,6 +75,10 @@ vet:
 lint: vet lint-md
     @gofmt -l . | grep . && echo "gofmt: files need formatting" && exit 1 || true
 
+# Run semgrep with cobra/pflag rules
+semgrep:
+    semgrep scan --config .semgrep/ --no-git-ignore
+
 # Format, vet, test — full check before commit
 check: fmt vet test
 
@@ -92,6 +99,10 @@ jaeger:
 # Stop Jaeger
 jaeger-down:
     docker compose -f docker/compose.yaml down
+
+# Generate CLI documentation (docs/cli/)
+docgen:
+    go run ./internal/tools/docgen/
 
 # Clean build artifacts
 clean:

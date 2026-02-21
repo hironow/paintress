@@ -1,5 +1,6 @@
 # build files
 /paintress
+/docgen
 # test
 coverage.out
 # paintress runtime state on target repository

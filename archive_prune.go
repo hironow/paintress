@@ -1,7 +1,9 @@
 package paintress
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,7 +26,7 @@ func ArchivePrune(continent string, days int, execute bool) (PruneResult, error)
 	dir := ArchiveDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return PruneResult{}, nil
 		}
 		return PruneResult{}, err
