@@ -181,8 +181,8 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 ## Setup
 
 ```bash
-# Build and install
-just install
+# Install from source
+go install github.com/hironow/paintress/cmd/paintress@latest
 
 # Initialize project config (Linear team key, etc.)
 paintress init /path/to/your/repo
@@ -204,20 +204,21 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 
 | Command | Description |
 |---------|-------------|
-| `paintress <repo-path>` | Run expedition loop (default) |
+| `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
 | `paintress doctor` | Check required external commands (git, claude, gh, docker) |
-| `paintress issues <repo-path>` | List Linear issues (`--output json` for JSON, `--state` to filter) |
-| `paintress archive-prune <repo-path>` | Prune old archived d-mails (`--days 30`, `--execute` to delete) |
-| `paintress --version` | Show version and exit |
+| `paintress issues <repo-path>` | List Linear issues (`-o json` for JSON, `-s` to filter by state) |
+| `paintress archive-prune <repo-path>` | Prune old archived d-mails (`-d 14` for days, `-x` to execute) |
+| `paintress version` | Show version, commit, date, and Go version (`-j` for JSON) |
+| `paintress update` | Self-update to the latest GitHub release (`-C` to check only) |
 
 ## Usage
 
-Flags and repo path can be placed in any order:
+Flags and repo path can be placed in any order. Both short (`-m`) and long (`--model`) forms are supported (GNU/POSIX hybrid):
 
 ```bash
-paintress --lang ja .          # flags before path
-paintress . --lang ja          # flags after path
+paintress -l ja .              # short flags
+paintress --lang ja .          # long flags
 paintress --model=opus .       # --flag=value form
 paintress -- ./my-repo         # -- terminates flags
 ```
@@ -227,88 +228,70 @@ paintress -- ./my-repo         # -- terminates flags
 paintress /path/to/repo
 
 # Japanese prompts
-paintress --lang ja /path/to/repo
-
-# French prompts
-paintress --lang fr /path/to/repo
+paintress -l ja /path/to/repo
 
 # With Reserve Party
-paintress --model opus,sonnet /path/to/repo
-
-# Direct execution (no worktrees, run on repo directly)
-paintress --workers 0 /path/to/repo
+paintress -m opus,sonnet /path/to/repo
 
 # Swarm Mode: 3 parallel workers with setup command
-paintress \
-  --workers 3 \
-  --setup-cmd "bun install" \
-  --model opus,sonnet \
-  /path/to/repo
+paintress -m opus,sonnet -w 3 --setup-cmd "bun install" /path/to/repo
+
+# Skip dev server (CLI tools, backend-only repos)
+paintress --no-dev /path/to/repo
+
+# Dry run (generate prompts only)
+paintress -n /path/to/repo
+
+# Prune archived d-mails (dry-run, then execute)
+paintress archive-prune /path/to/repo
+paintress archive-prune -d 14 -x /path/to/repo
+
+# Skip code review gate
+paintress --review-cmd "" /path/to/repo
 
 # All options
 paintress \
-  --model opus,sonnet,haiku \
-  --lang ja \
+  -m opus,sonnet,haiku \
+  -l ja \
   --max-expeditions 20 \
-  --timeout 1200 \
-  --workers 3 \
+  -t 1200 \
+  -w 3 \
   --setup-cmd "bun install" \
   --dev-cmd "pnpm dev" \
   --dev-dir /path/to/frontend \
   --dev-url "http://localhost:3000" \
   --review-cmd "codex review --base main" \
   /path/to/repo
-
-# Skip dev server (CLI tools, backend-only repos)
-paintress --no-dev /path/to/repo
-
-# Prune archived d-mails older than 30 days (dry-run)
-paintress archive-prune /path/to/repo
-
-# Prune with custom threshold and actually delete
-paintress archive-prune /path/to/repo --days 14 --execute
-
-# Skip code review gate
-paintress --review-cmd "" /path/to/repo
-
-# Dry run (generate prompts only)
-paintress --dry-run /path/to/repo
-
-# Custom Claude CLI path (e.g. when using an alias with env vars)
-# Shell aliases like `alias cc-p="CLAUDE_CONFIG_DIR=~/.claude claude"`
-# don't work with exec.Command — specify the binary path and env separately:
-CLAUDE_CONFIG_DIR=~/.claude paintress \
-  --claude-cmd ~/.local/bin/claude \
-  /path/to/repo
-
-# Dev server in a different directory than the repo
-paintress \
-  --dev-cmd "bun run dev" \
-  --dev-dir /path/to/frontend/app \
-  --dev-url "http://localhost:5174" \
-  /path/to/repo
 ```
 
 ## Options
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--model` | `opus` | Model(s), comma-separated for Reserve Party |
-| `--lang` | `en` | Prompt language: `en`, `ja`, or `fr` |
-| `--max-expeditions` | `50` | Maximum number of expeditions |
-| `--timeout` | `1980` | Timeout per expedition and review loop in seconds (33 min) |
-| `--base-branch` | `main` | Base git branch |
-| `--claude-cmd` | `claude` | Claude Code CLI command name |
-| `--dev-cmd` | `npm run dev` | Dev server command |
-| `--dev-dir` | repo path | Dev server working directory |
-| `--dev-url` | `http://localhost:3000` | Dev server URL |
-| `--review-cmd` | `codex review --base main` | Code review command after PR creation |
-| `--workers` | `1` | Number of parallel expedition workers (`0` = direct execution without worktrees, `1` = single worktree, `2+` = Swarm Mode) |
-| `--setup-cmd` | `""` | Command to run after worktree creation (e.g. `bun install`) |
-| `--no-dev` | `false` | Skip dev server startup entirely |
-| `--dry-run` | `false` | Generate prompts without executing |
-| `--output` | `text` | Output format: `text` or `json` (streaming goes to stderr in JSON mode) |
-| `--version` | — | Show version and exit |
+### Global Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--verbose` | `-v` | `false` | Enable verbose output |
+| `--output` | `-o` | `text` | Output format: `text` or `json` |
+| `--lang` | `-l` | `en` | Prompt language: `en`, `ja`, or `fr` |
+| `--version` | | | Show version and exit |
+
+### Run Flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--model` | `-m` | `opus` | Model(s), comma-separated for Reserve Party |
+| `--timeout` | `-t` | `1980` | Timeout per expedition in seconds (33 min) |
+| `--base-branch` | `-b` | `main` | Base git branch |
+| `--workers` | `-w` | `1` | Parallel workers (`0` = direct, `1` = single worktree, `2+` = Swarm) |
+| `--dry-run` | `-n` | `false` | Generate prompts without executing |
+| `--max-expeditions` | | `50` | Maximum number of expeditions |
+| `--no-dev` | | `false` | Skip dev server startup entirely |
+| `--claude-cmd` | | `claude` | Claude Code CLI command name |
+| `--dev-cmd` | | `npm run dev` | Dev server command |
+| `--dev-dir` | | repo path | Dev server working directory |
+| `--dev-url` | | `http://localhost:3000` | Dev server URL |
+| `--review-cmd` | | `codex review --base <base-branch>` | Code review command after PR creation |
+| `--setup-cmd` | | `""` | Command to run after worktree creation (e.g. `bun install`) |
 
 ## Tracing (OpenTelemetry)
 
@@ -316,46 +299,31 @@ Paintress instruments key operations (expedition, review loop, worktree pool, de
 
 ```bash
 # Start Jaeger (all-in-one trace viewer)
-just jaeger
+docker compose -f docker/compose.yaml up -d
 
 # Run paintress with tracing enabled
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 
 # View traces at http://localhost:16686
-
-# Stop Jaeger
-just jaeger-down
-```
-
-## Development
-
-```bash
-# Task runner (just)
-just build          # Build binary
-just install        # Build and install to /usr/local/bin
-just test           # Run all tests
-just test-v         # Verbose test output
-just test-race      # Tests with race detector
-just cover          # Coverage report
-just cover-html     # Open coverage in browser
-just fmt            # Format code (gofmt)
-just vet            # Run go vet
-just lint           # fmt check + go vet + markdown lint
-just lint-md        # Lint markdown files only
-just check          # fmt + vet + test (pre-commit check)
-just clean          # Clean build artifacts
-just prek-install   # Install prek hooks (pre-commit + pre-push)
-just prek-run       # Run all prek hooks on all files
-just jaeger         # Start Jaeger trace viewer (docker)
-just jaeger-down    # Stop Jaeger
 ```
 
 ## File Structure
 
 ```
 +-- cmd/paintress/
-|   +-- main.go              CLI entry point + flag parsing
-|   +-- main_test.go         CLI arg parsing tests
+|   +-- main.go              CLI entry point (signal, NeedsDefaultRun, ExecuteContext)
++-- internal/cmd/
+|   +-- root.go              Root cobra command + global flags
+|   +-- run.go               Run subcommand + expedition wiring
+|   +-- init.go              Init subcommand
+|   +-- doctor.go            Doctor subcommand
+|   +-- issues.go            Issues subcommand
+|   +-- archive_prune.go     Archive-prune subcommand
+|   +-- version.go           Version subcommand (--json)
+|   +-- update.go            Self-update subcommand (go-selfupdate)
+|   +-- default_run.go       NeedsDefaultRun (bare path → run delegation)
+|   +-- errors.go            ExitError type
+|   +-- *_test.go            Tests
 +-- main.go                  Config struct + ValidateContinent (library)
 +-- paintress.go             Gommage loop
 +-- expedition.go            Single Expedition + prompt generation
@@ -363,33 +331,19 @@ just jaeger-down    # Stop Jaeger
 +-- lumina.go                Lumina scanning (goroutines)
 +-- reserve.go               Reserve Party (goroutine)
 +-- devserver.go             Dev server (goroutine)
-+-- flag.go                  Flag read/write
-+-- flag_watcher.go          Real-time issue selection watcher (fsnotify)
-+-- inbox_watcher.go         Real-time inbox d-mail watcher (fsnotify)
-+-- journal.go               Journal read/write
-+-- report.go                Report parser (including failure_type)
-+-- context.go               Context injection (.expedition/context/)
-+-- dmail.go                 D-Mail protocol (scan, send, archive, parse)
-+-- issues.go                Linear issue fetcher (API + formatting)
 +-- worktree.go              WorktreePool for Swarm Mode
 +-- review.go                Code review gate (exec + parse)
-+-- mission.go               Mission text (prompt-embedded)
-+-- project_config.go        Project config (.expedition/config.yaml)
-+-- init.go                  Interactive init flow
-+-- doctor.go                External command checker
++-- dmail.go                 D-Mail protocol (scan, send, archive, parse)
++-- issues.go                Linear issue fetcher (API + formatting)
 +-- telemetry.go             OpenTelemetry tracer setup
 +-- lang.go                  i18n message map (en/ja/fr)
-+-- logger.go                Colored logging
 +-- *_test.go                Tests
-+-- justfile                 Task runner
 +-- docker/
 |   +-- compose.yaml         Jaeger all-in-one for trace viewing
 +-- templates/
     +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
     +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
     +-- skills/              Agent skill manifests (copied to .expedition/skills/)
-        +-- dmail-sendable/SKILL.md
-        +-- dmail-readable/SKILL.md
 ```
 
 ## Prerequisites
