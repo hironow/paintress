@@ -16,6 +16,17 @@ func NeedsDefaultRun(rootCmd *cobra.Command, args []string) bool {
 		return false
 	}
 
+	// --version and --help are "exit early" flags handled by cobra's root.
+	// Never rewrite args when these are present, regardless of other args.
+	for _, a := range args {
+		if a == "--version" || a == "--help" || a == "-h" {
+			return false
+		}
+		if a == "--" {
+			break
+		}
+	}
+
 	first := args[0]
 
 	// Not a flag → check if first arg is a known subcommand

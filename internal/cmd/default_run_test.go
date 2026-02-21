@@ -24,6 +24,9 @@ func TestNeedsDefaultRun(t *testing.T) {
 		{"root string flag then subcommand", []string{"-o", "json", "version"}, false},
 		{"root string flag=value then path", []string{"--output=json", "./repo"}, true},
 		{"root string flag=value then subcommand", []string{"--output=json", "doctor"}, false},
+		{"--version with extra path", []string{"--version", "/path/to/repo"}, false},
+		{"--help with extra path", []string{"--help", "/path/to/repo"}, false},
+		{"-h with extra path", []string{"-h", "/path/to/repo"}, false},
 	}
 
 	for _, tt := range tests {
