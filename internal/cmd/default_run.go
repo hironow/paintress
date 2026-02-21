@@ -62,7 +62,7 @@ func NeedsDefaultRun(rootCmd *cobra.Command, args []string) bool {
 		arg := args[i]
 
 		if strings.HasPrefix(arg, "-") {
-			// --flag=value is self-contained
+			// --flag=value or -f=value is self-contained
 			if strings.Contains(arg, "=") {
 				continue
 			}
@@ -72,6 +72,14 @@ func NeedsDefaultRun(rootCmd *cobra.Command, args []string) bool {
 			if stringFlags[arg] {
 				i++ // skip the value
 				continue
+			}
+			// Short flag with inline value: -ojson, -lja (pflag concatenated syntax).
+			// Only single-dash flags longer than 2 chars can be concatenated.
+			if !strings.HasPrefix(arg, "--") && len(arg) > 2 {
+				prefix := arg[:2]
+				if stringFlags[prefix] || boolFlags[prefix] {
+					continue
+				}
 			}
 			// Unknown flag → must be run-specific
 			return true

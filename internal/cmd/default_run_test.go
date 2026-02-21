@@ -30,6 +30,12 @@ func TestNeedsDefaultRun(t *testing.T) {
 		{"cobra builtin help", []string{"help"}, false},
 		{"cobra builtin completion", []string{"completion"}, false},
 		{"cobra builtin help with subcommand", []string{"help", "run"}, false},
+
+		// Short flag with inline value (pflag concatenated syntax)
+		{"short string flag inline value then subcommand", []string{"-ojson", "issues", "/repo"}, false},
+		{"short string flag inline value then path", []string{"-ojson", "./repo"}, true},
+		{"short lang flag inline value then subcommand", []string{"-lja", "version"}, false},
+		{"short lang flag inline value then path", []string{"-lja", "./repo"}, true},
 	}
 
 	for _, tt := range tests {
