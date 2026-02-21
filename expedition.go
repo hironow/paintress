@@ -305,7 +305,11 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	<-inboxDone
 
 	err = cmd.Wait()
-	fmt.Fprintln(e.Logger.Writer())
+	// Write a trailing newline to visually separate expedition output,
+	// but skip it when Logger shares DataOut to avoid corrupting JSON.
+	if e.Config.OutputFormat != "json" || e.Logger.Writer() != e.DataOut {
+		fmt.Fprintln(e.Logger.Writer())
+	}
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",
