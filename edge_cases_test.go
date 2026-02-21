@@ -3,6 +3,7 @@ package paintress
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -125,7 +126,7 @@ func TestGradient_LargeMax(t *testing.T) {
 // ═══════════════════════════════════════════════
 
 func TestReserve_EmptyChunk(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	detected := rp.CheckOutput("")
 	if detected {
 		t.Error("empty chunk should not detect rate limit")
@@ -136,7 +137,7 @@ func TestReserve_EmptyChunk(t *testing.T) {
 }
 
 func TestReserve_EmptyPrimaryModel(t *testing.T) {
-	rp := NewReserveParty("", []string{"sonnet"})
+	rp := NewReserveParty("", []string{"sonnet"}, NewLogger(io.Discard, false))
 	if rp.ActiveModel() != "" {
 		t.Errorf("active model should be empty string, got %q", rp.ActiveModel())
 	}
@@ -150,7 +151,7 @@ func TestReserve_EmptyPrimaryModel(t *testing.T) {
 
 func TestReserve_SelfReferentialReserve(t *testing.T) {
 	// Primary listed as its own reserve
-	rp := NewReserveParty("opus", []string{"opus"})
+	rp := NewReserveParty("opus", []string{"opus"}, NewLogger(io.Discard, false))
 	rp.CheckOutput("rate limit")
 
 	// It will "switch" to opus (same model)
@@ -160,7 +161,7 @@ func TestReserve_SelfReferentialReserve(t *testing.T) {
 }
 
 func TestReserve_PartialSignalNoMatch(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 
 	// These should NOT match
 	noMatch := []string{
@@ -171,7 +172,7 @@ func TestReserve_PartialSignalNoMatch(t *testing.T) {
 		"quota",
 	}
 	for _, s := range noMatch {
-		rp2 := NewReserveParty("opus", []string{"sonnet"})
+		rp2 := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 		detected := rp2.CheckOutput(s)
 		// "at full capacity to serve you" contains "capacity" so it will match
 		// "429th item" no longer matches — bare "429" was removed to avoid false positives
@@ -181,7 +182,7 @@ func TestReserve_PartialSignalNoMatch(t *testing.T) {
 }
 
 func TestReserve_WhitespaceOnlyChunk(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	detected := rp.CheckOutput("   \n\t\n   ")
 	if detected {
 		t.Error("whitespace-only chunk should not detect rate limit")
@@ -189,7 +190,7 @@ func TestReserve_WhitespaceOnlyChunk(t *testing.T) {
 }
 
 func TestReserve_ForceReserve_CooldownReset(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	rp.ForceReserve()
 
 	// Cooldown should be set
@@ -203,7 +204,7 @@ func TestReserve_ForceReserve_CooldownReset(t *testing.T) {
 }
 
 func TestReserve_ConcurrentRateLimitDetection(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	var wg sync.WaitGroup
 
 	// Blast rate limit signals from many goroutines
@@ -581,8 +582,9 @@ func TestExpedition_BuildPrompt_ZeroNumber(t *testing.T) {
 		Number:    0,
 		Continent: "/tmp",
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -596,8 +598,9 @@ func TestExpedition_BuildPrompt_EmptyConfig(t *testing.T) {
 		Number:    1,
 		Continent: "",
 		Config:    Config{}, // all empty
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("", nil),
+		Reserve:   NewReserveParty("", nil, NewLogger(io.Discard, false)),
 	}
 
 	// Should not panic with empty config
@@ -626,27 +629,28 @@ func TestExpedition_Run_ShortTimeout(t *testing.T) {
 func TestLogFunctions_ConcurrentLogging(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "concurrent.log")
-	InitLogFile(path)
-	defer CloseLogFile()
+	logger := NewLogger(io.Discard, false)
+	logger.SetLogFile(path)
+	defer logger.CloseLogFile()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
 		wg.Add(4)
 		go func(n int) {
 			defer wg.Done()
-			LogInfo("concurrent info %d", n)
+			logger.Info("concurrent info %d", n)
 		}(i)
 		go func(n int) {
 			defer wg.Done()
-			LogWarn("concurrent warn %d", n)
+			logger.Warn("concurrent warn %d", n)
 		}(i)
 		go func(n int) {
 			defer wg.Done()
-			LogOK("concurrent ok %d", n)
+			logger.OK("concurrent ok %d", n)
 		}(i)
 		go func(n int) {
 			defer wg.Done()
-			LogError("concurrent error %d", n)
+			logger.Error("concurrent error %d", n)
 		}(i)
 	}
 	wg.Wait()
@@ -663,12 +667,13 @@ func TestLogFunctions_ReinitLogFile(t *testing.T) {
 	path1 := filepath.Join(dir, "log1.log")
 	path2 := filepath.Join(dir, "log2.log")
 
-	InitLogFile(path1)
-	LogInfo("to first file")
-	// Init again without closing — old file handle leaks but should not panic
-	InitLogFile(path2)
-	LogInfo("to second file")
-	CloseLogFile()
+	logger := NewLogger(io.Discard, false)
+	logger.SetLogFile(path1)
+	logger.Info("to first file")
+	// SetLogFile again — closes old file handle cleanly
+	logger.SetLogFile(path2)
+	logger.Info("to second file")
+	logger.CloseLogFile()
 
 	content2, _ := os.ReadFile(path2)
 	if !containsStr(string(content2), "to second file") {
@@ -681,7 +686,7 @@ func TestLogFunctions_ReinitLogFile(t *testing.T) {
 // ═══════════════════════════════════════════════
 
 func TestDevServer_StopMultipleTimes(t *testing.T) {
-	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null")
+	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null", NewLogger(io.Discard, false))
 	// Multiple stops should not panic
 	ds.Stop()
 	ds.Stop()

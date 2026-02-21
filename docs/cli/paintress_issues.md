@@ -32,7 +32,7 @@ paintress issues <repo-path> [flags]
 
 ```
   -h, --help           help for issues
-      --state string   Comma-separated state filter (e.g. todo,in-progress)
+  -s, --state string   Comma-separated state filter (e.g. todo,in-progress)
 ```
 
 ### Options inherited from parent commands

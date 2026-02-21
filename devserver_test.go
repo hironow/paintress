@@ -1,11 +1,12 @@
 package paintress
 
 import (
+	"io"
 	"testing"
 )
 
 func TestNewDevServer(t *testing.T) {
-	ds := NewDevServer("npm run dev", "http://localhost:3000", "/some/dir", "/tmp/dev.log")
+	ds := NewDevServer("npm run dev", "http://localhost:3000", "/some/dir", "/tmp/dev.log", NewLogger(io.Discard, false))
 
 	if ds.cmd != "npm run dev" {
 		t.Errorf("cmd = %q", ds.cmd)
@@ -25,7 +26,7 @@ func TestNewDevServer(t *testing.T) {
 }
 
 func TestDevServer_StopWhenNotRunning(t *testing.T) {
-	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null")
+	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null", NewLogger(io.Discard, false))
 	// Stop on a non-running server should not panic
 	ds.Stop()
 }

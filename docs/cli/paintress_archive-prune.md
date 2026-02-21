@@ -30,8 +30,8 @@ paintress archive-prune <repo-path> [flags]
 ### Options
 
 ```
-      --days int   Number of days threshold (default 30)
-      --execute    Execute deletion (dry-run by default)
+  -d, --days int   Number of days threshold (default 30)
+  -x, --execute    Execute deletion (dry-run by default)
   -h, --help       help for archive-prune
 ```
 

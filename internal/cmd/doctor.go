@@ -53,26 +53,24 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// text output
 	w := cmd.ErrOrStderr()
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Fprintf(w, "%s║          Paintress Doctor                    ║%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Fprintf(w, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
+	fmt.Fprintln(w, "║          Paintress Doctor                    ║")
+	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
 	fmt.Fprintln(w)
 
 	allOK := true
 	for _, c := range checks {
 		if c.OK {
-			fmt.Fprintf(w, "  %s✓%s  %-12s %s (%s)\n", paintress.ColorGreen, paintress.ColorReset, c.Name, c.Version, c.Path)
+			fmt.Fprintf(w, "  ✓  %-12s %s (%s)\n", c.Name, c.Version, c.Path)
 		} else {
 			marker := "✗"
-			color := paintress.ColorRed
 			label := "MISSING (required)"
 			if !c.Required {
 				label = "not found (optional)"
-				color = paintress.ColorYellow
 			} else {
 				allOK = false
 			}
-			fmt.Fprintf(w, "  %s%s%s  %-12s %s\n", color, marker, paintress.ColorReset, c.Name, label)
+			fmt.Fprintf(w, "  %s  %-12s %s\n", marker, c.Name, label)
 		}
 	}
 	fmt.Fprintln(w)

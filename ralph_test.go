@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -207,14 +208,14 @@ func TestGradient_PriorityHint(t *testing.T) {
 // === Reserve Party Tests ===
 
 func TestReserve_DefaultModel(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"})
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
 	if rp.ActiveModel() != "opus" {
 		t.Errorf("ActiveModel = %q, want opus", rp.ActiveModel())
 	}
 }
 
 func TestReserve_RateLimitSwitch(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"})
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
 
 	detected := rp.CheckOutput("Error: rate limit exceeded, try again later")
 	if !detected {
@@ -226,7 +227,7 @@ func TestReserve_RateLimitSwitch(t *testing.T) {
 }
 
 func TestReserve_NoFalsePositive(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	detected := rp.CheckOutput("The implementation looks correct")
 	if detected {
 		t.Error("should not detect rate limit in normal output")
@@ -237,7 +238,7 @@ func TestReserve_NoFalsePositive(t *testing.T) {
 }
 
 func TestReserve_NoReserveAvailable(t *testing.T) {
-	rp := NewReserveParty("opus", nil) // no reserves
+	rp := NewReserveParty("opus", nil, NewLogger(io.Discard, false)) // no reserves
 	rp.CheckOutput("rate limit reached")
 	// Should stay on opus since no reserve available
 	if rp.ActiveModel() != "opus" {
@@ -246,7 +247,7 @@ func TestReserve_NoReserveAvailable(t *testing.T) {
 }
 
 func TestReserve_ForceReserve(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	rp.ForceReserve()
 	if rp.ActiveModel() != "sonnet" {
 		t.Errorf("got %q, want sonnet", rp.ActiveModel())

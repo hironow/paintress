@@ -2,106 +2,84 @@ package paintress
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
-
-	"golang.org/x/term"
 )
 
-const (
-	colorReset  = "\033[0m"
-	colorCyan   = "\033[36m"
-	colorGreen  = "\033[32m"
-	colorYellow = "\033[33m"
-	colorRed    = "\033[31m"
-	colorBlue   = "\033[34m"
-	colorPurple = "\033[35m"
-)
-
-// Exported color accessors — return ANSI codes only when stderr is a TTY.
-var (
-	ColorReset  = colorCode(colorReset)
-	ColorCyan   = colorCode(colorCyan)
-	ColorGreen  = colorCode(colorGreen)
-	ColorYellow = colorCode(colorYellow)
-	ColorRed    = colorCode(colorRed)
-	ColorBlue   = colorCode(colorBlue)
-	ColorPurple = colorCode(colorPurple)
-)
-
-func colorCode(code string) string {
-	if term.IsTerminal(int(os.Stderr.Fd())) {
-		return code
-	}
-	return ""
+type Logger struct {
+	out     io.Writer
+	mu      sync.Mutex
+	logFile *os.File
+	verbose bool
+	quiet   bool
 }
 
-var (
-	logMu   sync.Mutex
-	logFile *os.File
-)
+func NewLogger(out io.Writer, verbose bool) *Logger {
+	if out == nil {
+		out = io.Discard
+	}
+	return &Logger{out: out, verbose: verbose}
+}
 
-func InitLogFile(path string) error {
-	logMu.Lock()
-	defer logMu.Unlock()
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+// NewQuietLogger creates a Logger that suppresses console output but still writes to log files.
+func NewQuietLogger(out io.Writer) *Logger {
+	if out == nil {
+		out = io.Discard
+	}
+	return &Logger{out: out, quiet: true}
+}
+
+func (l *Logger) logLine(prefix, format string, args ...any) {
+	msg := fmt.Sprintf(format, args...)
+	ts := time.Now().Format("15:04:05")
+	line := fmt.Sprintf("[%s] %s %s\n", ts, prefix, msg)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if !l.quiet {
+		fmt.Fprint(l.out, line)
+	}
+	if l.logFile != nil {
+		fmt.Fprint(l.logFile, line)
+	}
+}
+
+func (l *Logger) Info(format string, args ...any)  { l.logLine("INFO", format, args...) }
+func (l *Logger) OK(format string, args ...any)    { l.logLine(" OK ", format, args...) }
+func (l *Logger) Warn(format string, args ...any)  { l.logLine("WARN", format, args...) }
+func (l *Logger) Error(format string, args ...any) { l.logLine(" ERR", format, args...) }
+func (l *Logger) QA(format string, args ...any)    { l.logLine(" QA ", format, args...) }
+func (l *Logger) Exp(format string, args ...any)   { l.logLine(" EXP", format, args...) }
+
+func (l *Logger) Debug(format string, args ...any) {
+	if l.verbose {
+		l.logLine("DBUG", format, args...)
+	}
+}
+
+func (l *Logger) Writer() io.Writer { return l.out }
+
+func (l *Logger) SetLogFile(path string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.logFile != nil {
+		l.logFile.Close()
+		l.logFile = nil
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return err
 	}
-	logFile = f
+	l.logFile = f
 	return nil
 }
 
-func CloseLogFile() {
-	logMu.Lock()
-	defer logMu.Unlock()
-	if logFile != nil {
-		logFile.Close()
-		logFile = nil
+func (l *Logger) CloseLogFile() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.logFile != nil {
+		l.logFile.Close()
+		l.logFile = nil
 	}
-}
-
-func logLine(prefix, color, format string, args ...any) {
-	msg := fmt.Sprintf(format, args...)
-	ts := time.Now().Format("15:04:05")
-
-	if os.Getenv("PAINTRESS_QUIET") == "" {
-		// TTY-aware: use color only when stderr is a terminal
-		if term.IsTerminal(int(os.Stderr.Fd())) {
-			fmt.Fprintf(os.Stderr, "[%s] %s%s%s %s\n", ts, color, prefix, colorReset, msg)
-		} else {
-			fmt.Fprintf(os.Stderr, "[%s] %s %s\n", ts, prefix, msg)
-		}
-	}
-
-	logMu.Lock()
-	defer logMu.Unlock()
-	if logFile != nil {
-		fmt.Fprintf(logFile, "[%s] %s %s\n", ts, prefix, msg)
-	}
-}
-
-func LogInfo(format string, args ...any) {
-	logLine("INFO", colorCyan, format, args...)
-}
-
-func LogOK(format string, args ...any) {
-	logLine(" OK ", colorGreen, format, args...)
-}
-
-func LogWarn(format string, args ...any) {
-	logLine("WARN", colorYellow, format, args...)
-}
-
-func LogError(format string, args ...any) {
-	logLine(" ERR", colorRed, format, args...)
-}
-
-func LogQA(format string, args ...any) {
-	logLine(" QA ", colorPurple, format, args...)
-}
-
-func LogExp(format string, args ...any) {
-	logLine(" EXP", colorBlue, format, args...)
 }

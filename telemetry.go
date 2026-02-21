@@ -23,16 +23,19 @@ var tracer trace.Tracer = noop.NewTracerProvider().Tracer("paintress")
 // with a BatchSpanProcessor. Otherwise, it uses the noop TracerProvider.
 // Returns a shutdown function that flushes and closes the exporter.
 func InitTracer(serviceName, ver string) func(context.Context) error {
-	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	if endpoint == "" {
-		// No endpoint configured — keep the noop tracer to avoid
-		// accidentally recording spans via a host's global provider.
+	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
+		np := noop.NewTracerProvider()
+		otel.SetTracerProvider(np)
+		tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 
 	exp, err := otlptracehttp.New(context.Background())
 	if err != nil {
 		// Exporter creation failed — keep noop so the CLI is not blocked.
+		np := noop.NewTracerProvider()
+		otel.SetTracerProvider(np)
+		tracer = np.Tracer(serviceName)
 		return func(context.Context) error { return nil }
 	}
 

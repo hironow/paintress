@@ -19,14 +19,18 @@ type DevServer struct {
 	url     string
 	dir     string
 	logPath string
+	logger  *Logger
 
 	mu      sync.Mutex
 	process *exec.Cmd
 	running bool
 }
 
-func NewDevServer(cmd, url, dir, logPath string) *DevServer {
-	return &DevServer{cmd: cmd, url: url, dir: dir, logPath: logPath}
+func NewDevServer(cmd, url, dir, logPath string, logger *Logger) *DevServer {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
+	return &DevServer{cmd: cmd, url: url, dir: dir, logPath: logPath, logger: logger}
 }
 
 func (ds *DevServer) Start(ctx context.Context) error {
@@ -54,11 +58,11 @@ func (ds *DevServer) Start(ctx context.Context) error {
 		ds.running = true
 		ds.mu.Unlock()
 		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", true)))
-		LogOK("%s", fmt.Sprintf(Msg("devserver_already"), ds.url))
+		ds.logger.OK("%s", fmt.Sprintf(Msg("devserver_already"), ds.url))
 		return nil
 	}
 
-	LogInfo("%s", fmt.Sprintf(Msg("devserver_start"), ds.cmd, ds.dir))
+	ds.logger.Info("%s", fmt.Sprintf(Msg("devserver_start"), ds.cmd, ds.dir))
 	logFile, err := os.Create(ds.logPath)
 	if err != nil {
 		return fmt.Errorf("log file creation failed: %w", err)
@@ -92,7 +96,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	ds.running = true
 	ds.mu.Unlock()
 	span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
-	LogOK("%s", fmt.Sprintf(Msg("devserver_ready"), ds.url))
+	ds.logger.OK("%s", fmt.Sprintf(Msg("devserver_ready"), ds.url))
 	return nil
 }
 
@@ -121,7 +125,7 @@ func (ds *DevServer) Stop() {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	if ds.process != nil && ds.process.Process != nil {
-		LogInfo("%s", Msg("devserver_stop"))
+		ds.logger.Info("%s", Msg("devserver_stop"))
 		_ = ds.process.Process.Signal(os.Interrupt)
 		done := make(chan struct{})
 		go func() {

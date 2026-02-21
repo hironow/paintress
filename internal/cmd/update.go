@@ -74,7 +74,7 @@ installing.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&checkOnly, "check", false, "Check for updates without installing")
+	cmd.Flags().BoolVarP(&checkOnly, "check", "C", false, "Check for updates without installing")
 
 	return cmd
 }

@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"context"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -78,7 +79,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg)
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -113,7 +114,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg)
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -172,8 +173,9 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			Model:      "opus",
 		},
 		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
+		Logger:   NewLogger(io.Discard, false),
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

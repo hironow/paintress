@@ -29,6 +29,7 @@ var (
 type Paintress struct {
 	config    Config
 	logDir    string
+	Logger    *Logger
 	devServer *DevServer
 	gradient  *GradientGauge
 	reserve   *ReserveParty
@@ -47,7 +48,10 @@ type Paintress struct {
 	flagMu sync.Mutex
 }
 
-func NewPaintress(cfg Config) *Paintress {
+func NewPaintress(cfg Config, logger *Logger) *Paintress {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
@@ -71,14 +75,16 @@ func NewPaintress(cfg Config) *Paintress {
 	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
+		Logger:   logger,
 		gradient: NewGradientGauge(gradientMax),
-		reserve:  NewReserveParty(primary, reserves),
+		reserve:  NewReserveParty(primary, reserves, logger),
 	}
 
 	if !cfg.NoDev {
 		p.devServer = NewDevServer(
 			cfg.DevCmd, cfg.DevURL, devDir,
 			filepath.Join(logDir, "dev-server.log"),
+			logger,
 		)
 	} else {
 		p.config.DevURL = ""
@@ -100,36 +106,36 @@ func (p *Paintress) Run(ctx context.Context) int {
 	defer rootSpan.End()
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
-	if err := InitLogFile(logPath); err != nil {
+	if err := p.Logger.SetLogFile(logPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: log file: %v\n", err)
 	}
-	defer CloseLogFile()
+	defer p.Logger.CloseLogFile()
 
 	monolith := ReadFlag(p.config.Continent)
 
 	p.printBanner()
-	LogInfo("%s", fmt.Sprintf(Msg("continent"), p.config.Continent))
-	LogInfo("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
-	LogInfo("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
-	LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
-	LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
-	LogInfo("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("continent"), p.config.Continent))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
 	claudeCmd := p.config.ClaudeCmd
 	if claudeCmd == "" {
 		claudeCmd = DefaultClaudeCmd
 	}
 	if claudeCmd != DefaultClaudeCmd {
-		LogInfo("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
 	}
 	if p.config.DryRun {
-		LogWarn("%s", Msg("dry_run"))
+		p.Logger.Warn("%s", Msg("dry_run"))
 	}
-	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(p.Logger.Writer())
 
 	// Start dev server (stays alive across expeditions)
 	if !p.config.DryRun && p.devServer != nil {
 		if err := p.devServer.Start(ctx); err != nil {
-			LogWarn("%s", fmt.Sprintf(Msg("devserver_warn"), err))
+			p.Logger.Warn("%s", fmt.Sprintf(Msg("devserver_warn"), err))
 		}
 		defer p.devServer.Stop()
 	}
@@ -144,7 +150,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 			p.config.Workers,
 		)
 		if err := p.pool.Init(ctx); err != nil {
-			LogError("worktree pool init failed: %v", err)
+			p.Logger.Error("worktree pool init failed: %v", err)
 			return 1
 		}
 		defer func() {
@@ -168,7 +174,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	// Pre-flight Lumina scan (once, before workers start)
 	luminas := ScanJournalsForLumina(p.config.Continent)
 	if len(luminas) > 0 {
-		LogOK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
+		p.Logger.OK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
@@ -182,7 +188,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	err := g.Wait()
 
-	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(p.Logger.Writer())
 	p.printSummary()
 
 	switch {
@@ -215,10 +221,10 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		p.totalAttempted.Add(1)
-		LogExp("%s", fmt.Sprintf(Msg("departing"), exp))
+		p.Logger.Exp("%s", fmt.Sprintf(Msg("departing"), exp))
 		p.reserve.TryRecoverPrimary()
-		LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
-		LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
 
 		model := p.reserve.ActiveModel()
 		expCtx, expSpan := tracer.Start(ctx, "expedition",
@@ -241,7 +247,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
-					LogWarn("worktree release: %v", err)
+					p.Logger.Warn("worktree release: %v", err)
 				}
 				workDir = ""
 				relSpan.End()
@@ -254,6 +260,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			WorkDir:   workDir,
 			Config:    p.config,
 			LogDir:    p.logDir,
+			Logger:    p.Logger,
 			Luminas:   luminas,
 			Gradient:  p.gradient,
 			Reserve:   p.reserve,
@@ -262,19 +269,19 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		if p.config.DryRun {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
 			if err := os.WriteFile(promptFile, []byte(expedition.BuildPrompt()), 0644); err != nil {
-				LogError("failed to write dry-run prompt: %v", err)
+				p.Logger.Error("failed to write dry-run prompt: %v", err)
 				releaseWorkDir()
 				expSpan.End()
 				continue
 			}
-			LogWarn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
+			p.Logger.Warn("%s", fmt.Sprintf(Msg("dry_run_prompt"), promptFile))
 			p.totalSuccess.Add(1)
 			releaseWorkDir()
 			expSpan.End()
 			continue
 		}
 
-		LogInfo("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
 		expStart := time.Now()
 		output, err := expedition.Run(expCtx)
 		expElapsed := time.Since(expStart)
@@ -285,7 +292,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				expSpan.End()
 				return nil
 			}
-			LogError("%s", fmt.Sprintf(Msg("exp_failed"), exp, err))
+			p.Logger.Error("%s", fmt.Sprintf(Msg("exp_failed"), exp, err))
 			if strings.Contains(err.Error(), "timeout") {
 				prevModel := p.reserve.ActiveModel()
 				p.reserve.ForceReserve()
@@ -323,14 +330,14 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				)
 				releaseWorkDir()
 				expSpan.End()
-				LogOK("%s", Msg("all_complete"))
+				p.Logger.OK("%s", Msg("all_complete"))
 				p.flagMu.Lock()
 				p.writeFlag(exp, "all", "complete", "0")
 				p.flagMu.Unlock()
 				return errComplete
 			case StatusParseError:
-				LogWarn("%s", Msg("report_parse_fail"))
-				LogWarn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
+				p.Logger.Warn("%s", Msg("report_parse_fail"))
+				p.Logger.Warn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
 				p.flagMu.Lock()
 				p.writeFlag(exp, "?", "parse_error", "?")
@@ -367,18 +374,18 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				// D-Mail: send report and archive processed inbox d-mails (best-effort)
 				if dm := NewReportDMail(report); dm.Name != "" {
 					if err := SendDMail(p.config.Continent, dm); err != nil {
-						LogWarn("dmail send: %v", err)
+						p.Logger.Warn("dmail send: %v", err)
 					}
 				}
 				for _, dm := range expedition.InboxDMails {
 					if err := ArchiveInboxDMail(p.config.Continent, dm.Name); err != nil {
-						LogWarn("dmail archive: %v", err)
+						p.Logger.Warn("dmail archive: %v", err)
 					}
 				}
 				p.consecutiveFailures.Store(0)
 				p.totalSuccess.Add(1)
 			case StatusSkipped:
-				LogWarn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
+				p.Logger.Warn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
 				p.flagMu.Lock()
 				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining)
@@ -386,7 +393,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				WriteJournal(p.config.Continent, report)
 				p.totalSkipped.Add(1)
 			case StatusFailed:
-				LogError("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
+				p.Logger.Error("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
 				p.flagMu.Lock()
 				p.writeFlag(exp, report.IssueID, "failed", report.Remaining)
@@ -403,7 +410,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			)
 			releaseWorkDir()
 			expSpan.End()
-			LogError("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
+			p.Logger.Error("%s", fmt.Sprintf(Msg("gommage"), maxConsecutiveFailures))
 			return errGommage
 		}
 
@@ -415,7 +422,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			_ = gitCmd.Run()
 		}
 
-		LogInfo("%s", Msg("cooldown"))
+		p.Logger.Info("%s", Msg("cooldown"))
 		select {
 		case <-time.After(10 * time.Second):
 		case <-ctx.Done():
@@ -467,11 +474,11 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 				}
 				report.Insight += "Review interrupted: " + summarizeReview(lastComments)
 			}
-			LogWarn("%s", fmt.Sprintf(Msg("review_error"), ctx.Err()))
+			p.Logger.Warn("%s", fmt.Sprintf(Msg("review_error"), ctx.Err()))
 			return
 		}
 
-		LogInfo("%s", fmt.Sprintf(Msg("review_running"), cycle, maxReviewCycles))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("review_running"), cycle, maxReviewCycles))
 
 		// Review phase — bounded by reviewTimeout, does NOT consume budget
 		_, revSpan := tracer.Start(ctx, "review.command",
@@ -488,7 +495,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 				}
 				report.Insight += "Review interrupted: " + summarizeReview(lastComments)
 			}
-			LogWarn("%s", fmt.Sprintf(Msg("review_error"), err))
+			p.Logger.Warn("%s", fmt.Sprintf(Msg("review_error"), err))
 			return
 		}
 
@@ -496,12 +503,12 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		revSpan.End()
 
 		if result.Passed {
-			LogOK("%s", Msg("review_passed"))
+			p.Logger.OK("%s", Msg("review_passed"))
 			return
 		}
 
 		lastComments = result.Comments
-		LogWarn("%s", fmt.Sprintf(Msg("review_comments"), cycle))
+		p.Logger.Warn("%s", fmt.Sprintf(Msg("review_comments"), cycle))
 
 		// Validate branch before attempting fix
 		branch := strings.TrimSpace(report.Branch)
@@ -534,7 +541,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 				report.Insight += " | "
 			}
 			report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
-			LogWarn("%s", Msg("review_limit"))
+			p.Logger.Warn("%s", Msg("review_limit"))
 			return
 		}
 
@@ -566,7 +573,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		cmd.Dir = reviewDir
 		cmd.WaitDelay = 3 * time.Second
 
-		LogInfo("%s", fmt.Sprintf(Msg("reviewfix_running"), model))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("reviewfix_running"), model))
 		start := time.Now()
 		out, err := cmd.CombinedOutput()
 		consumed += time.Since(start)
@@ -574,7 +581,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		fixCancel()
 
 		if err != nil {
-			LogWarn("%s", fmt.Sprintf(Msg("reviewfix_error"), err))
+			p.Logger.Warn("%s", fmt.Sprintf(Msg("reviewfix_error"), err))
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
@@ -588,35 +595,36 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 		report.Insight += " | "
 	}
 	report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
-	LogWarn("%s", Msg("review_limit"))
+	p.Logger.Warn("%s", Msg("review_limit"))
 }
 
 func (p *Paintress) handleSuccess(report *ExpeditionReport) {
 	if report.MissionType == "verify" {
-		LogQA("%s: %s", report.IssueID, report.IssueTitle)
+		p.Logger.QA("%s: %s", report.IssueID, report.IssueTitle)
 		if report.BugsFound > 0 {
-			LogQA("%s", fmt.Sprintf(Msg("qa_bugs"), report.BugsFound, report.BugIssues))
+			p.Logger.QA("%s", fmt.Sprintf(Msg("qa_bugs"), report.BugsFound, report.BugIssues))
 			p.totalBugs.Add(int64(report.BugsFound))
 		} else {
-			LogQA("%s", Msg("qa_all_pass"))
+			p.Logger.QA("%s", Msg("qa_all_pass"))
 		}
 	} else {
-		LogOK("%s: %s [%s]", report.IssueID, report.IssueTitle, report.MissionType)
+		p.Logger.OK("%s: %s [%s]", report.IssueID, report.IssueTitle, report.MissionType)
 	}
 	if report.PRUrl != "" && report.PRUrl != "none" {
-		LogOK("PR: %s", report.PRUrl)
+		p.Logger.OK("PR: %s", report.PRUrl)
 	}
 	if report.Remaining != "" {
-		LogInfo("%s", fmt.Sprintf(Msg("monolith_reads"), report.Remaining))
+		p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), report.Remaining))
 	}
 }
 
 func (p *Paintress) printBanner() {
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
-	fmt.Fprintf(os.Stderr, "%s║          The Paintress awakens               ║%s\n", ColorCyan, ColorReset)
-	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
-	fmt.Fprintln(os.Stderr)
+	w := p.Logger.Writer()
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
+	fmt.Fprintln(w, "║          The Paintress awakens               ║")
+	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
+	fmt.Fprintln(w)
 }
 
 // writeFlag writes the flag checkpoint only if expNum is greater than the
@@ -663,30 +671,31 @@ func (p *Paintress) printSummary() {
 		}
 		out, err := FormatSummaryJSON(summary)
 		if err != nil {
-			LogError("json marshal: %v", err)
+			p.Logger.Error("json marshal: %v", err)
 			return
 		}
 		fmt.Println(out)
 		return
 	}
 
-	fmt.Fprintln(os.Stderr)
-	fmt.Fprintf(os.Stderr, "%s╔══════════════════════════════════════════════╗%s\n", ColorCyan, ColorReset)
-	fmt.Fprintf(os.Stderr, "%s║          The Paintress rests                 ║%s\n", ColorCyan, ColorReset)
-	fmt.Fprintf(os.Stderr, "%s╚══════════════════════════════════════════════╝%s\n", ColorCyan, ColorReset)
-	fmt.Fprintln(os.Stderr)
-	LogInfo("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
-	LogOK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
-	LogWarn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
-	LogError("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed.Load()))
+	w := p.Logger.Writer()
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
+	fmt.Fprintln(w, "║          The Paintress rests                 ║")
+	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
+	fmt.Fprintln(w)
+	p.Logger.Info("%s", fmt.Sprintf(Msg("expeditions_sent"), total))
+	p.Logger.OK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
+	p.Logger.Warn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
+	p.Logger.Error("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed.Load()))
 	if p.totalBugs.Load() > 0 {
-		LogQA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
+		p.Logger.QA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}
-	fmt.Fprintln(os.Stderr)
-	LogInfo("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatLog()))
-	LogInfo("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
-	fmt.Fprintln(os.Stderr)
-	LogInfo("Flag:     %s", FlagPath(p.config.Continent))
-	LogInfo("Journals: %s", JournalDir(p.config.Continent))
-	LogInfo("Logs:     %s", p.logDir)
+	fmt.Fprintln(w)
+	p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatLog()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
+	fmt.Fprintln(w)
+	p.Logger.Info("Flag:     %s", FlagPath(p.config.Continent))
+	p.Logger.Info("Journals: %s", JournalDir(p.config.Continent))
+	p.Logger.Info("Logs:     %s", p.logDir)
 }

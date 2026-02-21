@@ -23,6 +23,24 @@ func TestUpdateCommand_NoArgs(t *testing.T) {
 	}
 }
 
+func TestUpdateCommand_CheckShortAlias(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	updateCmd, _, err := root.Find([]string{"update"})
+	if err != nil {
+		t.Fatalf("find update command: %v", err)
+	}
+
+	// then
+	f := updateCmd.Flags().Lookup("check")
+	if f == nil {
+		t.Fatal("--check flag not found")
+	}
+	if f.Shorthand != "C" {
+		t.Errorf("--check shorthand = %q, want %q", f.Shorthand, "C")
+	}
+}
+
 func TestUpdateCommand_CheckFlag(t *testing.T) {
 	// given
 	cmd := NewRootCommand()

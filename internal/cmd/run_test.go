@@ -62,6 +62,38 @@ func TestRunCommand_AllFlagsExist(t *testing.T) {
 	}
 }
 
+func TestRunCommand_ShortAliases(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	runCmd, _, err := root.Find([]string{"run"})
+	if err != nil {
+		t.Fatalf("find run command: %v", err)
+	}
+
+	// then: short aliases must exist for frequently used flags
+	aliases := []struct {
+		name      string
+		shorthand string
+	}{
+		{"dry-run", "n"},
+		{"model", "m"},
+		{"timeout", "t"},
+		{"base-branch", "b"},
+		{"workers", "w"},
+	}
+
+	for _, tc := range aliases {
+		f := runCmd.Flags().Lookup(tc.name)
+		if f == nil {
+			t.Errorf("--%s flag not found", tc.name)
+			continue
+		}
+		if f.Shorthand != tc.shorthand {
+			t.Errorf("--%s shorthand = %q, want %q", tc.name, f.Shorthand, tc.shorthand)
+		}
+	}
+}
+
 func TestRunCommand_DynamicReviewCmd(t *testing.T) {
 	// given: --base-branch set but --review-cmd not set
 	root := NewRootCommand()

@@ -32,7 +32,7 @@ converted to spaces automatically.`,
 		RunE: runIssues,
 	}
 
-	cmd.Flags().String("state", "", "Comma-separated state filter (e.g. todo,in-progress)")
+	cmd.Flags().StringP("state", "s", "", "Comma-separated state filter (e.g. todo,in-progress)")
 
 	return cmd
 }
@@ -79,7 +79,9 @@ func runIssues(cmd *cobra.Command, args []string) error {
 
 	issues = paintress.FilterIssuesByState(issues, stateFilter)
 
-	paintress.LogInfo("fetched %d issues from %s", len(issues), cfg.Linear.Team)
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	logger := paintress.NewLogger(cmd.ErrOrStderr(), verbose)
+	logger.Info("fetched %d issues from %s", len(issues), cfg.Linear.Team)
 
 	w := cmd.OutOrStdout()
 	switch outputFmt {

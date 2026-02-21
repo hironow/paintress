@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -95,7 +96,7 @@ func TestLumina_ConcurrentScan_CalledFromMultipleGoroutines(t *testing.T) {
 // === DevServer: Start/Stop Race ===
 
 func TestDevServer_ConcurrentStopCalls(t *testing.T) {
-	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"))
+	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), NewLogger(io.Discard, false))
 
 	// Multiple concurrent Stop calls should not panic
 	var wg sync.WaitGroup
@@ -110,7 +111,7 @@ func TestDevServer_ConcurrentStopCalls(t *testing.T) {
 }
 
 func TestDevServer_ConcurrentFieldAccess(t *testing.T) {
-	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"))
+	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
 
@@ -135,7 +136,7 @@ func TestDevServer_ConcurrentFieldAccess(t *testing.T) {
 // === Reserve Party: Extended Concurrent Scenarios ===
 
 func TestReserve_ConcurrentCheckAndRecover(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"})
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
 
@@ -169,7 +170,7 @@ func TestReserve_ConcurrentCheckAndRecover(t *testing.T) {
 }
 
 func TestReserve_ConcurrentForceAndRecover(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
 
@@ -194,7 +195,7 @@ func TestReserve_ConcurrentForceAndRecover(t *testing.T) {
 }
 
 func TestReserve_ConcurrentStatusAndCheckOutput(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
@@ -278,6 +279,7 @@ func TestGradient_ConcurrentFormatLog(t *testing.T) {
 
 func TestLogger_ConcurrentInitCloseWrite(t *testing.T) {
 	dir := t.TempDir()
+	logger := NewLogger(io.Discard, false)
 
 	var wg sync.WaitGroup
 
@@ -286,22 +288,22 @@ func TestLogger_ConcurrentInitCloseWrite(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			path := filepath.Join(dir, fmt.Sprintf("log_%d.log", n))
-			InitLogFile(path)
+			logger.SetLogFile(path)
 		}(i)
 		go func(n int) {
 			defer wg.Done()
-			LogInfo("race test info %d", n)
-			LogWarn("race test warn %d", n)
+			logger.Info("race test info %d", n)
+			logger.Warn("race test warn %d", n)
 		}(i)
 		go func() {
 			defer wg.Done()
-			CloseLogFile()
+			logger.CloseLogFile()
 		}()
 	}
 	wg.Wait()
 
 	// Clean up
-	CloseLogFile()
+	logger.CloseLogFile()
 }
 
 // === Lang: Concurrent Msg() reads with Lang writes ===
@@ -330,13 +332,14 @@ func TestLang_ConcurrentMsgReads(t *testing.T) {
 
 func TestExpedition_ConcurrentReserveCheckDuringBuild(t *testing.T) {
 	dir := t.TempDir()
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	g := NewGradientGauge(5)
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  g,
 		Reserve:   rp,
 	}

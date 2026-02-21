@@ -27,7 +27,7 @@ paintress update [flags]
 ### Options
 
 ```
-      --check   Check for updates without installing
+  -C, --check   Check for updates without installing
   -h, --help    help for update
 ```
 

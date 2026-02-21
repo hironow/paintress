@@ -3,6 +3,7 @@ package paintress
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,8 +60,9 @@ func newTestExpedition(t *testing.T, output string, exitCode int) *Expedition {
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", []string{"sonnet"}),
+		Reserve:  NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(output, exitCode),
 	}
 }
@@ -74,8 +76,9 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 		},
+		Logger:   NewLogger(io.Discard, false),
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -110,8 +113,9 @@ func TestExpedition_BuildPrompt_French(t *testing.T) {
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 		},
+		Logger:   NewLogger(io.Discard, false),
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -143,8 +147,9 @@ func TestExpedition_BuildPrompt_ContainsGradient(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  g,
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -159,8 +164,9 @@ func TestExpedition_BuildPrompt_ContainsLuminas(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 		Luminas: []Lumina{
 			{Pattern: "[WARN] Failed 3 times: timeout", Source: "failure-pattern", Uses: 3},
 		},
@@ -178,8 +184,9 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -190,13 +197,14 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 
 func TestExpedition_BuildPrompt_ReserveInfo(t *testing.T) {
 	dir := t.TempDir()
-	rp := NewReserveParty("opus", []string{"sonnet"})
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
 	rp.CheckOutput("rate limit") // Switch to reserve
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "develop", DevURL: "http://localhost:5173"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
 		Reserve:   rp,
 	}
@@ -219,8 +227,9 @@ func TestExpedition_BuildPrompt_OutputFormat(t *testing.T) {
 		Number:    3,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -248,8 +257,9 @@ func TestBuildPrompt_IncludesContextFiles(t *testing.T) {
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := exp.BuildPrompt()
@@ -271,8 +281,9 @@ func TestBuildPrompt_NoContextSection_WhenEmpty(t *testing.T) {
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := exp.BuildPrompt()
@@ -456,7 +467,7 @@ func TestNewPaintress_BasicConfig(t *testing.T) {
 		DevURL:         "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg)
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
 	if p.gradient == nil {
 		t.Error("gradient should be initialized")
 	}
@@ -480,7 +491,7 @@ func TestNewPaintress_MultiModelConfig(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg)
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -501,7 +512,7 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg)
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -529,8 +540,9 @@ echo "done"
 	os.WriteFile(script, []byte(scriptContent), 0755)
 
 	logPath := filepath.Join(logDir, "test-watcher.log")
-	InitLogFile(logPath)
-	defer CloseLogFile()
+	logger := NewLogger(io.Discard, false)
+	logger.SetLogFile(logPath)
+	defer logger.CloseLogFile()
 
 	exp := &Expedition{
 		Number:    1,
@@ -542,8 +554,9 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
+		Logger:   logger,
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, logger),
 	}
 
 	ctx := context.Background()
@@ -588,8 +601,9 @@ echo "done"
 	os.WriteFile(script, []byte(scriptContent), 0755)
 
 	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
-	InitLogFile(logPath)
-	defer CloseLogFile()
+	logger := NewLogger(io.Discard, false)
+	logger.SetLogFile(logPath)
+	defer logger.CloseLogFile()
 
 	exp := &Expedition{
 		Number:    1,
@@ -602,8 +616,9 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
+		Logger:   logger,
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, logger),
 	}
 
 	ctx := context.Background()
@@ -628,8 +643,9 @@ func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	for _, lang := range []string{"en", "ja", "fr"} {
@@ -655,8 +671,9 @@ func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: ""},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	// Test all 3 languages
@@ -697,8 +714,9 @@ func TestBuildPrompt_WithLinearConfig(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -718,8 +736,9 @@ func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -744,8 +763,9 @@ func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	// Must not panic — should gracefully omit Linear scope
@@ -809,8 +829,9 @@ __EXPEDITION_END__`
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(reportOutput, 0),
 	}
 
@@ -864,8 +885,9 @@ func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
 		Gradient: NewGradientGauge(5),
-		Reserve:  NewReserveParty("opus", nil),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
 	}
 
@@ -893,8 +915,9 @@ func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    NewLogger(io.Discard, false),
 		Gradient:  NewGradientGauge(5),
-		Reserve:   NewReserveParty("opus", nil),
+		Reserve:   NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -918,7 +941,7 @@ func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 		NoDev:     true,
 	}
 
-	p := NewPaintress(cfg)
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
 
 	if p.devServer != nil {
 		t.Error("devServer should be nil when NoDev=true")

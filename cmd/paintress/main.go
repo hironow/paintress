@@ -17,12 +17,14 @@ func main() {
 
 	rootCmd := cmd.NewRootCommand()
 
-	// Normalise bool flags: `--dry-run false` → `--dry-run=false`
-	// (pflag's NoOptDefVal prevents space-separated bool values).
-	args := cmd.RewriteBoolFlags(os.Args[1:])
+	// NOTE: RewriteBoolFlags was intentionally removed (MY-334).
+	// Space-separated bool values (e.g. `--dry-run false`) are no longer
+	// normalised. Use `--dry-run=false` instead. This aligns with
+	// POSIX/GNU conventions and matches kubectl/gh/docker behaviour.
 
 	// Preserve old `paintress [flags] <repo>` shorthand:
 	// prepend "run" when no subcommand is specified.
+	args := os.Args[1:]
 	if cmd.NeedsDefaultRun(rootCmd, args) {
 		args = append([]string{"run"}, args...)
 	}
