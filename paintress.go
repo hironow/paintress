@@ -101,9 +101,11 @@ func NewPaintress(cfg Config, logger *Logger, dataOut io.Writer, stdinIn io.Read
 		approver = NewCmdApprover(cfg.ApproveCmd)
 	default:
 		// StdinApprover needs a visible output for approval prompts.
-		// Fall back to os.Stderr if Logger is discarding output.
+		// Fall back to os.Stderr if Logger is discarding output or if
+		// the logger shares the same writer as DataOut (e.g. both stdout),
+		// which would corrupt machine-readable JSON output.
 		promptOut := logger.Writer()
-		if promptOut == io.Discard {
+		if promptOut == io.Discard || promptOut == dataOut {
 			promptOut = os.Stderr
 		}
 		approver = NewStdinApprover(stdinIn, promptOut)
