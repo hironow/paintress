@@ -403,7 +403,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			midHighNames := expedition.MidHighSeverityDMails()
 			midHighCount := len(midHighNames)
 			if midHighCount > 0 {
-				report.HighSeverityDMails = strings.Join(midHighNames, ", ")
+				if report != nil {
+					report.HighSeverityDMails = strings.Join(midHighNames, ", ")
+				}
 				p.totalMidHighSeverity.Add(int64(midHighCount))
 			}
 
