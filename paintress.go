@@ -201,6 +201,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	p.totalSkipped.Store(0)
 	p.totalFailed.Store(0)
 	p.totalBugs.Store(0)
+	p.totalMidHighSeverity.Store(0)
 	p.consecutiveFailures.Store(0)
 
 	startExp := monolith.LastExpedition + 1
