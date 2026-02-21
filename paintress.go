@@ -200,6 +200,31 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.OK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
 	}
 
+	// Pre-flight HIGH severity gate (once, before workers start).
+	// This prevents concurrent StdinApprover reads when workers > 1.
+	preflightInbox, _ := ScanInbox(p.config.Continent)
+	if highDMails := FilterHighSeverity(preflightInbox); len(highDMails) > 0 {
+		names := make([]string, len(highDMails))
+		for i, dm := range highDMails {
+			names[i] = dm.Name
+		}
+		msg := fmt.Sprintf("HIGH severity D-Mail detected: %s", strings.Join(names, ", "))
+		p.Logger.Warn("%s", msg)
+
+		if err := p.notifier.Notify(ctx, "Paintress", msg); err != nil {
+			p.Logger.Warn("notification failed: %v", err)
+		}
+
+		approved, err := p.approver.RequestApproval(ctx, msg)
+		if err != nil {
+			p.Logger.Warn("approval request failed: %v", err)
+		}
+		if !approved {
+			p.Logger.Warn("all expeditions aborted: HIGH severity D-Mail denied")
+			return 0
+		}
+	}
+
 	g, gCtx := errgroup.WithContext(ctx)
 	workerCount := max(p.config.Workers, 1)
 
@@ -293,43 +318,6 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			Reserve:     p.reserve,
 			InboxDMails: inboxDMails,
 			Notifier:    p.notifier,
-		}
-
-		// HIGH severity D-Mail gate: notify human and request approval
-		if highDMails := FilterHighSeverity(inboxDMails); len(highDMails) > 0 {
-			names := make([]string, len(highDMails))
-			for i, dm := range highDMails {
-				names[i] = dm.Name
-			}
-			msg := fmt.Sprintf("HIGH severity D-Mail detected: %s", strings.Join(names, ", "))
-			p.Logger.Warn("%s", msg)
-
-			if err := p.notifier.Notify(expCtx, "Paintress", msg); err != nil {
-				p.Logger.Warn("notification failed: %v", err)
-			}
-
-			approved, err := p.approver.RequestApproval(expCtx, msg)
-			if err != nil {
-				p.Logger.Warn("approval request failed: %v", err)
-			}
-			if !approved {
-				p.Logger.Warn("expedition #%d skipped: HIGH severity D-Mail denied", exp)
-				p.gradient.Decay()
-				p.flagMu.Lock()
-				p.writeFlag(exp, "?", "skipped", "?")
-				p.flagMu.Unlock()
-				WriteJournal(p.config.Continent, &ExpeditionReport{
-					Expedition: exp, IssueID: "?", IssueTitle: "?",
-					MissionType: "?", Status: "skipped",
-					Reason:      "HIGH severity D-Mail denied by human",
-					FailureType: "none",
-					PRUrl:       "none", BugIssues: "none",
-				})
-				p.totalSkipped.Add(1)
-				releaseWorkDir()
-				expSpan.End()
-				continue
-			}
 		}
 
 		if p.config.DryRun {

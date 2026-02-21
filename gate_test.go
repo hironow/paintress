@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 )
 
@@ -127,7 +128,7 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 	}
 }
 
-// TestHighSeverityGate_Denied verifies expedition is skipped when
+// TestHighSeverityGate_Denied verifies no expeditions run when
 // HIGH severity d-mail exists and human denies.
 func TestHighSeverityGate_Denied(t *testing.T) {
 	dir := setupTestRepo(t)
@@ -155,8 +156,9 @@ func TestHighSeverityGate_Denied(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("Run() = %d, want 0", code)
 	}
-	if p.totalSkipped.Load() != 1 {
-		t.Errorf("totalSkipped = %d, want 1 (denied expedition should be skipped)", p.totalSkipped.Load())
+	// Pre-flight gate denial should abort before any expedition is attempted
+	if p.totalAttempted.Load() != 0 {
+		t.Errorf("totalAttempted = %d, want 0 (gate denial should abort before workers)", p.totalAttempted.Load())
 	}
 	if p.totalSuccess.Load() != 0 {
 		t.Errorf("totalSuccess = %d, want 0", p.totalSuccess.Load())
@@ -193,6 +195,84 @@ func TestHighSeverityGate_AutoApprove(t *testing.T) {
 	if p.totalSuccess.Load() != 1 {
 		t.Errorf("totalSuccess = %d, want 1", p.totalSuccess.Load())
 	}
+}
+
+// TestHighSeverityGate_ApproverCalledOnce verifies that the gate invokes
+// the approver exactly once, even with multiple workers. This prevents
+// concurrent StdinApprover reads from deadlocking the run.
+func TestHighSeverityGate_ApproverCalledOnce(t *testing.T) {
+	dir := setupTestRepo(t)
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	content := "---\nname: alert-once\nkind: alert\ndescription: critical\nseverity: high\n---\n"
+	os.WriteFile(filepath.Join(inboxDir, "alert-once.md"), []byte(content), 0644)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        0, // single-worker mode (avoids needing worktree pool)
+		MaxExpeditions: 3,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	var callCount atomic.Int32
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p.approver = &countingApprover{count: &callCount, approve: true}
+	p.notifier = &NopNotifier{}
+
+	p.Run(context.Background())
+
+	if callCount.Load() != 1 {
+		t.Errorf("approver called %d times, want exactly 1 (gate should run once before workers)", callCount.Load())
+	}
+}
+
+// TestHighSeverityGate_DeniedAbortsAllExpeditions verifies that denial
+// in the pre-flight gate prevents ALL expeditions from running.
+func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
+	dir := setupTestRepo(t)
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	content := "---\nname: alert-abort\nkind: alert\ndescription: critical\nseverity: high\n---\n"
+	os.WriteFile(filepath.Join(inboxDir, "alert-abort.md"), []byte(content), 0644)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 5,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p.approver = &denyApprover{}
+	p.notifier = &NopNotifier{}
+
+	code := p.Run(context.Background())
+	if code != 0 {
+		t.Fatalf("Run() = %d, want 0 (denied is a clean exit)", code)
+	}
+	// No expeditions should have been attempted
+	if p.totalAttempted.Load() != 0 {
+		t.Errorf("totalAttempted = %d, want 0 (gate denial should abort before workers)", p.totalAttempted.Load())
+	}
+}
+
+// countingApprover counts how many times RequestApproval is called.
+type countingApprover struct {
+	count   *atomic.Int32
+	approve bool
+}
+
+func (a *countingApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
+	a.count.Add(1)
+	return a.approve, nil
 }
 
 // failApprover fails the test if RequestApproval is called.
