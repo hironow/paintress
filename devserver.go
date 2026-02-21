@@ -27,6 +27,9 @@ type DevServer struct {
 }
 
 func NewDevServer(cmd, url, dir, logPath string, logger *Logger) *DevServer {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	return &DevServer{cmd: cmd, url: url, dir: dir, logPath: logPath, logger: logger}
 }
 

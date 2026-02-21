@@ -28,6 +28,9 @@ type ReserveParty struct {
 }
 
 func NewReserveParty(primary string, reserves []string, logger *Logger) *ReserveParty {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	return &ReserveParty{
 		primary: primary,
 		reserve: reserves,

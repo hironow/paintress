@@ -49,6 +49,9 @@ type Paintress struct {
 }
 
 func NewPaintress(cfg Config, logger *Logger) *Paintress {
+	if logger == nil {
+		logger = NewLogger(nil, false)
+	}
 	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
