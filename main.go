@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -64,7 +65,7 @@ func ValidateContinent(continent string) error {
 		}
 		skillFile := filepath.Join(skillDir, "SKILL.md")
 		if _, err := os.Stat(skillFile); err != nil {
-			if !os.IsNotExist(err) {
+			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
 			content, err := fs.ReadFile(skillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
@@ -81,7 +82,7 @@ func ValidateContinent(continent string) error {
 	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
 	content, err := os.ReadFile(gitignore)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		// File doesn't exist — create with all entries
