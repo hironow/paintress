@@ -19,6 +19,7 @@ type ReserveParty struct {
 	primary string   // e.g. "opus"
 	reserve []string // e.g. ["sonnet", "haiku"]
 	active  string   // currently active model
+	logger  *Logger
 
 	// Rate limit tracking
 	rateLimitHits int
@@ -26,11 +27,12 @@ type ReserveParty struct {
 	cooldownUntil time.Time
 }
 
-func NewReserveParty(primary string, reserves []string) *ReserveParty {
+func NewReserveParty(primary string, reserves []string, logger *Logger) *ReserveParty {
 	return &ReserveParty{
 		primary: primary,
 		reserve: reserves,
 		active:  primary,
+		logger:  logger,
 	}
 }
 
@@ -108,7 +110,7 @@ func (rp *ReserveParty) onRateLimitDetected() {
 	if rp.active == rp.primary && len(rp.reserve) > 0 {
 		prev := rp.active
 		rp.active = rp.reserve[0]
-		LogWarn("%s", fmt.Sprintf(Msg("reserve_activated"), prev, rp.active))
+		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_activated"), prev, rp.active))
 	}
 }
 
@@ -121,7 +123,7 @@ func (rp *ReserveParty) TryRecoverPrimary() {
 	if rp.active != rp.primary && time.Now().After(rp.cooldownUntil) {
 		prev := rp.active
 		rp.active = rp.primary
-		LogOK("%s", fmt.Sprintf(Msg("primary_recovered"), prev, rp.active))
+		rp.logger.OK("%s", fmt.Sprintf(Msg("primary_recovered"), prev, rp.active))
 	}
 }
 
@@ -134,7 +136,7 @@ func (rp *ReserveParty) ForceReserve() {
 		prev := rp.active
 		rp.active = rp.reserve[0]
 		rp.cooldownUntil = time.Now().Add(30 * time.Minute)
-		LogWarn("%s", fmt.Sprintf(Msg("reserve_forced"), prev, rp.active))
+		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_forced"), prev, rp.active))
 	}
 }
 

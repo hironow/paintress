@@ -101,6 +101,12 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.DryRun, _ = cmd.Flags().GetBool("dry-run")
 	cfg.OutputFormat, _ = cmd.Flags().GetString("output")
 
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	logger := paintress.NewLogger(cmd.ErrOrStderr(), verbose)
+	if os.Getenv("PAINTRESS_QUIET") != "" {
+		logger = paintress.NewQuietLogger(cmd.ErrOrStderr())
+	}
+
 	shutdownTracer := paintress.InitTracer("paintress", Version)
 	defer func() {
 		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
@@ -127,13 +133,13 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	go func() {
 		select {
 		case sig := <-sigCh:
-			paintress.LogWarn("%s", fmt.Sprintf(paintress.Msg("signal_received"), sig))
+			logger.Warn("%s", fmt.Sprintf(paintress.Msg("signal_received"), sig))
 			cancel()
 		case <-ctx.Done():
 		}
 	}()
 
-	p := paintress.NewPaintress(cfg)
+	p := paintress.NewPaintress(cfg, logger)
 	exitCode := p.Run(ctx)
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}

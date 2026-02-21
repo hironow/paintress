@@ -31,9 +31,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	w := cmd.ErrOrStderr()
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%s╔══════════════════════════════════════════════╗%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Fprintf(w, "%s║          Paintress Init                      ║%s\n", paintress.ColorCyan, paintress.ColorReset)
-	fmt.Fprintf(w, "%s╚══════════════════════════════════════════════╝%s\n", paintress.ColorCyan, paintress.ColorReset)
+	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
+	fmt.Fprintln(w, "║          Paintress Init                      ║")
+	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
 	fmt.Fprintln(w)
 
 	if err := paintress.RunInitWithReader(repoPath, cmd.InOrStdin()); err != nil {

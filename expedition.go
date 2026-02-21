@@ -50,6 +50,7 @@ type Expedition struct {
 	WorkDir   string // execution directory (worktree path or Continent)
 	Config    Config
 	LogDir    string
+	Logger    *Logger
 
 	// Game mechanics
 	Luminas     []Lumina
@@ -66,7 +67,7 @@ type Expedition struct {
 func (e *Expedition) BuildPrompt() string {
 	projCfg, err := LoadProjectConfig(e.Continent)
 	if err != nil {
-		LogWarn("project config load failed: %v", err)
+		e.Logger.Warn("project config load failed: %v", err)
 		projCfg = &ProjectConfig{}
 	}
 
@@ -106,7 +107,7 @@ func (e *Expedition) loadInboxSection() string {
 	e.inboxOnce.Do(func() {
 		dmails, err := ScanInbox(e.Continent)
 		if err != nil {
-			LogWarn("inbox scan failed: %v", err)
+			e.Logger.Warn("inbox scan failed: %v", err)
 			return
 		}
 		e.InboxDMails = dmails
@@ -117,7 +118,7 @@ func (e *Expedition) loadInboxSection() string {
 func (e *Expedition) loadContextSection() string {
 	ctx, err := ReadContextFiles(e.Continent)
 	if err != nil {
-		LogWarn("context injection failed: %v", err)
+		e.Logger.Warn("context injection failed: %v", err)
 		return ""
 	}
 	return ctx
@@ -199,7 +200,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				attribute.String("issue_title", title),
 			),
 		)
-		LogInfo("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
+		e.Logger.Info("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
 	}, nil)
 
 	// Start inbox watcher to log d-mails arriving mid-expedition.
@@ -219,9 +220,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			}
 			seenFiles[dm.Name] = true
 			if dm.Severity == "high" {
-				LogWarn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
+				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
 			} else {
-				LogInfo("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
+				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
 			}
 		}, nil)
 	}()

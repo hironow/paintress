@@ -1,63 +1,68 @@
 package paintress
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestInitLogFile_CreatesFile(t *testing.T) {
+func TestSetLogFile_CreatesFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 
-	err := InitLogFile(path)
+	logger := NewLogger(io.Discard, false)
+	err := logger.SetLogFile(path)
 	if err != nil {
-		t.Fatalf("InitLogFile error: %v", err)
+		t.Fatalf("SetLogFile error: %v", err)
 	}
-	defer CloseLogFile()
+	defer logger.CloseLogFile()
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Error("log file should be created")
 	}
 }
 
-func TestInitLogFile_InvalidPath(t *testing.T) {
-	err := InitLogFile("/nonexistent/dir/test.log")
+func TestSetLogFile_InvalidPath(t *testing.T) {
+	logger := NewLogger(io.Discard, false)
+	err := logger.SetLogFile("/nonexistent/dir/test.log")
 	if err == nil {
 		t.Error("expected error for invalid path")
 	}
 }
 
 func TestCloseLogFile_WhenNotOpen(t *testing.T) {
-	// Ensure no previous log file is open
-	CloseLogFile()
-	// Should not panic when called without InitLogFile
-	CloseLogFile()
+	logger := NewLogger(io.Discard, false)
+	// Should not panic when called without SetLogFile
+	logger.CloseLogFile()
+	logger.CloseLogFile()
 }
 
 func TestLogFunctions_NoPanic(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
-	InitLogFile(path)
-	defer CloseLogFile()
+	logger := NewLogger(io.Discard, false)
+	logger.SetLogFile(path)
+	defer logger.CloseLogFile()
 
 	// These should not panic
-	LogInfo("info %s", "test")
-	LogOK("ok %d", 42)
-	LogWarn("warn %v", true)
-	LogError("error %s", "oops")
-	LogQA("qa %s", "check")
-	LogExp("exp %d", 1)
+	logger.Info("info %s", "test")
+	logger.OK("ok %d", 42)
+	logger.Warn("warn %v", true)
+	logger.Error("error %s", "oops")
+	logger.QA("qa %s", "check")
+	logger.Exp("exp %d", 1)
 }
 
 func TestLogFunctions_WritesToFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
-	InitLogFile(path)
+	logger := NewLogger(io.Discard, false)
+	logger.SetLogFile(path)
 
-	LogInfo("hello from test")
-	CloseLogFile()
+	logger.Info("hello from test")
+	logger.CloseLogFile()
 
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -73,43 +78,27 @@ func TestLogFunctions_WritesToFile(t *testing.T) {
 }
 
 func TestLogFunctions_WithoutLogFile(t *testing.T) {
-	// Ensure no log file is open
-	CloseLogFile()
+	logger := NewLogger(io.Discard, false)
 
 	// Should not panic even without log file
-	LogInfo("no file")
-	LogWarn("no file")
-	LogError("no file")
+	logger.Info("no file")
+	logger.Warn("no file")
+	logger.Error("no file")
 }
 
-func TestLogFunctions_WritesToStderr(t *testing.T) {
-	CloseLogFile()
+func TestLogFunctions_WritesToWriter(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, false)
 
-	// Capture stderr
-	origStderr := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	os.Stderr = w
+	logger.Info("writer test message")
 
-	LogInfo("stderr test message")
-
-	_ = w.Close()
-	os.Stderr = origStderr
-
-	out, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read stderr: %v", err)
-	}
-	if !containsStr(string(out), "stderr test message") {
-		t.Errorf("expected log output on stderr, got %q", string(out))
+	out := buf.String()
+	if !containsStr(out, "writer test message") {
+		t.Errorf("expected log output on writer, got %q", out)
 	}
 }
 
 func TestLogFunctions_DoesNotWriteToStdout(t *testing.T) {
-	CloseLogFile()
-
 	// Capture stdout — should be empty
 	origStdout := os.Stdout
 	r, w, err := os.Pipe()
@@ -118,7 +107,8 @@ func TestLogFunctions_DoesNotWriteToStdout(t *testing.T) {
 	}
 	os.Stdout = w
 
-	LogInfo("should not appear on stdout")
+	logger := NewLogger(io.Discard, false)
+	logger.Info("should not appear on stdout")
 
 	_ = w.Close()
 	os.Stdout = origStdout
@@ -128,64 +118,39 @@ func TestLogFunctions_DoesNotWriteToStdout(t *testing.T) {
 		t.Fatalf("read stdout: %v", err)
 	}
 	if len(out) != 0 {
-		t.Errorf("expected no stdout output from LogInfo, got %q", string(out))
+		t.Errorf("expected no stdout output from Info, got %q", string(out))
 	}
 }
 
-func TestLogFunctions_NoColorWhenNotTTY(t *testing.T) {
-	CloseLogFile()
+func TestLogFunctions_NoColorCodes(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, false)
 
-	// Pipe is not a TTY, so output should have no ANSI escape codes
-	origStderr := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
+	logger.Info("no color test")
+
+	out := buf.String()
+	if containsStr(out, "\033[") {
+		t.Errorf("expected no ANSI color codes, got %q", out)
 	}
-	os.Stderr = w
-
-	LogInfo("no color test")
-
-	_ = w.Close()
-	os.Stderr = origStderr
-
-	out, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read stderr: %v", err)
-	}
-	if containsStr(string(out), "\033[") {
-		t.Errorf("expected no ANSI color codes when stderr is a pipe, got %q", string(out))
-	}
-	if !containsStr(string(out), "no color test") {
-		t.Errorf("expected message content, got %q", string(out))
+	if !containsStr(out, "no color test") {
+		t.Errorf("expected message content, got %q", out)
 	}
 }
 
-func TestLogFunctions_QuietMode_SuppressesStderr(t *testing.T) {
+func TestLogFunctions_QuietMode_SuppressesWriter(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "quiet.log")
-	InitLogFile(path)
-	defer CloseLogFile()
 
-	t.Setenv("PAINTRESS_QUIET", "1")
+	var buf bytes.Buffer
+	logger := NewQuietLogger(&buf)
+	logger.SetLogFile(path)
+	defer logger.CloseLogFile()
 
-	origStderr := os.Stderr
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
-	os.Stderr = w
+	logger.Info("quiet mode")
 
-	LogInfo("quiet mode")
-
-	_ = w.Close()
-	os.Stderr = origStderr
-
-	out, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read stderr: %v", err)
-	}
+	out := buf.String()
 	if len(out) != 0 {
-		t.Errorf("expected no stderr output in quiet mode, got %q", string(out))
+		t.Errorf("expected no writer output in quiet mode, got %q", out)
 	}
 
 	content, err := os.ReadFile(path)
@@ -194,5 +159,38 @@ func TestLogFunctions_QuietMode_SuppressesStderr(t *testing.T) {
 	}
 	if !containsStr(string(content), "quiet mode") {
 		t.Error("log file should still contain message in quiet mode")
+	}
+}
+
+func TestLogger_Debug_Verbose(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, true)
+
+	logger.Debug("debug message")
+
+	out := buf.String()
+	if !containsStr(out, "debug message") {
+		t.Errorf("expected debug message when verbose, got %q", out)
+	}
+}
+
+func TestLogger_Debug_NotVerbose(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, false)
+
+	logger.Debug("debug message")
+
+	out := buf.String()
+	if len(out) != 0 {
+		t.Errorf("expected no output when not verbose, got %q", out)
+	}
+}
+
+func TestLogger_Writer(t *testing.T) {
+	var buf bytes.Buffer
+	logger := NewLogger(&buf, false)
+
+	if logger.Writer() != &buf {
+		t.Error("Writer() should return the configured writer")
 	}
 }

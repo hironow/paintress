@@ -3,6 +3,7 @@ package paintress
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,7 +33,7 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 		BaseBranch: "main",
 		Model:      "opus",
 	}
-	return NewPaintress(cfg)
+	return NewPaintress(cfg, NewLogger(io.Discard, false))
 }
 
 // TestReviewLoop_ReviewTimeDoesNotConsumeBudget verifies that slow review
