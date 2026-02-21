@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/creativeprojects/go-selfupdate"
@@ -43,18 +44,19 @@ installing.`,
 			}
 
 			// Guard: version may be "dev" for local builds (non-semver).
-			if _, err := semver.NewVersion(Version); err != nil {
+			ver := strings.TrimPrefix(Version, "v")
+			if _, err := semver.NewVersion(ver); err != nil {
 				fmt.Fprintf(cmd.OutOrStdout(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", Version, latest.Version())
 				return nil
 			}
 
 			if latest.LessOrEqual(Version) {
-				fmt.Fprintf(cmd.OutOrStdout(), "Already up to date (v%s).\n", Version)
+				fmt.Fprintf(cmd.OutOrStdout(), "Already up to date (v%s).\n", ver)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.OutOrStdout(), "Update available: v%s → v%s\n", Version, latest.Version())
+				fmt.Fprintf(cmd.OutOrStdout(), "Update available: v%s → v%s\n", ver, latest.Version())
 				return nil
 			}
 

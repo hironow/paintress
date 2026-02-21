@@ -6,23 +6,20 @@ import (
 )
 
 func TestUpdateCommand_NoArgs(t *testing.T) {
-	// given
+	// given — verify command accepts no args (flag wiring only, no network)
 	cmd := NewRootCommand()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"update"})
+	updateCmd, _, err := cmd.Find([]string{"update"})
 
-	// when
-	err := cmd.Execute()
-
-	// then — dev build guard: should succeed and print dev build message
+	// then
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("update subcommand not found: %v", err)
 	}
-	out := buf.String()
-	if len(out) == 0 {
-		t.Error("expected output, got empty string")
+	if updateCmd.Args == nil {
+		t.Fatal("Args validator not set on update command")
+	}
+	// cobra.NoArgs rejects any positional args
+	if err := updateCmd.Args(updateCmd, []string{}); err != nil {
+		t.Errorf("unexpected error for zero args: %v", err)
 	}
 }
 
