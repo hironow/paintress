@@ -38,7 +38,6 @@ paintress issues <repo-path> [flags]
 ### Options inherited from parent commands
 
 ```
-  -c, --config string   Path to config file
   -l, --lang string     Output language: en, ja, fr (default "en")
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output

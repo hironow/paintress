@@ -9,7 +9,6 @@ The Paintress — drives the Expedition loop for Claude Code.
 ### Options
 
 ```
-  -c, --config string   Path to config file
   -h, --help            help for paintress
   -l, --lang string     Output language: en, ja, fr (default "en")
   -o, --output string   Output format: text, json (default "text")
