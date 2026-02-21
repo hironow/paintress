@@ -84,7 +84,17 @@ func NeedsDefaultRun(rootCmd *cobra.Command, args []string) bool {
 	return false // only root flags, no positional
 }
 
+// cobraBuiltins are subcommands that cobra registers lazily during Execute().
+// NeedsDefaultRun runs before Execute, so these must be checked explicitly.
+var cobraBuiltins = map[string]bool{
+	"help":       true,
+	"completion": true,
+}
+
 func isSubcommand(rootCmd *cobra.Command, name string) bool {
+	if cobraBuiltins[name] {
+		return true
+	}
 	for _, c := range rootCmd.Commands() {
 		if c.Name() == name {
 			return true

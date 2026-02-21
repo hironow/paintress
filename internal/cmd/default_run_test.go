@@ -27,6 +27,9 @@ func TestNeedsDefaultRun(t *testing.T) {
 		{"--version with extra path", []string{"--version", "/path/to/repo"}, false},
 		{"--help with extra path", []string{"--help", "/path/to/repo"}, false},
 		{"-h with extra path", []string{"-h", "/path/to/repo"}, false},
+		{"cobra builtin help", []string{"help"}, false},
+		{"cobra builtin completion", []string{"completion"}, false},
+		{"cobra builtin help with subcommand", []string{"help", "run"}, false},
 	}
 
 	for _, tt := range tests {

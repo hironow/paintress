@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -41,8 +42,9 @@ for structured output suitable for scripts and CI.`,
 				return nil
 			}
 
+			ver := strings.TrimPrefix(Version, "v")
 			fmt.Fprintf(cmd.OutOrStdout(), "paintress v%s (commit: %s, date: %s, go: %s)\n",
-				Version, Commit, Date, runtime.Version())
+				ver, Commit, Date, runtime.Version())
 			return nil
 		},
 	}

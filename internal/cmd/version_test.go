@@ -70,6 +70,33 @@ func TestVersionCommand_JSONOutput(t *testing.T) {
 	}
 }
 
+func TestVersionCommand_NoDoubleV(t *testing.T) {
+	// given — simulate git describe output with v prefix
+	origVersion := Version
+	Version = "v1.2.3"
+	defer func() { Version = origVersion }()
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"version"})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "vv") {
+		t.Errorf("output contains double 'v': %q", out)
+	}
+	if !strings.Contains(out, "v1.2.3") {
+		t.Errorf("output = %q, want to contain 'v1.2.3'", out)
+	}
+}
+
 func TestVersionCommand_NoArgs(t *testing.T) {
 	// given
 	cmd := NewRootCommand()

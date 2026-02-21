@@ -21,7 +21,6 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
-	rootCmd.PersistentFlags().StringP("config", "c", "", "Path to config file")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 	rootCmd.PersistentFlags().StringP("lang", "l", "en", "Output language: en, ja, fr")
 

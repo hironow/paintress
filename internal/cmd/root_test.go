@@ -73,25 +73,6 @@ func TestNewRootCommand_PersistentFlags_Verbose(t *testing.T) {
 	}
 }
 
-func TestNewRootCommand_PersistentFlags_Config(t *testing.T) {
-	// given
-	cmd := NewRootCommand()
-
-	// when
-	f := cmd.PersistentFlags().Lookup("config")
-
-	// then
-	if f == nil {
-		t.Fatal("--config PersistentFlag not found")
-	}
-	if f.DefValue != "" {
-		t.Errorf("--config default = %q, want %q", f.DefValue, "")
-	}
-	if f.Shorthand != "c" {
-		t.Errorf("--config shorthand = %q, want %q", f.Shorthand, "c")
-	}
-}
-
 func TestNewRootCommand_HasSubcommands(t *testing.T) {
 	// given
 	cmd := NewRootCommand()
