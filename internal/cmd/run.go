@@ -73,6 +73,9 @@ max-expeditions is reached or the issue queue is empty.`,
 	cmd.Flags().String("setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
 	cmd.Flags().Bool("no-dev", false, "Skip dev server startup")
 	cmd.Flags().BoolP("dry-run", "n", false, "Generate prompts only")
+	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
+	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
+	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for HIGH severity D-Mail")
 
 	return cmd
 }
@@ -100,6 +103,9 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.NoDev, _ = cmd.Flags().GetBool("no-dev")
 	cfg.DryRun, _ = cmd.Flags().GetBool("dry-run")
 	cfg.OutputFormat, _ = cmd.Flags().GetString("output")
+	cfg.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
+	cfg.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
+	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	logger := paintress.NewLogger(cmd.ErrOrStderr(), verbose)

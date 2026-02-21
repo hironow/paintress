@@ -51,6 +51,7 @@ type Expedition struct {
 	Config    Config
 	LogDir    string
 	Logger    *Logger
+	Notifier  Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
 	Luminas     []Lumina
@@ -105,6 +106,9 @@ func (e *Expedition) BuildPrompt() string {
 
 func (e *Expedition) loadInboxSection() string {
 	e.inboxOnce.Do(func() {
+		if len(e.InboxDMails) > 0 {
+			return // already loaded externally (e.g., by HIGH severity gate)
+		}
 		dmails, err := ScanInbox(e.Continent)
 		if err != nil {
 			e.Logger.Warn("inbox scan failed: %v", err)
@@ -221,6 +225,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			seenFiles[dm.Name] = true
 			if dm.Severity == "high" {
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
+				if e.Notifier != nil {
+					_ = e.Notifier.Notify(watchCtx, "Paintress", fmt.Sprintf("HIGH severity D-Mail mid-expedition: %s", dm.Name))
+				}
 			} else {
 				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
 			}

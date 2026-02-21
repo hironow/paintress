@@ -98,6 +98,8 @@ Paintress communicates with external tools (phonewave, sightjack, courier) via t
 
 **Lifecycle**: inbox/ → prompt injection → expedition → archive/ (processed). Mid-expedition arrivals stay in inbox/ for the next expedition. Only d-mails that were embedded in the prompt are archived.
 
+**HIGH Severity Gate**: When inbox contains HIGH severity d-mails, Paintress sends a desktop notification (`osascript`/`notify-send`) and blocks for human approval before starting the expedition. Denied → expedition skipped. Use `--notify-cmd` for custom notifications (e.g. Slack), `--approve-cmd` for custom approval, or `--auto-approve` to skip the gate entirely.
+
 **Skills**: Agent skill manifests (`SKILL.md`) in `.expedition/skills/` declare D-Mail capabilities (`dmail-readable`: consumes specification/feedback, `dmail-sendable`: produces reports).
 
 ## Architecture
@@ -253,6 +255,15 @@ paintress archive-prune -d 14 -x /path/to/repo
 # Skip code review gate
 paintress --review-cmd "" /path/to/repo
 
+# Notify via ntfy.sh when HIGH severity D-Mail arrives
+paintress --notify-cmd 'curl -d "{message}" ntfy.sh/paintress' /path/to/repo
+
+# Skip approval gate (CI/automated runs)
+paintress --auto-approve /path/to/repo
+
+# Custom approval script
+paintress --approve-cmd './scripts/approve.sh "{message}"' /path/to/repo
+
 # All options
 paintress \
   -m opus,sonnet,haiku \
@@ -296,6 +307,9 @@ paintress \
 | `--dev-url` | | `http://localhost:3000` | Dev server URL |
 | `--review-cmd` | | `codex review --base <base-branch>` | Code review command after PR creation |
 | `--setup-cmd` | | `""` | Command to run after worktree creation (e.g. `bun install`) |
+| `--notify-cmd` | | `""` | Notification command for HIGH severity D-Mail (`{title}`, `{message}` placeholders) |
+| `--approve-cmd` | | `""` | Approval command for HIGH severity D-Mail (`{message}` placeholder, exit 0 = approve) |
+| `--auto-approve` | | `false` | Skip approval gate for HIGH severity D-Mail |
 
 ## Tracing (OpenTelemetry)
 
@@ -338,6 +352,9 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- devserver.go             Dev server (goroutine)
 +-- worktree.go              WorktreePool for Swarm Mode
 +-- review.go                Code review gate (exec + parse)
++-- notify.go                Notifier interface (LocalNotifier, CmdNotifier, NopNotifier)
++-- approve.go               Approver interface (StdinApprover, CmdApprover, AutoApprover)
++-- gate.go                  HIGH severity D-Mail gate (FilterHighSeverity)
 +-- dmail.go                 D-Mail protocol (scan, send, archive, parse)
 +-- issues.go                Linear issue fetcher (API + formatting)
 +-- mission.go               Mission type detection + prompt templates

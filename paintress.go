@@ -34,6 +34,8 @@ type Paintress struct {
 	gradient  *GradientGauge
 	reserve   *ReserveParty
 	pool      *WorktreePool // nil when --workers=0
+	notifier  Notifier
+	approver  Approver
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter          atomic.Int64
@@ -72,12 +74,33 @@ func NewPaintress(cfg Config, logger *Logger) *Paintress {
 		devDir = cfg.Continent
 	}
 
+	// Wire notifier based on config
+	var notifier Notifier
+	if cfg.NotifyCmd != "" {
+		notifier = NewCmdNotifier(cfg.NotifyCmd)
+	} else {
+		notifier = &LocalNotifier{}
+	}
+
+	// Wire approver based on config
+	var approver Approver
+	switch {
+	case cfg.AutoApprove:
+		approver = &AutoApprover{}
+	case cfg.ApproveCmd != "":
+		approver = NewCmdApprover(cfg.ApproveCmd)
+	default:
+		approver = NewStdinApprover()
+	}
+
 	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
 		Logger:   logger,
 		gradient: NewGradientGauge(gradientMax),
 		reserve:  NewReserveParty(primary, reserves, logger),
+		notifier: notifier,
+		approver: approver,
 	}
 
 	if !cfg.NoDev {
@@ -177,6 +200,37 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.OK("%s", fmt.Sprintf(Msg("lumina_extracted"), len(luminas)))
 	}
 
+	// Pre-flight HIGH severity gate (once, before workers start).
+	// This prevents concurrent StdinApprover reads when workers > 1.
+	// Fail closed: if inbox cannot be read, abort rather than skip the gate.
+	preflightInbox, scanErr := ScanInbox(p.config.Continent)
+	if scanErr != nil {
+		p.Logger.Error("inbox scan failed (fail-closed): %v", scanErr)
+		return 1
+	}
+	if highDMails := FilterHighSeverity(preflightInbox); len(highDMails) > 0 {
+		names := make([]string, len(highDMails))
+		for i, dm := range highDMails {
+			names[i] = dm.Name
+		}
+		msg := fmt.Sprintf("HIGH severity D-Mail detected: %s", strings.Join(names, ", "))
+		p.Logger.Warn("%s", msg)
+
+		if err := p.notifier.Notify(ctx, "Paintress", msg); err != nil {
+			p.Logger.Warn("notification failed: %v", err)
+		}
+
+		approved, err := p.approver.RequestApproval(ctx, msg)
+		if err != nil {
+			p.Logger.Error("approval request failed (fail-closed): %v", err)
+			return 1
+		}
+		if !approved {
+			p.Logger.Warn("all expeditions aborted: HIGH severity D-Mail denied")
+			return 0
+		}
+	}
+
 	g, gCtx := errgroup.WithContext(ctx)
 	workerCount := max(p.config.Workers, 1)
 
@@ -254,16 +308,24 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
+		// Scan inbox for expedition prompt data (gate already ran in pre-flight)
+		inboxDMails, scanErr := ScanInbox(p.config.Continent)
+		if scanErr != nil {
+			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
+		}
+
 		expedition := &Expedition{
-			Number:    exp,
-			Continent: p.config.Continent,
-			WorkDir:   workDir,
-			Config:    p.config,
-			LogDir:    p.logDir,
-			Logger:    p.Logger,
-			Luminas:   luminas,
-			Gradient:  p.gradient,
-			Reserve:   p.reserve,
+			Number:      exp,
+			Continent:   p.config.Continent,
+			WorkDir:     workDir,
+			Config:      p.config,
+			LogDir:      p.logDir,
+			Logger:      p.Logger,
+			Luminas:     luminas,
+			Gradient:    p.gradient,
+			Reserve:     p.reserve,
+			InboxDMails: inboxDMails,
+			Notifier:    p.notifier,
 		}
 
 		if p.config.DryRun {
