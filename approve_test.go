@@ -3,6 +3,8 @@ package paintress
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -127,11 +129,11 @@ func TestCmdApprover_ExitZero(t *testing.T) {
 }
 
 func TestCmdApprover_ExitNonZero(t *testing.T) {
-	// given
+	// given: non-zero exit is intentional deny — error should be nil
 	a := &CmdApprover{
 		cmdTemplate: "false", // exit 1
 		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
-			return &fakeCmd{err: &fakeExitError{code: 1}}
+			return &fakeCmd{err: &exec.ExitError{}}
 		},
 	}
 
@@ -144,6 +146,31 @@ func TestCmdApprover_ExitNonZero(t *testing.T) {
 	}
 	if approved {
 		t.Error("expected approved=false for exit 1")
+	}
+}
+
+func TestCmdApprover_ExecutionError_SurfacesError(t *testing.T) {
+	// given: execution error (e.g. binary not found) — must surface as error
+	execErr := fmt.Errorf("exec: \"nonexistent\": executable file not found in $PATH")
+	a := &CmdApprover{
+		cmdTemplate: "nonexistent-binary",
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			return &fakeCmd{err: execErr}
+		},
+	}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then
+	if approved {
+		t.Error("expected approved=false for execution error")
+	}
+	if err == nil {
+		t.Fatal("expected error to be surfaced for execution failure, got nil")
+	}
+	if !strings.Contains(err.Error(), "executable file not found") {
+		t.Errorf("error should contain original message, got: %v", err)
 	}
 }
 
@@ -191,15 +218,6 @@ type blockingReader struct{}
 
 func (r *blockingReader) Read(p []byte) (int, error) {
 	select {} //nolint:staticcheck // intentional blocking for test
-}
-
-// fakeExitError satisfies the error interface for testing non-zero exits.
-type fakeExitError struct {
-	code int
-}
-
-func (e *fakeExitError) Error() string {
-	return "exit status " + string(rune('0'+e.code))
 }
 
 // TestStdinApprover_ShowsMessage verifies the approval message is displayed.

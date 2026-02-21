@@ -3,9 +3,11 @@ package paintress
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 )
 
@@ -79,8 +81,13 @@ func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool
 	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", message)
 	err := a.factory()(ctx, "sh", "-c", expanded).Run()
 	if err != nil {
-		// Non-zero exit = denied (not an error condition)
-		return false, nil
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// Non-zero exit = intentional deny (not an error condition)
+			return false, nil
+		}
+		// Execution error (binary not found, permission denied, etc.) — surface to caller
+		return false, err
 	}
 	return true, nil
 }
