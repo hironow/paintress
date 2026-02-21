@@ -222,7 +222,8 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 		approved, err := p.approver.RequestApproval(ctx, msg)
 		if err != nil {
-			p.Logger.Warn("approval request failed: %v", err)
+			p.Logger.Error("approval request failed (fail-closed): %v", err)
+			return 1
 		}
 		if !approved {
 			p.Logger.Warn("all expeditions aborted: HIGH severity D-Mail denied")

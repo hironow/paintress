@@ -2,6 +2,7 @@ package paintress
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -301,6 +302,40 @@ func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
 	}
 }
 
+// TestHighSeverityGate_ApprovalError_FailsClosed verifies that when the
+// approver returns a technical error (e.g. command not found, context timeout),
+// the run aborts with exit code 1 rather than treating it as a denial (exit 0).
+func TestHighSeverityGate_ApprovalError_FailsClosed(t *testing.T) {
+	dir := setupTestRepo(t)
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	content := "---\nname: alert-err\nkind: alert\ndescription: critical\nseverity: high\n---\n"
+	os.WriteFile(filepath.Join(inboxDir, "alert-err.md"), []byte(content), 0644)
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 1,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p.approver = &errorApprover{err: fmt.Errorf("exec: command not found")}
+	p.notifier = &NopNotifier{}
+
+	code := p.Run(context.Background())
+	if code != 1 {
+		t.Fatalf("Run() = %d, want 1 (fail-closed on approval error)", code)
+	}
+	if p.totalAttempted.Load() != 0 {
+		t.Errorf("totalAttempted = %d, want 0 (no expeditions should run on approval error)", p.totalAttempted.Load())
+	}
+}
+
 // countingApprover counts how many times RequestApproval is called.
 type countingApprover struct {
 	count   *atomic.Int32
@@ -327,4 +362,13 @@ type denyApprover struct{}
 
 func (a *denyApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
 	return false, nil
+}
+
+// errorApprover simulates a technical failure during approval.
+type errorApprover struct {
+	err error
+}
+
+func (a *errorApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
+	return false, a.err
 }
