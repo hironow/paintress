@@ -49,7 +49,7 @@ for structured output suitable for scripts and CI.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output version info as JSON")
+	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output version info as JSON")
 
 	return cmd
 }

@@ -61,18 +61,18 @@ max-expeditions is reached or the issue queue is empty.`,
 	}
 
 	cmd.Flags().Int("max-expeditions", 50, "Maximum number of expeditions")
-	cmd.Flags().Int("timeout", 1980, "Timeout per expedition in seconds (default: 33min)")
-	cmd.Flags().String("model", "opus", "Model(s) comma-separated for reserve: opus,sonnet,haiku")
-	cmd.Flags().String("base-branch", "main", "Base branch")
+	cmd.Flags().IntP("timeout", "t", 1980, "Timeout per expedition in seconds (default: 33min)")
+	cmd.Flags().StringP("model", "m", "opus", "Model(s) comma-separated for reserve: opus,sonnet,haiku")
+	cmd.Flags().StringP("base-branch", "b", "main", "Base branch")
 	cmd.Flags().String("claude-cmd", paintress.DefaultClaudeCmd, "Claude Code CLI command name")
 	cmd.Flags().String("dev-cmd", "npm run dev", "Dev server command")
 	cmd.Flags().String("dev-dir", "", "Dev server working directory (defaults to repo path)")
 	cmd.Flags().String("dev-url", "http://localhost:3000", "Dev server URL")
 	cmd.Flags().String("review-cmd", "", "Code review command after PR creation")
-	cmd.Flags().Int("workers", 1, "Number of worktrees in pool (0 = direct execution)")
+	cmd.Flags().IntP("workers", "w", 1, "Number of worktrees in pool (0 = direct execution)")
 	cmd.Flags().String("setup-cmd", "", "Command to run after worktree creation (e.g. 'bun install')")
 	cmd.Flags().Bool("no-dev", false, "Skip dev server startup")
-	cmd.Flags().Bool("dry-run", false, "Generate prompts only")
+	cmd.Flags().BoolP("dry-run", "n", false, "Generate prompts only")
 
 	return cmd
 }

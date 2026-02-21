@@ -37,8 +37,8 @@ git-tracked, so deletions should be reviewed and committed.`,
 		RunE: runArchivePrune,
 	}
 
-	cmd.Flags().Int("days", 30, "Number of days threshold")
-	cmd.Flags().Bool("execute", false, "Execute deletion (dry-run by default)")
+	cmd.Flags().IntP("days", "d", 30, "Number of days threshold")
+	cmd.Flags().BoolP("execute", "x", false, "Execute deletion (dry-run by default)")
 
 	return cmd
 }

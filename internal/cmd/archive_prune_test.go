@@ -62,6 +62,35 @@ func TestArchivePruneCommand_ExecuteFlagDefault(t *testing.T) {
 	}
 }
 
+func TestArchivePruneCommand_ShortAliases(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	pruneCmd, _, err := root.Find([]string{"archive-prune"})
+	if err != nil {
+		t.Fatalf("find archive-prune command: %v", err)
+	}
+
+	// then
+	aliases := []struct {
+		name      string
+		shorthand string
+	}{
+		{"days", "d"},
+		{"execute", "x"},
+	}
+
+	for _, tc := range aliases {
+		f := pruneCmd.Flags().Lookup(tc.name)
+		if f == nil {
+			t.Errorf("--%s flag not found", tc.name)
+			continue
+		}
+		if f.Shorthand != tc.shorthand {
+			t.Errorf("--%s shorthand = %q, want %q", tc.name, f.Shorthand, tc.shorthand)
+		}
+	}
+}
+
 func TestArchivePruneCommand_NegativeDays(t *testing.T) {
 	// given
 	cmd := NewRootCommand()

@@ -70,6 +70,24 @@ func TestVersionCommand_JSONOutput(t *testing.T) {
 	}
 }
 
+func TestVersionCommand_JSONShortAlias(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	versionCmd, _, err := root.Find([]string{"version"})
+	if err != nil {
+		t.Fatalf("find version command: %v", err)
+	}
+
+	// then
+	f := versionCmd.Flags().Lookup("json")
+	if f == nil {
+		t.Fatal("--json flag not found")
+	}
+	if f.Shorthand != "j" {
+		t.Errorf("--json shorthand = %q, want %q", f.Shorthand, "j")
+	}
+}
+
 func TestVersionCommand_NoDoubleV(t *testing.T) {
 	// given — simulate git describe output with v prefix
 	origVersion := Version

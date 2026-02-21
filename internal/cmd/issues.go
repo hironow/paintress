@@ -32,7 +32,7 @@ converted to spaces automatically.`,
 		RunE: runIssues,
 	}
 
-	cmd.Flags().String("state", "", "Comma-separated state filter (e.g. todo,in-progress)")
+	cmd.Flags().StringP("state", "s", "", "Comma-separated state filter (e.g. todo,in-progress)")
 
 	return cmd
 }

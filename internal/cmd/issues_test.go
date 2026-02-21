@@ -42,6 +42,24 @@ func TestIssuesCommand_StateFlagDefault(t *testing.T) {
 	}
 }
 
+func TestIssuesCommand_StateShortAlias(t *testing.T) {
+	// given
+	root := NewRootCommand()
+	issuesCmd, _, err := root.Find([]string{"issues"})
+	if err != nil {
+		t.Fatalf("find issues command: %v", err)
+	}
+
+	// then
+	f := issuesCmd.Flags().Lookup("state")
+	if f == nil {
+		t.Fatal("--state flag not found")
+	}
+	if f.Shorthand != "s" {
+		t.Errorf("--state shorthand = %q, want %q", f.Shorthand, "s")
+	}
+}
+
 func TestIssuesCommand_OutputFlagInherited(t *testing.T) {
 	// given: --output is a PersistentFlag on root, issues should inherit it
 	root := NewRootCommand()
