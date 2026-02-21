@@ -93,7 +93,7 @@ func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 	// given
 	var capturedShellCmd string
 	n := &CmdNotifier{
-		cmdTemplate: `curl -d "{title}: {message}" https://example.com`,
+		cmdTemplate: `curl -d {title}: {message} https://example.com`,
 		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
 			capturedShellCmd = args[len(args)-1] // last arg to "sh -c ..."
 			return &fakeCmd{}
@@ -107,17 +107,61 @@ func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(capturedShellCmd, "Paintress") {
-		t.Errorf("shell cmd should contain title, got: %s", capturedShellCmd)
-	}
-	if !strings.Contains(capturedShellCmd, "HIGH severity D-Mail") {
-		t.Errorf("shell cmd should contain message, got: %s", capturedShellCmd)
+	// After shellQuote: 'Paintress' and 'HIGH severity D-Mail'
+	want := `curl -d 'Paintress': 'HIGH severity D-Mail' https://example.com`
+	if capturedShellCmd != want {
+		t.Errorf("shell cmd = %q, want %q", capturedShellCmd, want)
 	}
 	if strings.Contains(capturedShellCmd, "{title}") {
 		t.Error("shell cmd still contains {title} placeholder")
 	}
 	if strings.Contains(capturedShellCmd, "{message}") {
 		t.Error("shell cmd still contains {message} placeholder")
+	}
+}
+
+func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
+	// given: message with shell metacharacters that could cause injection
+	var capturedShellCmd string
+	n := &CmdNotifier{
+		cmdTemplate: `echo {message}`,
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			capturedShellCmd = args[len(args)-1]
+			return &fakeCmd{}
+		},
+	}
+
+	// when: message contains shell metacharacters
+	_ = n.Notify(context.Background(), "Title", `"; rm -rf /; echo "`)
+
+	// then: the raw injection string must NOT appear unquoted
+	// After shellQuote, it becomes '"; rm -rf /; echo "' (safely single-quoted)
+	if strings.Contains(capturedShellCmd, `echo "; rm -rf`) {
+		t.Error("shell metacharacters were not escaped — command injection possible")
+	}
+	// The escaped message should be shell-safe (wrapped in single quotes)
+	if !strings.Contains(capturedShellCmd, `'"; rm -rf /; echo "'`) {
+		t.Errorf("expected single-quoted message in shell cmd, got: %s", capturedShellCmd)
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"simple", "'simple'"},
+		{"with spaces", "'with spaces'"},
+		{`has "double" quotes`, `'has "double" quotes'`},
+		{"has 'single' quotes", "'has '\\''single'\\'' quotes'"},
+		{`"; rm -rf /`, `'"; rm -rf /'`},
+		{"", "''"},
+	}
+	for _, tt := range tests {
+		got := shellQuote(tt.input)
+		if got != tt.want {
+			t.Errorf("shellQuote(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }
 

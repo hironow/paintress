@@ -78,7 +78,7 @@ func (a *CmdApprover) factory() cmdFactory {
 }
 
 func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
-	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", message)
+	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", shellQuote(message))
 	err := a.factory()(ctx, "sh", "-c", expanded).Run()
 	if err != nil {
 		var exitErr *exec.ExitError

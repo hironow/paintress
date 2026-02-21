@@ -84,9 +84,15 @@ func (n *CmdNotifier) factory() cmdFactory {
 }
 
 func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
-	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", title)
-	expanded = strings.ReplaceAll(expanded, "{message}", message)
+	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", shellQuote(title))
+	expanded = strings.ReplaceAll(expanded, "{message}", shellQuote(message))
 	return n.factory()(ctx, "sh", "-c", expanded).Run()
+}
+
+// shellQuote wraps s in single quotes for safe interpolation into sh -c commands.
+// Internal single quotes are escaped as '\” (end quote, escaped quote, start quote).
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 // NopNotifier is a no-op notifier for quiet mode or testing.

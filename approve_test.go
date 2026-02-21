@@ -178,7 +178,7 @@ func TestCmdApprover_PlaceholderReplacement(t *testing.T) {
 	// given
 	var capturedShellCmd string
 	a := &CmdApprover{
-		cmdTemplate: `echo "{message}"`,
+		cmdTemplate: `echo {message}`,
 		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
 			capturedShellCmd = args[len(args)-1]
 			return &fakeCmd{}
@@ -188,12 +188,34 @@ func TestCmdApprover_PlaceholderReplacement(t *testing.T) {
 	// when
 	_, _ = a.RequestApproval(context.Background(), "HIGH severity alert")
 
-	// then
-	if !strings.Contains(capturedShellCmd, "HIGH severity alert") {
-		t.Errorf("shell cmd should contain message, got: %s", capturedShellCmd)
+	// then: message is shell-quoted
+	want := `echo 'HIGH severity alert'`
+	if capturedShellCmd != want {
+		t.Errorf("shell cmd = %q, want %q", capturedShellCmd, want)
 	}
 	if strings.Contains(capturedShellCmd, "{message}") {
 		t.Error("shell cmd still contains {message} placeholder")
+	}
+}
+
+func TestCmdApprover_EscapesShellMetacharacters(t *testing.T) {
+	// given: message with shell metacharacters that could force exit 0
+	var capturedShellCmd string
+	a := &CmdApprover{
+		cmdTemplate: `echo {message}`,
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			capturedShellCmd = args[len(args)-1]
+			return &fakeCmd{}
+		},
+	}
+
+	// when: attacker message tries to inject shell commands
+	_, _ = a.RequestApproval(context.Background(), `"; exit 0; #`)
+
+	// then: message should be single-quoted, not interpolated raw
+	want := `echo '"; exit 0; #'`
+	if capturedShellCmd != want {
+		t.Errorf("shell cmd = %q, want %q (message must be shell-quoted)", capturedShellCmd, want)
 	}
 }
 
