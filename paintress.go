@@ -451,12 +451,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.flagMu.Lock()
 				p.writeFlag(exp, "?", "parse_error", "?", midHighCount)
 				p.flagMu.Unlock()
-				WriteJournal(p.config.Continent, &ExpeditionReport{
+				parseErrReport := &ExpeditionReport{
 					Expedition: exp, IssueID: "?", IssueTitle: "?",
 					MissionType: "?", Status: "parse_error", Reason: "report markers not found",
 					FailureType: "blocker",
 					PRUrl:       "none", BugIssues: "none",
-				})
+				}
+				if midHighCount > 0 {
+					parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
+				}
+				WriteJournal(p.config.Continent, parseErrReport)
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
 			case StatusSuccess:
