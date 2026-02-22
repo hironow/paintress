@@ -65,8 +65,51 @@ type Expedition struct {
 	midHighMu    sync.Mutex
 	midHighNames []string
 
+	// Mid-expedition issue-matched D-Mail routing (MY-361)
+	currentIssueMu  sync.Mutex
+	currentIssue    string
+	midMatchedMu    sync.Mutex
+	midMatchedMails []DMail
+
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+}
+
+// containsIssue reports whether issues contains target (case-insensitive).
+func containsIssue(issues []string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for _, id := range issues {
+		if strings.EqualFold(id, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// setCurrentIssue records the issue being worked on (called from watchFlag callback).
+func (e *Expedition) setCurrentIssue(issue string) {
+	e.currentIssueMu.Lock()
+	e.currentIssue = issue
+	e.currentIssueMu.Unlock()
+}
+
+// getCurrentIssue returns the issue being worked on (thread-safe).
+func (e *Expedition) getCurrentIssue() string {
+	e.currentIssueMu.Lock()
+	defer e.currentIssueMu.Unlock()
+	return e.currentIssue
+}
+
+// MidMatchedDMails returns a copy of issue-matched D-Mails received mid-expedition.
+func (e *Expedition) MidMatchedDMails() []DMail {
+	e.midMatchedMu.Lock()
+	defer e.midMatchedMu.Unlock()
+	if len(e.midMatchedMails) == 0 {
+		return []DMail{}
+	}
+	return append([]DMail(nil), e.midMatchedMails...)
 }
 
 // MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
@@ -205,6 +248,20 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 	defer outFile.Close()
 
+	// Clear stale current_issue from flag.md before starting the process.
+	// If a previous expedition was interrupted, flag.md may still contain
+	// current_issue from that run. Re-writing via WriteFlag produces a
+	// format that omits current_issue/current_title, effectively clearing them.
+	// Must happen before cmd.Start() to avoid clobbering a legitimate write.
+	//
+	// NOTE(MY-362): This bypasses p.flagMu / p.writeFlag's monotonic guard.
+	// In Workers > 1 mode, a concurrent worker's checkpoint write could be
+	// rolled back if it lands between ReadFlag and WriteFlag here. Safe for
+	// Workers=1 (default). Per-worktree flag isolation will resolve this.
+	if stale := ReadFlag(e.Continent); stale.CurrentIssue != "" {
+		WriteFlag(e.Continent, stale.LastExpedition, stale.LastIssue, stale.LastStatus, stale.Remaining, stale.MidHighSeverity)
+	}
+
 	if err := cmd.Start(); err != nil {
 		return "", fmt.Errorf("%s start failed: %w", claudeCmd, err)
 	}
@@ -213,6 +270,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
 	go watchFlag(watchCtx, e.Continent, func(issue, title string) {
+		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
 				attribute.String("issue_id", issue),
@@ -248,6 +306,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				}
 			} else {
 				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
+			}
+			// Issue routing runs regardless of severity: collect D-Mails
+			// that match the current expedition's issue for follow-up.
+			if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
+				e.midMatchedMu.Lock()
+				e.midMatchedMails = append(e.midMatchedMails, dm)
+				e.midMatchedMu.Unlock()
+				e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
 			}
 		}, nil)
 	}()

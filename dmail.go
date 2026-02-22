@@ -67,6 +67,19 @@ func NewReportDMail(report *ExpeditionReport) DMail {
 	}
 }
 
+// BuildFollowUpPrompt builds a follow-up prompt for issue-matched D-Mails
+// received mid-expedition. Returns empty string for empty input.
+func BuildFollowUpPrompt(dmails []DMail) string {
+	if len(dmails) == 0 {
+		return ""
+	}
+	var buf strings.Builder
+	buf.WriteString("The following D-Mail(s) arrived during this expedition and are related to the issue you just worked on.\n")
+	buf.WriteString("Review them and take any additional action if needed. If no action is required, briefly acknowledge.\n\n")
+	buf.WriteString(FormatDMailForPrompt(dmails))
+	return buf.String()
+}
+
 // InboxDir returns the path to the d-mail inbox directory.
 func InboxDir(continent string) string {
 	return filepath.Join(continent, ".expedition", "inbox")

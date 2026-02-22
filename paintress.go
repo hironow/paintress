@@ -368,7 +368,6 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.Logger.Info("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
 		expStart := time.Now()
 		output, err := expedition.Run(expCtx)
-		expElapsed := time.Since(expStart)
 
 		if err != nil {
 			if ctx.Err() != nil {
@@ -473,9 +472,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				)
 				p.handleSuccess(report)
 				p.gradient.Charge()
+				// Follow-up runs before review to keep --continue in the
+				// expedition's conversation context (review also uses --continue).
+				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
+					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
+					followUpBudget := totalTimeout - time.Since(expStart)
+					p.runFollowUp(ctx, matched, workDir, followUpBudget)
+				}
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
-					remaining := totalTimeout - expElapsed
+					remaining := totalTimeout - time.Since(expStart)
 					if remaining > 0 {
 						p.runReviewLoop(ctx, report, remaining, workDir)
 					}
@@ -713,6 +719,72 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 	}
 	report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
 	p.Logger.Warn("%s", Msg("review_limit"))
+}
+
+// runFollowUp executes a --continue -p follow-up turn for issue-matched D-Mails
+// received mid-expedition. The follow-up reuses the same conversation context
+// as the just-completed expedition. No-op if dmails is empty or remaining budget
+// is zero. The remaining parameter caps the follow-up timeout to stay within
+// the overall expedition time budget.
+func (p *Paintress) runFollowUp(ctx context.Context, dmails []DMail, workDir string, remaining time.Duration) {
+	if len(dmails) == 0 {
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	if remaining <= 0 {
+		p.Logger.Warn("Follow-up skipped: no remaining time budget")
+		return
+	}
+
+	prompt := BuildFollowUpPrompt(dmails)
+	claudeCmd := p.config.ClaudeCmd
+	if claudeCmd == "" {
+		claudeCmd = DefaultClaudeCmd
+	}
+
+	model := p.reserve.ActiveModel()
+	_, followUpSpan := tracer.Start(ctx, "followup.claude",
+		trace.WithAttributes(
+			attribute.String("model", model),
+			attribute.Int("matched_dmails", len(dmails)),
+		),
+	)
+	defer followUpSpan.End()
+
+	p.Logger.Info("Follow-up: delivering %d matched D-Mail(s) via --continue", len(dmails))
+
+	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	if remaining < timeout {
+		timeout = remaining
+	}
+	followCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(followCtx, claudeCmd,
+		"--model", model,
+		"--continue",
+		"--dangerously-skip-permissions",
+		"--print",
+		"-p", prompt,
+	)
+	if workDir != "" {
+		cmd.Dir = workDir
+	} else {
+		cmd.Dir = p.config.Continent
+	}
+	cmd.WaitDelay = 3 * time.Second
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		p.Logger.Warn("Follow-up failed: %v", err)
+		followUpSpan.AddEvent("followup.error",
+			trace.WithAttributes(attribute.String("error", err.Error())),
+		)
+		return
+	}
+	p.Logger.OK("Follow-up completed (%d bytes output)", len(out))
 }
 
 func (p *Paintress) handleSuccess(report *ExpeditionReport) {
