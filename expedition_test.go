@@ -1390,6 +1390,224 @@ echo "done"
 	}
 }
 
+// TestExpedition_StaleFlagClearedOnWorkDir verifies that when WorkDir
+// differs from Continent, a stale current_issue in {WorkDir}/.expedition/.run/flag.md
+// is cleared before the expedition starts — preventing incorrect D-Mail routing.
+func TestExpedition_StaleFlagClearedOnWorkDir(t *testing.T) {
+	// given — WorkDir has stale current_issue from a prior interrupted run
+	continent := t.TempDir()
+	workDir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(continent, ".expedition", "inbox"), 0755)
+	os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755)
+
+	// Pre-populate WorkDir's flag.md with stale current_issue
+	staleFlagPath := filepath.Join(workDir, ".expedition", ".run", "flag.md")
+	os.WriteFile(staleFlagPath, []byte("current_issue: STALE-77\ncurrent_title: stale from prior run\n"), 0644)
+
+	continentInboxDir := filepath.Join(continent, ".expedition", "inbox")
+
+	// Script does NOT write current_issue — only drops a D-Mail for STALE-77
+	script := filepath.Join(workDir, "stale-workdir-test.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+sleep 0.5
+cat > %s/spec-stale77.md << 'DMEOF'
+---
+name: spec-stale77
+kind: specification
+description: d-mail for stale issue
+issues:
+  - STALE-77
+---
+
+Stale body
+DMEOF
+sleep 1
+echo "done"
+`, continentInboxDir)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: continent,
+		WorkDir:   workDir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — stale current_issue should have been cleared from WorkDir's flag.md;
+	// the D-Mail for STALE-77 should NOT be in midMatchedMails
+	matched := exp.MidMatchedDMails()
+	if len(matched) != 0 {
+		t.Errorf("expected 0 matched d-mails (stale WorkDir flag should be cleared), got %d: %v", len(matched), matched)
+	}
+
+	// Also verify the stale current_issue was actually removed from flag.md
+	flag := ReadFlag(workDir)
+	if flag.CurrentIssue != "" {
+		t.Errorf("WorkDir flag.md should have current_issue cleared, got %q", flag.CurrentIssue)
+	}
+}
+
+// TestExpedition_TwoWorkersConcurrent_NoContamination verifies that two
+// expeditions running concurrently with separate WorkDirs do not cross-
+// contaminate each other's current_issue routing. Each worker should only
+// collect D-Mails matching its own issue.
+func TestExpedition_TwoWorkersConcurrent_NoContamination(t *testing.T) {
+	// given — shared Continent, two separate WorkDirs
+	continent := t.TempDir()
+	workDir1 := t.TempDir()
+	workDir2 := t.TempDir()
+	logDir1 := t.TempDir()
+	logDir2 := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(continent, ".expedition", "inbox"), 0755)
+
+	continentInboxDir := filepath.Join(continent, ".expedition", "inbox")
+	workDirFlag1 := filepath.Join(workDir1, ".expedition", ".run", "flag.md")
+	workDirFlag2 := filepath.Join(workDir2, ".expedition", ".run", "flag.md")
+
+	// Worker 1: writes ISSUE-W1, waits, then drops D-Mails for both issues
+	script1 := filepath.Join(workDir1, "worker1.sh")
+	script1Content := fmt.Sprintf(`#!/bin/bash
+mkdir -p %s
+cat > %s << 'FLAGEOF'
+current_issue: ISSUE-W1
+current_title: worker 1 issue
+FLAGEOF
+sleep 1
+# Drop D-Mails for both worker issues into shared inbox
+cat > %s/dmail-w1.md << 'DMEOF'
+---
+name: dmail-w1
+kind: specification
+description: d-mail for worker 1
+issues:
+  - ISSUE-W1
+---
+
+Worker 1 content
+DMEOF
+cat > %s/dmail-w2.md << 'DMEOF2'
+---
+name: dmail-w2
+kind: specification
+description: d-mail for worker 2
+issues:
+  - ISSUE-W2
+---
+
+Worker 2 content
+DMEOF2
+sleep 1
+echo "done"
+`, filepath.Dir(workDirFlag1), workDirFlag1, continentInboxDir, continentInboxDir)
+	os.WriteFile(script1, []byte(script1Content), 0755)
+
+	// Worker 2: writes ISSUE-W2, waits for D-Mails to appear
+	script2 := filepath.Join(workDir2, "worker2.sh")
+	script2Content := fmt.Sprintf(`#!/bin/bash
+mkdir -p %s
+cat > %s << 'FLAGEOF'
+current_issue: ISSUE-W2
+current_title: worker 2 issue
+FLAGEOF
+sleep 3
+echo "done"
+`, filepath.Dir(workDirFlag2), workDirFlag2)
+	os.WriteFile(script2, []byte(script2Content), 0755)
+
+	exp1 := &Expedition{
+		Number:    1,
+		Continent: continent,
+		WorkDir:   workDir1,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script1,
+		},
+		LogDir:   logDir1,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+	exp2 := &Expedition{
+		Number:    2,
+		Continent: continent,
+		WorkDir:   workDir2,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script2,
+		},
+		LogDir:   logDir2,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when — run both expeditions concurrently
+	ctx := context.Background()
+	var wg sync.WaitGroup
+	var err1, err2 error
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		_, err1 = exp1.Run(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		_, err2 = exp2.Run(ctx)
+	}()
+	wg.Wait()
+
+	if err1 != nil {
+		t.Fatalf("Worker 1 Run() error: %v", err1)
+	}
+	if err2 != nil {
+		t.Fatalf("Worker 2 Run() error: %v", err2)
+	}
+
+	// then — each worker should only have matched its own issue's D-Mail
+	matched1 := exp1.MidMatchedDMails()
+	matched2 := exp2.MidMatchedDMails()
+
+	// Worker 1 should have matched dmail-w1 (ISSUE-W1), not dmail-w2
+	if len(matched1) != 1 {
+		t.Errorf("Worker 1: expected 1 matched d-mail, got %d: %v", len(matched1), matched1)
+	} else if matched1[0].Name != "dmail-w1" {
+		t.Errorf("Worker 1: matched[0].Name = %q, want dmail-w1", matched1[0].Name)
+	}
+
+	// Worker 2 should have matched dmail-w2 (ISSUE-W2), not dmail-w1
+	if len(matched2) != 1 {
+		t.Errorf("Worker 2: expected 1 matched d-mail, got %d: %v", len(matched2), matched2)
+	} else if matched2[0].Name != "dmail-w2" {
+		t.Errorf("Worker 2: matched[0].Name = %q, want dmail-w2", matched2[0].Name)
+	}
+}
+
 func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 	dir := t.TempDir()
 	cfg := Config{
