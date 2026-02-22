@@ -361,10 +361,18 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- flag.go                  Flag file read/write (.expedition/.run/flag.md)
 +-- flag_watcher.go          fsnotify: real-time flag change detection
 +-- inbox_watcher.go         fsnotify: real-time inbox d-mail detection
++-- init.go                  Init logic (interactive config creation)
++-- doctor.go                Doctor logic (external command checks)
++-- archive_prune.go         Archive pruning logic (age-based d-mail cleanup)
 +-- logger.go                Structured logger (verbose/quiet modes)
 +-- telemetry.go             OpenTelemetry tracer setup
 +-- lang.go                  i18n message map (en/ja/fr)
 +-- *_test.go                Tests
++-- docs/
+|   +-- dmail-protocol.md    D-Mail wire format, schema versioning, function map
+|   +-- expedition-directory.md  .expedition/ directory structure and prompt injection map
+|   +-- approval-contract.md HIGH severity gate three-way approval contract
+|   +-- cli/                 Auto-generated CLI reference (docgen)
 +-- internal/tools/docgen/
 |   +-- main.go              CLI documentation generator (docs/cli/)
 +-- docker/
