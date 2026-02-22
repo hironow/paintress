@@ -90,17 +90,14 @@ paintress --model opus,sonnet,haiku ./repo
 
 ## D-Mail Protocol
 
-Paintress communicates with external tools (phonewave, sightjack, courier) via the D-Mail protocol — markdown files exchanged through `inbox/` and `outbox/` directories.
+Paintress communicates with external tools (phonewave, sightjack, amadeus) via the D-Mail protocol — Markdown files with YAML frontmatter exchanged through `inbox/` and `outbox/` directories. Each message carries a `dmail-schema-version` field (currently `"1"`) for protocol compatibility.
 
-**Inbound** (inbox/ → prompt): External tools write specification or feedback d-mails to `.expedition/inbox/`. Paintress scans them at expedition start (`ScanInbox`) and embeds them in the prompt. A real-time `watchInbox` goroutine (fsnotify) also detects d-mails arriving mid-expedition (logged but not processed until the next expedition).
+- **Inbound**: External tools write specification/feedback d-mails to `inbox/`. Paintress scans and embeds them in the expedition prompt.
+- **Outbound**: After a successful expedition, a report d-mail is written to `archive/` first, then `outbox/` (archive-first for durability).
+- **HIGH Severity Gate**: HIGH severity d-mails trigger desktop notification + human approval before the expedition starts. See [docs/approval-contract.md](docs/approval-contract.md).
+- **Skills**: Agent skill manifests (`SKILL.md`) in `.expedition/skills/` follow the [Agent Skills](https://agentskills.io) specification, declaring D-Mail capabilities under `metadata`.
 
-**Outbound** (report → outbox/): After a successful expedition, Paintress generates a report d-mail and writes it to `archive/` first, then `outbox/` (archive-first for durability). The courier tool picks up outbox/ files for delivery.
-
-**Lifecycle**: inbox/ → prompt injection → expedition → archive/ (processed). Mid-expedition arrivals stay in inbox/ for the next expedition. Only d-mails that were embedded in the prompt are archived.
-
-**HIGH Severity Gate**: When inbox contains HIGH severity d-mails, Paintress sends a desktop notification (`osascript`/`notify-send`) and blocks for human approval before starting the expedition. Denied → expedition skipped. Use `--notify-cmd` for custom notifications (e.g. Slack), `--approve-cmd` for custom approval, or `--auto-approve` to skip the gate entirely.
-
-**Skills**: Agent skill manifests (`SKILL.md`) in `.expedition/skills/` declare D-Mail capabilities (`dmail-readable`: consumes specification/feedback, `dmail-sendable`: produces reports).
+Full protocol details: **[docs/dmail-protocol.md](docs/dmail-protocol.md)** | Directory structure: **[docs/expedition-directory.md](docs/expedition-directory.md)**
 
 ## Architecture
 
@@ -364,10 +361,18 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- flag.go                  Flag file read/write (.expedition/.run/flag.md)
 +-- flag_watcher.go          fsnotify: real-time flag change detection
 +-- inbox_watcher.go         fsnotify: real-time inbox d-mail detection
++-- init.go                  Init logic (interactive config creation)
++-- doctor.go                Doctor logic (external command checks)
++-- archive_prune.go         Archive pruning logic (age-based d-mail cleanup)
 +-- logger.go                Structured logger (verbose/quiet modes)
 +-- telemetry.go             OpenTelemetry tracer setup
 +-- lang.go                  i18n message map (en/ja/fr)
 +-- *_test.go                Tests
++-- docs/
+|   +-- dmail-protocol.md    D-Mail wire format, schema versioning, function map
+|   +-- expedition-directory.md  .expedition/ directory structure and prompt injection map
+|   +-- approval-contract.md HIGH severity gate three-way approval contract
+|   +-- cli/                 Auto-generated CLI reference (docgen)
 +-- internal/tools/docgen/
 |   +-- main.go              CLI documentation generator (docs/cli/)
 +-- docker/
@@ -375,7 +380,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- templates/
 |   +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
 |   +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
-|   +-- skills/              Agent skill manifests (copied to .expedition/skills/)
+|   +-- skills/              Agent skill manifests (Agent Skills spec, embedded via go:embed)
 +-- .goreleaser.yaml         GoReleaser v2 config (multi-platform + Homebrew)
 +-- .github/workflows/
     +-- ci.yaml              CI (test + vet)

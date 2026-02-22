@@ -1113,6 +1113,111 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 	if !strings.Contains(parsed.Body, "Added Redis caching layer") {
 		t.Errorf("Body should contain reason after roundtrip")
 	}
+	if parsed.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q after roundtrip", parsed.SchemaVersion, DMailSchemaVersion)
+	}
+}
+
+// === SchemaVersion Tests ===
+
+func TestParseDMail_SchemaVersion(t *testing.T) {
+	// given — d-mail with dmail-schema-version in frontmatter
+	input := []byte(`---
+name: "versioned-msg"
+kind: specification
+description: "Has schema version"
+dmail-schema-version: "1"
+---
+
+Body content.
+`)
+
+	// when
+	dm, err := ParseDMail(input)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dm.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, DMailSchemaVersion)
+	}
+}
+
+func TestDMailMarshal_SchemaVersionRoundTrip(t *testing.T) {
+	// given — DMail with SchemaVersion set
+	original := DMail{
+		Name:          "schema-v1",
+		Kind:          "report",
+		Description:   "Round-trip schema version",
+		SchemaVersion: DMailSchemaVersion,
+		Body:          "Content.\n",
+	}
+
+	// when — marshal then parse
+	data, err := original.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+	parsed, err := ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail error: %v", err)
+	}
+
+	// then
+	if parsed.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", parsed.SchemaVersion, DMailSchemaVersion)
+	}
+}
+
+func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
+	// given
+	report := &ExpeditionReport{
+		Expedition:  1,
+		IssueID:     "MY-99",
+		IssueTitle:  "Test issue",
+		MissionType: "implement",
+		Status:      "success",
+	}
+
+	// when
+	dm := NewReportDMail(report)
+
+	// then
+	if dm.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, DMailSchemaVersion)
+	}
+}
+
+func TestSendDMail_StampsSchemaVersion(t *testing.T) {
+	// given — DMail without SchemaVersion set
+	continent := t.TempDir()
+	dm := DMail{
+		Name:        "no-version",
+		Kind:        "report",
+		Description: "Missing schema version should be stamped",
+	}
+
+	// when
+	err := SendDMail(continent, dm)
+
+	// then
+	if err != nil {
+		t.Fatalf("SendDMail error: %v", err)
+	}
+
+	// Read back and verify version was stamped
+	data, err := os.ReadFile(filepath.Join(OutboxDir(continent), "no-version.md"))
+	if err != nil {
+		t.Fatalf("read outbox: %v", err)
+	}
+	parsed, err := ParseDMail(data)
+	if err != nil {
+		t.Fatalf("parse outbox: %v", err)
+	}
+	if parsed.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q (should be stamped by SendDMail)", parsed.SchemaVersion, DMailSchemaVersion)
+	}
 }
 
 // === Marshal Edge Cases ===

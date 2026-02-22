@@ -17,9 +17,9 @@ This document describes what each directory/file does, who creates it, and how i
     *.md                # user-placed context files (injected into prompt)
   skills/
     dmail-sendable/
-      SKILL.md          # agent skill manifest (phonewave discovery)
+      SKILL.md          # Agent Skills spec manifest (produces: report)
     dmail-readable/
-      SKILL.md
+      SKILL.md          # Agent Skills spec manifest (consumes: specification, feedback)
   inbox/                # incoming d-mails (specifications, feedback)
     *.md
   outbox/               # outgoing d-mails (reports)
@@ -53,7 +53,7 @@ outbox/
 |------|-----------|--------|
 | `journal/` | Tracked | Permanent knowledge; Lumina extraction source |
 | `context/` | Tracked | User-curated guidance for expeditions |
-| `skills/` | Tracked | Agent capability manifests for tool discovery |
+| `skills/` | Tracked | Agent Skills spec manifests for phonewave discovery (see [dmail-protocol.md](./dmail-protocol.md#agent-skills-skillmd)) |
 | `config.yaml` | Tracked | Project-level configuration |
 | `archive/` | Tracked | Audit trail of processed d-mails |
 | `.run/` | Ignored | Ephemeral runtime state (logs, flag, worktrees) |
@@ -120,6 +120,8 @@ Journals serve two purposes simultaneously:
 - `watchInbox` (fsnotify) performs an initial scan of existing files on startup, then monitors for Create/Write events
 - D-mails arriving mid-expedition are logged but NOT archived — they stay in inbox/ for the next expedition's `ScanInbox`
 
+For full protocol details (wire format, schema versioning, function map), see [dmail-protocol.md](./dmail-protocol.md).
+
 ## File Creators
 
 | File | Created By | When |
@@ -129,7 +131,7 @@ Journals serve two purposes simultaneously:
 | `config.yaml` | User or `SaveProjectConfig` | Manual or programmatic |
 | `journal/NNN.md` | `WriteJournal` | After each expedition (success, skip, or fail) |
 | `context/*.md` | User | Manual placement |
-| `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created if absent) |
+| `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates if absent, never overwrites) |
 | `inbox/*.md` | External tool (courier/sightjack) | Before expedition |
 | `outbox/*.md` | `SendDMail` | After successful expedition |
 | `archive/*.md` | `SendDMail` + `ArchiveInboxDMail` | After successful expedition |

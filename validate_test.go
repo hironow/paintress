@@ -290,10 +290,10 @@ func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 
 	skills := []struct {
 		dir      string
-		contains string
+		contains []string
 	}{
-		{"dmail-sendable", "produces:"},
-		{"dmail-readable", "consumes:"},
+		{"dmail-sendable", []string{"produces:", "kind: report", "license: Apache-2.0", "dmail-schema-version:"}},
+		{"dmail-readable", []string{"consumes:", "kind: specification", "kind: feedback", "license: Apache-2.0", "dmail-schema-version:"}},
 	}
 
 	for _, s := range skills {
@@ -306,8 +306,10 @@ func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 		if !strings.Contains(str, "name: "+s.dir) {
 			t.Errorf("%s/SKILL.md should contain 'name: %s', got: %q", s.dir, s.dir, str)
 		}
-		if !strings.Contains(str, s.contains) {
-			t.Errorf("%s/SKILL.md should contain %q, got: %q", s.dir, s.contains, str)
+		for _, c := range s.contains {
+			if !strings.Contains(str, c) {
+				t.Errorf("%s/SKILL.md should contain %q, got: %q", s.dir, c, str)
+			}
 		}
 	}
 }
