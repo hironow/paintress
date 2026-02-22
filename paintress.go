@@ -266,8 +266,10 @@ func (p *Paintress) Run(ctx context.Context) int {
 	// so that flag.md in the project root is always up-to-date for
 	// human inspection and the next startup's reconcileFlags.
 	if latest := reconcileFlags(p.config.Continent, p.config.Workers); latest.LastExpedition > 0 {
-		WriteFlag(p.config.Continent, latest.LastExpedition, latest.LastIssue,
-			latest.LastStatus, latest.Remaining, latest.MidHighSeverity)
+		if flagErr := WriteFlag(p.config.Continent, latest.LastExpedition, latest.LastIssue,
+			latest.LastStatus, latest.Remaining, latest.MidHighSeverity); flagErr != nil {
+			p.Logger.Warn("consolidate flag: %v", flagErr)
+		}
 	}
 
 	fmt.Fprintln(p.Logger.Writer())

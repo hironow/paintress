@@ -237,7 +237,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	// Ensure .expedition/.run/ exists in the execution directory so that
 	// watchFlag and the Claude process can read/write flag.md there.
-	os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755)
+	if err := os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755); err != nil {
+		return "", fmt.Errorf("create expedition run dir: %w", err)
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
