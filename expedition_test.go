@@ -577,28 +577,28 @@ echo "done"
 	}
 }
 
-// TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir verifies that
+// TestExpedition_Run_WatcherReadsFromWorkDir_NotContinent verifies that
 // in worktree mode (WorkDir != Continent), the flag watcher polls
-// Continent/.expedition/.run/flag.md — NOT WorkDir/.expedition/.run/flag.md.
-func TestExpedition_Run_WatcherReadsFromContinent_NotWorkDir(t *testing.T) {
+// WorkDir/.expedition/.run/flag.md — NOT Continent's (MY-362).
+func TestExpedition_Run_WatcherReadsFromWorkDir_NotContinent(t *testing.T) {
 	continent := t.TempDir()
 	workDir := t.TempDir() // simulate worktree — different from continent
 	logDir := t.TempDir()
 	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
-	os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755)
+	// WorkDir's .expedition/.run/ is created by Run()
 
-	// Script writes flag.md to CONTINENT root (not workDir), then outputs
-	flagPath := filepath.Join(continent, ".expedition", ".run", "flag.md")
+	// Script writes flag.md to WORKDIR (where Claude runs), not Continent
+	workDirFlagPath := filepath.Join(workDir, ".expedition", ".run", "flag.md")
 	script := filepath.Join(workDir, "write-flag.sh")
 	scriptContent := fmt.Sprintf(`#!/bin/bash
+mkdir -p %s
 cat > %s << 'FLAGEOF'
 current_issue: TREE-42
 current_title: worktree watcher test
 FLAGEOF
 sleep 1
 echo "done"
-`, flagPath)
+`, filepath.Dir(workDirFlagPath), workDirFlagPath)
 	os.WriteFile(script, []byte(scriptContent), 0755)
 
 	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
@@ -634,7 +634,7 @@ echo "done"
 	}
 
 	if !containsStr(string(logContent), "TREE-42") {
-		t.Errorf("watcher should detect issue from CONTINENT flag.md, not workDir; log:\n%s", string(logContent))
+		t.Errorf("watcher should detect issue from WORKDIR flag.md; log:\n%s", string(logContent))
 	}
 }
 
@@ -1305,6 +1305,88 @@ func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
 	got := exp.MidMatchedDMails()
 	if len(got) != 10 {
 		t.Errorf("expected 10 d-mails, got %d", len(got))
+	}
+}
+
+// TestExpedition_MidMatchedRouting_WorkDirIsolation verifies that when
+// WorkDir differs from Continent (Workers>0 worktree mode), watchFlag
+// monitors {WorkDir}/.expedition/.run/flag.md — not Continent's.
+// This ensures per-worker isolation: each worker detects only the issue
+// written by its own Claude process running in its worktree.
+func TestExpedition_MidMatchedRouting_WorkDirIsolation(t *testing.T) {
+	// given — separate Continent and WorkDir (simulates Workers>0 worktree)
+	continent := t.TempDir()
+	workDir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(continent, ".expedition", "inbox"), 0755)
+	// WorkDir's .expedition/.run/ will be created by Run()
+
+	workDirFlagPath := filepath.Join(workDir, ".expedition", ".run", "flag.md")
+	continentInboxDir := filepath.Join(continent, ".expedition", "inbox")
+
+	// Script writes current_issue to WorkDir (where Claude runs),
+	// then drops a matching D-Mail into Continent's inbox (shared).
+	script := filepath.Join(workDir, "workdir-isolation-test.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Write current_issue to WorkDir flag.md (Claude writes relative to cmd.Dir)
+mkdir -p %s
+cat > %s << 'FLAGEOF'
+current_issue: WORKER-1
+current_title: worker isolation test
+FLAGEOF
+# Wait for watcher to detect
+sleep 1
+# Drop matching D-Mail into Continent's shared inbox
+cat > %s/spec-worker1.md << 'DMEOF'
+---
+name: spec-worker1
+kind: specification
+description: d-mail for worker 1
+issues:
+  - WORKER-1
+---
+
+Worker 1 body
+DMEOF
+# Wait for inbox watcher to process
+sleep 1
+echo "done"
+`, filepath.Dir(workDirFlagPath), workDirFlagPath, continentInboxDir)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: continent,
+		WorkDir:   workDir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — watchFlag should have detected current_issue from WorkDir,
+	// and the matching D-Mail should be routed
+	matched := exp.MidMatchedDMails()
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 matched d-mail (from WorkDir flag), got %d: %v", len(matched), matched)
+	}
+	if matched[0].Name != "spec-worker1" {
+		t.Errorf("matched[0].Name = %q, want spec-worker1", matched[0].Name)
 	}
 }
 
