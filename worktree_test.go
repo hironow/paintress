@@ -112,7 +112,7 @@ func setupGitContainer(t *testing.T, ctx context.Context) testcontainers.Contain
 		ContainerRequest: testcontainers.ContainerRequest{
 			Image:      "alpine/git:latest",
 			Entrypoint: []string{"/bin/sh", "-c"},
-			Cmd:        []string{"sleep infinity"},
+			Cmd:        []string{"trap 'exit 0' TERM; while :; do sleep 1; done"},
 			WaitingFor: wait.ForExec([]string{"git", "--version"}).
 				WithExitCodeMatcher(func(exitCode int) bool {
 					return exitCode == 0

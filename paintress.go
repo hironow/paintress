@@ -184,7 +184,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}()
 	}
 
-	monolith := reconcileFlags(p.config.Continent)
+	monolith := reconcileFlags(p.config.Continent, p.config.Workers)
 	p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
 	p.Logger.Info("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
 	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
@@ -265,7 +265,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	// Consolidate: write the latest checkpoint back to Continent
 	// so that flag.md in the project root is always up-to-date for
 	// human inspection and the next startup's reconcileFlags.
-	if latest := reconcileFlags(p.config.Continent); latest.LastExpedition > 0 {
+	if latest := reconcileFlags(p.config.Continent, p.config.Workers); latest.LastExpedition > 0 {
 		WriteFlag(p.config.Continent, latest.LastExpedition, latest.LastIssue,
 			latest.LastStatus, latest.Remaining, latest.MidHighSeverity)
 	}
@@ -818,11 +818,16 @@ func (p *Paintress) printBanner() {
 	fmt.Fprintln(w)
 }
 
-// reconcileFlags scans the continent's own flag.md and all worktree flag.md
-// files, returning the one with the highest LastExpedition. This determines
-// the resume point at startup regardless of which worker wrote the checkpoint.
-func reconcileFlags(continent string) ExpeditionFlag {
+// reconcileFlags scans the continent's own flag.md and, when workers > 0,
+// all worktree flag.md files, returning the one with the highest
+// LastExpedition. When workers == 0, worktree flags are skipped because
+// WorktreePool.Init (which cleans stale worktrees) does not run, and
+// leftover flags from a previous multi-worker crash would be stale.
+func reconcileFlags(continent string, workers int) ExpeditionFlag {
 	best := ReadFlag(continent)
+	if workers == 0 {
+		return best
+	}
 	pattern := filepath.Join(continent, ".expedition", ".run", "worktrees", "*",
 		".expedition", ".run", "flag.md")
 	matches, _ := filepath.Glob(pattern)

@@ -306,7 +306,7 @@ func TestReconcileFlags_FindsMaxAcrossWorktrees(t *testing.T) {
 	WriteFlag(w2, 3, "MY-5", "failed", "7", 0)
 
 	// when
-	best := reconcileFlags(continent)
+	best := reconcileFlags(continent, 2)
 
 	// then — should return worker-001's flag (exp 7)
 	if best.LastExpedition != 7 {
@@ -327,7 +327,7 @@ func TestReconcileFlags_NoWorktrees(t *testing.T) {
 	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
 
 	// when
-	best := reconcileFlags(continent)
+	best := reconcileFlags(continent, 2)
 
 	// then — should return continent's flag
 	if best.LastExpedition != 5 {
@@ -343,7 +343,7 @@ func TestReconcileFlags_NoFlagFiles(t *testing.T) {
 	continent := t.TempDir()
 
 	// when
-	best := reconcileFlags(continent)
+	best := reconcileFlags(continent, 2)
 
 	// then — zero-value defaults
 	if best.LastExpedition != 0 {
@@ -351,5 +351,27 @@ func TestReconcileFlags_NoFlagFiles(t *testing.T) {
 	}
 	if best.Remaining != "?" {
 		t.Errorf("Remaining = %q, want '?'", best.Remaining)
+	}
+}
+
+func TestReconcileFlags_Workers0_IgnoresWorktreeFlags(t *testing.T) {
+	// given — continent flag (exp 5), stale worktree flag (exp 99)
+	continent := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
+	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
+
+	w1 := filepath.Join(continent, ".expedition", ".run", "worktrees", "worker-001")
+	os.MkdirAll(filepath.Join(w1, ".expedition", ".run"), 0755)
+	WriteFlag(w1, 99, "STALE-1", "success", "0", 0)
+
+	// when — workers=0 means no pool init, stale worktree flags are ignored
+	best := reconcileFlags(continent, 0)
+
+	// then — only continent flag is considered
+	if best.LastExpedition != 5 {
+		t.Errorf("LastExpedition = %d, want 5 (should ignore stale worktree exp 99)", best.LastExpedition)
+	}
+	if best.LastIssue != "MY-10" {
+		t.Errorf("LastIssue = %q, want MY-10", best.LastIssue)
 	}
 }
