@@ -864,3 +864,228 @@ func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
 		t.Errorf("mid_high_severity = %d, want 4", parsed.MidHighSeverity)
 	}
 }
+
+// ═══════════════════════════════════════════════
+// Workers>1 Integration Tests (MY-362 gap fill)
+// ═══════════════════════════════════════════════
+
+// TestSwarmMode_TwoWorkers_Consolidation verifies that post-run consolidation
+// writes the max(LastExpedition) from per-worker worktree flag.md files back
+// to Continent's flag.md. Workers=2, MaxExpeditions=2: each worker runs 1
+// expedition, then reconcileFlags picks the highest and consolidates.
+func TestSwarmMode_TwoWorkers_Consolidation(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// fakeClaude outputs a valid success report
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: TEST-1'
+echo 'issue_title: consolidation test'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 3'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Consolidation: Continent flag.md should have the highest expedition number
+	flag := ReadFlag(dir)
+	if flag.LastExpedition < 2 {
+		t.Errorf("consolidation: expected LastExpedition >= 2, got %d", flag.LastExpedition)
+	}
+	if flag.LastStatus != "success" {
+		t.Errorf("expected LastStatus=success, got %q", flag.LastStatus)
+	}
+	if flag.Remaining != "3" {
+		t.Errorf("expected Remaining=3, got %q", flag.Remaining)
+	}
+
+	// Both expeditions should have completed successfully
+	if p.totalSuccess.Load() != 2 {
+		t.Errorf("expected totalSuccess=2, got %d", p.totalSuccess.Load())
+	}
+}
+
+// TestSwarmMode_TwoWorkers_ArchiveIdempotent verifies that when two workers
+// both process the same inbox D-Mail and both attempt to archive it on success,
+// idempotent ArchiveInboxDMail ensures no errors. One os.Rename succeeds; the
+// second gets ENOENT and returns nil (not an error).
+func TestSwarmMode_TwoWorkers_ArchiveIdempotent(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Place a D-Mail in inbox before start
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+	dmailContent := "---\nname: shared-dmail\nkind: info\ndescription: shared test\n---\n\nShared body\n"
+	if err := os.WriteFile(filepath.Join(inboxDir, "shared-dmail.md"), []byte(dmailContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// fakeClaude outputs a valid success report
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: TEST-1'
+echo 'issue_title: archive test'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 5'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Inbox should be empty: both workers tried to archive, one succeeded,
+	// the other got ENOENT (idempotent nil) — no error either way.
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".md" {
+			t.Errorf("inbox should be empty after archive, found: %s", e.Name())
+		}
+	}
+
+	// Archive should contain the D-Mail
+	archivePath := filepath.Join(dir, ".expedition", "archive", "shared-dmail.md")
+	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+		t.Error("expected shared-dmail.md in archive/")
+	}
+}
+
+// TestSwarmMode_TwoWorkers_MidHighSeverityAggregation verifies that
+// totalMidHighSeverity correctly aggregates HIGH severity D-Mails detected
+// mid-expedition across multiple workers. Each worker's script writes a unique
+// HIGH severity D-Mail during execution; the inbox watcher detects them.
+func TestSwarmMode_TwoWorkers_MidHighSeverityAggregation(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	// Script writes a unique HIGH severity D-Mail (using PID for uniqueness)
+	// to Continent's inbox mid-execution, waits for watcher, then outputs report.
+	script := filepath.Join(dir, "fakeclaude-high.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+DMAIL_NAME="high-$$"
+cat > %s/$DMAIL_NAME.md << DMEOF
+---
+name: $DMAIL_NAME
+kind: alert
+description: high severity test
+severity: high
+---
+
+High severity body
+DMEOF
+# Wait for inbox watcher (fsnotify) to detect the new file
+sleep 2
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: TEST-1'
+echo 'issue_title: high severity test'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 3'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`, inboxDir)
+	if err := os.WriteFile(script, []byte(scriptContent), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Each worker should have detected at least 1 HIGH severity D-Mail.
+	// Both watchers may see both D-Mails (timing-dependent), so total >= 2.
+	total := p.totalMidHighSeverity.Load()
+	if total < 2 {
+		t.Errorf("expected totalMidHighSeverity >= 2, got %d", total)
+	}
+
+	// Flag should reflect the mid-high severity count
+	flag := ReadFlag(dir)
+	if flag.MidHighSeverity == 0 {
+		t.Error("consolidated flag.md should have MidHighSeverity > 0")
+	}
+}
