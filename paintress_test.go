@@ -1089,3 +1089,59 @@ echo '__EXPEDITION_END__'
 		t.Error("consolidated flag.md should have MidHighSeverity > 0")
 	}
 }
+
+// TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag verifies that the
+// StatusComplete path writes the "all/complete" flag checkpoint before
+// releasing the worktree back to the pool. If writeFlag ran after
+// releaseWorkDir, another worker could reclaim the worktree and overwrite
+// the flag.md, losing the completion checkpoint.
+func TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// fakeClaude outputs __EXPEDITION_COMPLETE__ which triggers StatusComplete
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_COMPLETE__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Consolidated flag must reflect the StatusComplete checkpoint.
+	// If writeFlag ran after releaseWorkDir (the bug), reconcileFlags
+	// could miss the "complete" status or see stale data from a reused worktree.
+	flag := ReadFlag(dir)
+	if flag.LastExpedition == 0 {
+		t.Fatal("consolidated flag.md has LastExpedition=0; writeFlag may not have run before release")
+	}
+	if flag.LastStatus != "complete" {
+		t.Errorf("expected LastStatus=complete, got %q", flag.LastStatus)
+	}
+	if flag.LastIssue != "all" {
+		t.Errorf("expected LastIssue=all, got %q", flag.LastIssue)
+	}
+	if flag.Remaining != "0" {
+		t.Errorf("expected Remaining=0, got %q", flag.Remaining)
+	}
+}
