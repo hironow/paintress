@@ -1113,6 +1113,9 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 	if !strings.Contains(parsed.Body, "Added Redis caching layer") {
 		t.Errorf("Body should contain reason after roundtrip")
 	}
+	if parsed.SchemaVersion != "1" {
+		t.Errorf("SchemaVersion = %q, want %q after roundtrip", parsed.SchemaVersion, "1")
+	}
 }
 
 // === SchemaVersion Tests ===
