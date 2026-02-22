@@ -1136,6 +1136,76 @@ echo "done"
 	}
 }
 
+// TestExpedition_MidMatchedRouting_StaleFlagIgnored verifies that a
+// stale current_issue in flag.md from a previous interrupted expedition
+// does not cause incorrect routing. Run() should clear stale current_issue
+// before starting the watchFlag watcher.
+func TestExpedition_MidMatchedRouting_StaleFlagIgnored(t *testing.T) {
+	// given — flag.md already has a stale current_issue from a prior run
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
+
+	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+
+	// Pre-populate flag.md with stale current_issue (simulates interrupted prior run)
+	os.WriteFile(flagPath, []byte("current_issue: STALE-99\ncurrent_title: stale issue\n"), 0644)
+
+	// Script does NOT write current_issue — only drops a D-Mail for STALE-99
+	script := filepath.Join(dir, "stale-test.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Write a D-Mail that matches the STALE issue (should NOT be routed)
+sleep 0.5
+cat > %s/spec-stale.md << 'DMEOF'
+---
+name: spec-stale
+kind: specification
+description: d-mail for stale issue
+issues:
+  - STALE-99
+---
+
+Stale body
+DMEOF
+sleep 1
+echo "done"
+`, inboxDir)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — stale current_issue should have been cleared;
+	// the D-Mail for STALE-99 should NOT be in midMatchedMails
+	matched := exp.MidMatchedDMails()
+	if len(matched) != 0 {
+		t.Errorf("expected 0 matched d-mails (stale issue should be ignored), got %d: %v", len(matched), matched)
+	}
+}
+
 // TestExpedition_MidMatchedRouting_HighSeverityAlsoRouted verifies that
 // a HIGH severity D-Mail matching the current issue is collected in both
 // midHighNames (for notification) and midMatchedMails (for follow-up).
