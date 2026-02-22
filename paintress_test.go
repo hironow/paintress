@@ -1,6 +1,7 @@
 package paintress
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -1143,5 +1145,86 @@ echo '__EXPEDITION_COMPLETE__'
 	}
 	if flag.Remaining != "0" {
 		t.Errorf("expected Remaining=0, got %q", flag.Remaining)
+	}
+}
+
+// TestSwarmMode_StaleWorktreeFlag_IgnoredAfterInit verifies that stale
+// flag.md files from a crashed prior run do not advance the resume point.
+// WorktreePool.Init force-removes old worktrees (and their flag.md files),
+// and reconcileFlags runs after Init, so stale checkpoints are invisible.
+func TestSwarmMode_StaleWorktreeFlag_IgnoredAfterInit(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Plant a stale worktree with a real git worktree and a flag.md at exp 99
+	// to simulate a prior crash that left behind worktree state.
+	stalePath := filepath.Join(dir, ".expedition", ".run", "worktrees", "worker-001")
+	cmd := exec.Command("git", "worktree", "add", "--detach", stalePath, "main")
+	cmd.Dir = dir
+	cmd.Env = gitIsolatedEnv(dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	WriteFlag(stalePath, 99, "STALE-1", "success", "0", 0)
+
+	// Continent's own flag at exp 2 (the real checkpoint)
+	WriteFlag(dir, 2, "MY-1", "success", "5", 0)
+
+	// fakeClaude outputs a success report — if stale flag is read,
+	// startExp would be 100 and this expedition would not run.
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: MY-2'
+echo 'issue_title: not stale'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 4'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 3, // startExp=3 from continent flag (exp 2), runs exp 3,4,5
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	var logBuf bytes.Buffer
+	p := NewPaintress(cfg, NewLogger(&logBuf, false), &logBuf, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d\nlog:\n%s", code, logBuf.String())
+	}
+
+	// If the stale flag (exp 99) was read, startExp would be 100 and
+	// nothing would run (MaxExpeditions=3 < 100). The test proves
+	// reconcileFlags ignores stale worktree flags after Init cleans them.
+	if p.totalSuccess.Load() == 0 {
+		t.Fatal("no expeditions ran; stale worktree flag.md likely advanced startExp past MaxExpeditions")
+	}
+
+	flag := ReadFlag(dir)
+	// startExp = continent flag (2) + 1 = 3, runs 3 expeditions: exp 3, 4, 5
+	if flag.LastExpedition != 5 {
+		t.Errorf("expected LastExpedition=5, got %d", flag.LastExpedition)
+	}
+	if flag.LastIssue != "MY-2" {
+		t.Errorf("expected LastIssue=MY-2, got %q", flag.LastIssue)
 	}
 }

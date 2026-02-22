@@ -150,26 +150,8 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 	defer p.Logger.CloseLogFile()
 
-	monolith := reconcileFlags(p.config.Continent)
-
 	p.printBanner()
 	p.Logger.Info("%s", fmt.Sprintf(Msg("continent"), p.config.Continent))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
-	claudeCmd := p.config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = DefaultClaudeCmd
-	}
-	if claudeCmd != DefaultClaudeCmd {
-		p.Logger.Info("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
-	}
-	if p.config.DryRun {
-		p.Logger.Warn("%s", Msg("dry_run"))
-	}
-	fmt.Fprintln(p.Logger.Writer())
 
 	// Start dev server (stays alive across expeditions)
 	if !p.config.DryRun && p.devServer != nil {
@@ -179,7 +161,10 @@ func (p *Paintress) Run(ctx context.Context) int {
 		defer p.devServer.Stop()
 	}
 
-	// Initialize worktree pool if workers > 0
+	// Initialize worktree pool if workers > 0.
+	// Init force-removes stale worktrees from prior runs, which also
+	// deletes their per-worker flag.md files. reconcileFlags must run
+	// AFTER Init so it never reads a stale checkpoint.
 	if p.config.Workers > 0 {
 		p.pool = NewWorktreePool(
 			&localGitExecutor{},
@@ -198,6 +183,24 @@ func (p *Paintress) Run(ctx context.Context) int {
 			p.pool.Shutdown(shutdownCtx)
 		}()
 	}
+
+	monolith := reconcileFlags(p.config.Continent)
+	p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
+	claudeCmd := p.config.ClaudeCmd
+	if claudeCmd == "" {
+		claudeCmd = DefaultClaudeCmd
+	}
+	if claudeCmd != DefaultClaudeCmd {
+		p.Logger.Info("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
+	}
+	if p.config.DryRun {
+		p.Logger.Warn("%s", Msg("dry_run"))
+	}
+	fmt.Fprintln(p.Logger.Writer())
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===
 	p.totalAttempted.Store(0)
