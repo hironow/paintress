@@ -32,10 +32,14 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		return
 	}
 
-	// Track last-processed mod time per file to deduplicate: fsnotify may
-	// fire CREATE + WRITE for the same atomic write (same mod time), but
-	// legitimate updates (different mod time) must still be delivered.
-	lastMod := make(map[string]time.Time)
+	// Deduplicate fsnotify's duplicate CREATE+WRITE events for the same
+	// atomic os.WriteFile, while still delivering legitimate updates.
+	// We track (modTime, size); if either changes the file is re-processed.
+	type fileStat struct {
+		modTime time.Time
+		size    int64
+	}
+	lastStat := make(map[string]fileStat)
 
 	// Initial scan: catch files that already exist before the event loop starts.
 	entries, _ := os.ReadDir(inboxDir)
@@ -56,7 +60,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		if err != nil {
 			continue
 		}
-		lastMod[fullPath] = info.ModTime()
+		lastStat[fullPath] = fileStat{info.ModTime(), info.Size()}
 		onNewDMail(dm)
 	}
 
@@ -82,7 +86,8 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if err != nil {
 				continue
 			}
-			if prev, ok := lastMod[event.Name]; ok && !info.ModTime().After(prev) {
+			cur := fileStat{info.ModTime(), info.Size()}
+			if prev, ok := lastStat[event.Name]; ok && prev == cur {
 				continue
 			}
 			data, err := os.ReadFile(event.Name)
@@ -93,7 +98,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if err != nil {
 				continue
 			}
-			lastMod[event.Name] = info.ModTime()
+			lastStat[event.Name] = cur
 			onNewDMail(dm)
 		case _, ok := <-watcher.Errors:
 			if !ok {
