@@ -248,16 +248,17 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 	defer outFile.Close()
 
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("%s start failed: %w", claudeCmd, err)
-	}
-
-	// Clear stale current_issue from flag.md before starting the watcher.
+	// Clear stale current_issue from flag.md before starting the process.
 	// If a previous expedition was interrupted, flag.md may still contain
 	// current_issue from that run. Re-writing via WriteFlag produces a
 	// format that omits current_issue/current_title, effectively clearing them.
+	// Must happen before cmd.Start() to avoid clobbering a legitimate write.
 	if stale := ReadFlag(e.Continent); stale.CurrentIssue != "" {
 		WriteFlag(e.Continent, stale.LastExpedition, stale.LastIssue, stale.LastStatus, stale.Remaining, stale.MidHighSeverity)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("%s start failed: %w", claudeCmd, err)
 	}
 
 	// Start flag.md watcher to detect issue selection in real-time
