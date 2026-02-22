@@ -123,7 +123,7 @@ Journals serve two purposes simultaneously:
 - **inbox/** -> prompt injection -> **archive/** (after success)
 - **report** -> **archive/** first, then **outbox/** (archive-first for durability)
 - `SendDMail` and `ArchiveInboxDMail` are best-effort (LogWarn on failure, never block success)
-- `ArchiveInboxDMail` is idempotent — returns nil if source already gone (`ENOENT`), safe for concurrent workers archiving the same d-mail
+- `ArchiveInboxDMail` is idempotent — returns nil only if source is gone AND destination already exists in archive (confirmed by `os.Stat`), errors on genuinely missing source
 - `watchInbox` (fsnotify) performs an initial scan of existing files on startup, then monitors for Create/Write events
 - D-mails arriving mid-expedition are logged but NOT archived — they stay in inbox/ for the next expedition's `ScanInbox`
 - HIGH severity d-mails arriving mid-expedition trigger notification and are counted in `totalMidHighSeverity`

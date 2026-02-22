@@ -84,7 +84,7 @@ Bump `DMailSchemaVersion` when the frontmatter format changes.
 
 - `SendDMail` writes to **archive/ first**, then outbox/ (archive-first for durability)
 - `ScanInbox` returns d-mails **sorted by filename** for deterministic ordering
-- `ArchiveInboxDMail` uses `os.Rename` for atomic move; idempotent — returns nil if source already gone (`ENOENT`), safe for concurrent workers archiving the same d-mail
+- `ArchiveInboxDMail` uses `os.Rename` for atomic move; idempotent — returns nil only if source is gone AND destination already exists in archive (confirmed by `os.Stat`), errors on genuinely missing source
 
 ### Mid-Expedition Arrivals
 
@@ -101,7 +101,7 @@ D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logg
 | `DMail.Marshal` | `dmail.go` | Serialize DMail to wire format |
 | `SendDMail` | `dmail.go` | Write to archive/ then outbox/ |
 | `ScanInbox` | `dmail.go` | Read all .md files from inbox/ |
-| `ArchiveInboxDMail` | `dmail.go` | Move inbox/ file to archive/ (idempotent) |
+| `ArchiveInboxDMail` | `dmail.go` | Move inbox/ file to archive/ (idempotent if already archived) |
 | `FormatDMailForPrompt` | `dmail.go` | Format d-mails for prompt injection |
 | `NewReportDMail` | `dmail.go` | Create report d-mail from ExpeditionReport |
 | `FilterHighSeverity` | `gate.go` | Filter d-mails with severity=HIGH |

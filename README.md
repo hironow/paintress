@@ -155,7 +155,7 @@ Continent (Git repo)       <- Persistent world
 4. **Consolidate** — After all workers complete: `reconcileFlags` scans all worktree flag.md files, picks max(LastExpedition), writes it back to Continent's flag.md for human inspection and next startup.
 5. **Shutdown** — On exit (30s timeout, independent of parent context): `git worktree remove -f` each → `git worktree prune`
 
-When `--workers 0`, no pool is created and expeditions run directly on the repository. The flag.md path unifies: `flagDir = workDir` (worktree path when Workers>0, Continent when Workers=0). No mutex is needed — each worker has exclusive access to its own flag.md.
+When `--workers 0`, no pool is created and expeditions run directly on the repository. The flag.md path unifies: `flagDir = workDir` (worktree path when Workers>0, Continent when Workers=0). No mutex is needed — each worker has exclusive access to its own flag.md. `reconcileFlags` skips worktree glob scan when workers=0, reading only the Continent flag.md to avoid stale worktree contamination from crashed prior runs.
 
 ## Goroutines
 
