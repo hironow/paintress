@@ -1136,6 +1136,86 @@ echo "done"
 	}
 }
 
+// TestExpedition_MidMatchedRouting_HighSeverityAlsoRouted verifies that
+// a HIGH severity D-Mail matching the current issue is collected in both
+// midHighNames (for notification) and midMatchedMails (for follow-up).
+func TestExpedition_MidMatchedRouting_HighSeverityAlsoRouted(t *testing.T) {
+	// given — expedition writes current_issue, then a HIGH severity D-Mail matching it
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
+
+	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+
+	script := filepath.Join(dir, "high-route-test.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Step 1: Write current_issue to flag.md
+cat > %s << 'FLAGEOF'
+current_issue: MY-42
+current_title: high severity route test
+FLAGEOF
+# Step 2: Wait for watcher to pick up flag
+sleep 1
+# Step 3: Write HIGH severity D-Mail matching the issue
+cat > %s/urgent-spec.md << 'DMEOF'
+---
+name: urgent-spec
+kind: specification
+description: urgent matched d-mail
+severity: high
+issues:
+  - MY-42
+---
+
+Urgent body
+DMEOF
+# Step 4: Wait for inbox watcher to process
+sleep 1
+echo "done"
+`, flagPath, inboxDir)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — should appear in BOTH midHighNames and midMatchedMails
+	highNames := exp.MidHighSeverityDMails()
+	if len(highNames) != 1 || highNames[0] != "urgent-spec" {
+		t.Errorf("expected midHighNames=[urgent-spec], got %v", highNames)
+	}
+
+	matched := exp.MidMatchedDMails()
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 matched d-mail (HIGH severity), got %d: %v", len(matched), matched)
+	}
+	if matched[0].Name != "urgent-spec" {
+		t.Errorf("matched[0].Name = %q, want urgent-spec", matched[0].Name)
+	}
+}
+
 func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
 	exp := &Expedition{}
 

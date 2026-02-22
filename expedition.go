@@ -292,13 +292,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				}
 			} else {
 				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
-				// Issue routing: collect D-Mails that match the current expedition's issue
-				if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
-					e.midMatchedMu.Lock()
-					e.midMatchedMails = append(e.midMatchedMails, dm)
-					e.midMatchedMu.Unlock()
-					e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
-				}
+			}
+			// Issue routing runs regardless of severity: collect D-Mails
+			// that match the current expedition's issue for follow-up.
+			if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
+				e.midMatchedMu.Lock()
+				e.midMatchedMails = append(e.midMatchedMails, dm)
+				e.midMatchedMu.Unlock()
+				e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
 			}
 		}, nil)
 	}()
