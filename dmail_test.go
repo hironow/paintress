@@ -887,20 +887,43 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 }
 
-func TestArchiveInboxDMail_SourceNotFound(t *testing.T) {
-	// given — no file in inbox
+func TestArchiveInboxDMail_SourceNotFound_Idempotent(t *testing.T) {
+	// given — no file in inbox (already archived or never existed)
 	continent := t.TempDir()
 	os.MkdirAll(InboxDir(continent), 0755)
 
 	// when
 	err := ArchiveInboxDMail(continent, "nonexistent")
 
-	// then
-	if err == nil {
-		t.Fatal("expected error for missing source file, got nil")
+	// then — idempotent: missing source is not an error
+	if err != nil {
+		t.Fatalf("expected nil for missing source (idempotent), got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "nonexistent") {
-		t.Errorf("error should mention name, got %q", err.Error())
+}
+
+func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
+	// given — one file in inbox, two goroutines try to archive it
+	continent := t.TempDir()
+	inboxDir := InboxDir(continent)
+	os.MkdirAll(inboxDir, 0755)
+
+	dm := DMail{Name: "race-me", Kind: "report", Description: "concurrent test"}
+	data, _ := dm.Marshal()
+	os.WriteFile(filepath.Join(inboxDir, "race-me.md"), data, 0644)
+
+	// when — two goroutines race to archive
+	errs := make(chan error, 2)
+	for range 2 {
+		go func() {
+			errs <- ArchiveInboxDMail(continent, "race-me")
+		}()
+	}
+
+	// then — both should return nil (one renames, one gets already-gone)
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent archive should be idempotent, got: %v", err)
+		}
 	}
 }
 

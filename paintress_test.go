@@ -761,14 +761,10 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 
 	// Write flag for expedition 5
-	p.flagMu.Lock()
-	p.writeFlag(5, "ISS-5", "success", "10", 0)
-	p.flagMu.Unlock()
+	p.writeFlag(dir, 5, "ISS-5", "success", "10", 0)
 
 	// Attempt to write flag for expedition 3 (out-of-order completion)
-	p.flagMu.Lock()
-	p.writeFlag(3, "ISS-3", "success", "12", 0)
-	p.flagMu.Unlock()
+	p.writeFlag(dir, 3, "ISS-3", "success", "12", 0)
 
 	// Flag should still show expedition 5, not 3
 	flag := ReadFlag(dir)

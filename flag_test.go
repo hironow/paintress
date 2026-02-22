@@ -284,3 +284,72 @@ mid_high_severity: 3
 		t.Errorf("MidHighSeverity = %d, want 3", f.MidHighSeverity)
 	}
 }
+
+// === reconcileFlags Tests ===
+
+func TestReconcileFlags_FindsMaxAcrossWorktrees(t *testing.T) {
+	// given — continent flag (exp 5), worker-001 (exp 7), worker-002 (exp 3)
+	continent := t.TempDir()
+
+	// Continent's own flag.md
+	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
+	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
+
+	// worker-001 flag.md — the highest
+	w1 := filepath.Join(continent, ".expedition", ".run", "worktrees", "worker-001")
+	os.MkdirAll(filepath.Join(w1, ".expedition", ".run"), 0755)
+	WriteFlag(w1, 7, "MY-20", "success", "3", 1)
+
+	// worker-002 flag.md — lower than both
+	w2 := filepath.Join(continent, ".expedition", ".run", "worktrees", "worker-002")
+	os.MkdirAll(filepath.Join(w2, ".expedition", ".run"), 0755)
+	WriteFlag(w2, 3, "MY-5", "failed", "7", 0)
+
+	// when
+	best := reconcileFlags(continent)
+
+	// then — should return worker-001's flag (exp 7)
+	if best.LastExpedition != 7 {
+		t.Errorf("LastExpedition = %d, want 7", best.LastExpedition)
+	}
+	if best.LastIssue != "MY-20" {
+		t.Errorf("LastIssue = %q, want MY-20", best.LastIssue)
+	}
+	if best.MidHighSeverity != 1 {
+		t.Errorf("MidHighSeverity = %d, want 1", best.MidHighSeverity)
+	}
+}
+
+func TestReconcileFlags_NoWorktrees(t *testing.T) {
+	// given — only continent flag.md, no worktrees
+	continent := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
+	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
+
+	// when
+	best := reconcileFlags(continent)
+
+	// then — should return continent's flag
+	if best.LastExpedition != 5 {
+		t.Errorf("LastExpedition = %d, want 5", best.LastExpedition)
+	}
+	if best.LastIssue != "MY-10" {
+		t.Errorf("LastIssue = %q, want MY-10", best.LastIssue)
+	}
+}
+
+func TestReconcileFlags_NoFlagFiles(t *testing.T) {
+	// given — empty directory, no flag.md anywhere
+	continent := t.TempDir()
+
+	// when
+	best := reconcileFlags(continent)
+
+	// then — zero-value defaults
+	if best.LastExpedition != 0 {
+		t.Errorf("LastExpedition = %d, want 0", best.LastExpedition)
+	}
+	if best.Remaining != "?" {
+		t.Errorf("Remaining = %q, want '?'", best.Remaining)
+	}
+}
