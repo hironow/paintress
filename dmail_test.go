@@ -1113,8 +1113,8 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 	if !strings.Contains(parsed.Body, "Added Redis caching layer") {
 		t.Errorf("Body should contain reason after roundtrip")
 	}
-	if parsed.SchemaVersion != "1" {
-		t.Errorf("SchemaVersion = %q, want %q after roundtrip", parsed.SchemaVersion, "1")
+	if parsed.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q after roundtrip", parsed.SchemaVersion, DMailSchemaVersion)
 	}
 }
 
@@ -1139,8 +1139,8 @@ Body content.
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if dm.SchemaVersion != "1" {
-		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, "1")
+	if dm.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, DMailSchemaVersion)
 	}
 }
 
@@ -1150,7 +1150,7 @@ func TestDMailMarshal_SchemaVersionRoundTrip(t *testing.T) {
 		Name:          "schema-v1",
 		Kind:          "report",
 		Description:   "Round-trip schema version",
-		SchemaVersion: "1",
+		SchemaVersion: DMailSchemaVersion,
 		Body:          "Content.\n",
 	}
 
@@ -1165,8 +1165,8 @@ func TestDMailMarshal_SchemaVersionRoundTrip(t *testing.T) {
 	}
 
 	// then
-	if parsed.SchemaVersion != "1" {
-		t.Errorf("SchemaVersion = %q, want %q", parsed.SchemaVersion, "1")
+	if parsed.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", parsed.SchemaVersion, DMailSchemaVersion)
 	}
 }
 
@@ -1183,9 +1183,9 @@ func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
 	// when
 	dm := NewReportDMail(report)
 
-	// then — schema version must be "1"
-	if dm.SchemaVersion != "1" {
-		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, "1")
+	// then
+	if dm.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, DMailSchemaVersion)
 	}
 }
 
@@ -1215,29 +1215,8 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse outbox: %v", err)
 	}
-	if parsed.SchemaVersion != "1" {
-		t.Errorf("SchemaVersion = %q, want %q (should be stamped by SendDMail)", parsed.SchemaVersion, "1")
-	}
-}
-
-func TestParseDMail_NoSchemaVersion_BackwardCompat(t *testing.T) {
-	// given — old d-mail without dmail-schema-version
-	input := []byte(`---
-name: "old-format"
-kind: report
-description: "No schema version field"
----
-`)
-
-	// when
-	dm, err := ParseDMail(input)
-
-	// then — empty string, no error (backward compatible)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if dm.SchemaVersion != "" {
-		t.Errorf("SchemaVersion = %q, want empty for old format", dm.SchemaVersion)
+	if parsed.SchemaVersion != DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q (should be stamped by SendDMail)", parsed.SchemaVersion, DMailSchemaVersion)
 	}
 }
 

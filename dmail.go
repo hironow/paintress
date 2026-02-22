@@ -62,7 +62,7 @@ func NewReportDMail(report *ExpeditionReport) DMail {
 		Kind:          "report",
 		Description:   fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
 		Issues:        []string{report.IssueID},
-		SchemaVersion: "1",
+		SchemaVersion: DMailSchemaVersion,
 		Body:          body.String(),
 	}
 }
@@ -81,6 +81,10 @@ func OutboxDir(continent string) string {
 func ArchiveDir(continent string) string {
 	return filepath.Join(continent, ".expedition", "archive")
 }
+
+// DMailSchemaVersion is the current D-Mail protocol schema version.
+// Bump this when the frontmatter format changes (must match dmail-frontmatter.v1.schema.json).
+const DMailSchemaVersion = "1"
 
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
 // The format uses Jekyll/Hugo-style frontmatter delimiters (---).
@@ -168,7 +172,7 @@ func (d DMail) Marshal() ([]byte, error) {
 // Creates directories if needed. Filename: <d.Name>.md
 func SendDMail(continent string, d DMail) error {
 	if d.SchemaVersion == "" {
-		d.SchemaVersion = "1"
+		d.SchemaVersion = DMailSchemaVersion
 	}
 	data, err := d.Marshal()
 	if err != nil {
