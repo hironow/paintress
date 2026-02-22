@@ -498,7 +498,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				// Follow-up: deliver issue-matched mid-expedition D-Mails via --continue
 				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
-					followUpBudget := totalTimeout - expElapsed
+					followUpBudget := totalTimeout - time.Since(expStart)
 					p.runFollowUp(ctx, matched, workDir, followUpBudget)
 				}
 				p.consecutiveFailures.Store(0)
