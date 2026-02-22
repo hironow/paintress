@@ -1614,3 +1614,46 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 		t.Errorf("final: archive should have 4 files, got %d: %v", len(archiveEntries), names)
 	}
 }
+
+// === BuildFollowUpPrompt Tests ===
+
+func TestBuildFollowUpPrompt_SingleDMail(t *testing.T) {
+	dmails := []DMail{
+		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting spec", Issues: []string{"MY-42"}, Body: "# DoD\n- Token bucket\n"},
+	}
+
+	prompt := BuildFollowUpPrompt(dmails)
+
+	if !strings.Contains(prompt, "spec-my-42") {
+		t.Error("prompt should contain d-mail name")
+	}
+	if !strings.Contains(prompt, "Token bucket") {
+		t.Error("prompt should contain d-mail body content")
+	}
+	if !strings.Contains(prompt, "D-Mail") {
+		t.Error("prompt should mention D-Mail")
+	}
+}
+
+func TestBuildFollowUpPrompt_MultipleDMails(t *testing.T) {
+	dmails := []DMail{
+		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting"},
+		{Name: "feedback-d-001", Kind: "feedback", Description: "Review feedback", Severity: "medium"},
+	}
+
+	prompt := BuildFollowUpPrompt(dmails)
+
+	if !strings.Contains(prompt, "spec-my-42") {
+		t.Error("prompt should contain first d-mail")
+	}
+	if !strings.Contains(prompt, "feedback-d-001") {
+		t.Error("prompt should contain second d-mail")
+	}
+}
+
+func TestBuildFollowUpPrompt_EmptySlice(t *testing.T) {
+	prompt := BuildFollowUpPrompt(nil)
+	if prompt != "" {
+		t.Errorf("empty input should return empty string, got %q", prompt)
+	}
+}

@@ -65,8 +65,51 @@ type Expedition struct {
 	midHighMu    sync.Mutex
 	midHighNames []string
 
+	// Mid-expedition issue-matched D-Mail routing (MY-361)
+	currentIssueMu  sync.Mutex
+	currentIssue    string
+	midMatchedMu    sync.Mutex
+	midMatchedMails []DMail
+
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+}
+
+// containsIssue reports whether issues contains target (case-insensitive).
+func containsIssue(issues []string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for _, id := range issues {
+		if strings.EqualFold(id, target) {
+			return true
+		}
+	}
+	return false
+}
+
+// setCurrentIssue records the issue being worked on (called from watchFlag callback).
+func (e *Expedition) setCurrentIssue(issue string) {
+	e.currentIssueMu.Lock()
+	e.currentIssue = issue
+	e.currentIssueMu.Unlock()
+}
+
+// getCurrentIssue returns the issue being worked on (thread-safe).
+func (e *Expedition) getCurrentIssue() string {
+	e.currentIssueMu.Lock()
+	defer e.currentIssueMu.Unlock()
+	return e.currentIssue
+}
+
+// MidMatchedDMails returns a copy of issue-matched D-Mails received mid-expedition.
+func (e *Expedition) MidMatchedDMails() []DMail {
+	e.midMatchedMu.Lock()
+	defer e.midMatchedMu.Unlock()
+	if len(e.midMatchedMails) == 0 {
+		return []DMail{}
+	}
+	return append([]DMail(nil), e.midMatchedMails...)
 }
 
 // MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
@@ -213,6 +256,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
 	go watchFlag(watchCtx, e.Continent, func(issue, title string) {
+		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
 				attribute.String("issue_id", issue),
@@ -248,6 +292,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				}
 			} else {
 				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
+				// Issue routing: collect D-Mails that match the current expedition's issue
+				if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
+					e.midMatchedMu.Lock()
+					e.midMatchedMails = append(e.midMatchedMails, dm)
+					e.midMatchedMu.Unlock()
+					e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
+				}
 			}
 		}, nil)
 	}()

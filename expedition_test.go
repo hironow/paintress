@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -928,6 +929,232 @@ func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 	}
 	if !containsStr(prompt, "implement") && !containsStr(prompt, "verify") {
 		t.Error("prompt should contain mission type descriptions")
+	}
+}
+
+func TestContainsIssue_Match(t *testing.T) {
+	if !containsIssue([]string{"MY-42", "MY-43"}, "MY-42") {
+		t.Error("should match MY-42 in list")
+	}
+}
+
+func TestContainsIssue_NoMatch(t *testing.T) {
+	if containsIssue([]string{"MY-42", "MY-43"}, "MY-99") {
+		t.Error("should not match MY-99")
+	}
+}
+
+func TestContainsIssue_EmptyList(t *testing.T) {
+	if containsIssue(nil, "MY-42") {
+		t.Error("empty list should not match")
+	}
+}
+
+func TestContainsIssue_EmptyTarget(t *testing.T) {
+	if containsIssue([]string{"MY-42"}, "") {
+		t.Error("empty target should not match")
+	}
+}
+
+func TestContainsIssue_CaseInsensitive(t *testing.T) {
+	if !containsIssue([]string{"my-42"}, "MY-42") {
+		t.Error("should match case-insensitively")
+	}
+}
+
+func TestMidMatchedDMails_Empty(t *testing.T) {
+	exp := &Expedition{}
+	got := exp.MidMatchedDMails()
+	if got == nil {
+		t.Fatal("should return non-nil empty slice")
+	}
+	if len(got) != 0 {
+		t.Errorf("should be empty, got %d", len(got))
+	}
+}
+
+func TestMidMatchedDMails_ReturnsCopy(t *testing.T) {
+	exp := &Expedition{}
+	exp.midMatchedMu.Lock()
+	exp.midMatchedMails = []DMail{{Name: "spec-1", Kind: "specification"}}
+	exp.midMatchedMu.Unlock()
+
+	got := exp.MidMatchedDMails()
+	if len(got) != 1 || got[0].Name != "spec-1" {
+		t.Fatalf("unexpected result: %v", got)
+	}
+
+	// mutating returned slice must not affect internal state
+	got[0].Name = "MUTATED"
+	internal := exp.MidMatchedDMails()
+	if internal[0].Name != "spec-1" {
+		t.Error("MidMatchedDMails should return a defensive copy")
+	}
+}
+
+func TestExpedition_MidMatchedRouting_MatchesCurrentIssue(t *testing.T) {
+	// given — expedition with a shell script that:
+	//   1. writes current_issue to flag.md
+	//   2. writes a matching D-Mail to inbox/
+	//   3. writes a non-matching D-Mail to inbox/
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
+
+	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+
+	script := filepath.Join(dir, "route-test.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Step 1: Write current_issue to flag.md
+cat > %s << 'FLAGEOF'
+current_issue: MY-42
+current_title: route test issue
+FLAGEOF
+# Step 2: Wait for watcher to pick up flag
+sleep 1
+# Step 3: Write matching D-Mail (issues contains MY-42)
+cat > %s/spec-matched.md << 'DMEOF'
+---
+name: spec-matched
+kind: specification
+description: matched d-mail
+issues:
+  - MY-42
+---
+
+Matched body
+DMEOF
+# Step 4: Write non-matching D-Mail (issues contains MY-99)
+cat > %s/spec-unmatched.md << 'DMEOF2'
+---
+name: spec-unmatched
+kind: specification
+description: unmatched d-mail
+issues:
+  - MY-99
+---
+
+Unmatched body
+DMEOF2
+# Step 5: Wait for inbox watcher to process
+sleep 1
+echo "done"
+`, flagPath, inboxDir, inboxDir)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — only the matching D-Mail should be in midMatchedMails
+	matched := exp.MidMatchedDMails()
+	if len(matched) != 1 {
+		t.Fatalf("expected 1 matched d-mail, got %d: %v", len(matched), matched)
+	}
+	if matched[0].Name != "spec-matched" {
+		t.Errorf("matched[0].Name = %q, want spec-matched", matched[0].Name)
+	}
+}
+
+func TestExpedition_MidMatchedRouting_NoCurrentIssue_NoMatch(t *testing.T) {
+	// given — expedition that writes D-Mails but never sets current_issue
+	dir := t.TempDir()
+	logDir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
+
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	script := filepath.Join(dir, "no-issue-test.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+# Write D-Mail without setting current_issue in flag
+cat > %s/spec-orphan.md << 'DMEOF'
+---
+name: spec-orphan
+kind: specification
+description: orphan d-mail
+issues:
+  - MY-42
+---
+
+Orphan body
+DMEOF
+sleep 1
+echo "done"
+`, inboxDir)
+	os.WriteFile(script, []byte(scriptContent), 0755)
+
+	exp := &Expedition{
+		Number:    1,
+		Continent: dir,
+		Config: Config{
+			BaseBranch: "main",
+			DevURL:     "http://localhost:3000",
+			TimeoutSec: 30,
+			ClaudeCmd:  script,
+		},
+		LogDir:   logDir,
+		Logger:   NewLogger(io.Discard, false),
+		DataOut:  io.Discard,
+		Gradient: NewGradientGauge(5),
+		Reserve:  NewReserveParty("opus", nil, NewLogger(io.Discard, false)),
+	}
+
+	// when
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	// then — no matches (currentIssue was never set)
+	matched := exp.MidMatchedDMails()
+	if len(matched) != 0 {
+		t.Errorf("expected 0 matched d-mails when no current_issue, got %d", len(matched))
+	}
+}
+
+func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
+	exp := &Expedition{}
+
+	// concurrent writes
+	var wg sync.WaitGroup
+	for i := range 10 {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			exp.midMatchedMu.Lock()
+			exp.midMatchedMails = append(exp.midMatchedMails, DMail{Name: fmt.Sprintf("dm-%d", n)})
+			exp.midMatchedMu.Unlock()
+		}(i)
+	}
+	wg.Wait()
+
+	got := exp.MidMatchedDMails()
+	if len(got) != 10 {
+		t.Errorf("expected 10 d-mails, got %d", len(got))
 	}
 }
 

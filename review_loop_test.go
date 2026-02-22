@@ -265,6 +265,81 @@ func TestReviewLoop_ShortTimeoutStillRunsReview(t *testing.T) {
 	}
 }
 
+// === runFollowUp Tests ===
+
+func TestRunFollowUp_ExecutesClaude(t *testing.T) {
+	// given — a fake claude command that echoes its arguments
+	dir := t.TempDir()
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, `
+# Write all arguments to a marker file for verification
+echo "$@" > `+filepath.Join(dir, ".followup-args")+`
+exit 0
+`)
+
+	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
+	dmails := []DMail{
+		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting", Issues: []string{"MY-42"}, Body: "# DoD\n"},
+	}
+
+	// when
+	p.runFollowUp(context.Background(), dmails, dir)
+
+	// then — the follow-up command should have been executed
+	args, err := os.ReadFile(filepath.Join(dir, ".followup-args"))
+	if err != nil {
+		t.Fatalf("follow-up command was not executed: %v", err)
+	}
+	argsStr := string(args)
+	if !strings.Contains(argsStr, "--continue") {
+		t.Errorf("expected --continue in args, got: %q", argsStr)
+	}
+	if !strings.Contains(argsStr, "--print") {
+		t.Errorf("expected --print in args, got: %q", argsStr)
+	}
+}
+
+func TestRunFollowUp_EmptyDMails_Noop(t *testing.T) {
+	// given — no matched d-mails
+	dir := t.TempDir()
+	markerFile := filepath.Join(dir, ".followup-ran")
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, "touch "+markerFile+"\nexit 0\n")
+
+	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
+
+	// when
+	p.runFollowUp(context.Background(), nil, dir)
+
+	// then — command should NOT have been executed
+	if _, err := os.Stat(markerFile); err == nil {
+		t.Error("follow-up should not execute when dmails is empty")
+	}
+}
+
+func TestRunFollowUp_ContextCanceled_Returns(t *testing.T) {
+	// given — context is already canceled
+	dir := t.TempDir()
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, "sleep 10\nexit 0\n")
+
+	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
+	dmails := []DMail{{Name: "spec-1", Kind: "specification", Description: "test"}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // pre-cancel
+
+	// when
+	start := time.Now()
+	p.runFollowUp(ctx, dmails, dir)
+	elapsed := time.Since(start)
+
+	// then — should return quickly
+	if elapsed > 2*time.Second {
+		t.Errorf("canceled context should return quickly, took %v", elapsed)
+	}
+}
+
 // TestReviewLoop_ReviewErrorPreservesLastComments verifies that when
 // the review command fails on a later cycle, the review comments found
 // in earlier cycles are still recorded in the report insight.

@@ -495,6 +495,10 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 						p.Logger.Warn("dmail archive: %v", err)
 					}
 				}
+				// Follow-up: deliver issue-matched mid-expedition D-Mails via --continue
+				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
+					p.runFollowUp(ctx, matched, workDir)
+				}
 				p.consecutiveFailures.Store(0)
 				p.totalSuccess.Add(1)
 			case StatusSkipped:
@@ -713,6 +717,63 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 	}
 	report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
 	p.Logger.Warn("%s", Msg("review_limit"))
+}
+
+// runFollowUp executes a --continue -p follow-up turn for issue-matched D-Mails
+// received mid-expedition. The follow-up reuses the same conversation context
+// as the just-completed expedition. No-op if dmails is empty.
+func (p *Paintress) runFollowUp(ctx context.Context, dmails []DMail, workDir string) {
+	if len(dmails) == 0 {
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
+
+	prompt := BuildFollowUpPrompt(dmails)
+	claudeCmd := p.config.ClaudeCmd
+	if claudeCmd == "" {
+		claudeCmd = DefaultClaudeCmd
+	}
+
+	model := p.reserve.ActiveModel()
+	_, followUpSpan := tracer.Start(ctx, "followup.claude",
+		trace.WithAttributes(
+			attribute.String("model", model),
+			attribute.Int("matched_dmails", len(dmails)),
+		),
+	)
+	defer followUpSpan.End()
+
+	p.Logger.Info("Follow-up: delivering %d matched D-Mail(s) via --continue", len(dmails))
+
+	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	followCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(followCtx, claudeCmd,
+		"--model", model,
+		"--continue",
+		"--dangerously-skip-permissions",
+		"--print",
+		"-p", prompt,
+	)
+	if workDir != "" {
+		cmd.Dir = workDir
+	} else {
+		cmd.Dir = p.config.Continent
+	}
+	cmd.WaitDelay = 3 * time.Second
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		p.Logger.Warn("Follow-up failed: %v", err)
+		followUpSpan.AddEvent("followup.error",
+			trace.WithAttributes(attribute.String("error", err.Error())),
+		)
+		return
+	}
+	p.Logger.OK("Follow-up completed (%d bytes output)", len(out))
 }
 
 func (p *Paintress) handleSuccess(report *ExpeditionReport) {
