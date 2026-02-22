@@ -253,6 +253,11 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// current_issue from that run. Re-writing via WriteFlag produces a
 	// format that omits current_issue/current_title, effectively clearing them.
 	// Must happen before cmd.Start() to avoid clobbering a legitimate write.
+	//
+	// NOTE(MY-362): This bypasses p.flagMu / p.writeFlag's monotonic guard.
+	// In Workers > 1 mode, a concurrent worker's checkpoint write could be
+	// rolled back if it lands between ReadFlag and WriteFlag here. Safe for
+	// Workers=1 (default). Per-worktree flag isolation will resolve this.
 	if stale := ReadFlag(e.Continent); stale.CurrentIssue != "" {
 		WriteFlag(e.Continent, stale.LastExpedition, stale.LastIssue, stale.LastStatus, stale.Remaining, stale.MidHighSeverity)
 	}
