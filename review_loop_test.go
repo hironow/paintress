@@ -282,8 +282,8 @@ exit 0
 		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting", Issues: []string{"MY-42"}, Body: "# DoD\n"},
 	}
 
-	// when
-	p.runFollowUp(context.Background(), dmails, dir)
+	// when — generous budget
+	p.runFollowUp(context.Background(), dmails, dir, 30*time.Second)
 
 	// then — the follow-up command should have been executed
 	args, err := os.ReadFile(filepath.Join(dir, ".followup-args"))
@@ -309,7 +309,7 @@ func TestRunFollowUp_EmptyDMails_Noop(t *testing.T) {
 	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
 
 	// when
-	p.runFollowUp(context.Background(), nil, dir)
+	p.runFollowUp(context.Background(), nil, dir, 30*time.Second)
 
 	// then — command should NOT have been executed
 	if _, err := os.Stat(markerFile); err == nil {
@@ -331,12 +331,31 @@ func TestRunFollowUp_ContextCanceled_Returns(t *testing.T) {
 
 	// when
 	start := time.Now()
-	p.runFollowUp(ctx, dmails, dir)
+	p.runFollowUp(ctx, dmails, dir, 30*time.Second)
 	elapsed := time.Since(start)
 
 	// then — should return quickly
 	if elapsed > 2*time.Second {
 		t.Errorf("canceled context should return quickly, took %v", elapsed)
+	}
+}
+
+func TestRunFollowUp_ZeroBudget_Skipped(t *testing.T) {
+	// given — zero remaining budget should skip execution
+	dir := t.TempDir()
+	markerFile := filepath.Join(dir, ".followup-ran")
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, "touch "+markerFile+"\nexit 0\n")
+
+	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
+	dmails := []DMail{{Name: "spec-1", Kind: "specification", Description: "test"}}
+
+	// when — zero budget remaining
+	p.runFollowUp(context.Background(), dmails, dir, 0)
+
+	// then — command should NOT have been executed
+	if _, err := os.Stat(markerFile); err == nil {
+		t.Error("follow-up should not execute when remaining budget is zero")
 	}
 }
 

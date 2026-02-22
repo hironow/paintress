@@ -497,7 +497,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 				// Follow-up: deliver issue-matched mid-expedition D-Mails via --continue
 				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
-					p.runFollowUp(ctx, matched, workDir)
+					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
+					followUpBudget := totalTimeout - expElapsed
+					p.runFollowUp(ctx, matched, workDir, followUpBudget)
 				}
 				p.consecutiveFailures.Store(0)
 				p.totalSuccess.Add(1)
@@ -721,12 +723,18 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *ExpeditionReport,
 
 // runFollowUp executes a --continue -p follow-up turn for issue-matched D-Mails
 // received mid-expedition. The follow-up reuses the same conversation context
-// as the just-completed expedition. No-op if dmails is empty.
-func (p *Paintress) runFollowUp(ctx context.Context, dmails []DMail, workDir string) {
+// as the just-completed expedition. No-op if dmails is empty or remaining budget
+// is zero. The remaining parameter caps the follow-up timeout to stay within
+// the overall expedition time budget.
+func (p *Paintress) runFollowUp(ctx context.Context, dmails []DMail, workDir string, remaining time.Duration) {
 	if len(dmails) == 0 {
 		return
 	}
 	if ctx.Err() != nil {
+		return
+	}
+	if remaining <= 0 {
+		p.Logger.Warn("Follow-up skipped: no remaining time budget")
 		return
 	}
 
@@ -748,6 +756,9 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []DMail, workDir str
 	p.Logger.Info("Follow-up: delivering %d matched D-Mail(s) via --continue", len(dmails))
 
 	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	if remaining < timeout {
+		timeout = remaining
+	}
 	followCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
