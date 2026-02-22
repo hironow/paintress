@@ -940,7 +940,7 @@ echo '__EXPEDITION_END__'
 // TestSwarmMode_TwoWorkers_ArchiveIdempotent verifies that when two workers
 // both process the same inbox D-Mail and both attempt to archive it on success,
 // idempotent ArchiveInboxDMail ensures no errors. One os.Rename succeeds; the
-// second gets ENOENT and returns nil (not an error).
+// second gets ENOENT, confirms the destination exists in archive, and returns nil.
 func TestSwarmMode_TwoWorkers_ArchiveIdempotent(t *testing.T) {
 	dir := setupTestRepo(t)
 
@@ -994,7 +994,7 @@ echo '__EXPEDITION_END__'
 	}
 
 	// Inbox should be empty: both workers tried to archive, one succeeded,
-	// the other got ENOENT (idempotent nil) — no error either way.
+	// the other got ENOENT but confirmed dst in archive (idempotent nil).
 	entries, err := os.ReadDir(inboxDir)
 	if err != nil {
 		t.Fatal(err)
