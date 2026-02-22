@@ -30,7 +30,7 @@ This structure maps directly to AI agent loop design:
 | **Paintress** | This binary | External force that drives the loop |
 | **Monolith** | Linear backlog | The remaining issue count is inscribed |
 | **Expedition** | One Claude Code execution | Departs with fresh context each time |
-| **Expedition Flag** | `.expedition/.run/flag.md` | Checkpoint passed to the next run |
+| **Expedition Flag** | `.expedition/.run/flag.md` | Per-worker checkpoint, consolidated at exit |
 | **Journal** | `.expedition/journal/` | Record of past decisions and lessons |
 | **Canvas** | LLM context window | Beautiful but temporary — destroyed each run |
 | **Lumina** | Auto-extracted patterns | Patterns learned from past failures/successes |
@@ -138,19 +138,24 @@ Continent (Git repo)       <- Persistent world
          +-- outbox/       <- Outgoing d-mails (gitignored, transient)
          +-- archive/      <- Processed d-mails (tracked, audit trail)
          +-- .run/         <- Ephemeral (gitignored)
-              +-- flag.md       <- Checkpoint (auto-generated)
+              +-- flag.md       <- Checkpoint (consolidated from per-worker flags at exit)
               +-- logs/         <- Expedition logs
               +-- worktrees/    <- Managed by WorktreePool
+                   +-- worker-001/
+                   |    +-- .expedition/.run/flag.md  <- Per-worker checkpoint
+                   +-- worker-002/
+                        +-- .expedition/.run/flag.md  <- Per-worker checkpoint
 ```
 
 ### WorktreePool Lifecycle (`--workers >= 1`)
 
 1. **Init** — `git worktree prune`, then for each worker: force-remove leftover → `git worktree add --detach` → run `--setup-cmd` if set
 2. **Acquire** — Worker claims a worktree from the pool (blocks if all in use)
-3. **Release** — After each expedition: `git checkout --detach <base-branch>` → `git reset --hard <base-branch>` → `git clean -fd` → return to pool
-4. **Shutdown** — On exit (30s timeout, independent of parent context): `git worktree remove -f` each → `git worktree prune`
+3. **Release** — After each expedition: `git checkout --detach <base-branch>` → `git reset --hard <base-branch>` → `git clean -fd -e .expedition` → return to pool. The `-e .expedition` exclusion preserves per-worker flag.md across releases.
+4. **Consolidate** — After all workers complete: `reconcileFlags` scans all worktree flag.md files, picks max(LastExpedition), writes it back to Continent's flag.md for human inspection and next startup.
+5. **Shutdown** — On exit (30s timeout, independent of parent context): `git worktree remove -f` each → `git worktree prune`
 
-When `--workers 0`, no pool is created and expeditions run directly on the repository.
+When `--workers 0`, no pool is created and expeditions run directly on the repository. The flag.md path unifies: `flagDir = workDir` (worktree path when Workers>0, Continent when Workers=0). No mutex is needed — each worker has exclusive access to its own flag.md.
 
 ## Goroutines
 
