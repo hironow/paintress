@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 )
@@ -12,6 +11,10 @@ import (
 // watchInbox watches the inbox/ directory for new or updated D-Mail files using
 // filesystem notifications and invokes onNewDMail when a valid .md file is detected.
 // Returns silently if the inbox directory does not exist.
+//
+// Callers are responsible for deduplication — fsnotify may fire multiple events
+// (CREATE + WRITE) for a single file write, and files from the initial scan may
+// also produce events. See expedition.go seenFiles for the canonical dedup.
 //
 // If ready is non-nil, a value is sent after the watcher is fully set up,
 // allowing callers to synchronize without time.Sleep.
@@ -32,27 +35,13 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		return
 	}
 
-	// Deduplicate fsnotify's duplicate CREATE+WRITE events for the same
-	// atomic os.WriteFile, while still delivering legitimate updates.
-	// We track (modTime, size); if either changes the file is re-processed.
-	type fileStat struct {
-		modTime time.Time
-		size    int64
-	}
-	lastStat := make(map[string]fileStat)
-
 	// Initial scan: catch files that already exist before the event loop starts.
 	entries, _ := os.ReadDir(inboxDir)
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
 			continue
 		}
-		fullPath := filepath.Join(inboxDir, entry.Name())
-		info, err := os.Stat(fullPath)
-		if err != nil {
-			continue
-		}
-		data, err := os.ReadFile(fullPath)
+		data, err := os.ReadFile(filepath.Join(inboxDir, entry.Name()))
 		if err != nil {
 			continue
 		}
@@ -60,7 +49,6 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		if err != nil {
 			continue
 		}
-		lastStat[fullPath] = fileStat{info.ModTime(), info.Size()}
 		onNewDMail(dm)
 	}
 
@@ -82,14 +70,6 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if event.Op&(fsnotify.Create|fsnotify.Write) == 0 {
 				continue
 			}
-			info, err := os.Stat(event.Name)
-			if err != nil {
-				continue
-			}
-			cur := fileStat{info.ModTime(), info.Size()}
-			if prev, ok := lastStat[event.Name]; ok && prev == cur {
-				continue
-			}
 			data, err := os.ReadFile(event.Name)
 			if err != nil {
 				continue
@@ -98,7 +78,6 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if err != nil {
 				continue
 			}
-			lastStat[event.Name] = cur
 			onNewDMail(dm)
 		case _, ok := <-watcher.Errors:
 			if !ok {
