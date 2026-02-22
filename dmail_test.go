@@ -887,20 +887,65 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 }
 
-func TestArchiveInboxDMail_SourceNotFound(t *testing.T) {
-	// given — no file in inbox
+func TestArchiveInboxDMail_SourceNotFound_NotInArchive(t *testing.T) {
+	// given — no file in inbox AND no file in archive (wrong name)
 	continent := t.TempDir()
 	os.MkdirAll(InboxDir(continent), 0755)
 
 	// when
 	err := ArchiveInboxDMail(continent, "nonexistent")
 
-	// then
+	// then — error: source missing and not in archive means wrong name
 	if err == nil {
-		t.Fatal("expected error for missing source file, got nil")
+		t.Fatal("expected error for missing source not in archive, got nil")
 	}
-	if !strings.Contains(err.Error(), "nonexistent") {
-		t.Errorf("error should mention name, got %q", err.Error())
+	if !strings.Contains(err.Error(), "not in archive") {
+		t.Fatalf("expected 'not in archive' error, got: %v", err)
+	}
+}
+
+func TestArchiveInboxDMail_SourceNotFound_AlreadyInArchive(t *testing.T) {
+	// given — file already in archive (previously archived by another worker)
+	continent := t.TempDir()
+	os.MkdirAll(InboxDir(continent), 0755)
+	arcDir := ArchiveDir(continent)
+	os.MkdirAll(arcDir, 0755)
+	dm := DMail{Name: "already-moved", Kind: "report", Description: "already archived"}
+	data, _ := dm.Marshal()
+	os.WriteFile(filepath.Join(arcDir, "already-moved.md"), data, 0644)
+
+	// when
+	err := ArchiveInboxDMail(continent, "already-moved")
+
+	// then — idempotent: dst exists proves another worker archived it
+	if err != nil {
+		t.Fatalf("expected nil for already-archived d-mail, got: %v", err)
+	}
+}
+
+func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
+	// given — one file in inbox, two goroutines try to archive it
+	continent := t.TempDir()
+	inboxDir := InboxDir(continent)
+	os.MkdirAll(inboxDir, 0755)
+
+	dm := DMail{Name: "race-me", Kind: "report", Description: "concurrent test"}
+	data, _ := dm.Marshal()
+	os.WriteFile(filepath.Join(inboxDir, "race-me.md"), data, 0644)
+
+	// when — two goroutines race to archive
+	errs := make(chan error, 2)
+	for range 2 {
+		go func() {
+			errs <- ArchiveInboxDMail(continent, "race-me")
+		}()
+	}
+
+	// then — both should return nil (one renames, one gets already-gone)
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent archive should be idempotent, got: %v", err)
+		}
 	}
 }
 

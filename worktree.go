@@ -102,7 +102,10 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	if _, err := wp.git.Git(ctx, path, "reset", "--hard", wp.baseBranch); err != nil {
 		return fmt.Errorf("reset: %w", err)
 	}
-	if _, err := wp.git.Git(ctx, path, "clean", "-fd"); err != nil {
+	// Exclude .expedition/ from clean so that per-worker flag.md survives
+	// across releases. The post-run reconcileFlags needs these files to
+	// determine the latest checkpoint. Shutdown removes the worktree entirely.
+	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", ".expedition"); err != nil {
 		return fmt.Errorf("clean: %w", err)
 	}
 	wp.workers <- path

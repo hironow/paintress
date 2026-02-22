@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -49,9 +48,6 @@ type Paintress struct {
 	totalBugs            atomic.Int64
 	totalMidHighSeverity atomic.Int64
 	consecutiveFailures  atomic.Int64
-
-	// Swarm Mode: mutex-protected shared resources
-	flagMu sync.Mutex
 }
 
 func NewPaintress(cfg Config, logger *Logger, dataOut io.Writer, stdinIn io.Reader) *Paintress {
@@ -154,26 +150,8 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 	defer p.Logger.CloseLogFile()
 
-	monolith := ReadFlag(p.config.Continent)
-
 	p.printBanner()
 	p.Logger.Info("%s", fmt.Sprintf(Msg("continent"), p.config.Continent))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
-	p.Logger.Info("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
-	claudeCmd := p.config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = DefaultClaudeCmd
-	}
-	if claudeCmd != DefaultClaudeCmd {
-		p.Logger.Info("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
-	}
-	if p.config.DryRun {
-		p.Logger.Warn("%s", Msg("dry_run"))
-	}
-	fmt.Fprintln(p.Logger.Writer())
 
 	// Start dev server (stays alive across expeditions)
 	if !p.config.DryRun && p.devServer != nil {
@@ -183,7 +161,10 @@ func (p *Paintress) Run(ctx context.Context) int {
 		defer p.devServer.Stop()
 	}
 
-	// Initialize worktree pool if workers > 0
+	// Initialize worktree pool if workers > 0.
+	// Init force-removes stale worktrees from prior runs, which also
+	// deletes their per-worker flag.md files. reconcileFlags must run
+	// AFTER Init so it never reads a stale checkpoint.
 	if p.config.Workers > 0 {
 		p.pool = NewWorktreePool(
 			&localGitExecutor{},
@@ -202,6 +183,24 @@ func (p *Paintress) Run(ctx context.Context) int {
 			p.pool.Shutdown(shutdownCtx)
 		}()
 	}
+
+	monolith := reconcileFlags(p.config.Continent, p.config.Workers)
+	p.Logger.Info("%s", fmt.Sprintf(Msg("monolith_reads"), monolith.Remaining))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("max_expeditions"), p.config.MaxExpeditions))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("party_info"), p.reserve.Status()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("gradient_info"), p.gradient.FormatForPrompt()))
+	p.Logger.Info("%s", fmt.Sprintf(Msg("timeout_info"), p.config.TimeoutSec))
+	claudeCmd := p.config.ClaudeCmd
+	if claudeCmd == "" {
+		claudeCmd = DefaultClaudeCmd
+	}
+	if claudeCmd != DefaultClaudeCmd {
+		p.Logger.Info("%s", fmt.Sprintf(Msg("claude_cmd_info"), claudeCmd))
+	}
+	if p.config.DryRun {
+		p.Logger.Warn("%s", Msg("dry_run"))
+	}
+	fmt.Fprintln(p.Logger.Writer())
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===
 	p.totalAttempted.Store(0)
@@ -262,6 +261,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 
 	err := g.Wait()
+
+	// Consolidate: write the latest checkpoint back to Continent
+	// so that flag.md in the project root is always up-to-date for
+	// human inspection and the next startup's reconcileFlags.
+	if latest := reconcileFlags(p.config.Continent, p.config.Workers); latest.LastExpedition > 0 {
+		if flagErr := WriteFlag(p.config.Continent, latest.LastExpedition, latest.LastIssue,
+			latest.LastStatus, latest.Remaining, latest.MidHighSeverity); flagErr != nil {
+			p.Logger.Warn("consolidate flag: %v", flagErr)
+		}
+	}
 
 	fmt.Fprintln(p.Logger.Writer())
 	p.printSummary()
@@ -335,6 +344,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
 
+		// Each worker writes its checkpoint to its own workDir (or Continent
+		// when Workers=0). No mutex needed — each worker has exclusive access.
+		flagDir := workDir
+		if flagDir == "" {
+			flagDir = p.config.Continent
+		}
+
 		expedition := &Expedition{
 			Number:      exp,
 			Continent:   p.config.Continent,
@@ -398,9 +414,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.totalMidHighSeverity.Add(int64(midHighCount))
 			}
 
-			p.flagMu.Lock()
-			p.writeFlag(exp, "error", "failed", "?", midHighCount)
-			p.flagMu.Unlock()
+			p.writeFlag(flagDir, exp, "error", "failed", "?", midHighCount)
 			errReport := &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
 				MissionType: "?", Status: "failed", Reason: err.Error(),
@@ -436,20 +450,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				expSpan.AddEvent("expedition.complete",
 					trace.WithAttributes(attribute.String("status", "all_complete")),
 				)
+				p.writeFlag(flagDir, exp, "all", "complete", "0", midHighCount)
 				releaseWorkDir()
 				expSpan.End()
 				p.Logger.OK("%s", Msg("all_complete"))
-				p.flagMu.Lock()
-				p.writeFlag(exp, "all", "complete", "0", midHighCount)
-				p.flagMu.Unlock()
 				return errComplete
 			case StatusParseError:
 				p.Logger.Warn("%s", Msg("report_parse_fail"))
 				p.Logger.Warn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
-				p.flagMu.Lock()
-				p.writeFlag(exp, "?", "parse_error", "?", midHighCount)
-				p.flagMu.Unlock()
+				p.writeFlag(flagDir, exp, "?", "parse_error", "?", midHighCount)
 				parseErrReport := &ExpeditionReport{
 					Expedition: exp, IssueID: "?", IssueTitle: "?",
 					MissionType: "?", Status: "parse_error", Reason: "report markers not found",
@@ -486,9 +496,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 						p.runReviewLoop(ctx, report, remaining, workDir)
 					}
 				}
-				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "success", report.Remaining, midHighCount)
-				p.flagMu.Unlock()
+				p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
 				// D-Mail: send report and archive processed inbox d-mails (best-effort)
 				if dm := NewReportDMail(report); dm.Name != "" {
@@ -506,17 +514,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			case StatusSkipped:
 				p.Logger.Warn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
-				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining, midHighCount)
-				p.flagMu.Unlock()
+				p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
 				p.totalSkipped.Add(1)
 			case StatusFailed:
 				p.Logger.Error("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
-				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "failed", report.Remaining, midHighCount)
-				p.flagMu.Unlock()
+				p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
@@ -816,15 +820,40 @@ func (p *Paintress) printBanner() {
 	fmt.Fprintln(w)
 }
 
+// reconcileFlags scans the continent's own flag.md and, when workers > 0,
+// all worktree flag.md files, returning the one with the highest
+// LastExpedition. When workers == 0, worktree flags are skipped because
+// WorktreePool.Init (which cleans stale worktrees) does not run, and
+// leftover flags from a previous multi-worker crash would be stale.
+func reconcileFlags(continent string, workers int) ExpeditionFlag {
+	best := ReadFlag(continent)
+	if workers == 0 {
+		return best
+	}
+	pattern := filepath.Join(continent, ".expedition", ".run", "worktrees", "*",
+		".expedition", ".run", "flag.md")
+	matches, _ := filepath.Glob(pattern)
+	for _, match := range matches {
+		// match: {continent}/.expedition/.run/worktrees/worker-NNN/.expedition/.run/flag.md
+		// Dir×3: flag.md → .run → .expedition → worker-NNN base
+		base := filepath.Dir(filepath.Dir(filepath.Dir(match)))
+		f := ReadFlag(base)
+		if f.LastExpedition > best.LastExpedition {
+			best = f
+		}
+	}
+	return best
+}
+
 // writeFlag writes the flag checkpoint only if expNum is greater than the
-// current checkpoint. This ensures monotonic progression when workers
-// complete out of order. Caller must hold p.flagMu.
-func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string, midHighSeverity int) {
-	current := ReadFlag(p.config.Continent)
+// current checkpoint in the given directory. Each worker writes to its own
+// workDir (worktree path or Continent), so no mutex is needed.
+func (p *Paintress) writeFlag(dir string, expNum int, issueID, status, remaining string, midHighSeverity int) {
+	current := ReadFlag(dir)
 	if expNum <= current.LastExpedition {
 		return
 	}
-	WriteFlag(p.config.Continent, expNum, issueID, status, remaining, midHighSeverity)
+	WriteFlag(dir, expNum, issueID, status, remaining, midHighSeverity)
 }
 
 // RunSummary holds the results of a paintress loop run.

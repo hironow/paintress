@@ -235,6 +235,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 	cmd.Dir = workDir
 
+	// Ensure .expedition/.run/ exists in the execution directory so that
+	// watchFlag and the Claude process can read/write flag.md there.
+	if err := os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755); err != nil {
+		return "", fmt.Errorf("create expedition run dir: %w", err)
+	}
+
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", fmt.Errorf("stdout pipe failed: %w", err)
@@ -254,12 +260,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// format that omits current_issue/current_title, effectively clearing them.
 	// Must happen before cmd.Start() to avoid clobbering a legitimate write.
 	//
-	// NOTE(MY-362): This bypasses p.flagMu / p.writeFlag's monotonic guard.
-	// In Workers > 1 mode, a concurrent worker's checkpoint write could be
-	// rolled back if it lands between ReadFlag and WriteFlag here. Safe for
-	// Workers=1 (default). Per-worktree flag isolation will resolve this.
-	if stale := ReadFlag(e.Continent); stale.CurrentIssue != "" {
-		WriteFlag(e.Continent, stale.LastExpedition, stale.LastIssue, stale.LastStatus, stale.Remaining, stale.MidHighSeverity)
+	// Operating on workDir (not Continent) ensures each worker clears only
+	// its own worktree's flag.md, not the shared checkpoint (MY-362).
+	if stale := ReadFlag(workDir); stale.CurrentIssue != "" {
+		WriteFlag(workDir, stale.LastExpedition, stale.LastIssue, stale.LastStatus, stale.Remaining, stale.MidHighSeverity)
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -269,7 +273,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// Start flag.md watcher to detect issue selection in real-time
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
-	go watchFlag(watchCtx, e.Continent, func(issue, title string) {
+	go watchFlag(watchCtx, workDir, func(issue, title string) {
 		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(

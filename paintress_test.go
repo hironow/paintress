@@ -1,6 +1,7 @@
 package paintress
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -761,14 +763,10 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 
 	// Write flag for expedition 5
-	p.flagMu.Lock()
-	p.writeFlag(5, "ISS-5", "success", "10", 0)
-	p.flagMu.Unlock()
+	p.writeFlag(dir, 5, "ISS-5", "success", "10", 0)
 
 	// Attempt to write flag for expedition 3 (out-of-order completion)
-	p.flagMu.Lock()
-	p.writeFlag(3, "ISS-3", "success", "12", 0)
-	p.flagMu.Unlock()
+	p.writeFlag(dir, 3, "ISS-3", "success", "12", 0)
 
 	// Flag should still show expedition 5, not 3
 	flag := ReadFlag(dir)
@@ -866,5 +864,367 @@ func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
 	}
 	if parsed.MidHighSeverity != 4 {
 		t.Errorf("mid_high_severity = %d, want 4", parsed.MidHighSeverity)
+	}
+}
+
+// ═══════════════════════════════════════════════
+// Workers>1 Integration Tests (MY-362 gap fill)
+// ═══════════════════════════════════════════════
+
+// TestSwarmMode_TwoWorkers_Consolidation verifies that post-run consolidation
+// writes the max(LastExpedition) from per-worker worktree flag.md files back
+// to Continent's flag.md. Workers=2, MaxExpeditions=2: each worker runs 1
+// expedition, then reconcileFlags picks the highest and consolidates.
+func TestSwarmMode_TwoWorkers_Consolidation(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// fakeClaude outputs a valid success report
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: TEST-1'
+echo 'issue_title: consolidation test'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 3'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Consolidation: Continent flag.md should have the highest expedition number
+	flag := ReadFlag(dir)
+	if flag.LastExpedition < 2 {
+		t.Errorf("consolidation: expected LastExpedition >= 2, got %d", flag.LastExpedition)
+	}
+	if flag.LastStatus != "success" {
+		t.Errorf("expected LastStatus=success, got %q", flag.LastStatus)
+	}
+	if flag.Remaining != "3" {
+		t.Errorf("expected Remaining=3, got %q", flag.Remaining)
+	}
+
+	// Both expeditions should have completed successfully
+	if p.totalSuccess.Load() != 2 {
+		t.Errorf("expected totalSuccess=2, got %d", p.totalSuccess.Load())
+	}
+}
+
+// TestSwarmMode_TwoWorkers_ArchiveIdempotent verifies that when two workers
+// both process the same inbox D-Mail and both attempt to archive it on success,
+// idempotent ArchiveInboxDMail ensures no errors. One os.Rename succeeds; the
+// second gets ENOENT, confirms the destination exists in archive, and returns nil.
+func TestSwarmMode_TwoWorkers_ArchiveIdempotent(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Place a D-Mail in inbox before start
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+	dmailContent := "---\nname: shared-dmail\nkind: info\ndescription: shared test\n---\n\nShared body\n"
+	if err := os.WriteFile(filepath.Join(inboxDir, "shared-dmail.md"), []byte(dmailContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// fakeClaude outputs a valid success report
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: TEST-1'
+echo 'issue_title: archive test'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 5'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Inbox should be empty: both workers tried to archive, one succeeded,
+	// the other got ENOENT but confirmed dst in archive (idempotent nil).
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".md" {
+			t.Errorf("inbox should be empty after archive, found: %s", e.Name())
+		}
+	}
+
+	// Archive should contain the D-Mail
+	archivePath := filepath.Join(dir, ".expedition", "archive", "shared-dmail.md")
+	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+		t.Error("expected shared-dmail.md in archive/")
+	}
+}
+
+// TestSwarmMode_TwoWorkers_MidHighSeverityAggregation verifies that
+// totalMidHighSeverity correctly aggregates HIGH severity D-Mails detected
+// mid-expedition across multiple workers. Each worker's script writes a unique
+// HIGH severity D-Mail during execution; the inbox watcher detects them.
+func TestSwarmMode_TwoWorkers_MidHighSeverityAggregation(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	// Script writes a unique HIGH severity D-Mail (using PID for uniqueness)
+	// to Continent's inbox mid-execution, waits for watcher, then outputs report.
+	script := filepath.Join(dir, "fakeclaude-high.sh")
+	scriptContent := fmt.Sprintf(`#!/bin/bash
+DMAIL_NAME="high-$$"
+cat > %s/$DMAIL_NAME.md << DMEOF
+---
+name: $DMAIL_NAME
+kind: alert
+description: high severity test
+severity: high
+---
+
+High severity body
+DMEOF
+# Wait for inbox watcher (fsnotify) to detect the new file
+sleep 2
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: TEST-1'
+echo 'issue_title: high severity test'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 3'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`, inboxDir)
+	if err := os.WriteFile(script, []byte(scriptContent), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Each worker should have detected at least 1 HIGH severity D-Mail.
+	// Both watchers may see both D-Mails (timing-dependent), so total >= 2.
+	total := p.totalMidHighSeverity.Load()
+	if total < 2 {
+		t.Errorf("expected totalMidHighSeverity >= 2, got %d", total)
+	}
+
+	// Flag should reflect the mid-high severity count
+	flag := ReadFlag(dir)
+	if flag.MidHighSeverity == 0 {
+		t.Error("consolidated flag.md should have MidHighSeverity > 0")
+	}
+}
+
+// TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag verifies that the
+// StatusComplete path writes the "all/complete" flag checkpoint before
+// releasing the worktree back to the pool. If writeFlag ran after
+// releaseWorkDir, another worker could reclaim the worktree and overwrite
+// the flag.md, losing the completion checkpoint.
+func TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// fakeClaude outputs __EXPEDITION_COMPLETE__ which triggers StatusComplete
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_COMPLETE__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        2,
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Consolidated flag must reflect the StatusComplete checkpoint.
+	// If writeFlag ran after releaseWorkDir (the bug), reconcileFlags
+	// could miss the "complete" status or see stale data from a reused worktree.
+	flag := ReadFlag(dir)
+	if flag.LastExpedition == 0 {
+		t.Fatal("consolidated flag.md has LastExpedition=0; writeFlag may not have run before release")
+	}
+	if flag.LastStatus != "complete" {
+		t.Errorf("expected LastStatus=complete, got %q", flag.LastStatus)
+	}
+	if flag.LastIssue != "all" {
+		t.Errorf("expected LastIssue=all, got %q", flag.LastIssue)
+	}
+	if flag.Remaining != "0" {
+		t.Errorf("expected Remaining=0, got %q", flag.Remaining)
+	}
+}
+
+// TestSwarmMode_StaleWorktreeFlag_IgnoredAfterInit verifies that stale
+// flag.md files from a crashed prior run do not advance the resume point.
+// WorktreePool.Init force-removes old worktrees (and their flag.md files),
+// and reconcileFlags runs after Init, so stale checkpoints are invisible.
+func TestSwarmMode_StaleWorktreeFlag_IgnoredAfterInit(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Plant a stale worktree with a real git worktree and a flag.md at exp 99
+	// to simulate a prior crash that left behind worktree state.
+	stalePath := filepath.Join(dir, ".expedition", ".run", "worktrees", "worker-001")
+	cmd := exec.Command("git", "worktree", "add", "--detach", stalePath, "main")
+	cmd.Dir = dir
+	cmd.Env = gitIsolatedEnv(dir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git worktree add: %v\n%s", err, out)
+	}
+	WriteFlag(stalePath, 99, "STALE-1", "success", "0", 0)
+
+	// Continent's own flag at exp 2 (the real checkpoint)
+	WriteFlag(dir, 2, "MY-1", "success", "5", 0)
+
+	// fakeClaude outputs a success report — if stale flag is read,
+	// startExp would be 100 and this expedition would not run.
+	script := filepath.Join(dir, "fakeclaude.sh")
+	if err := os.WriteFile(script, []byte(`#!/bin/bash
+echo '__EXPEDITION_REPORT__'
+echo 'issue_id: MY-2'
+echo 'issue_title: not stale'
+echo 'mission_type: implement'
+echo 'branch: none'
+echo 'pr_url: none'
+echo 'status: success'
+echo 'reason: done'
+echo 'remaining_issues: 4'
+echo 'bugs_found: 0'
+echo 'bug_issues: none'
+echo '__EXPEDITION_END__'
+`), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 3, // startExp=3 from continent flag (exp 2), runs exp 3,4,5
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	var logBuf bytes.Buffer
+	p := NewPaintress(cfg, NewLogger(&logBuf, false), &logBuf, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d\nlog:\n%s", code, logBuf.String())
+	}
+
+	// If the stale flag (exp 99) was read, startExp would be 100 and
+	// nothing would run (MaxExpeditions=3 < 100). The test proves
+	// reconcileFlags ignores stale worktree flags after Init cleans them.
+	if p.totalSuccess.Load() == 0 {
+		t.Fatal("no expeditions ran; stale worktree flag.md likely advanced startExp past MaxExpeditions")
+	}
+
+	flag := ReadFlag(dir)
+	// startExp = continent flag (2) + 1 = 3, runs 3 expeditions: exp 3, 4, 5
+	if flag.LastExpedition != 5 {
+		t.Errorf("expected LastExpedition=5, got %d", flag.LastExpedition)
+	}
+	if flag.LastIssue != "MY-2" {
+		t.Errorf("expected LastIssue=MY-2, got %q", flag.LastIssue)
 	}
 }
