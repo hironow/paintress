@@ -368,7 +368,6 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.Logger.Info("%s", fmt.Sprintf(Msg("sending"), p.reserve.ActiveModel()))
 		expStart := time.Now()
 		output, err := expedition.Run(expCtx)
-		expElapsed := time.Since(expStart)
 
 		if err != nil {
 			if ctx.Err() != nil {
@@ -473,9 +472,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				)
 				p.handleSuccess(report)
 				p.gradient.Charge()
+				// Follow-up runs before review to keep --continue in the
+				// expedition's conversation context (review also uses --continue).
+				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
+					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
+					followUpBudget := totalTimeout - time.Since(expStart)
+					p.runFollowUp(ctx, matched, workDir, followUpBudget)
+				}
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
-					remaining := totalTimeout - expElapsed
+					remaining := totalTimeout - time.Since(expStart)
 					if remaining > 0 {
 						p.runReviewLoop(ctx, report, remaining, workDir)
 					}
@@ -494,12 +500,6 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 					if err := ArchiveInboxDMail(p.config.Continent, dm.Name); err != nil {
 						p.Logger.Warn("dmail archive: %v", err)
 					}
-				}
-				// Follow-up: deliver issue-matched mid-expedition D-Mails via --continue
-				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
-					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
-					followUpBudget := totalTimeout - time.Since(expStart)
-					p.runFollowUp(ctx, matched, workDir, followUpBudget)
 				}
 				p.consecutiveFailures.Store(0)
 				p.totalSuccess.Add(1)
