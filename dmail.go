@@ -58,11 +58,12 @@ func NewReportDMail(report *ExpeditionReport) DMail {
 	}
 
 	return DMail{
-		Name:        name,
-		Kind:        "report",
-		Description: fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
-		Issues:      []string{report.IssueID},
-		Body:        body.String(),
+		Name:          name,
+		Kind:          "report",
+		Description:   fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
+		Issues:        []string{report.IssueID},
+		SchemaVersion: "1",
+		Body:          body.String(),
 	}
 }
 
@@ -84,13 +85,14 @@ func ArchiveDir(continent string) string {
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
 // The format uses Jekyll/Hugo-style frontmatter delimiters (---).
 type DMail struct {
-	Name        string            `yaml:"name"`
-	Kind        string            `yaml:"kind"`
-	Description string            `yaml:"description"`
-	Issues      []string          `yaml:"issues,omitempty"`
-	Severity    string            `yaml:"severity,omitempty"`
-	Metadata    map[string]string `yaml:"metadata,omitempty"`
-	Body        string            `yaml:"-"`
+	Name          string            `yaml:"name"`
+	Kind          string            `yaml:"kind"`
+	Description   string            `yaml:"description"`
+	Issues        []string          `yaml:"issues,omitempty"`
+	Severity      string            `yaml:"severity,omitempty"`
+	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
+	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Body          string            `yaml:"-"`
 }
 
 var (
@@ -165,6 +167,9 @@ func (d DMail) Marshal() ([]byte, error) {
 // Archive-first ensures the permanent record survives even if the outbox write fails.
 // Creates directories if needed. Filename: <d.Name>.md
 func SendDMail(continent string, d DMail) error {
+	if d.SchemaVersion == "" {
+		d.SchemaVersion = "1"
+	}
 	data, err := d.Marshal()
 	if err != nil {
 		return fmt.Errorf("dmail: marshal: %w", err)
