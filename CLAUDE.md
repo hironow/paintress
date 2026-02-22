@@ -1,38 +1,33 @@
-# CLAUDE.md
+# paintress
 
-## Architecture Decisions
+## Workflow
 
-### CLI structure: `internal/cmd/` (not `cmd/`)
+- Do NOT use git worktrees (`EnterWorktree`, `isolation: "worktree"`). Work directly on the current branch.
 
-paintress uses `internal/cmd/` instead of the cobra-cli default `cmd/` directory.
+## Repository Structure
 
-Reason: paintress is a standalone CLI binary with no need to export command logic to other packages. Using `internal/` prevents external import of command definitions while keeping the `cmd/paintress/main.go` entry point minimal (~20 lines). This structure was agreed upon across all 4 tools in the MY-329 consensus (2026-02).
+- Entry: `cmd/paintress/main.go` (signal.NotifyContext + NeedsDefaultRun + ExitError)
+- CLI: `internal/cmd/` (cobra v1.10.2, `NewRootCommand()` exported for testability)
+- Library: root package `paintress` (expedition, dmail, gate, review, journal, inbox_watcher, etc.)
+- OTel: `telemetry.go` (noop default + OTLP HTTP exporter)
+- Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)
+- Semgrep: `.semgrep/cobra.yaml` (canonical source is phonewave)
 
-### cobra framework
+## CLI Design
 
-CLI is built on `spf13/cobra` v1.10.2.
+- `cobra.EnableTraverseRunHooks = true` in `init()` (not constructor)
+- All commands use `RunE` (not `Run`)
+- `--output`, `--lang` are PersistentFlags on root
+- Default subcommand: `paintress [flags] <repo>` → prepends `run` via `NeedsDefaultRun`
 
-- `NewRootCommand()` is exported from `internal/cmd` for testability (`SetArgs`/`SetOut`) and future docgen
-- `cobra.EnableTraverseRunHooks = true` for PersistentPreRunE propagation
-- All commands use `RunE` (not `Run`) — error handling centralized in `main()`
-- `--output` and `--lang` are PersistentFlags on root, inherited by all subcommands
-- `--review-cmd` default is dynamically derived from `--base-branch` in `PreRunE`
-
-## Build
-
-```bash
-just build    # builds with version from git tags
-just install  # builds and installs to /usr/local/bin
-```
-
-Version is injected via `-ldflags "-X github.com/hironow/paintress/internal/cmd.Version=..."`.
-
-## Testing
+## Build & Test
 
 ```bash
-just test       # all tests, 300s timeout
-just test-v     # verbose
-just test-race  # with race detector
+just build       # build with version from git tags
+just install     # build + install to /usr/local/bin
+just test        # all tests, 300s timeout
+just test-race   # with race detector
+just check       # fmt + vet + test
+just semgrep     # cobra semgrep rules
+just lint        # vet + markdown lint + gofmt check
 ```
-
-Container tests (`testcontainers-go`) require Docker and may take ~11s each. `testing.Short()` skips them.
