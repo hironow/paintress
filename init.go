@@ -11,6 +11,9 @@ import (
 // RunInitWithReader executes the init flow reading input from r
 // and writing prompts/status to w.
 func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
+	if w == nil {
+		w = io.Discard
+	}
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
