@@ -467,7 +467,7 @@ func TestNewPaintress_BasicConfig(t *testing.T) {
 		DevURL:         "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	if p.gradient == nil {
 		t.Error("gradient should be initialized")
 	}
@@ -491,7 +491,7 @@ func TestNewPaintress_MultiModelConfig(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -512,7 +512,7 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -788,7 +788,7 @@ func TestLifecycle_Init_Then_Expedition(t *testing.T) {
 
 	// Phase 1: simulate `paintress init` with stdin
 	input := "MY\npaintress\n"
-	if err := RunInitWithReader(dir, strings.NewReader(input)); err != nil {
+	if err := RunInitWithReader(dir, strings.NewReader(input), io.Discard); err != nil {
 		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
@@ -941,7 +941,7 @@ func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 		NoDev:     true,
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 
 	if p.devServer != nil {
 		t.Error("devServer should be nil when NoDev=true")

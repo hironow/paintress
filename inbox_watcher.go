@@ -12,6 +12,10 @@ import (
 // filesystem notifications and invokes onNewDMail when a valid .md file is detected.
 // Returns silently if the inbox directory does not exist.
 //
+// Callers are responsible for deduplication — fsnotify may fire multiple events
+// (CREATE + WRITE) for a single file write, and files from the initial scan may
+// also produce events. See expedition.go seenFiles for the canonical dedup.
+//
 // If ready is non-nil, a value is sent after the watcher is fully set up,
 // allowing callers to synchronize without time.Sleep.
 func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail), ready chan<- struct{}) {
@@ -32,8 +36,6 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 	}
 
 	// Initial scan: catch files that already exist before the event loop starts.
-	// The watcher is already registered, so any file created during this scan
-	// will also produce an event — duplicates are handled by the caller's dedup.
 	entries, _ := os.ReadDir(inboxDir)
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {

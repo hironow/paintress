@@ -56,7 +56,7 @@ func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -81,7 +81,7 @@ func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Plant a flag indicating expedition 7 was the last
-	WriteFlag(dir, 7, "AWE-50", "success", "3")
+	WriteFlag(dir, 7, "AWE-50", "success", "3", 0)
 
 	cfg := Config{
 		Continent:      dir,
@@ -94,7 +94,7 @@ func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -133,7 +133,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 			Status: "success", Reason: "done", PRUrl: "none", BugIssues: "none",
 		})
 	}
-	WriteFlag(dir, 3, "AWE-3", "success", "5")
+	WriteFlag(dir, 3, "AWE-3", "success", "5", 0)
 
 	// Capture original content of journal 001
 	original001, err := os.ReadFile(filepath.Join(jDir, "001.md"))
@@ -152,7 +152,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	p.Run(context.Background())
 
 	// Verify original journals are untouched
@@ -184,7 +184,7 @@ func TestReadFlag_ResumeExpeditionNumber(t *testing.T) {
 			name: "flag at expedition 5",
 			setup: func(dir string) {
 				os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-				WriteFlag(dir, 5, "AWE-10", "success", "8")
+				WriteFlag(dir, 5, "AWE-10", "success", "8", 0)
 			},
 			wantLastExp:   5,
 			wantStartExp:  6,
@@ -194,7 +194,7 @@ func TestReadFlag_ResumeExpeditionNumber(t *testing.T) {
 			name: "flag at expedition 20",
 			setup: func(dir string) {
 				os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-				WriteFlag(dir, 20, "AWE-99", "failed", "2")
+				WriteFlag(dir, 20, "AWE-99", "failed", "2", 0)
 			},
 			wantLastExp:   20,
 			wantStartExp:  21,
@@ -290,7 +290,7 @@ func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -336,7 +336,7 @@ func TestSwarmMode_DryRun_SingleWorker(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -370,7 +370,7 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 1 {
@@ -403,7 +403,7 @@ func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -442,7 +442,7 @@ func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
 		cancel()
 	}()
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(ctx)
 
 	// Workers fail fast with /bin/false, but cooldown is 10s.
@@ -465,7 +465,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// Plant flag at expedition 4
-	WriteFlag(dir, 4, "AWE-10", "success", "10")
+	WriteFlag(dir, 4, "AWE-10", "success", "10", 0)
 
 	cfg := Config{
 		Continent:      dir,
@@ -477,7 +477,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -527,7 +527,7 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(ctx)
 
 	// DeadlineExceeded should return non-zero (130), not 0
@@ -569,7 +569,7 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(ctx)
 
 	// Should be interrupted (130), NOT gommage (1)
@@ -597,7 +597,7 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -641,7 +641,7 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	code := p.Run(context.Background())
 
 	// errComplete → exit code 0
@@ -675,7 +675,7 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 
 	// First run: 2 DryRun expeditions
 	code := p.Run(context.Background())
@@ -731,7 +731,7 @@ func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 	p.Run(context.Background())
 
 	// Journal entry should exist for expedition 1
@@ -758,16 +758,16 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 
 	// Directly test the monotonic guard via Paintress.writeFlag
 	cfg := Config{Continent: dir, BaseBranch: "main", Model: "opus"}
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 
 	// Write flag for expedition 5
 	p.flagMu.Lock()
-	p.writeFlag(5, "ISS-5", "success", "10")
+	p.writeFlag(5, "ISS-5", "success", "10", 0)
 	p.flagMu.Unlock()
 
 	// Attempt to write flag for expedition 3 (out-of-order completion)
 	p.flagMu.Lock()
-	p.writeFlag(3, "ISS-3", "success", "12")
+	p.writeFlag(3, "ISS-3", "success", "12", 0)
 	p.flagMu.Unlock()
 
 	// Flag should still show expedition 5, not 3
@@ -794,7 +794,7 @@ func TestPaintressRun_NoDev_SkipsDevServer(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false))
+	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
 
 	// devServer should be nil — no panic during Run
 	if p.devServer != nil {
@@ -840,5 +840,31 @@ func TestFormatSummaryJSON(t *testing.T) {
 	}
 	if parsed.Gradient != "3/5" {
 		t.Errorf("gradient = %q, want %q", parsed.Gradient, "3/5")
+	}
+}
+
+func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
+	// given
+	summary := RunSummary{
+		Total:           3,
+		Success:         2,
+		Failed:          1,
+		MidHighSeverity: 4,
+		Gradient:        "2/3",
+	}
+
+	// when
+	out, err := FormatSummaryJSON(summary)
+	if err != nil {
+		t.Fatalf("FormatSummaryJSON: %v", err)
+	}
+
+	// then — mid_high_severity must appear in JSON
+	var parsed RunSummary
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("output is not valid JSON: %v\nraw: %s", err, out)
+	}
+	if parsed.MidHighSeverity != 4 {
+		t.Errorf("mid_high_severity = %d, want 4", parsed.MidHighSeverity)
 	}
 }

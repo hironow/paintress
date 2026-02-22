@@ -80,7 +80,7 @@ func TestReadWriteFlag(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 5, "AWE-42", "success", "3")
+	WriteFlag(dir, 5, "AWE-42", "success", "3", 0)
 	f := ReadFlag(dir)
 	if f.LastExpedition != 5 {
 		t.Errorf("LastExpedition = %d", f.LastExpedition)

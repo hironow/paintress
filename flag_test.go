@@ -80,7 +80,7 @@ func TestWriteFlag_AllFields(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 10, "AWE-99", "success", "0")
+	WriteFlag(dir, 10, "AWE-99", "success", "0", 0)
 	f := ReadFlag(dir)
 
 	if f.LastExpedition != 10 {
@@ -104,8 +104,8 @@ func TestWriteFlag_Overwrite(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 1, "AWE-1", "success", "10")
-	WriteFlag(dir, 2, "AWE-2", "failed", "9")
+	WriteFlag(dir, 1, "AWE-1", "success", "10", 0)
+	WriteFlag(dir, 2, "AWE-2", "failed", "9", 0)
 
 	f := ReadFlag(dir)
 	if f.LastExpedition != 2 {
@@ -140,7 +140,7 @@ func TestWriteFlag_IssueIDWithNewline_IsSanitized(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	issueID := "AWE-1\nAWE-2"
-	WriteFlag(dir, 1, issueID, "success", "5")
+	WriteFlag(dir, 1, issueID, "success", "5", 0)
 
 	f := ReadFlag(dir)
 	if f.LastIssue != "AWE-1 AWE-2" {
@@ -152,7 +152,7 @@ func TestWriteFlag_SanitizesStatusAndRemaining(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 1, "AWE-1", "success\nextra", "5\r\nmore")
+	WriteFlag(dir, 1, "AWE-1", "success\nextra", "5\r\nmore", 0)
 	f := ReadFlag(dir)
 
 	if f.LastStatus != "success extra" {
@@ -268,5 +268,60 @@ remaining_issues: 1
 	// Negative values are currently accepted by fmt.Sscanf.
 	if f.LastExpedition != -5 {
 		t.Errorf("LastExpedition = %d, want -5 for negative values", f.LastExpedition)
+	}
+}
+
+func TestWriteFlag_MidHighSeverity(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+
+	// given — write flag with mid-high severity count
+	WriteFlag(dir, 5, "MY-42", "success", "3", 2)
+	f := ReadFlag(dir)
+
+	// then — mid_high_severity should be recorded
+	if f.MidHighSeverity != 2 {
+		t.Errorf("MidHighSeverity = %d, want 2", f.MidHighSeverity)
+	}
+	// other fields should be unaffected
+	if f.LastExpedition != 5 {
+		t.Errorf("LastExpedition = %d, want 5", f.LastExpedition)
+	}
+}
+
+func TestWriteFlag_MidHighSeverityZero(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+
+	// given — write flag with zero mid-high severity
+	WriteFlag(dir, 3, "MY-10", "failed", "5", 0)
+	f := ReadFlag(dir)
+
+	// then — mid_high_severity should be 0 (not omitted)
+	if f.MidHighSeverity != 0 {
+		t.Errorf("MidHighSeverity = %d, want 0", f.MidHighSeverity)
+	}
+}
+
+func TestReadFlag_MidHighSeverity(t *testing.T) {
+	dir := t.TempDir()
+	runDir := filepath.Join(dir, ".expedition", ".run")
+	os.MkdirAll(runDir, 0755)
+
+	// given — flag.md with mid_high_severity field
+	content := `last_expedition: 7
+last_issue: MY-50
+last_status: success
+remaining_issues: 2
+mid_high_severity: 3
+`
+	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
+
+	// when
+	f := ReadFlag(dir)
+
+	// then
+	if f.MidHighSeverity != 3 {
+		t.Errorf("MidHighSeverity = %d, want 3", f.MidHighSeverity)
 	}
 }

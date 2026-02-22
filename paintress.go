@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,6 +31,8 @@ type Paintress struct {
 	config    Config
 	logDir    string
 	Logger    *Logger
+	DataOut   io.Writer // stdout-equivalent for data output
+	StdinIn   io.Reader // stdin-equivalent for interactive input
 	devServer *DevServer
 	gradient  *GradientGauge
 	reserve   *ReserveParty
@@ -38,21 +41,28 @@ type Paintress struct {
 	approver  Approver
 
 	// Swarm Mode: atomic counters for concurrent worker access
-	expCounter          atomic.Int64
-	totalAttempted      atomic.Int64
-	totalSuccess        atomic.Int64
-	totalSkipped        atomic.Int64
-	totalFailed         atomic.Int64
-	totalBugs           atomic.Int64
-	consecutiveFailures atomic.Int64
+	expCounter           atomic.Int64
+	totalAttempted       atomic.Int64
+	totalSuccess         atomic.Int64
+	totalSkipped         atomic.Int64
+	totalFailed          atomic.Int64
+	totalBugs            atomic.Int64
+	totalMidHighSeverity atomic.Int64
+	consecutiveFailures  atomic.Int64
 
 	// Swarm Mode: mutex-protected shared resources
 	flagMu sync.Mutex
 }
 
-func NewPaintress(cfg Config, logger *Logger) *Paintress {
+func NewPaintress(cfg Config, logger *Logger, dataOut io.Writer, stdinIn io.Reader) *Paintress {
 	if logger == nil {
 		logger = NewLogger(nil, false)
+	}
+	if dataOut == nil {
+		dataOut = os.Stdout
+	}
+	if stdinIn == nil {
+		stdinIn = os.Stdin
 	}
 	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -90,13 +100,23 @@ func NewPaintress(cfg Config, logger *Logger) *Paintress {
 	case cfg.ApproveCmd != "":
 		approver = NewCmdApprover(cfg.ApproveCmd)
 	default:
-		approver = NewStdinApprover()
+		// StdinApprover needs a visible output for approval prompts.
+		// Fall back to os.Stderr if Logger is discarding output or if
+		// the logger shares the same writer as DataOut (e.g. both stdout),
+		// which would corrupt machine-readable JSON output.
+		promptOut := logger.Writer()
+		if promptOut == io.Discard || promptOut == dataOut {
+			promptOut = os.Stderr
+		}
+		approver = NewStdinApprover(stdinIn, promptOut)
 	}
 
 	p := &Paintress{
 		config:   cfg,
 		logDir:   logDir,
 		Logger:   logger,
+		DataOut:  dataOut,
+		StdinIn:  stdinIn,
 		gradient: NewGradientGauge(gradientMax),
 		reserve:  NewReserveParty(primary, reserves, logger),
 		notifier: notifier,
@@ -130,7 +150,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
 	if err := p.Logger.SetLogFile(logPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: log file: %v\n", err)
+		p.Logger.Warn("log file: %v", err)
 	}
 	defer p.Logger.CloseLogFile()
 
@@ -189,6 +209,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	p.totalSkipped.Store(0)
 	p.totalFailed.Store(0)
 	p.totalBugs.Store(0)
+	p.totalMidHighSeverity.Store(0)
 	p.consecutiveFailures.Store(0)
 
 	startExp := monolith.LastExpedition + 1
@@ -321,6 +342,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			Config:      p.config,
 			LogDir:      p.logDir,
 			Logger:      p.Logger,
+			DataOut:     p.DataOut,
 			Luminas:     luminas,
 			Gradient:    p.gradient,
 			Reserve:     p.reserve,
@@ -369,21 +391,46 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 			}
 			p.gradient.Discharge()
+
+			// Collect mid-expedition HIGH severity D-Mails even on error
+			midHighNames := expedition.MidHighSeverityDMails()
+			midHighCount := len(midHighNames)
+			if midHighCount > 0 {
+				p.totalMidHighSeverity.Add(int64(midHighCount))
+			}
+
 			p.flagMu.Lock()
-			p.writeFlag(exp, "error", "failed", "?")
+			p.writeFlag(exp, "error", "failed", "?", midHighCount)
 			p.flagMu.Unlock()
-			WriteJournal(p.config.Continent, &ExpeditionReport{
+			errReport := &ExpeditionReport{
 				Expedition: exp, IssueID: "?", IssueTitle: "?",
 				MissionType: "?", Status: "failed", Reason: err.Error(),
 				FailureType: "blocker",
 				PRUrl:       "none", BugIssues: "none",
-			})
+			}
+			if midHighCount > 0 {
+				errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
+			}
+			WriteJournal(p.config.Continent, errReport)
+			if midHighCount > 0 {
+				p.Logger.Warn("Expedition #%d: %d HIGH severity D-Mail received mid-expedition", exp, midHighCount)
+			}
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
 		} else {
 			_, parseSpan := tracer.Start(expCtx, "report.parse")
 			report, status := ParseReport(output, exp)
 			parseSpan.End()
+
+			// Attach mid-expedition HIGH severity D-Mail names to the report
+			midHighNames := expedition.MidHighSeverityDMails()
+			midHighCount := len(midHighNames)
+			if midHighCount > 0 {
+				if report != nil {
+					report.HighSeverityDMails = strings.Join(midHighNames, ", ")
+				}
+				p.totalMidHighSeverity.Add(int64(midHighCount))
+			}
 
 			switch status {
 			case StatusComplete:
@@ -394,7 +441,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				expSpan.End()
 				p.Logger.OK("%s", Msg("all_complete"))
 				p.flagMu.Lock()
-				p.writeFlag(exp, "all", "complete", "0")
+				p.writeFlag(exp, "all", "complete", "0", midHighCount)
 				p.flagMu.Unlock()
 				return errComplete
 			case StatusParseError:
@@ -402,14 +449,18 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("%s", fmt.Sprintf(Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
 				p.flagMu.Lock()
-				p.writeFlag(exp, "?", "parse_error", "?")
+				p.writeFlag(exp, "?", "parse_error", "?", midHighCount)
 				p.flagMu.Unlock()
-				WriteJournal(p.config.Continent, &ExpeditionReport{
+				parseErrReport := &ExpeditionReport{
 					Expedition: exp, IssueID: "?", IssueTitle: "?",
 					MissionType: "?", Status: "parse_error", Reason: "report markers not found",
 					FailureType: "blocker",
 					PRUrl:       "none", BugIssues: "none",
-				})
+				}
+				if midHighCount > 0 {
+					parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
+				}
+				WriteJournal(p.config.Continent, parseErrReport)
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
 			case StatusSuccess:
@@ -430,7 +481,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 					}
 				}
 				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "success", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "success", report.Remaining, midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				// D-Mail: send report and archive processed inbox d-mails (best-effort)
@@ -450,7 +501,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("%s", fmt.Sprintf(Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
 				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.totalSkipped.Add(1)
@@ -458,11 +509,15 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Error("%s", fmt.Sprintf(Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
 				p.flagMu.Lock()
-				p.writeFlag(exp, report.IssueID, "failed", report.Remaining)
+				p.writeFlag(exp, report.IssueID, "failed", report.Remaining, midHighCount)
 				p.flagMu.Unlock()
 				WriteJournal(p.config.Continent, report)
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
+			}
+
+			if midHighCount > 0 {
+				p.Logger.Warn("Expedition #%d: %d HIGH severity D-Mail received mid-expedition", exp, midHighCount)
 			}
 		}
 
@@ -692,22 +747,23 @@ func (p *Paintress) printBanner() {
 // writeFlag writes the flag checkpoint only if expNum is greater than the
 // current checkpoint. This ensures monotonic progression when workers
 // complete out of order. Caller must hold p.flagMu.
-func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string) {
+func (p *Paintress) writeFlag(expNum int, issueID, status, remaining string, midHighSeverity int) {
 	current := ReadFlag(p.config.Continent)
 	if expNum <= current.LastExpedition {
 		return
 	}
-	WriteFlag(p.config.Continent, expNum, issueID, status, remaining)
+	WriteFlag(p.config.Continent, expNum, issueID, status, remaining, midHighSeverity)
 }
 
 // RunSummary holds the results of a paintress loop run.
 type RunSummary struct {
-	Total    int64  `json:"total"`
-	Success  int64  `json:"success"`
-	Skipped  int64  `json:"skipped"`
-	Failed   int64  `json:"failed"`
-	Bugs     int64  `json:"bugs"`
-	Gradient string `json:"gradient"`
+	Total           int64  `json:"total"`
+	Success         int64  `json:"success"`
+	Skipped         int64  `json:"skipped"`
+	Failed          int64  `json:"failed"`
+	Bugs            int64  `json:"bugs"`
+	MidHighSeverity int64  `json:"mid_high_severity"`
+	Gradient        string `json:"gradient"`
 }
 
 // FormatSummaryJSON returns the summary as a JSON string.
@@ -724,19 +780,20 @@ func (p *Paintress) printSummary() {
 
 	if p.config.OutputFormat == "json" {
 		summary := RunSummary{
-			Total:    total,
-			Success:  p.totalSuccess.Load(),
-			Skipped:  p.totalSkipped.Load(),
-			Failed:   p.totalFailed.Load(),
-			Bugs:     p.totalBugs.Load(),
-			Gradient: p.gradient.FormatLog(),
+			Total:           total,
+			Success:         p.totalSuccess.Load(),
+			Skipped:         p.totalSkipped.Load(),
+			Failed:          p.totalFailed.Load(),
+			Bugs:            p.totalBugs.Load(),
+			MidHighSeverity: p.totalMidHighSeverity.Load(),
+			Gradient:        p.gradient.FormatLog(),
 		}
 		out, err := FormatSummaryJSON(summary)
 		if err != nil {
 			p.Logger.Error("json marshal: %v", err)
 			return
 		}
-		fmt.Println(out)
+		fmt.Fprintln(p.DataOut, out)
 		return
 	}
 
@@ -750,6 +807,9 @@ func (p *Paintress) printSummary() {
 	p.Logger.OK("%s", fmt.Sprintf(Msg("success_count"), p.totalSuccess.Load()))
 	p.Logger.Warn("%s", fmt.Sprintf(Msg("skipped_count"), p.totalSkipped.Load()))
 	p.Logger.Error("%s", fmt.Sprintf(Msg("failed_count"), p.totalFailed.Load()))
+	if p.totalMidHighSeverity.Load() > 0 {
+		p.Logger.Warn("Mid-expedition HIGH severity D-Mail: %d", p.totalMidHighSeverity.Load())
+	}
 	if p.totalBugs.Load() > 0 {
 		p.Logger.QA("%s", fmt.Sprintf(Msg("bugs_count"), p.totalBugs.Load()))
 	}

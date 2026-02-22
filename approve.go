@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 )
@@ -23,9 +22,9 @@ type StdinApprover struct {
 	writer io.Writer
 }
 
-// NewStdinApprover creates a StdinApprover reading from stdin and writing to stderr.
-func NewStdinApprover() *StdinApprover {
-	return &StdinApprover{reader: os.Stdin, writer: os.Stderr}
+// NewStdinApprover creates a StdinApprover with the given reader and writer.
+func NewStdinApprover(r io.Reader, w io.Writer) *StdinApprover {
+	return &StdinApprover{reader: r, writer: w}
 }
 
 func (a *StdinApprover) RequestApproval(ctx context.Context, message string) (bool, error) {

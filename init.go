@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 )
 
-// RunInitWithReader executes the init flow reading input from r.
-// This is separated from runInit for testability.
-func RunInitWithReader(repoPath string, r io.Reader) error {
+// RunInitWithReader executes the init flow reading input from r
+// and writing prompts/status to w.
+func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
+	if w == nil {
+		w = io.Discard
+	}
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
@@ -23,7 +25,7 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 
 	scanner := bufio.NewScanner(r)
 
-	fmt.Fprint(os.Stderr, "Linear team key (e.g. MY): ")
+	fmt.Fprint(w, "Linear team key (e.g. MY): ")
 	var team string
 	if scanner.Scan() {
 		team = strings.TrimSpace(scanner.Text())
@@ -35,7 +37,7 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 		return fmt.Errorf("team key is required")
 	}
 
-	fmt.Fprint(os.Stderr, "Linear project name (optional, press Enter to skip): ")
+	fmt.Fprint(w, "Linear project name (optional, press Enter to skip): ")
 	var project string
 	if scanner.Scan() {
 		project = strings.TrimSpace(scanner.Text())
@@ -55,10 +57,10 @@ func RunInitWithReader(repoPath string, r io.Reader) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "\nConfig saved to %s\n", ProjectConfigPath(absPath))
-	fmt.Fprintf(os.Stderr, "  Linear team:    %s\n", team)
+	fmt.Fprintf(w, "\nConfig saved to %s\n", ProjectConfigPath(absPath))
+	fmt.Fprintf(w, "  Linear team:    %s\n", team)
 	if project != "" {
-		fmt.Fprintf(os.Stderr, "  Linear project: %s\n", project)
+		fmt.Fprintf(w, "  Linear project: %s\n", project)
 	}
 	return nil
 }

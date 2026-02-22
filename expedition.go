@@ -51,7 +51,8 @@ type Expedition struct {
 	Config    Config
 	LogDir    string
 	Logger    *Logger
-	Notifier  Notifier // for mid-expedition HIGH severity notifications
+	DataOut   io.Writer // stdout-equivalent for streaming Claude output
+	Notifier  Notifier  // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
 	Luminas     []Lumina
@@ -60,8 +61,19 @@ type Expedition struct {
 	InboxDMails []DMail // d-mails from inbox (for archiving after expedition)
 	inboxOnce   sync.Once
 
+	// Mid-expedition HIGH severity D-Mail tracking
+	midHighMu    sync.Mutex
+	midHighNames []string
+
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+}
+
+// MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
+func (e *Expedition) MidHighSeverityDMails() []string {
+	e.midHighMu.Lock()
+	defer e.midHighMu.Unlock()
+	return append([]string(nil), e.midHighNames...)
 }
 
 // BuildPrompt generates the expedition prompt in the configured language.
@@ -132,6 +144,9 @@ func (e *Expedition) loadContextSection() string {
 // The output streaming goroutine also feeds chunks to ReserveParty
 // for rate-limit detection.
 func (e *Expedition) Run(ctx context.Context) (string, error) {
+	if e.DataOut == nil {
+		e.DataOut = os.Stdout
+	}
 	prompt := e.BuildPrompt()
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
@@ -224,6 +239,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			}
 			seenFiles[dm.Name] = true
 			if dm.Severity == "high" {
+				e.midHighMu.Lock()
+				e.midHighNames = append(e.midHighNames, dm.Name)
+				e.midHighMu.Unlock()
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
 				if e.Notifier != nil {
 					_ = e.Notifier.Notify(watchCtx, "Paintress", fmt.Sprintf("HIGH severity D-Mail mid-expedition: %s", dm.Name))
@@ -241,12 +259,21 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	go func() {
 		defer close(done)
 		reader := bufio.NewReader(stdout)
-		// In JSON output mode, stream to stderr so stdout stays machine-readable
-		streamDest := io.Writer(os.Stdout)
+		// In JSON output mode, stream only to the output file to keep
+		// DataOut (stdout) machine-readable. Interface equality cannot
+		// reliably detect stdout wrappers, so file-only is the safest
+		// approach. Human-readable streaming is still available via
+		// `tail -f` on the output file.
+		streamDest := e.DataOut
 		if e.Config.OutputFormat == "json" {
-			streamDest = os.Stderr
+			streamDest = nil
 		}
-		writer := io.MultiWriter(streamDest, outFile)
+		var writer io.Writer
+		if streamDest != nil {
+			writer = io.MultiWriter(streamDest, outFile)
+		} else {
+			writer = outFile
+		}
 
 		buf := make([]byte, 4096)
 		for {
@@ -275,7 +302,11 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	<-inboxDone
 
 	err = cmd.Wait()
-	fmt.Fprintln(os.Stderr)
+	// Write a trailing newline to visually separate expedition output,
+	// but skip it in JSON mode to avoid corrupting machine-readable stdout.
+	if e.Config.OutputFormat != "json" {
+		fmt.Fprintln(e.Logger.Writer())
+	}
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",

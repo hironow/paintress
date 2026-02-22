@@ -36,7 +36,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
 	fmt.Fprintln(w)
 
-	if err := paintress.RunInitWithReader(repoPath, cmd.InOrStdin()); err != nil {
+	if err := paintress.RunInitWithReader(repoPath, cmd.InOrStdin(), cmd.ErrOrStderr()); err != nil {
 		return err
 	}
 	return nil

@@ -11,13 +11,14 @@ import (
 
 // ExpeditionFlag represents the checkpoint on the Continent.
 type ExpeditionFlag struct {
-	LastExpedition int
-	LastUpdated    string
-	LastIssue      string
-	LastStatus     string
-	Remaining      string
-	CurrentIssue   string
-	CurrentTitle   string
+	LastExpedition  int
+	LastUpdated     string
+	LastIssue       string
+	LastStatus      string
+	Remaining       string
+	CurrentIssue    string
+	CurrentTitle    string
+	MidHighSeverity int
 }
 
 func FlagPath(continent string) string {
@@ -57,13 +58,15 @@ func ReadFlag(continent string) ExpeditionFlag {
 				f.CurrentIssue = v
 			case "current_title":
 				f.CurrentTitle = v
+			case "mid_high_severity":
+				fmt.Sscanf(v, "%d", &f.MidHighSeverity)
 			}
 		}
 	}
 	return f
 }
 
-func WriteFlag(continent string, expNum int, issueID, status, remaining string) error {
+func WriteFlag(continent string, expNum int, issueID, status, remaining string, midHighSeverity int) error {
 	issueID = sanitizeFlagValue(issueID)
 	status = sanitizeFlagValue(status)
 	remaining = sanitizeFlagValue(remaining)
@@ -78,7 +81,8 @@ last_updated: %s
 last_issue: %s
 last_status: %s
 remaining_issues: %s
-`, expNum, expNum, time.Now().Format("2006-01-02 15:04:05"), issueID, status, remaining)
+mid_high_severity: %d
+`, expNum, expNum, time.Now().Format("2006-01-02 15:04:05"), issueID, status, remaining, midHighSeverity)
 
 	return os.WriteFile(FlagPath(continent), []byte(content), 0644)
 }

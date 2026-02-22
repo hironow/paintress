@@ -278,25 +278,33 @@ func TestWatchInbox_MultipleFilesInSequence(t *testing.T) {
 		t.Fatal("timeout waiting for watcher ready")
 	}
 
-	// Write 3 files in quick succession
-	for _, name := range []string{"first", "second", "third"} {
+	// Write 3 files with a small gap between each to avoid kqueue event
+	// coalescing on macOS, which can drop events during rapid writes.
+	expected := []string{"first", "second", "third"}
+	for _, name := range expected {
 		content := "---\nname: " + name + "\nkind: report\ndescription: " + name + "\n---\n"
 		os.WriteFile(filepath.Join(inboxDir, name+".md"), []byte(content), 0644)
+		time.Sleep(50 * time.Millisecond)
 	}
 
-	// Wait for all callbacks to fire
+	// Wait until all 3 unique names have been seen. The watcher may fire
+	// duplicate callbacks (CREATE+WRITE) — dedup is the caller's job.
 	deadline := time.After(4 * time.Second)
 	for {
 		mu.Lock()
-		count := len(names)
+		unique := make(map[string]bool)
+		for _, n := range names {
+			unique[n] = true
+		}
+		allSeen := len(unique) >= len(expected)
 		mu.Unlock()
-		if count >= 3 {
+		if allSeen {
 			break
 		}
 		select {
 		case <-deadline:
 			mu.Lock()
-			t.Fatalf("timeout: got %d callbacks (%v), want 3", len(names), names)
+			t.Fatalf("timeout: got names %v, want all of %v", names, expected)
 			mu.Unlock()
 			return
 		case <-time.After(100 * time.Millisecond):
@@ -305,8 +313,14 @@ func TestWatchInbox_MultipleFilesInSequence(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(names) != 3 {
-		t.Errorf("got %d callbacks, want 3: %v", len(names), names)
+	unique := make(map[string]bool)
+	for _, n := range names {
+		unique[n] = true
+	}
+	for _, name := range expected {
+		if !unique[name] {
+			t.Errorf("missing expected name %q in callbacks: %v", name, names)
+		}
 	}
 }
 

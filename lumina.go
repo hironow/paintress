@@ -27,11 +27,12 @@ func ScanJournalsForLumina(continent string) []Lumina {
 	}
 
 	type journalData struct {
-		status  string
-		reason  string
-		mission string
-		issue   string
-		insight string
+		status       string
+		reason       string
+		mission      string
+		issue        string
+		insight      string
+		highSeverity string
 	}
 
 	// Parallel journal scanning
@@ -62,6 +63,8 @@ func ScanJournalsForLumina(continent string) []Lumina {
 					entry.issue = extractValue(line)
 				} else if strings.HasPrefix(line, "- **Insight**:") {
 					entry.insight = extractValue(line)
+				} else if strings.HasPrefix(line, "- **HIGH severity D-Mail**:") {
+					entry.highSeverity = extractValue(line)
 				}
 			}
 
@@ -75,6 +78,7 @@ func ScanJournalsForLumina(continent string) []Lumina {
 	// Aggregate patterns
 	failureReasons := make(map[string]int)
 	successPatterns := make(map[string]int)
+	highSeverityAlerts := make(map[string]int)
 
 	for _, e := range entries {
 		if e.status == "failed" {
@@ -97,9 +101,21 @@ func ScanJournalsForLumina(continent string) []Lumina {
 				successPatterns[key]++
 			}
 		}
+		if e.highSeverity != "" {
+			highSeverityAlerts[e.highSeverity]++
+		}
 	}
 
 	var luminas []Lumina
+
+	// HIGH severity D-Mail alerts become immediate Luminas (threshold = 1)
+	for names, count := range highSeverityAlerts {
+		luminas = append(luminas, Lumina{
+			Pattern: fmt.Sprintf("[ALERT] HIGH severity D-Mail in past expedition: %s", names),
+			Source:  "high-severity-alert",
+			Uses:    count,
+		})
+	}
 
 	// Failures that repeat become defensive Luminas (like parry skills)
 	for reason, count := range failureReasons {
@@ -133,9 +149,11 @@ func FormatLuminaForPrompt(luminas []Lumina) string {
 		return Msg("lumina_none")
 	}
 
-	var defensive, offensive []string
+	var alerts, defensive, offensive []string
 	for _, l := range luminas {
 		switch l.Source {
+		case "high-severity-alert":
+			alerts = append(alerts, fmt.Sprintf("- %s", l.Pattern))
 		case "failure-pattern":
 			defensive = append(defensive, fmt.Sprintf("- %s", l.Pattern))
 		case "success-pattern":
@@ -144,6 +162,14 @@ func FormatLuminaForPrompt(luminas []Lumina) string {
 	}
 
 	var sb strings.Builder
+	if len(alerts) > 0 {
+		sb.WriteString("## Alert (HIGH severity D-Mail from past expeditions)\n")
+		for _, a := range alerts {
+			sb.WriteString(a)
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n")
+	}
 	if len(defensive) > 0 {
 		sb.WriteString(Msg("lumina_defensive"))
 		sb.WriteString("\n")
