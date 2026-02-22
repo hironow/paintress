@@ -259,17 +259,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	go func() {
 		defer close(done)
 		reader := bufio.NewReader(stdout)
-		// In JSON output mode, stream to Logger (stderr) so DataOut (stdout)
-		// stays machine-readable. Falls back to file-only streaming if Logger
-		// and DataOut share the same writer (defensive guard).
+		// In JSON output mode, stream only to the output file to keep
+		// DataOut (stdout) machine-readable. Interface equality cannot
+		// reliably detect stdout wrappers, so file-only is the safest
+		// approach. Human-readable streaming is still available via
+		// `tail -f` on the output file.
 		streamDest := e.DataOut
 		if e.Config.OutputFormat == "json" {
-			logWriter := e.Logger.Writer()
-			if logWriter != e.DataOut {
-				streamDest = logWriter
-			} else {
-				streamDest = nil // file-only: don't corrupt DataOut
-			}
+			streamDest = nil
 		}
 		var writer io.Writer
 		if streamDest != nil {
@@ -306,8 +303,8 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	err = cmd.Wait()
 	// Write a trailing newline to visually separate expedition output,
-	// but skip it when Logger shares DataOut to avoid corrupting JSON.
-	if e.Config.OutputFormat != "json" || e.Logger.Writer() != e.DataOut {
+	// but skip it in JSON mode to avoid corrupting machine-readable stdout.
+	if e.Config.OutputFormat != "json" {
 		fmt.Fprintln(e.Logger.Writer())
 	}
 
