@@ -445,10 +445,10 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				expSpan.AddEvent("expedition.complete",
 					trace.WithAttributes(attribute.String("status", "all_complete")),
 				)
+				p.writeFlag(flagDir, exp, "all", "complete", "0", midHighCount)
 				releaseWorkDir()
 				expSpan.End()
 				p.Logger.OK("%s", Msg("all_complete"))
-				p.writeFlag(flagDir, exp, "all", "complete", "0", midHighCount)
 				return errComplete
 			case StatusParseError:
 				p.Logger.Warn("%s", Msg("report_parse_fail"))
