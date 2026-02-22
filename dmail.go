@@ -261,7 +261,10 @@ func ArchiveInboxDMail(continent, name string) error {
 
 	if err := os.Rename(src, dst); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil // already archived by another worker
+			if _, statErr := os.Stat(dst); statErr == nil {
+				return nil // already archived by another worker
+			}
+			return fmt.Errorf("dmail: archive %s: source not found and not in archive", name)
 		}
 		return fmt.Errorf("dmail: archive %s: %w", name, err)
 	}
