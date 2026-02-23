@@ -23,8 +23,9 @@ func newBotFromEnv() (botAPI, botConfig, error) {
 	if err != nil {
 		return nil, botConfig{}, fmt.Errorf("failed to create Discord session: %w", err)
 	}
-	// Only listen for interaction events (minimize Gateway traffic)
-	session.Identify.Intents = discordgo.IntentsGuildMessages
+	// InteractionCreate events are always delivered regardless of intents.
+	// Request no intents to minimize Gateway traffic (least privilege).
+	session.Identify.Intents = 0
 	return session, cfg, nil
 }
 
