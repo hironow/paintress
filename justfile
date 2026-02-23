@@ -41,9 +41,28 @@ lint-md:
 build:
     go build -ldflags "{{LDFLAGS}}" -o {{TOOL}} ./cmd/{{TOOL}}/
 
+# Build Telegram companion binary
+build-tg:
+    go build -o {{TOOL}}-tg ./cmd/{{TOOL}}-tg/
+
+# Build Discord companion binary
+build-discord:
+    go build -o {{TOOL}}-discord ./cmd/{{TOOL}}-discord/
+
+# Build all binaries (main + companions)
+build-all: build build-tg build-discord
+
 # Build and install to /usr/local/bin
 install: build
     mv {{TOOL}} /usr/local/bin/
+
+# Build and install companion binaries to /usr/local/bin
+install-companions: build-tg build-discord
+    mv {{TOOL}}-tg /usr/local/bin/
+    mv {{TOOL}}-discord /usr/local/bin/
+
+# Install all binaries (main + companions)
+install-all: install install-companions
 
 # Run all tests
 test:
@@ -105,5 +124,5 @@ docgen:
 
 # Clean build artifacts
 clean:
-    rm -f {{TOOL}} coverage.out
+    rm -f {{TOOL}} {{TOOL}}-tg {{TOOL}}-discord coverage.out
     go clean
