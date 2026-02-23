@@ -14,6 +14,7 @@ import (
 type botAPI interface {
 	ChannelMessageSend(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error)
 	ChannelMessageSendComplex(channelID string, data *discordgo.MessageSend, options ...discordgo.RequestOption) (*discordgo.Message, error)
+	InteractionRespond(interaction *discordgo.Interaction, resp *discordgo.InteractionResponse, options ...discordgo.RequestOption) error
 	AddHandler(handler interface{}) func()
 	Open() error
 	Close() error
@@ -74,19 +75,32 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 		}
 
 		data := i.MessageComponentData()
-		// Non-blocking send: if the result channel already has a value
-		// (e.g. duplicate clicks), drop silently to avoid goroutine leaks.
+		var label string
+		var approved bool
 		switch data.CustomID {
 		case "approve":
-			select {
-			case result <- true:
-			default:
-			}
+			label = "Approved"
+			approved = true
 		case "deny":
-			select {
-			case result <- false:
-			default:
-			}
+			label = "Denied"
+		default:
+			return
+		}
+
+		// Acknowledge the interaction so Discord doesn't show "interaction failed".
+		_ = bot.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseUpdateMessage,
+			Data: &discordgo.InteractionResponseData{
+				Content:    message + "\n\n**" + label + "**",
+				Components: []discordgo.MessageComponent{}, // remove buttons
+			},
+		})
+
+		// Non-blocking send: if the result channel already has a value
+		// (e.g. duplicate clicks), drop silently to avoid goroutine leaks.
+		select {
+		case result <- approved:
+		default:
 		}
 	})
 	defer removeHandler()

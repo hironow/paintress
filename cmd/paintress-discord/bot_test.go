@@ -16,6 +16,7 @@ type mockBot struct {
 	openFunc        func() error
 	closed          bool
 	interactionCh   chan *discordgo.InteractionCreate
+	respondedWith   []*discordgo.InteractionResponse
 }
 
 func (m *mockBot) ChannelMessageSend(channelID, content string, options ...discordgo.RequestOption) (*discordgo.Message, error) {
@@ -43,6 +44,11 @@ func (m *mockBot) AddHandler(handler interface{}) func() {
 		}
 	}()
 	return func() {}
+}
+
+func (m *mockBot) InteractionRespond(_ *discordgo.Interaction, resp *discordgo.InteractionResponse, _ ...discordgo.RequestOption) error {
+	m.respondedWith = append(m.respondedWith, resp)
+	return nil
 }
 
 func (m *mockBot) Open() error {
@@ -179,6 +185,13 @@ func TestSendApprove_Approved(t *testing.T) {
 	}
 	if !bot.closed {
 		t.Error("expected Close to be called")
+	}
+	if len(bot.respondedWith) == 0 {
+		t.Fatal("expected InteractionRespond to be called (ACK)")
+	}
+	if bot.respondedWith[0].Type != discordgo.InteractionResponseUpdateMessage {
+		t.Errorf("response type = %d, want InteractionResponseUpdateMessage (%d)",
+			bot.respondedWith[0].Type, discordgo.InteractionResponseUpdateMessage)
 	}
 }
 
