@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -108,7 +109,9 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 				slack.NewTextBlockObject(slack.MarkdownType, message+"\n\n*"+label+"*", false, false),
 				nil, nil,
 			)
-			_, _, _, _ = bot.UpdateMessage(channelID, sentTS, slack.MsgOptionBlocks(resultText))
+			if _, _, _, err := bot.UpdateMessage(channelID, sentTS, slack.MsgOptionBlocks(resultText)); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to update message: %v\n", err)
+			}
 
 			return approved, nil
 		}
