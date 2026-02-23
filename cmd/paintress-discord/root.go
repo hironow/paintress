@@ -41,6 +41,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(
 		newNotifyCommand(),
 		newApproveCommand(),
+		newDoctorCommand(),
 	)
 
 	return rootCmd
