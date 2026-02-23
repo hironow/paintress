@@ -55,11 +55,33 @@ func maskSecret(s string) string {
 	return s[:6] + "***"
 }
 
+const setupGuide = `
+Setup Guide:
+
+  PAINTRESS_TG_TOKEN — Telegram Bot API token
+    1. Open Telegram and search for @BotFather
+    2. Send /newbot and follow the prompts (name + username ending in "bot")
+    3. BotFather replies with your token (format: 123456:ABC-DEF...)
+    4. To retrieve later: send /mybots to @BotFather, select your bot, tap "API Token"
+
+  PAINTRESS_TG_CHAT_ID — Target chat ID (integer)
+    1. Add your bot to the target chat (group or channel)
+    2. Send any message in that chat
+    3. Open: https://api.telegram.org/bot<TOKEN>/getUpdates
+    4. Find "chat":{"id": ...} in the JSON response
+    Alternative: send /start to @RawDataBot to get your personal chat ID
+
+  Example:
+    export PAINTRESS_TG_TOKEN="123456:ABC-DEF..."
+    export PAINTRESS_TG_CHAT_ID="987654321"
+`
+
 func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor",
-		Short: "Check required environment variables",
-		Args:  cobra.NoArgs,
+		Use:          "doctor",
+		Short:        "Check required environment variables",
+		SilenceUsage: true,
+		Args:         cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			checks := runDoctorChecks(os.Getenv)
 			w := cmd.ErrOrStderr()
@@ -84,6 +106,7 @@ func newDoctorCommand() *cobra.Command {
 			fmt.Fprintln(w)
 
 			if !allOK {
+				fmt.Fprint(w, setupGuide)
 				return fmt.Errorf("some checks failed")
 			}
 			fmt.Fprintln(w, "All checks passed.")

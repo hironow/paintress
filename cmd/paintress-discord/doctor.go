@@ -50,11 +50,34 @@ func maskSecret(s string) string {
 	return s[:6] + "***"
 }
 
+const setupGuide = `
+Setup Guide:
+
+  PAINTRESS_DISCORD_TOKEN — Discord Bot token
+    1. Go to https://discord.com/developers/applications
+    2. Click "New Application", give it a name, click "Create"
+    3. Go to the "Bot" tab in the left sidebar
+    4. Click "Reset Token" and copy the token
+    5. Under "Privileged Gateway Intents", no special intents are required
+    6. Invite the bot to your server:
+       https://discord.com/oauth2/authorize?client_id=<APP_ID>&scope=bot&permissions=2048
+       (replace <APP_ID> with your Application ID from the "General Information" tab)
+
+  PAINTRESS_DISCORD_CHANNEL_ID — Target channel ID
+    1. Open Discord Settings > Advanced > enable "Developer Mode"
+    2. Right-click the target channel > "Copy Channel ID"
+
+  Example:
+    export PAINTRESS_DISCORD_TOKEN="MTIz.abc.xyz..."
+    export PAINTRESS_DISCORD_CHANNEL_ID="1234567890"
+`
+
 func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor",
-		Short: "Check required environment variables",
-		Args:  cobra.NoArgs,
+		Use:          "doctor",
+		Short:        "Check required environment variables",
+		SilenceUsage: true,
+		Args:         cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			checks := runDoctorChecks(os.Getenv)
 			w := cmd.ErrOrStderr()
@@ -79,6 +102,7 @@ func newDoctorCommand() *cobra.Command {
 			fmt.Fprintln(w)
 
 			if !allOK {
+				fmt.Fprint(w, setupGuide)
 				return fmt.Errorf("some checks failed")
 			}
 			fmt.Fprintln(w, "All checks passed.")
