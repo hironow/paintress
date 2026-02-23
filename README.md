@@ -332,6 +332,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 ```
 +-- cmd/paintress/
 |   +-- main.go              CLI entry point (signal, NeedsDefaultRun, ExecuteContext)
++-- cmd/paintress-tg/
+|   +-- *.go                 Telegram companion (notify/approve via Bot API)
++-- cmd/paintress-discord/
+|   +-- *.go                 Discord companion (notify/approve via Bot Gateway)
++-- cmd/paintress-slack/
+|   +-- *.go                 Slack companion (notify/approve via Socket Mode)
 +-- internal/cmd/
 |   +-- root.go              Root cobra command + global flags
 |   +-- run.go               Run subcommand + expedition wiring
@@ -390,6 +396,40 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- .github/workflows/
     +-- ci.yaml              CI (test + vet)
     +-- release.yaml         Release on tag push (GoReleaser)
+```
+
+## Companion Binaries
+
+Paintress ships three companion binaries for sending notifications and approval requests to chat platforms. They plug into `--notify-cmd` and `--approve-cmd`:
+
+| Binary | Platform | Transport | Env Vars |
+|--------|----------|-----------|----------|
+| `paintress-tg` | Telegram | Bot API (long polling) | `PAINTRESS_TG_TOKEN`, `PAINTRESS_TG_CHAT_ID` |
+| `paintress-discord` | Discord | Bot Gateway (WebSocket) | `PAINTRESS_DISCORD_TOKEN`, `PAINTRESS_DISCORD_CHANNEL_ID` |
+| `paintress-slack` | Slack | Socket Mode (WebSocket) | `PAINTRESS_SLACK_TOKEN`, `PAINTRESS_SLACK_CHANNEL_ID`, `PAINTRESS_SLACK_APP_TOKEN` |
+
+Each binary provides three subcommands: `notify`, `approve`, and `doctor`.
+
+```bash
+# Example: Slack notifications + Telegram approval
+paintress \
+  --notify-cmd 'paintress-slack notify "{message}"' \
+  --approve-cmd 'paintress-tg approve "{message}"' \
+  /path/to/repo
+
+# Check companion setup
+paintress-tg doctor
+paintress-discord doctor
+paintress-slack doctor
+```
+
+All companions follow the [approval contract](docs/approval-contract.md): exit 0 = approved, exit non-zero = denied.
+
+Install via Homebrew (`brew install hironow/tap/paintress` includes all binaries) or build from source:
+
+```bash
+just build-all       # build all 4 binaries
+just install-all     # install all to /usr/local/bin
 ```
 
 ## Prerequisites

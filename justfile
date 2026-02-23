@@ -49,17 +49,22 @@ build-tg:
 build-discord:
     go build -o {{TOOL}}-discord ./cmd/{{TOOL}}-discord/
 
+# Build Slack companion binary
+build-slack:
+    go build -o {{TOOL}}-slack ./cmd/{{TOOL}}-slack/
+
 # Build all binaries (main + companions)
-build-all: build build-tg build-discord
+build-all: build build-tg build-discord build-slack
 
 # Build and install to /usr/local/bin
 install: build
     mv {{TOOL}} /usr/local/bin/
 
 # Build and install companion binaries to /usr/local/bin
-install-companions: build-tg build-discord
+install-companions: build-tg build-discord build-slack
     mv {{TOOL}}-tg /usr/local/bin/
     mv {{TOOL}}-discord /usr/local/bin/
+    mv {{TOOL}}-slack /usr/local/bin/
 
 # Install all binaries (main + companions)
 install-all: install install-companions
@@ -124,5 +129,5 @@ docgen:
 
 # Clean build artifacts
 clean:
-    rm -f {{TOOL}} {{TOOL}}-tg {{TOOL}}-discord coverage.out
+    rm -f {{TOOL}} {{TOOL}}-tg {{TOOL}}-discord {{TOOL}}-slack coverage.out
     go clean

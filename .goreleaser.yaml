@@ -56,6 +56,21 @@ builds:
     ldflags:
       - -s -w
 
+  - id: paintress-slack
+    main: ./cmd/paintress-slack/
+    binary: paintress-slack
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
 archives:
   - formats:
       - tar.gz
@@ -102,5 +117,6 @@ brews:
       bin.install "paintress"
       bin.install "paintress-tg"
       bin.install "paintress-discord"
+      bin.install "paintress-slack"
     test: |
       system "#{bin}/paintress", "version"
