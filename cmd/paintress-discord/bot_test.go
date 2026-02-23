@@ -61,7 +61,7 @@ func (m *mockBot) Close() error {
 
 func TestParseBotConfig_Valid(t *testing.T) {
 	// given
-	token := "Bot MTIz.abc.xyz"
+	token := "MTIz.abc.xyz"
 	channelID := "123456789"
 
 	// when
@@ -76,6 +76,23 @@ func TestParseBotConfig_Valid(t *testing.T) {
 	}
 	if cfg.channelID != channelID {
 		t.Errorf("channelID = %q, want %q", cfg.channelID, channelID)
+	}
+}
+
+func TestParseBotConfig_StripsBotPrefix(t *testing.T) {
+	// given: token already has "Bot " prefix (common in docs/env examples)
+	token := "Bot MTIz.abc.xyz"
+	channelID := "123456789"
+
+	// when
+	cfg, err := parseBotConfig(token, channelID)
+
+	// then: prefix should be stripped to avoid double-prefixing
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.token != "MTIz.abc.xyz" {
+		t.Errorf("token = %q, want %q (Bot prefix should be stripped)", cfg.token, "MTIz.abc.xyz")
 	}
 }
 

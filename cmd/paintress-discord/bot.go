@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -25,6 +26,8 @@ type botConfig struct {
 }
 
 // parseBotConfig reads and validates environment-sourced configuration.
+// Strips the "Bot " prefix from the token if present, so callers can
+// safely prepend it without risk of double-prefixing.
 func parseBotConfig(token, channelID string) (botConfig, error) {
 	if token == "" {
 		return botConfig{}, fmt.Errorf("PAINTRESS_DISCORD_TOKEN is required")
@@ -32,6 +35,7 @@ func parseBotConfig(token, channelID string) (botConfig, error) {
 	if channelID == "" {
 		return botConfig{}, fmt.Errorf("PAINTRESS_DISCORD_CHANNEL_ID is required")
 	}
+	token = strings.TrimPrefix(token, "Bot ")
 	return botConfig{token: token, channelID: channelID}, nil
 }
 
@@ -53,15 +57,19 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 
 	result := make(chan bool, 1)
 	var sentID atomic.Value // stores the sent message ID (string)
+	ready := make(chan struct{})
 
 	// Register handler BEFORE sending the message to avoid dropping
 	// fast button clicks that arrive between send and registration.
 	removeHandler := bot.AddHandler(func(_ *discordgo.Session, i *discordgo.InteractionCreate) {
+		// Block until sentID is stored (closed after ChannelMessageSendComplex).
+		<-ready
+
 		if i.Type != discordgo.InteractionMessageComponent {
 			return
 		}
 		id, _ := sentID.Load().(string)
-		if id == "" || i.Message == nil || i.Message.ID != id {
+		if i.Message == nil || i.Message.ID != id {
 			return
 		}
 
@@ -103,9 +111,11 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 		},
 	})
 	if err != nil {
+		close(ready)
 		return false, fmt.Errorf("failed to send approval message: %w", err)
 	}
 	sentID.Store(sent.ID)
+	close(ready)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
