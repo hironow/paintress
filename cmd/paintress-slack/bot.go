@@ -21,18 +21,28 @@ type botConfig struct {
 	appToken  string
 }
 
-// parseBotConfig reads and validates environment-sourced configuration.
-func parseBotConfig(token, channelID, appToken string) (botConfig, error) {
+// parseNotifyConfig validates config for notify (token + channelID only).
+func parseNotifyConfig(token, channelID string) (botConfig, error) {
 	if token == "" {
 		return botConfig{}, fmt.Errorf("PAINTRESS_SLACK_TOKEN is required")
 	}
 	if channelID == "" {
 		return botConfig{}, fmt.Errorf("PAINTRESS_SLACK_CHANNEL_ID is required")
 	}
+	return botConfig{token: token, channelID: channelID}, nil
+}
+
+// parseBotConfig validates config for approve (token + channelID + appToken).
+func parseBotConfig(token, channelID, appToken string) (botConfig, error) {
+	cfg, err := parseNotifyConfig(token, channelID)
+	if err != nil {
+		return botConfig{}, err
+	}
 	if appToken == "" {
 		return botConfig{}, fmt.Errorf("PAINTRESS_SLACK_APP_TOKEN is required")
 	}
-	return botConfig{token: token, channelID: channelID, appToken: appToken}, nil
+	cfg.appToken = appToken
+	return cfg, nil
 }
 
 // socketEvent represents an incoming interactive action from Socket Mode.

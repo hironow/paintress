@@ -49,10 +49,14 @@ func newNotifyCommand() *cobra.Command {
 		Short: "Send a notification message",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			api, cfg, err := newBotFromEnv()
+			cfg, err := parseNotifyConfig(
+				os.Getenv("PAINTRESS_SLACK_TOKEN"),
+				os.Getenv("PAINTRESS_SLACK_CHANNEL_ID"),
+			)
 			if err != nil {
 				return err
 			}
+			api := slack.New(cfg.token)
 			return sendNotify(api, cfg.channelID, args[0])
 		},
 	}

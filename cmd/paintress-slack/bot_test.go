@@ -29,6 +29,55 @@ func (m *mockBot) UpdateMessage(channelID, timestamp string, opts ...slack.MsgOp
 	return "ch-1", "1234567890.123456", "", nil
 }
 
+// --- parseNotifyConfig tests ---
+
+func TestParseNotifyConfig_Valid(t *testing.T) {
+	// given
+	token := "xoxb-123-456-abc"
+	channelID := "C01234567"
+
+	// when
+	cfg, err := parseNotifyConfig(token, channelID)
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.token != token {
+		t.Errorf("token = %q, want %q", cfg.token, token)
+	}
+	if cfg.channelID != channelID {
+		t.Errorf("channelID = %q, want %q", cfg.channelID, channelID)
+	}
+}
+
+func TestParseNotifyConfig_MissingToken(t *testing.T) {
+	_, err := parseNotifyConfig("", "C01234567")
+	if err == nil {
+		t.Fatal("expected error for missing token")
+	}
+}
+
+func TestParseNotifyConfig_MissingChannelID(t *testing.T) {
+	_, err := parseNotifyConfig("xoxb-123", "")
+	if err == nil {
+		t.Fatal("expected error for missing channel ID")
+	}
+}
+
+func TestParseNotifyConfig_DoesNotRequireAppToken(t *testing.T) {
+	// given: only token and channelID (no app token)
+	cfg, err := parseNotifyConfig("xoxb-123", "C01234567")
+
+	// then: succeeds without app token
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.appToken != "" {
+		t.Errorf("appToken should be empty, got %q", cfg.appToken)
+	}
+}
+
 // --- parseBotConfig tests ---
 
 func TestParseBotConfig_Valid(t *testing.T) {
