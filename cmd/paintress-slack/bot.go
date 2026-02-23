@@ -36,9 +36,11 @@ func parseBotConfig(token, channelID, appToken string) (botConfig, error) {
 }
 
 // socketEvent represents an incoming interactive action from Socket Mode.
+// When Err is non-nil, it signals a connection/auth failure instead of a user action.
 type socketEvent struct {
 	ActionID  string
 	MessageTS string
+	Err       error
 }
 
 // sendNotify sends a text message to the configured channel and returns immediately.
@@ -73,6 +75,9 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 		case <-timeoutCtx.Done():
 			return false, nil
 		case ev := <-events:
+			if ev.Err != nil {
+				return false, fmt.Errorf("socket mode failure: %w", ev.Err)
+			}
 			if ev.MessageTS != sentTS {
 				continue
 			}

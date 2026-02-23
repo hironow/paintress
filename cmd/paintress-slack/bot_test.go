@@ -206,6 +206,40 @@ func TestSendApprove_DuplicateClicks(t *testing.T) {
 	}
 }
 
+func TestSendApprove_SocketModeError(t *testing.T) {
+	// given: a socketEvent with an error (e.g. invalid auth)
+	ch := make(chan socketEvent, 1)
+	bot := &mockBot{}
+	ch <- socketEvent{Err: fmt.Errorf("socket mode: invalid auth")}
+
+	// when
+	approved, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+
+	// then: error is surfaced (not treated as denial)
+	if err == nil {
+		t.Fatal("expected error for socket mode failure")
+	}
+	if approved {
+		t.Error("expected approved=false on socket mode error")
+	}
+}
+
+func TestSendApprove_SocketModeErrorBeforeInteraction(t *testing.T) {
+	// given: error arrives before any interactive event
+	ch := make(chan socketEvent, 2)
+	bot := &mockBot{}
+	ch <- socketEvent{Err: fmt.Errorf("socket mode: connection error")}
+	ch <- socketEvent{ActionID: "approve", MessageTS: "1234567890.123456"}
+
+	// when
+	_, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+
+	// then: error takes priority, approval never reached
+	if err == nil {
+		t.Fatal("expected error for socket mode failure")
+	}
+}
+
 func TestSendApprove_UpdatesMessage(t *testing.T) {
 	ch := make(chan socketEvent, 1)
 	var updatedTS string

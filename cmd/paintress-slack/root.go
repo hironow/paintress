@@ -102,7 +102,16 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 			if !ok {
 				return
 			}
-			if evt.Type != socketmode.EventTypeInteractive {
+			switch evt.Type {
+			case socketmode.EventTypeInvalidAuth:
+				events <- socketEvent{Err: fmt.Errorf("invalid auth (check PAINTRESS_SLACK_APP_TOKEN)")}
+				return
+			case socketmode.EventTypeConnectionError:
+				events <- socketEvent{Err: fmt.Errorf("connection error")}
+				return
+			case socketmode.EventTypeInteractive:
+				// handled below
+			default:
 				continue
 			}
 			cb, ok := evt.Data.(slack.InteractionCallback)
