@@ -3,8 +3,10 @@ package paintress
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
-	"sync"
+
+	"github.com/alitto/pond/v2"
 )
 
 // Lumina represents a learned passive skill extracted from past expedition journals.
@@ -35,18 +37,15 @@ func ScanJournalsForLumina(continent string) []Lumina {
 		highSeverity string
 	}
 
-	// Parallel journal scanning
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	var entries []journalData
+	// Parallel journal scanning with bounded concurrency
+	pool := pond.NewResultPool[journalData](runtime.GOMAXPROCS(0))
+	group := pool.NewGroup()
 
 	for _, f := range files {
-		wg.Add(1)
-		go func(path string) {
-			defer wg.Done()
-			content, err := os.ReadFile(path)
+		group.Submit(func() journalData {
+			content, err := os.ReadFile(f)
 			if err != nil {
-				return
+				return journalData{}
 			}
 			text := string(content)
 
@@ -68,12 +67,15 @@ func ScanJournalsForLumina(continent string) []Lumina {
 				}
 			}
 
-			mu.Lock()
-			entries = append(entries, entry)
-			mu.Unlock()
-		}(f)
+			return entry
+		})
 	}
-	wg.Wait()
+
+	entries, err := group.Wait()
+	if err != nil {
+		return nil
+	}
+	pool.StopAndWait()
 
 	// Aggregate patterns
 	failureReasons := make(map[string]int)
