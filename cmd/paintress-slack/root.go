@@ -108,10 +108,16 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 			}
 			switch evt.Type {
 			case socketmode.EventTypeInvalidAuth:
-				events <- socketEvent{Err: fmt.Errorf("invalid auth (check PAINTRESS_SLACK_APP_TOKEN)")}
+				select {
+				case events <- socketEvent{Err: fmt.Errorf("invalid auth (check PAINTRESS_SLACK_APP_TOKEN)")}:
+				case <-ctx.Done():
+				}
 				return
 			case socketmode.EventTypeConnectionError:
-				events <- socketEvent{Err: fmt.Errorf("connection error")}
+				select {
+				case events <- socketEvent{Err: fmt.Errorf("connection error")}:
+				case <-ctx.Done():
+				}
 				return
 			case socketmode.EventTypeInteractive:
 				// handled below
@@ -125,9 +131,15 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 			sm.Ack(*evt.Request)
 
 			for _, action := range cb.ActionCallback.BlockActions {
-				events <- socketEvent{
+				select {
+				case events <- socketEvent{
 					ActionID:  action.ActionID,
 					MessageTS: cb.Message.Timestamp,
+				}:
+				case <-ctx.Done():
+					return
+				default:
+					// Drop if channel is full (e.g. duplicate clicks after sendApprove returned)
 				}
 			}
 		}
