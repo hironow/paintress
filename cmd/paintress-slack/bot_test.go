@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/slack-go/slack"
 )
@@ -93,5 +95,131 @@ func TestSendNotify_Failure(t *testing.T) {
 	err := sendNotify(bot, "C01234567", "test message")
 	if err == nil {
 		t.Fatal("expected error on send failure")
+	}
+}
+
+// --- sendApprove tests ---
+
+func TestSendApprove_Approved(t *testing.T) {
+	ch := make(chan socketEvent, 1)
+	bot := &mockBot{}
+	ch <- socketEvent{ActionID: "approve", MessageTS: "1234567890.123456"}
+
+	approved, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approved=true")
+	}
+}
+
+func TestSendApprove_Denied(t *testing.T) {
+	ch := make(chan socketEvent, 1)
+	bot := &mockBot{}
+	ch <- socketEvent{ActionID: "deny", MessageTS: "1234567890.123456"}
+
+	approved, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected approved=false for deny")
+	}
+}
+
+func TestSendApprove_Timeout(t *testing.T) {
+	ch := make(chan socketEvent) // no events
+	bot := &mockBot{}
+
+	approved, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 50*time.Millisecond, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected approved=false on timeout")
+	}
+}
+
+func TestSendApprove_SendFailure(t *testing.T) {
+	ch := make(chan socketEvent)
+	bot := &mockBot{
+		postFunc: func(string, ...slack.MsgOption) (string, string, error) {
+			return "", "", fmt.Errorf("API error")
+		},
+	}
+
+	_, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+	if err == nil {
+		t.Fatal("expected error on send failure")
+	}
+}
+
+func TestSendApprove_IgnoresUnrelated(t *testing.T) {
+	ch := make(chan socketEvent, 2)
+	bot := &mockBot{}
+
+	// Unrelated action (different timestamp)
+	ch <- socketEvent{ActionID: "approve", MessageTS: "9999999999.999999"}
+	// Our action
+	ch <- socketEvent{ActionID: "approve", MessageTS: "1234567890.123456"}
+
+	approved, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approved=true (should skip unrelated)")
+	}
+}
+
+func TestSendApprove_ContextCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	ch := make(chan socketEvent)
+	bot := &mockBot{}
+
+	approved, err := sendApprove(ctx, bot, "C01234567", "approve?", 5*time.Second, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected approved=false on context cancel")
+	}
+}
+
+func TestSendApprove_DuplicateClicks(t *testing.T) {
+	ch := make(chan socketEvent, 3)
+	bot := &mockBot{}
+
+	ch <- socketEvent{ActionID: "approve", MessageTS: "1234567890.123456"}
+	ch <- socketEvent{ActionID: "approve", MessageTS: "1234567890.123456"} // dup
+	ch <- socketEvent{ActionID: "deny", MessageTS: "1234567890.123456"}    // late
+
+	approved, err := sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approved=true (first click wins)")
+	}
+}
+
+func TestSendApprove_UpdatesMessage(t *testing.T) {
+	ch := make(chan socketEvent, 1)
+	var updatedTS string
+	bot := &mockBot{
+		updateFunc: func(_ string, ts string, _ ...slack.MsgOption) (string, string, string, error) {
+			updatedTS = ts
+			return "", ts, "", nil
+		},
+	}
+	ch <- socketEvent{ActionID: "approve", MessageTS: "1234567890.123456"}
+
+	sendApprove(context.Background(), bot, "C01234567", "approve?", 5*time.Second, ch)
+
+	if updatedTS != "1234567890.123456" {
+		t.Errorf("expected message update with ts=%q, got %q", "1234567890.123456", updatedTS)
 	}
 }
