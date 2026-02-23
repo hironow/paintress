@@ -8,7 +8,8 @@ before:
     - go test ./... -count=1 -short
 
 builds:
-  - main: ./cmd/paintress/
+  - id: paintress
+    main: ./cmd/paintress/
     binary: paintress
     env:
       - CGO_ENABLED=0
@@ -24,6 +25,36 @@ builds:
       - -X github.com/hironow/paintress/internal/cmd.Version={{.Version}}
       - -X github.com/hironow/paintress/internal/cmd.Commit={{.ShortCommit}}
       - -X github.com/hironow/paintress/internal/cmd.Date={{.Date}}
+
+  - id: paintress-tg
+    main: ./cmd/paintress-tg/
+    binary: paintress-tg
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+  - id: paintress-discord
+    main: ./cmd/paintress-discord/
+    binary: paintress-discord
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
 
 archives:
   - formats:
@@ -69,5 +100,7 @@ brews:
     license: "Apache-2.0"
     install: |
       bin.install "paintress"
+      bin.install "paintress-tg"
+      bin.install "paintress-discord"
     test: |
       system "#{bin}/paintress", "version"
