@@ -115,19 +115,18 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 		select {
 		case <-ctx.Done():
 			return
+		case err := <-runErr:
+			// RunContext exited — surface the error immediately regardless of
+			// whether sm.Events is still open.
+			if err != nil && ctx.Err() == nil {
+				select {
+				case events <- socketEvent{Err: fmt.Errorf("socket mode: %w", err)}:
+				case <-ctx.Done():
+				}
+			}
+			return
 		case evt, ok := <-sm.Events:
 			if !ok {
-				// sm.Events closed — check if RunContext returned an error.
-				select {
-				case err := <-runErr:
-					if err != nil && ctx.Err() == nil {
-						select {
-						case events <- socketEvent{Err: fmt.Errorf("socket mode: %w", err)}:
-						case <-ctx.Done():
-						}
-					}
-				default:
-				}
 				return
 			}
 			switch evt.Type {
