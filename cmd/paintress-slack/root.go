@@ -78,10 +78,13 @@ Exit 0 = approved, exit 1 = denied or timed out.`,
 			timeout, _ := cmd.Flags().GetDuration("timeout")
 			events := make(chan socketEvent, 1)
 
-			sm := socketmode.New(api)
-			go runSocketMode(cmd.Context(), sm, events)
+			ctx, cancel := context.WithCancel(cmd.Context())
+			defer cancel()
 
-			approved, err := sendApprove(cmd.Context(), api, cfg.channelID, args[0], timeout, events)
+			sm := socketmode.New(api)
+			go runSocketMode(ctx, sm, events)
+
+			approved, err := sendApprove(ctx, api, cfg.channelID, args[0], timeout, events)
 			if err != nil {
 				return err
 			}
