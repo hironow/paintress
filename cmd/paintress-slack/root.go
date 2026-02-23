@@ -138,8 +138,6 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 				}:
 				case <-ctx.Done():
 					return
-				default:
-					// Drop if channel is full (e.g. duplicate clicks after sendApprove returned)
 				}
 			}
 		}
