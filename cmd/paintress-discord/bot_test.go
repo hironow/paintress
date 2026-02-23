@@ -307,3 +307,38 @@ func TestSendApprove_ContextCancel(t *testing.T) {
 		t.Error("expected approved=false on context cancel")
 	}
 }
+
+func TestSendApprove_DuplicateClicks_NoGoroutineLeak(t *testing.T) {
+	// given: multiple rapid clicks on the same button — handler must not block
+	ch := make(chan *discordgo.InteractionCreate, 3)
+	bot := &mockBot{interactionCh: ch}
+
+	interaction := func(customID string) *discordgo.InteractionCreate {
+		return &discordgo.InteractionCreate{
+			Interaction: &discordgo.Interaction{
+				Type: discordgo.InteractionMessageComponent,
+				Message: &discordgo.Message{
+					ID: "msg-42",
+				},
+				Data: discordgo.MessageComponentInteractionData{
+					CustomID: customID,
+				},
+			},
+		}
+	}
+
+	ch <- interaction("approve")
+	ch <- interaction("approve") // duplicate
+	ch <- interaction("deny")    // late click
+
+	// when
+	approved, err := sendApprove(context.Background(), bot, "ch-1", "approve?", 5*time.Second)
+
+	// then: first click wins, no goroutine leak from duplicates
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approved=true (first click should win)")
+	}
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -50,6 +51,38 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 	}
 	defer bot.Close()
 
+	result := make(chan bool, 1)
+	var sentID atomic.Value // stores the sent message ID (string)
+
+	// Register handler BEFORE sending the message to avoid dropping
+	// fast button clicks that arrive between send and registration.
+	removeHandler := bot.AddHandler(func(_ *discordgo.Session, i *discordgo.InteractionCreate) {
+		if i.Type != discordgo.InteractionMessageComponent {
+			return
+		}
+		id, _ := sentID.Load().(string)
+		if id == "" || i.Message == nil || i.Message.ID != id {
+			return
+		}
+
+		data := i.MessageComponentData()
+		// Non-blocking send: if the result channel already has a value
+		// (e.g. duplicate clicks), drop silently to avoid goroutine leaks.
+		switch data.CustomID {
+		case "approve":
+			select {
+			case result <- true:
+			default:
+			}
+		case "deny":
+			select {
+			case result <- false:
+			default:
+			}
+		}
+	})
+	defer removeHandler()
+
 	sent, err := bot.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 		Content: message,
 		Components: []discordgo.MessageComponent{
@@ -72,28 +105,7 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 	if err != nil {
 		return false, fmt.Errorf("failed to send approval message: %w", err)
 	}
-
-	result := make(chan bool, 1)
-
-	// Handler signature matches discordgo's expected: func(*Session, *Event).
-	// The session parameter is unused — we only read the interaction data.
-	removeHandler := bot.AddHandler(func(_ *discordgo.Session, i *discordgo.InteractionCreate) {
-		if i.Type != discordgo.InteractionMessageComponent {
-			return
-		}
-		if i.Message == nil || i.Message.ID != sent.ID {
-			return
-		}
-
-		data := i.MessageComponentData()
-		switch data.CustomID {
-		case "approve":
-			result <- true
-		case "deny":
-			result <- false
-		}
-	})
-	defer removeHandler()
+	sentID.Store(sent.ID)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
