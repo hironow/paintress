@@ -98,8 +98,18 @@ Exit 0 = approved, exit 1 = denied or timed out.`,
 
 // runSocketMode runs the Socket Mode client, converting interactive events
 // to socketEvent structs on the events channel. Blocks until ctx is cancelled.
+//
+// sm.RunContext errors are captured: if RunContext exits with a non-nil error
+// (and ctx is not cancelled), the error is surfaced through the events channel
+// so sendApprove can return it instead of silently timing out.
+//
+// EventTypeConnectionError is treated as transient (Socket Mode retries with
+// backoff internally). Only EventTypeInvalidAuth is terminal.
 func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- socketEvent) {
-	go sm.RunContext(ctx)
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- sm.RunContext(ctx)
+	}()
 
 	for {
 		select {
@@ -107,6 +117,17 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 			return
 		case evt, ok := <-sm.Events:
 			if !ok {
+				// sm.Events closed — check if RunContext returned an error.
+				select {
+				case err := <-runErr:
+					if err != nil && ctx.Err() == nil {
+						select {
+						case events <- socketEvent{Err: fmt.Errorf("socket mode: %w", err)}:
+						case <-ctx.Done():
+						}
+					}
+				default:
+				}
 				return
 			}
 			switch evt.Type {
@@ -117,11 +138,7 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 				}
 				return
 			case socketmode.EventTypeConnectionError:
-				select {
-				case events <- socketEvent{Err: fmt.Errorf("connection error")}:
-				case <-ctx.Done():
-				}
-				return
+				continue // transient — Socket Mode retries with backoff
 			case socketmode.EventTypeInteractive:
 				// handled below
 			default:
