@@ -21,7 +21,7 @@ func (m *mockBot) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 	if m.sendFunc != nil {
 		return m.sendFunc(c)
 	}
-	return tgbotapi.Message{MessageID: 42}, nil
+	return tgbotapi.Message{MessageID: 42, Chat: &tgbotapi.Chat{ID: 123}}, nil
 }
 
 func (m *mockBot) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
@@ -136,6 +136,7 @@ func TestSendApprove_Approved(t *testing.T) {
 			Data: "approve",
 			Message: &tgbotapi.Message{
 				MessageID: 42,
+				Chat:      &tgbotapi.Chat{ID: 123},
 			},
 		},
 	}
@@ -166,6 +167,7 @@ func TestSendApprove_Denied(t *testing.T) {
 			Data: "deny",
 			Message: &tgbotapi.Message{
 				MessageID: 42,
+				Chat:      &tgbotapi.Chat{ID: 123},
 			},
 		},
 	}
@@ -229,6 +231,7 @@ func TestSendApprove_IgnoresUnrelatedCallback(t *testing.T) {
 			Data: "deny",
 			Message: &tgbotapi.Message{
 				MessageID: 999, // different from our sent message (42)
+				Chat:      &tgbotapi.Chat{ID: 123},
 			},
 		},
 	}
@@ -239,6 +242,7 @@ func TestSendApprove_IgnoresUnrelatedCallback(t *testing.T) {
 			Data: "approve",
 			Message: &tgbotapi.Message{
 				MessageID: 42,
+				Chat:      &tgbotapi.Chat{ID: 123},
 			},
 		},
 	}
@@ -252,6 +256,54 @@ func TestSendApprove_IgnoresUnrelatedCallback(t *testing.T) {
 	}
 	if !approved {
 		t.Error("expected approved=true (should skip unrelated callback)")
+	}
+}
+
+func TestSendApprove_IgnoresCrossChat(t *testing.T) {
+	// given: callback from a different chat with the same message ID, then correct chat
+	ch := make(chan tgbotapi.Update, 2)
+	bot := &mockBot{
+		updatesCh: ch,
+		sendFunc: func(_ tgbotapi.Chattable) (tgbotapi.Message, error) {
+			return tgbotapi.Message{
+				MessageID: 42,
+				Chat:      &tgbotapi.Chat{ID: 123},
+			}, nil
+		},
+	}
+
+	// Cross-chat callback: same message ID but different chat
+	ch <- tgbotapi.Update{
+		CallbackQuery: &tgbotapi.CallbackQuery{
+			ID:   "cross-chat",
+			Data: "deny",
+			Message: &tgbotapi.Message{
+				MessageID: 42,                      // same message ID
+				Chat:      &tgbotapi.Chat{ID: 999}, // different chat
+			},
+		},
+	}
+	// Correct callback from our chat
+	ch <- tgbotapi.Update{
+		CallbackQuery: &tgbotapi.CallbackQuery{
+			ID:   "ours",
+			Data: "approve",
+			Message: &tgbotapi.Message{
+				MessageID: 42,
+				Chat:      &tgbotapi.Chat{ID: 123},
+			},
+		},
+	}
+
+	// when
+	approved, err := sendApprove(context.Background(), bot, 123, "approve?", 5*time.Second)
+
+	// then: cross-chat callback should be skipped, our callback accepted
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approved=true (should skip cross-chat callback)")
 	}
 }
 

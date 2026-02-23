@@ -82,8 +82,14 @@ func sendApprove(ctx context.Context, bot botAPI, chatID int64, message string, 
 			if update.CallbackQuery == nil {
 				continue
 			}
-			// Only respond to callbacks on our specific message
-			if update.CallbackQuery.Message == nil || update.CallbackQuery.Message.MessageID != sent.MessageID {
+			// Only respond to callbacks on our specific message in our chat.
+			// Telegram message IDs are per-chat, so we must also verify Chat.ID
+			// to avoid accepting cross-chat callbacks with colliding message IDs.
+			cbMsg := update.CallbackQuery.Message
+			if cbMsg == nil || cbMsg.MessageID != sent.MessageID {
+				continue
+			}
+			if cbMsg.Chat == nil || sent.Chat == nil || cbMsg.Chat.ID != sent.Chat.ID {
 				continue
 			}
 
