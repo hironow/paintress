@@ -39,6 +39,7 @@ func ScanJournalsForLumina(continent string) []Lumina {
 
 	// Parallel journal scanning with bounded concurrency
 	pool := pond.NewResultPool[journalData](runtime.GOMAXPROCS(0))
+	defer pool.StopAndWait()
 	group := pool.NewGroup()
 
 	for _, f := range files {
@@ -75,7 +76,6 @@ func ScanJournalsForLumina(continent string) []Lumina {
 	if err != nil {
 		return nil
 	}
-	pool.StopAndWait()
 
 	// Aggregate patterns
 	failureReasons := make(map[string]int)

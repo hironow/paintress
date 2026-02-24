@@ -33,6 +33,18 @@ func NewDevServer(cmd, url, dir, logPath string, logger *Logger) *DevServer {
 	return &DevServer{cmd: cmd, url: url, dir: dir, logPath: logPath, logger: logger}
 }
 
+func (ds *DevServer) isRunning() bool {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	return ds.running
+}
+
+func (ds *DevServer) setRunning(v bool) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.running = v
+}
+
 func (ds *DevServer) Start(ctx context.Context) error {
 	ctx, span := tracer.Start(ctx, "devserver.start",
 		trace.WithAttributes(
@@ -42,21 +54,16 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	)
 	defer span.End()
 
-	ds.mu.Lock()
-	if ds.running {
-		ds.mu.Unlock()
+	if ds.isRunning() {
 		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
 		return nil
 	}
-	ds.mu.Unlock()
 
 	// Check if dev server is already running externally
 	client := &http.Client{Timeout: 2 * time.Second}
 	if resp, err := client.Get(ds.url); err == nil {
 		resp.Body.Close()
-		ds.mu.Lock()
-		ds.running = true
-		ds.mu.Unlock()
+		ds.setRunning(true)
 		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", true)))
 		ds.logger.OK("%s", fmt.Sprintf(Msg("devserver_already"), ds.url))
 		return nil
@@ -82,9 +89,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	go func() {
 		defer logFile.Close()
 		_ = ds.process.Wait()
-		ds.mu.Lock()
-		ds.running = false
-		ds.mu.Unlock()
+		ds.setRunning(false)
 	}()
 
 	if err := ds.waitReady(ctx); err != nil {
@@ -92,9 +97,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 		return err
 	}
 
-	ds.mu.Lock()
-	ds.running = true
-	ds.mu.Unlock()
+	ds.setRunning(true)
 	span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
 	ds.logger.OK("%s", fmt.Sprintf(Msg("devserver_ready"), ds.url))
 	return nil

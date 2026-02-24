@@ -4,6 +4,7 @@ go 1.26
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/alitto/pond/v2 v2.6.2
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/creativeprojects/go-selfupdate v1.5.2
 	github.com/fsnotify/fsnotify v1.9.0
@@ -26,7 +27,6 @@ require (
 	github.com/42wim/httpsig v1.2.3 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/alitto/pond/v2 v2.6.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
