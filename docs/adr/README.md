@@ -12,6 +12,14 @@
 | 0004 | D-Mail Schema v1 specification | MY-352, MY-353 |
 | 0005 | fsnotify daemon design | MY-363 |
 
+## Extended Shared ADRs (S-series, canonical: phonewave)
+
+| # | Decision |
+|---|----------|
+| S0001 | Logger as root package exception |
+| S0002 | JSONL append-only event sourcing pattern |
+| S0003 | Three-way approval contract |
+
 ## paintress-specific ADRs
 
 | # | Decision | Linear |
