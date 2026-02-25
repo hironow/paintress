@@ -19,6 +19,7 @@ approved  denied     error
 ```
 
 Legend:
+
 - approved: Expedition continues normally
 - denied: Clean exit, no expeditions run
 - error: Fail-closed abort, no expeditions run
@@ -50,6 +51,7 @@ Run()
 ```
 
 Legend:
+
 - gate: Blocking approval request (session-scoped)
 - notification: Fire-and-forget alert (per-event)
 

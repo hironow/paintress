@@ -53,6 +53,7 @@ Adopt a game-inspired (MMO/RPG) metaphor across the entire codebase:
 ## Consequences
 
 ### Positive
+
 - Metaphor consistency makes conceptual mapping intuitive — "Reserve Party
   activated" immediately conveys "fallback model engaged due to rate limit"
 - Domain vocabulary naturally defines module boundaries (one file per concept)
@@ -60,6 +61,7 @@ Adopt a game-inspired (MMO/RPG) metaphor across the entire codebase:
   Go standard library or common programming terms
 
 ### Negative
+
 - New developers must learn the metaphor vocabulary before understanding the
   codebase (mitigated by `docs/` documentation and inline comments)
 - Non-gamers may find the naming unfamiliar (mitigated by the comment on each

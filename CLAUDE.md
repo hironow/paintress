@@ -30,11 +30,11 @@
 ## Test Layout
 
 - Unit tests: `*_test.go` colocated with source (Go convention)
-  - All tests use in-package testing (`package paintress`, `package cmd`, `package main`)
-  - No external test packages — tests access unexported internals directly
+    - All tests use in-package testing (`package paintress`, `package cmd`, `package main`)
+    - No external test packages — tests access unexported internals directly
 - Container tests: `worktree_test.go` (testcontainers-go with `alpine/git:latest`, ~11s per test)
-  - Entrypoint: SIGTERM-aware `trap 'exit 0' TERM; while :; do sleep 1; done` (NOT `sleep infinity`)
-  - Skipped with `testing.Short()`
+    - Entrypoint: SIGTERM-aware `trap 'exit 0' TERM; while :; do sleep 1; done` (NOT `sleep infinity`)
+    - Skipped with `testing.Short()`
 - Host integration tests: `review_loop_test.go` (shell scripts + local git, ~13s total)
 - Race tests: `race_test.go` (dedicated concurrency tests, run with `just test-race`)
 - CLI integration: `internal/cmd/*_test.go` (cobra command testing)
