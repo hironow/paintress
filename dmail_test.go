@@ -1702,3 +1702,53 @@ func TestBuildFollowUpPrompt_EmptySlice(t *testing.T) {
 		t.Errorf("empty input should return empty string, got %q", prompt)
 	}
 }
+
+func TestFilterHighSeverity_NoHighSeverity(t *testing.T) {
+	// given
+	dmails := []DMail{
+		{Name: "report-1", Kind: "report", Severity: ""},
+		{Name: "spec-2", Kind: "specification", Severity: "low"},
+	}
+
+	// when
+	high := FilterHighSeverity(dmails)
+
+	// then
+	if len(high) != 0 {
+		t.Errorf("expected 0 HIGH severity d-mails, got %d", len(high))
+	}
+}
+
+func TestFilterHighSeverity_MixedSeverity(t *testing.T) {
+	// given
+	dmails := []DMail{
+		{Name: "report-1", Kind: "report", Severity: ""},
+		{Name: "alert-1", Kind: "alert", Severity: "high"},
+		{Name: "spec-1", Kind: "specification", Severity: "low"},
+		{Name: "alert-2", Kind: "alert", Severity: "high"},
+	}
+
+	// when
+	high := FilterHighSeverity(dmails)
+
+	// then
+	if len(high) != 2 {
+		t.Fatalf("expected 2 HIGH severity d-mails, got %d", len(high))
+	}
+	if high[0].Name != "alert-1" || high[1].Name != "alert-2" {
+		t.Errorf("unexpected high d-mails: %v", high)
+	}
+}
+
+func TestFilterHighSeverity_EmptySlice(t *testing.T) {
+	// given
+	var dmails []DMail
+
+	// when
+	high := FilterHighSeverity(dmails)
+
+	// then
+	if len(high) != 0 {
+		t.Errorf("expected 0 for nil/empty, got %d", len(high))
+	}
+}

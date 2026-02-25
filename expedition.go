@@ -4,11 +4,13 @@ import (
 	"bufio"
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"text/template"
@@ -24,6 +26,30 @@ var expeditionFS embed.FS
 var expeditionTemplates = template.Must(
 	template.ParseFS(expeditionFS, "templates/expedition_*.md.tmpl"),
 )
+
+//go:embed templates/mission_*.md.tmpl
+var missionFS embed.FS
+
+var missionTemplates = template.Must(
+	template.ParseFS(missionFS, "templates/mission_*.md.tmpl"),
+)
+
+// MissionText returns the mission rules of engagement in the active language.
+func MissionText() string {
+	tmplName := "mission_en.md.tmpl"
+	switch Lang {
+	case "ja":
+		tmplName = "mission_ja.md.tmpl"
+	case "fr":
+		tmplName = "mission_fr.md.tmpl"
+	}
+
+	var buf strings.Builder
+	if err := missionTemplates.ExecuteTemplate(&buf, tmplName, nil); err != nil {
+		panic(fmt.Sprintf("mission template execution failed: %v", err))
+	}
+	return buf.String()
+}
 
 // PromptData holds all dynamic values injected into the expedition prompt template.
 type PromptData struct {
@@ -399,4 +425,43 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 
 	return output.String(), err
+}
+
+// ContextDir returns the path to the context injection directory.
+func ContextDir(continent string) string {
+	return filepath.Join(continent, ".expedition", "context")
+}
+
+// ReadContextFiles reads all .md files from .expedition/context/ and
+// concatenates them into a single string for prompt injection.
+// Returns ("", nil) if the directory does not exist.
+// Returns a non-nil error for other filesystem failures (e.g. permission denied).
+func ReadContextFiles(continent string) (string, error) {
+	dir := ContextDir(continent)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", fmt.Errorf("reading context directory: %w", err)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+
+	var buf strings.Builder
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".md" {
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			return "", fmt.Errorf("reading context file %s: %w", e.Name(), err)
+		}
+		name := strings.TrimSuffix(e.Name(), ".md")
+		buf.WriteString(fmt.Sprintf("### %s\n\n", name))
+		buf.Write(content)
+		buf.WriteString("\n\n")
+	}
+	return buf.String(), nil
 }
