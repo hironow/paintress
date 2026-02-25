@@ -31,3 +31,4 @@
 | [0010](0010-three-way-approval-contract.md) | Three-way approval contract | MY-323, MY-365 |
 | [0011](0011-bounded-concurrency-pond-v2.md) | Bounded concurrency with pond/v2 | — |
 | [0012](0012-defer-unlock-enforcement.md) | Defer-unlock enforcement via semgrep | — |
+| [0013](0013-root-package-layer-separation.md) | Root package layer separation | — |
