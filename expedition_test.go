@@ -787,10 +787,15 @@ func TestLifecycle_Init_Then_Expedition(t *testing.T) {
 	dir := t.TempDir()
 	logDir := t.TempDir()
 
-	// Phase 1: simulate `paintress init` with stdin
-	input := "MY\npaintress\n"
-	if err := RunInitWithReader(dir, strings.NewReader(input), io.Discard); err != nil {
-		t.Fatalf("RunInitWithReader: %v", err)
+	// Phase 1: set up config as if `paintress init` was run
+	initCfg := &ProjectConfig{
+		Linear: LinearConfig{
+			Team:    "MY",
+			Project: "paintress",
+		},
+	}
+	if err := SaveProjectConfig(dir, initCfg); err != nil {
+		t.Fatalf("SaveProjectConfig: %v", err)
 	}
 
 	// Verify config was persisted

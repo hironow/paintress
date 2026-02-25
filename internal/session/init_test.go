@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"io"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress"
 )
 
 func TestRunInit_WritesConfig(t *testing.T) {
@@ -20,13 +22,13 @@ func TestRunInit_WritesConfig(t *testing.T) {
 	}
 
 	// Verify config file was created
-	cfgPath := ProjectConfigPath(dir)
+	cfgPath := paintress.ProjectConfigPath(dir)
 	if _, err := os.Stat(cfgPath); err != nil {
 		t.Fatalf("config file not created: %v", err)
 	}
 
 	// Verify content
-	cfg, err := LoadProjectConfig(dir)
+	cfg, err := paintress.LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
@@ -49,7 +51,7 @@ func TestRunInit_SkipOptionalProject(t *testing.T) {
 		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
-	cfg, err := LoadProjectConfig(dir)
+	cfg, err := paintress.LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}

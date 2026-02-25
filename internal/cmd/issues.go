@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -72,7 +73,7 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("LINEAR_API_KEY environment variable is required")
 	}
 
-	issues, err := paintress.FetchIssues(cmd.Context(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	issues, err := session.FetchIssues(cmd.Context(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
 	if err != nil {
 		return err
 	}

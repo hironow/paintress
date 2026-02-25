@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"bufio"
@@ -6,6 +6,8 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+
+	"github.com/hironow/paintress"
 )
 
 // RunInitWithReader executes the init flow reading input from r
@@ -19,7 +21,7 @@ func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	if err := ValidateContinent(absPath); err != nil {
+	if err := paintress.ValidateContinent(absPath); err != nil {
 		return fmt.Errorf("continent validation: %w", err)
 	}
 
@@ -46,18 +48,18 @@ func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
-	cfg := &ProjectConfig{
-		Linear: LinearConfig{
+	cfg := &paintress.ProjectConfig{
+		Linear: paintress.LinearConfig{
 			Team:    team,
 			Project: project,
 		},
 	}
 
-	if err := SaveProjectConfig(absPath, cfg); err != nil {
+	if err := paintress.SaveProjectConfig(absPath, cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(w, "\nConfig saved to %s\n", ProjectConfigPath(absPath))
+	fmt.Fprintf(w, "\nConfig saved to %s\n", paintress.ProjectConfigPath(absPath))
 	fmt.Fprintf(w, "  Linear team:    %s\n", team)
 	if project != "" {
 		fmt.Fprintf(w, "  Linear project: %s\n", project)

@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +36,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
 	fmt.Fprintln(w)
 
-	if err := paintress.RunInitWithReader(repoPath, cmd.InOrStdin(), cmd.ErrOrStderr()); err != nil {
+	if err := session.RunInitWithReader(repoPath, cmd.InOrStdin(), cmd.ErrOrStderr()); err != nil {
 		return err
 	}
 	return nil
