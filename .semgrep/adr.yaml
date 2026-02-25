@@ -1,7 +1,7 @@
 rules:
   # ==========================================================================
   # ADR enforcement rules
-  # docs/adr/ (0000-0010) のうち Go コードで静的検知できるものをカバー
+  # docs/adr/ (0000-0012) のうち Go コードで静的検知できるものをカバー
   # 対象外: ADR 0000 (governance), ADR 0004 (data format)
   # ==========================================================================
 
@@ -114,7 +114,7 @@ rules:
       $M.Lock() の直後に defer $M.Unlock() がありません。
       Lock/Unlock のペアリングを忘れるとデッドロックの原因になります。
       条件付き Unlock が必要な場合は nosemgrep を付与してください。
-      Ref: docs/adr/0005-fsnotify-daemon-watcher.md
+      Ref: docs/adr/0012-defer-unlock-enforcement.md
     severity: ERROR
     patterns:
       - pattern: $M.Lock()

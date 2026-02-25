@@ -21,3 +21,5 @@
 | [0008](0008-archive-first-dmail-write.md) | Archive-first D-Mail write pattern | MY-365 |
 | [0009](0009-reserve-party-rate-limit-fallback.md) | Reserve Party rate limit fallback | MY-365 |
 | [0010](0010-three-way-approval-contract.md) | Three-way approval contract | MY-323, MY-365 |
+| [0011](0011-bounded-concurrency-pond-v2.md) | Bounded concurrency with pond/v2 | — |
+| [0012](0012-defer-unlock-enforcement.md) | Defer-unlock enforcement via semgrep | — |
