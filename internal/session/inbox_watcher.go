@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"context"
@@ -6,20 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/hironow/paintress"
 )
 
-// watchInbox watches the inbox/ directory for new or updated D-Mail files using
-// filesystem notifications and invokes onNewDMail when a valid .md file is detected.
-// Returns silently if the inbox directory does not exist.
-//
-// Callers are responsible for deduplication — fsnotify may fire multiple events
-// (CREATE + WRITE) for a single file write, and files from the initial scan may
-// also produce events. See expedition.go seenFiles for the canonical dedup.
-//
-// If ready is non-nil, a value is sent after the watcher is fully set up,
-// allowing callers to synchronize without time.Sleep.
-func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail), ready chan<- struct{}) {
-	inboxDir := InboxDir(continent)
+// watchInbox watches the inbox/ directory for new or updated D-Mail files.
+func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintress.DMail), ready chan<- struct{}) {
+	inboxDir := paintress.InboxDir(continent)
 
 	if _, err := os.Stat(inboxDir); err != nil {
 		return
@@ -45,7 +37,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 		if err != nil {
 			continue
 		}
-		dm, err := ParseDMail(data)
+		dm, err := paintress.ParseDMail(data)
 		if err != nil {
 			continue
 		}
@@ -74,7 +66,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm DMail)
 			if err != nil {
 				continue
 			}
-			dm, err := ParseDMail(data)
+			dm, err := paintress.ParseDMail(data)
 			if err != nil {
 				continue
 			}

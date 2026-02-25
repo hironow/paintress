@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"context"
@@ -9,15 +9,9 @@ import (
 	"strings"
 	"testing"
 	"time"
-)
 
-// writeScript creates an executable shell script.
-func writeScript(t *testing.T, path string, content string) {
-	t.Helper()
-	if err := os.WriteFile(path, []byte("#!/bin/bash\n"+content), 0755); err != nil {
-		t.Fatalf("write script %s: %v", path, err)
-	}
-}
+	"github.com/hironow/paintress"
+)
 
 // newTestPaintress creates a minimal Paintress for review loop tests.
 func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string, claudeCmd string) *Paintress {
@@ -25,7 +19,7 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run", "logs"), 0755)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:  dir,
 		TimeoutSec: timeoutSec,
 		ClaudeCmd:  claudeCmd,
@@ -33,7 +27,7 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 		BaseBranch: "main",
 		Model:      "opus",
 	}
-	return NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	return NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 }
 
 // TestReviewLoop_ReviewTimeDoesNotConsumeBudget verifies that slow review
@@ -52,7 +46,7 @@ func TestReviewLoop_ReviewTimeDoesNotConsumeBudget(t *testing.T) {
 	writeScript(t, fakeClaudeCmd, "exit 0\n") // instant fix
 
 	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when — pass 2s budget (simulating expedition consumed most of the 30s)
 	start := time.Now()
@@ -83,7 +77,7 @@ func TestReviewLoop_FixTimeConsumesBudget(t *testing.T) {
 	writeScript(t, fakeClaudeCmd, "sleep 0.4\nexit 0\n")
 
 	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when — pass 1s budget
 	p.runReviewLoop(context.Background(), report, 1*time.Second, "")
@@ -120,7 +114,7 @@ func TestReviewLoop_GitCheckoutTimeoutPreventsHang(t *testing.T) {
 	defer os.Setenv("PATH", origPath)
 
 	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when
 	start := time.Now()
@@ -150,7 +144,7 @@ func TestReviewLoop_ParentContextCancellationStopsLoop(t *testing.T) {
 	writeScript(t, fakeClaudeCmd, "exit 0\n")
 
 	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -191,7 +185,7 @@ func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
 
 	// TimeoutSec=6 → review timeout = 6s/3 = 2s per call
 	p := newTestPaintress(t, dir, 6, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when
 	start := time.Now()
@@ -219,7 +213,7 @@ func TestReviewLoop_BudgetSharedWithExpedition(t *testing.T) {
 	writeScript(t, fakeClaudeCmd, "sleep 0.3\nexit 0\n")
 
 	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when — only 0.5s budget remaining (expedition consumed 29.5s of 30s)
 	start := time.Now()
@@ -254,7 +248,7 @@ func TestReviewLoop_ShortTimeoutStillRunsReview(t *testing.T) {
 
 	// TimeoutSec=0 → without clamp, reviewTimeout=0 → instant cancel
 	p := newTestPaintress(t, dir, 0, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when
 	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
@@ -278,7 +272,7 @@ exit 0
 `)
 
 	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
-	dmails := []DMail{
+	dmails := []paintress.DMail{
 		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting", Issues: []string{"MY-42"}, Body: "# DoD\n"},
 	}
 
@@ -324,7 +318,7 @@ func TestRunFollowUp_ContextCanceled_Returns(t *testing.T) {
 	writeScript(t, fakeClaudeCmd, "sleep 10\nexit 0\n")
 
 	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
-	dmails := []DMail{{Name: "spec-1", Kind: "specification", Description: "test"}}
+	dmails := []paintress.DMail{{Name: "spec-1", Kind: "specification", Description: "test"}}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // pre-cancel
@@ -348,7 +342,7 @@ func TestRunFollowUp_ZeroBudget_Skipped(t *testing.T) {
 	writeScript(t, fakeClaudeCmd, "touch "+markerFile+"\nexit 0\n")
 
 	p := newTestPaintress(t, dir, 30, "", fakeClaudeCmd)
-	dmails := []DMail{{Name: "spec-1", Kind: "specification", Description: "test"}}
+	dmails := []paintress.DMail{{Name: "spec-1", Kind: "specification", Description: "test"}}
 
 	// when — zero budget remaining
 	p.runFollowUp(context.Background(), dmails, dir, 0)
@@ -383,7 +377,7 @@ fi
 	writeScript(t, fakeClaudeCmd, "exit 0\n")
 
 	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
-	report := &ExpeditionReport{Branch: "feat/test"}
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
 
 	// when
 	p.runReviewLoop(context.Background(), report, 30*time.Second, "")

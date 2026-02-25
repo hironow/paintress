@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"bytes"
@@ -12,6 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress"
 )
 
 func TestStdinApprover_Yes(t *testing.T) {
@@ -225,7 +227,7 @@ func TestCmdApprover_EscapesShellMetacharacters(t *testing.T) {
 
 func TestAutoApprover(t *testing.T) {
 	// given
-	a := &AutoApprover{}
+	a := &paintress.AutoApprover{}
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "anything")
@@ -297,7 +299,7 @@ func TestHighSeverityGate_NoHighSeverity(t *testing.T) {
 	content := "---\nname: spec-1\nkind: specification\ndescription: normal spec\nseverity: low\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "spec-1.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -308,9 +310,9 @@ func TestHighSeverityGate_NoHighSeverity(t *testing.T) {
 	}
 
 	// Approver that would fail if called
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	p.approver = &failApprover{t: t}
-	p.notifier = &NopNotifier{}
+	p.notifier = &paintress.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -332,7 +334,7 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 	content := "---\nname: alert-1\nkind: alert\ndescription: critical issue\nseverity: high\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "alert-1.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -342,9 +344,9 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
-	p.approver = &AutoApprover{}
-	p.notifier = &NopNotifier{}
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p.approver = &paintress.AutoApprover{}
+	p.notifier = &paintress.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -365,7 +367,7 @@ func TestHighSeverityGate_Denied(t *testing.T) {
 	content := "---\nname: alert-deny\nkind: alert\ndescription: critical\nseverity: high\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "alert-deny.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -375,9 +377,9 @@ func TestHighSeverityGate_Denied(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	p.approver = &denyApprover{}
-	p.notifier = &NopNotifier{}
+	p.notifier = &paintress.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -401,7 +403,7 @@ func TestHighSeverityGate_AutoApprove(t *testing.T) {
 	content := "---\nname: alert-auto\nkind: alert\ndescription: critical\nseverity: high\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "alert-auto.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -412,7 +414,7 @@ func TestHighSeverityGate_AutoApprove(t *testing.T) {
 		AutoApprove:    true,
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	// AutoApprove wiring happens in NewPaintress — approver should be AutoApprover
 
 	code := p.Run(context.Background())
@@ -435,7 +437,7 @@ func TestHighSeverityGate_ApproverCalledOnce(t *testing.T) {
 	content := "---\nname: alert-once\nkind: alert\ndescription: critical\nseverity: high\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "alert-once.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0, // single-worker mode (avoids needing worktree pool)
 		MaxExpeditions: 3,
@@ -446,9 +448,9 @@ func TestHighSeverityGate_ApproverCalledOnce(t *testing.T) {
 	}
 
 	var callCount atomic.Int32
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	p.approver = &countingApprover{count: &callCount, approve: true}
-	p.notifier = &NopNotifier{}
+	p.notifier = &paintress.NopNotifier{}
 
 	p.Run(context.Background())
 
@@ -467,7 +469,7 @@ func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
 	content := "---\nname: alert-abort\nkind: alert\ndescription: critical\nseverity: high\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "alert-abort.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 5,
@@ -477,9 +479,9 @@ func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	p.approver = &denyApprover{}
-	p.notifier = &NopNotifier{}
+	p.notifier = &paintress.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -505,7 +507,7 @@ func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
 	os.Chmod(inboxDir, 0000) // make inbox unreadable
 	t.Cleanup(func() { os.Chmod(inboxDir, 0755) })
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -515,9 +517,9 @@ func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	p.approver = &failApprover{t: t}
-	p.notifier = &NopNotifier{}
+	p.notifier = &paintress.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 1 {
@@ -539,7 +541,7 @@ func TestHighSeverityGate_ApprovalError_FailsClosed(t *testing.T) {
 	content := "---\nname: alert-err\nkind: alert\ndescription: critical\nseverity: high\n---\n"
 	os.WriteFile(filepath.Join(inboxDir, "alert-err.md"), []byte(content), 0644)
 
-	cfg := Config{
+	cfg := paintress.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -549,9 +551,9 @@ func TestHighSeverityGate_ApprovalError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
 	p.approver = &errorApprover{err: fmt.Errorf("exec: command not found")}
-	p.notifier = &NopNotifier{}
+	p.notifier = &paintress.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 1 {

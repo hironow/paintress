@@ -2,152 +2,17 @@ package paintress
 
 import (
 	"fmt"
-	"os"
-	"runtime"
 	"strings"
-
-	"github.com/alitto/pond/v2"
 )
 
 // Lumina represents a learned passive skill extracted from past expedition journals.
-// In the game, Pictos are mastered after 4 uses, unlocking their Lumina for all characters.
-// Here, patterns that recur across journals become Luminas injected into future prompts.
 type Lumina struct {
 	Pattern string // The learned pattern / lesson
 	Source  string // Which journal(s) contributed
 	Uses    int    // How many times this pattern appeared
 }
 
-// ScanJournalsForLumina reads all journal files in parallel goroutines,
-// extracts failure reasons and success patterns, and returns Luminas.
-// This runs at each Expedition Flag (before departure), just like
-// resting at a flag lets you learn new skills.
-func ScanJournalsForLumina(continent string) []Lumina {
-	files, err := ListJournalFiles(continent)
-	if err != nil || len(files) == 0 {
-		return nil
-	}
-
-	type journalData struct {
-		status       string
-		reason       string
-		mission      string
-		issue        string
-		insight      string
-		highSeverity string
-	}
-
-	// Parallel journal scanning with bounded concurrency
-	pool := pond.NewResultPool[journalData](runtime.GOMAXPROCS(0))
-	defer pool.StopAndWait()
-	group := pool.NewGroup()
-
-	for _, f := range files {
-		group.Submit(func() journalData {
-			content, err := os.ReadFile(f)
-			if err != nil {
-				return journalData{}
-			}
-			text := string(content)
-
-			entry := journalData{}
-			for _, line := range strings.Split(text, "\n") {
-				line = strings.TrimSpace(line)
-				if strings.HasPrefix(line, "- **Status**:") {
-					entry.status = extractValue(line)
-				} else if strings.HasPrefix(line, "- **Reason**:") {
-					entry.reason = extractValue(line)
-				} else if strings.HasPrefix(line, "- **Mission**:") {
-					entry.mission = extractValue(line)
-				} else if strings.HasPrefix(line, "- **Issue**:") {
-					entry.issue = extractValue(line)
-				} else if strings.HasPrefix(line, "- **Insight**:") {
-					entry.insight = extractValue(line)
-				} else if strings.HasPrefix(line, "- **HIGH severity D-Mail**:") {
-					entry.highSeverity = extractValue(line)
-				}
-			}
-
-			return entry
-		})
-	}
-
-	// group.Wait returns an error only when a submitted task panics.
-	// Current tasks never panic, so this is defensive for future changes.
-	entries, err := group.Wait()
-	if err != nil {
-		return nil
-	}
-
-	// Aggregate patterns
-	failureReasons := make(map[string]int)
-	successPatterns := make(map[string]int)
-	highSeverityAlerts := make(map[string]int)
-
-	for _, e := range entries {
-		if e.status == "failed" {
-			// Prefer insight over raw reason for defensive lumina
-			key := e.insight
-			if key == "" {
-				key = e.reason
-			}
-			if key != "" {
-				failureReasons[key]++
-			}
-		}
-		if e.status == "success" {
-			// Prefer insight over mission type for offensive lumina
-			key := e.insight
-			if key == "" {
-				key = e.mission
-			}
-			if key != "" {
-				successPatterns[key]++
-			}
-		}
-		if e.highSeverity != "" {
-			highSeverityAlerts[e.highSeverity]++
-		}
-	}
-
-	var luminas []Lumina
-
-	// HIGH severity D-Mail alerts become immediate Luminas (threshold = 1)
-	for names, count := range highSeverityAlerts {
-		luminas = append(luminas, Lumina{
-			Pattern: fmt.Sprintf("[ALERT] HIGH severity D-Mail in past expedition: %s", names),
-			Source:  "high-severity-alert",
-			Uses:    count,
-		})
-	}
-
-	// Failures that repeat become defensive Luminas (like parry skills)
-	for reason, count := range failureReasons {
-		if count >= 2 { // "Mastered" after 2 occurrences (like Pictos after 4 uses, scaled down)
-			luminas = append(luminas, Lumina{
-				Pattern: fmt.Sprintf("[WARN] Avoid — failed %d times: %s", count, reason),
-				Source:  "failure-pattern",
-				Uses:    count,
-			})
-		}
-	}
-
-	// Successful patterns become offensive Luminas
-	for pattern, count := range successPatterns {
-		if count >= 3 { // Reliable pattern after 3 successes
-			luminas = append(luminas, Lumina{
-				Pattern: fmt.Sprintf("[OK] Proven approach (%dx successful): %s", count, pattern),
-				Source:  "success-pattern",
-				Uses:    count,
-			})
-		}
-	}
-
-	return luminas
-}
-
 // FormatLuminaForPrompt formats Luminas for injection into the expedition prompt.
-// Groups entries by Defensive (failure-pattern) and Offensive (success-pattern).
 func FormatLuminaForPrompt(luminas []Lumina) string {
 	if len(luminas) == 0 {
 		return Msg("lumina_none")
@@ -192,16 +57,4 @@ func FormatLuminaForPrompt(luminas []Lumina) string {
 		}
 	}
 	return sb.String()
-}
-
-func extractValue(line string) string {
-	parts := strings.SplitN(line, ":", 2)
-	if len(parts) < 2 {
-		return ""
-	}
-	val := strings.TrimSpace(parts[1])
-	// Remove markdown bold markers
-	val = strings.TrimPrefix(val, "**")
-	val = strings.TrimSuffix(val, "**")
-	return val
 }

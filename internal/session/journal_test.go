@@ -1,14 +1,16 @@
-package paintress
+package session
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress"
 )
 
 func TestJournalDir(t *testing.T) {
-	p := JournalDir("/some/repo")
+	p := paintress.JournalDir("/some/repo")
 	want := filepath.Join("/some/repo", ".expedition", "journal")
 	if p != want {
 		t.Errorf("JournalDir = %q, want %q", p, want)
@@ -19,7 +21,7 @@ func TestWriteJournal_CreatesDirectoryIfMissing(t *testing.T) {
 	dir := t.TempDir()
 	// Do not pre-create journal dir — WriteJournal should create it
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "AWE-1",
 		IssueTitle:  "Test Issue",
@@ -43,7 +45,7 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:  5,
 		IssueID:     "AWE-42",
 		IssueTitle:  "Add dark mode",
@@ -89,7 +91,7 @@ func TestWriteJournal_IncludesFailureType(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "AWE-99",
 		IssueTitle:  "Fix auth",
@@ -117,7 +119,7 @@ func TestWriteJournal_EmptyInsightField(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:  2,
 		IssueID:     "AWE-12",
 		IssueTitle:  "No insight",
@@ -144,7 +146,7 @@ func TestWriteJournal_InsightNotSetDefaultsToEmptyLine(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:  3,
 		IssueID:     "AWE-13",
 		IssueTitle:  "Insight omitted",
@@ -180,7 +182,7 @@ func TestWriteJournal_FilenamePadding(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		report := &ExpeditionReport{
+		report := &paintress.ExpeditionReport{
 			Expedition: tt.expedition, IssueID: "X", Status: "success",
 			PRUrl: "none", BugIssues: "none",
 		}
@@ -270,7 +272,7 @@ func TestWriteJournal_HighSeverityDMailField(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:         1,
 		IssueID:            "AWE-50",
 		IssueTitle:         "Fix login",
@@ -299,7 +301,7 @@ func TestWriteJournal_HighSeverityDMailEmpty(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &ExpeditionReport{
+	report := &paintress.ExpeditionReport{
 		Expedition:  2,
 		IssueID:     "AWE-51",
 		IssueTitle:  "No alerts",

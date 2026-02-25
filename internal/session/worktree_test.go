@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"context"
@@ -550,7 +550,7 @@ func TestWorktreePool_Shutdown_RemovesAll(t *testing.T) {
 	}
 }
 
-// === Edge case tests (P0–P3) ===
+// === Edge case tests (P0-P3) ===
 
 func TestWorktreePool_Release_ResetsCommittedChanges(t *testing.T) {
 	if testing.Short() {

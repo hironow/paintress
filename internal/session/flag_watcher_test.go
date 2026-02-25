@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"context"

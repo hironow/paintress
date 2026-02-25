@@ -60,7 +60,7 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	cfg, err := paintress.LoadProjectConfig(absPath)
+	cfg, err := session.LoadProjectConfig(absPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

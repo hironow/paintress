@@ -21,7 +21,7 @@ func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	if err := paintress.ValidateContinent(absPath); err != nil {
+	if err := ValidateContinent(absPath); err != nil {
 		return fmt.Errorf("continent validation: %w", err)
 	}
 
@@ -55,7 +55,7 @@ func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
 		},
 	}
 
-	if err := paintress.SaveProjectConfig(absPath, cfg); err != nil {
+	if err := SaveProjectConfig(absPath, cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 

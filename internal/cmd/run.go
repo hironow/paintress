@@ -121,7 +121,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		shutdownTracer(shutdownCtx)
 	}()
 
-	if err := paintress.ValidateContinent(cfg.Continent); err != nil {
+	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err
 	}
 
@@ -146,7 +146,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	p := paintress.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin())
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin())
 	exitCode := p.Run(ctx)
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}

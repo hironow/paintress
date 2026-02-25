@@ -1,9 +1,11 @@
-package paintress
+package session
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/hironow/paintress"
 )
 
 func TestParseKV_Normal(t *testing.T) {
@@ -69,7 +71,7 @@ func TestReadFlag_NonexistentFile(t *testing.T) {
 }
 
 func TestFlagPath(t *testing.T) {
-	p := FlagPath("/some/repo")
+	p := paintress.FlagPath("/some/repo")
 	want := filepath.Join("/some/repo", ".expedition", ".run", "flag.md")
 	if p != want {
 		t.Errorf("FlagPath = %q, want %q", p, want)

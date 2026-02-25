@@ -1,17 +1,9 @@
 package paintress
 
-import (
-	"embed"
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
-)
+import "embed"
 
 //go:embed templates/skills/*/SKILL.md
-var skillsFS embed.FS
+var SkillsFS embed.FS
 
 // DefaultClaudeCmd is the default CLI command name for Claude Code.
 const DefaultClaudeCmd = "claude"
@@ -36,89 +28,4 @@ type Config struct {
 	NotifyCmd      string // External notification command ({title}, {message} placeholders)
 	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
 	AutoApprove    bool   // Skip approval gate for HIGH severity D-Mail
-}
-
-// ValidateContinent ensures the .expedition directory structure exists.
-func ValidateContinent(continent string) error {
-	journalDir := filepath.Join(continent, ".expedition", "journal")
-	if err := os.MkdirAll(journalDir, 0755); err != nil {
-		return err
-	}
-
-	// Ensure .run/ directory exists for ephemeral files (flag.md, logs/, worktrees/)
-	runDir := filepath.Join(continent, ".expedition", ".run")
-	if err := os.MkdirAll(runDir, 0755); err != nil {
-		return err
-	}
-
-	// Ensure d-mail directories exist (inbox, outbox, archive)
-	for _, sub := range []string{"inbox", "outbox", "archive"} {
-		d := filepath.Join(continent, ".expedition", sub)
-		if err := os.MkdirAll(d, 0755); err != nil {
-			return err
-		}
-	}
-
-	// Ensure Agent Skills SKILL.md files exist for phonewave discovery
-	skillDirs := []string{"dmail-sendable", "dmail-readable"}
-	for _, dir := range skillDirs {
-		skillDir := filepath.Join(continent, ".expedition", "skills", dir)
-		if err := os.MkdirAll(skillDir, 0755); err != nil {
-			return err
-		}
-		skillFile := filepath.Join(skillDir, "SKILL.md")
-		if _, err := os.Stat(skillFile); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return err
-			}
-			content, err := fs.ReadFile(skillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
-			if err != nil {
-				return fmt.Errorf("read embedded skill %s: %w", dir, err)
-			}
-			if err := os.WriteFile(skillFile, content, 0644); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Ensure .run/, inbox/, outbox/ are gitignored (handles both fresh and upgrade scenarios)
-	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
-	content, err := os.ReadFile(gitignore)
-	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		// File doesn't exist — create with all entries
-		if err := os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n"), 0644); err != nil {
-			return err
-		}
-	} else {
-		// Existing file — append any missing entries
-		entries := []string{".run/", "inbox/", "outbox/"}
-		var missing []string
-		for _, entry := range entries {
-			if !strings.Contains(string(content), entry) {
-				missing = append(missing, entry)
-			}
-		}
-		if len(missing) > 0 {
-			f, err := os.OpenFile(gitignore, os.O_APPEND|os.O_WRONLY, 0644)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			// Ensure first entry starts on its own line
-			if len(content) > 0 && content[len(content)-1] != '\n' {
-				if _, err := f.WriteString("\n"); err != nil {
-					return err
-				}
-			}
-			for _, entry := range missing {
-				if _, err := f.WriteString(entry + "\n"); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
 }

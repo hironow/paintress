@@ -28,7 +28,7 @@ func TestRunInit_WritesConfig(t *testing.T) {
 	}
 
 	// Verify content
-	cfg, err := paintress.LoadProjectConfig(dir)
+	cfg, err := LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestRunInit_SkipOptionalProject(t *testing.T) {
 		t.Fatalf("RunInitWithReader: %v", err)
 	}
 
-	cfg, err := paintress.LoadProjectConfig(dir)
+	cfg, err := LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}

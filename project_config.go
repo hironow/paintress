@@ -1,12 +1,6 @@
 package paintress
 
-import (
-	"errors"
-	"os"
-	"path/filepath"
-
-	"gopkg.in/yaml.v3"
-)
+import "path/filepath"
 
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 type ProjectConfig struct {
@@ -22,35 +16,4 @@ type LinearConfig struct {
 // ProjectConfigPath returns the path to the project config file.
 func ProjectConfigPath(continent string) string {
 	return filepath.Join(continent, ".expedition", "config.yaml")
-}
-
-// LoadProjectConfig reads the project config from .expedition/config.yaml.
-// Returns a zero-value config (no error) if the file does not exist.
-func LoadProjectConfig(continent string) (*ProjectConfig, error) {
-	data, err := os.ReadFile(ProjectConfigPath(continent))
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return &ProjectConfig{}, nil
-		}
-		return nil, err
-	}
-
-	var cfg ProjectConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
-
-// SaveProjectConfig writes the project config to .expedition/config.yaml.
-func SaveProjectConfig(continent string, cfg *ProjectConfig) error {
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return err
-	}
-	path := ProjectConfigPath(continent)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
 }

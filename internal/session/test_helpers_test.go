@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"os"
@@ -7,6 +7,11 @@ import (
 	"strings"
 	"testing"
 )
+
+// containsStr is a simple substring check without importing strings.
+func containsStr(s, sub string) bool {
+	return strings.Contains(s, sub)
+}
 
 // gitIsolatedEnv returns an environment that strips GIT_DIR and GIT_WORK_TREE
 // to prevent test git commands from operating on the parent repo.
@@ -69,4 +74,12 @@ func setupTestRepo(t *testing.T) string {
 	}
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 	return dir
+}
+
+// writeScript creates an executable shell script.
+func writeScript(t *testing.T, path string, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte("#!/bin/bash\n"+content), 0755); err != nil {
+		t.Fatalf("write script %s: %v", path, err)
+	}
 }

@@ -1,10 +1,12 @@
-package paintress
+package session
 
 import (
 	"context"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress"
 )
 
 func TestLocalNotifier_Darwin_CommandShape(t *testing.T) {
@@ -84,7 +86,7 @@ func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	err := n.Notify(context.Background(), "Title", "Message")
 
 	// then: returns ErrUnsupportedOS, does not panic or invoke command
-	if err != ErrUnsupportedOS {
+	if err != paintress.ErrUnsupportedOS {
 		t.Errorf("err = %v, want ErrUnsupportedOS", err)
 	}
 }
@@ -167,7 +169,7 @@ func TestShellQuote(t *testing.T) {
 
 func TestNopNotifier_NoError(t *testing.T) {
 	// given
-	n := &NopNotifier{}
+	n := &paintress.NopNotifier{}
 
 	// when
 	err := n.Notify(context.Background(), "Any", "Thing")

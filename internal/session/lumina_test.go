@@ -1,10 +1,12 @@
-package paintress
+package session
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/hironow/paintress"
 )
 
 func TestExtractValue_Normal(t *testing.T) {
@@ -44,18 +46,18 @@ func TestExtractValue_ValueWithColons(t *testing.T) {
 }
 
 func TestFormatLuminaForPrompt_Empty(t *testing.T) {
-	result := FormatLuminaForPrompt(nil)
+	result := paintress.FormatLuminaForPrompt(nil)
 	if !containsStr(result, "No Lumina learned") {
 		t.Errorf("empty luminas should say no luminas: %q", result)
 	}
 }
 
 func TestFormatLuminaForPrompt_WithLuminas(t *testing.T) {
-	luminas := []Lumina{
+	luminas := []paintress.Lumina{
 		{Pattern: "[WARN] Avoid — failed 3 times: tests failing", Source: "failure-pattern", Uses: 3},
 		{Pattern: "[OK] Proven approach (4x successful): implement", Source: "success-pattern", Uses: 4},
 	}
-	result := FormatLuminaForPrompt(luminas)
+	result := paintress.FormatLuminaForPrompt(luminas)
 
 	if !containsStr(result, "Defensive") {
 		t.Errorf("should contain Defensive section header: %q", result)
@@ -366,13 +368,13 @@ func TestScanJournalsForLumina_NoHighSeverity(t *testing.T) {
 
 func TestFormatLuminaForPrompt_WithAlert(t *testing.T) {
 	// given
-	luminas := []Lumina{
+	luminas := []paintress.Lumina{
 		{Pattern: "[ALERT] HIGH severity D-Mail in past expedition: alert-critical", Source: "high-severity-alert", Uses: 1},
 		{Pattern: "[WARN] Avoid — failed 2 times: lint error", Source: "failure-pattern", Uses: 2},
 	}
 
 	// when
-	result := FormatLuminaForPrompt(luminas)
+	result := paintress.FormatLuminaForPrompt(luminas)
 
 	// then
 	if !containsStr(result, "Alert") {

@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress"
 )
 
 func TestWatchInbox_DetectsNewDMail(t *testing.T) {
@@ -16,14 +18,14 @@ func TestWatchInbox_DetectsNewDMail(t *testing.T) {
 	os.MkdirAll(inboxDir, 0755)
 
 	var mu sync.Mutex
-	var got DMail
+	var got paintress.DMail
 	done := make(chan struct{}, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		got = dm
 		mu.Unlock()
@@ -67,7 +69,7 @@ func TestWatchInbox_StopsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		watchInbox(ctx, dir, func(dm DMail) {}, nil)
+		watchInbox(ctx, dir, func(dm paintress.DMail) {}, nil)
 		close(done)
 	}()
 
@@ -92,7 +94,7 @@ func TestWatchInbox_IgnoresNonMdFiles(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		callCount++
 		mu.Unlock()
@@ -129,14 +131,14 @@ func TestWatchInbox_DetectsWriteToExistingFile(t *testing.T) {
 	os.WriteFile(filePath, []byte{}, 0644)
 
 	var mu sync.Mutex
-	var got DMail
+	var got paintress.DMail
 	done := make(chan struct{}, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		got = dm
 		mu.Unlock()
@@ -179,14 +181,14 @@ func TestWatchInbox_ScansExistingFilesOnStartup(t *testing.T) {
 	os.WriteFile(filepath.Join(inboxDir, "spec-pre-existing.md"), []byte(content), 0644)
 
 	var mu sync.Mutex
-	var got DMail
+	var got paintress.DMail
 	done := make(chan struct{}, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		got = dm
 		mu.Unlock()
@@ -228,7 +230,7 @@ func TestWatchInbox_IgnoresInvalidDMailFile(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		callCount++
 		mu.Unlock()
@@ -266,7 +268,7 @@ func TestWatchInbox_MultipleFilesInSequence(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		names = append(names, dm.Name)
 		mu.Unlock()
@@ -342,7 +344,7 @@ func TestWatchInbox_InitialScanSkipsInvalidFiles(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		names = append(names, dm.Name)
 		mu.Unlock()
@@ -386,7 +388,7 @@ func TestWatchInbox_NoDirNoPanic(t *testing.T) {
 	defer cancel()
 
 	// Should not panic — returns silently
-	watchInbox(ctx, dir, func(dm DMail) {
+	watchInbox(ctx, dir, func(dm paintress.DMail) {
 		t.Error("callback should not fire when inbox dir does not exist")
 	}, nil)
 }
@@ -397,14 +399,14 @@ func TestWatchInbox_ParsesCorrectly(t *testing.T) {
 	os.MkdirAll(inboxDir, 0755)
 
 	var mu sync.Mutex
-	var got DMail
+	var got paintress.DMail
 	done := make(chan struct{}, 1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		mu.Lock()
 		got = dm
 		mu.Unlock()
@@ -470,7 +472,7 @@ func TestWatchInbox_HighSeverity_TriggersNotifier(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm DMail) {
+	go watchInbox(ctx, dir, func(dm paintress.DMail) {
 		if seenFiles[dm.Name] {
 			return
 		}

@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"context"
@@ -38,7 +38,7 @@ type WorktreePool struct {
 	repoDir    string      // original repository
 	poolDir    string      // .expedition/worktrees/
 	setupCmd   string      // command to run after worktree creation
-	workers    chan string // available worktree paths
+	workers    chan string  // available worktree paths
 	size       int
 }
 
@@ -70,7 +70,6 @@ func (wp *WorktreePool) Init(ctx context.Context) error {
 		name := fmt.Sprintf("worker-%03d", i+1)
 		path := filepath.Join(wp.poolDir, name)
 
-		// Force-remove any leftover worktree from a previous run (self-healing).
 		wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path)
 
 		if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "add", "--detach", path, wp.baseBranch); err != nil {
@@ -102,9 +101,6 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	if _, err := wp.git.Git(ctx, path, "reset", "--hard", wp.baseBranch); err != nil {
 		return fmt.Errorf("reset: %w", err)
 	}
-	// Exclude .expedition/ from clean so that per-worker flag.md survives
-	// across releases. The post-run reconcileFlags needs these files to
-	// determine the latest checkpoint. Shutdown removes the worktree entirely.
 	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", ".expedition"); err != nil {
 		return fmt.Errorf("clean: %w", err)
 	}
