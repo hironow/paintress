@@ -1,4 +1,4 @@
-package paintress
+package session
 
 import (
 	"os"
@@ -82,7 +82,6 @@ func TestArchivePrune_Execute_DeletesOldFiles(t *testing.T) {
 
 func TestArchivePrune_NoArchiveDir_ReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
-	// no .expedition/archive/ directory
 
 	// when
 	result, err := ArchivePrune(dir, 30, false)
@@ -151,7 +150,7 @@ func TestArchivePrune_Execute_ReportsPartialFailure(t *testing.T) {
 	archiveDir := filepath.Join(dir, ".expedition", "archive")
 	os.MkdirAll(archiveDir, 0755)
 
-	// given: two old files, one in a read-only directory (simulated by removing dir write)
+	// given: two old files
 	old1 := filepath.Join(archiveDir, "report-my-1.md")
 	old2 := filepath.Join(archiveDir, "report-my-2.md")
 	os.WriteFile(old1, []byte("old1"), 0644)

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +52,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	execute, _ := cmd.Flags().GetBool("execute")
 	outputFmt, _ := cmd.Flags().GetString("output")
 
-	result, err := paintress.ArchivePrune(repoPath, days, execute)
+	result, err := session.ArchivePrune(repoPath, days, execute)
 	if err != nil {
 		return err
 	}

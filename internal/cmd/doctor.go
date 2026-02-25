@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ docker. Reports version and path for each found command.`,
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
 	claudeCmd := paintress.DefaultClaudeCmd
-	checks := paintress.RunDoctor(claudeCmd)
+	checks := session.RunDoctor(claudeCmd)
 
 	allRequired := true
 	for _, c := range checks {
