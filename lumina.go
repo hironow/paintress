@@ -72,6 +72,8 @@ func ScanJournalsForLumina(continent string) []Lumina {
 		})
 	}
 
+	// group.Wait returns an error only when a submitted task panics.
+	// Current tasks never panic, so this is defensive for future changes.
 	entries, err := group.Wait()
 	if err != nil {
 		return nil

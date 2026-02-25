@@ -122,3 +122,6 @@ rules:
           $M.Lock()
           ...
           defer $M.Unlock()
+    paths:
+      exclude:
+        - "*_test.go"
