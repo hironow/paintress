@@ -91,8 +91,8 @@ func containsIssue(issues []string, target string) bool {
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
 func (e *Expedition) setCurrentIssue(issue string) {
 	e.currentIssueMu.Lock()
+	defer e.currentIssueMu.Unlock()
 	e.currentIssue = issue
-	e.currentIssueMu.Unlock()
 }
 
 // getCurrentIssue returns the issue being worked on (thread-safe).
@@ -110,6 +110,20 @@ func (e *Expedition) MidMatchedDMails() []DMail {
 		return []DMail{}
 	}
 	return append([]DMail(nil), e.midMatchedMails...)
+}
+
+// appendMidHighName appends a HIGH severity D-Mail name (thread-safe).
+func (e *Expedition) appendMidHighName(name string) {
+	e.midHighMu.Lock()
+	defer e.midHighMu.Unlock()
+	e.midHighNames = append(e.midHighNames, name)
+}
+
+// appendMidMatchedMail appends an issue-matched D-Mail (thread-safe).
+func (e *Expedition) appendMidMatchedMail(dm DMail) {
+	e.midMatchedMu.Lock()
+	defer e.midMatchedMu.Unlock()
+	e.midMatchedMails = append(e.midMatchedMails, dm)
 }
 
 // MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
@@ -301,9 +315,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			}
 			seenFiles[dm.Name] = true
 			if dm.Severity == "high" {
-				e.midHighMu.Lock()
-				e.midHighNames = append(e.midHighNames, dm.Name)
-				e.midHighMu.Unlock()
+				e.appendMidHighName(dm.Name)
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
 				if e.Notifier != nil {
 					_ = e.Notifier.Notify(watchCtx, "Paintress", fmt.Sprintf("HIGH severity D-Mail mid-expedition: %s", dm.Name))
@@ -314,9 +326,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			// Issue routing runs regardless of severity: collect D-Mails
 			// that match the current expedition's issue for follow-up.
 			if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
-				e.midMatchedMu.Lock()
-				e.midMatchedMails = append(e.midMatchedMails, dm)
-				e.midMatchedMu.Unlock()
+				e.appendMidMatchedMail(dm)
 				e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
 			}
 		}, nil)
