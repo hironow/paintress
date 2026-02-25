@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -113,7 +114,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		logger = paintress.NewQuietLogger(cmd.ErrOrStderr())
 	}
 
-	shutdownTracer := paintress.InitTracer("paintress", Version)
+	shutdownTracer := session.InitTracer("paintress", Version)
 	defer func() {
 		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
 		defer c()
