@@ -189,7 +189,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	model := e.Reserve.ActiveModel()
 
-	expCtx, invokeSpan := tracer.Start(expCtx, "claude.invoke",
+	expCtx, invokeSpan := paintress.Tracer.Start(expCtx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("model", model),
 			attribute.Int("expedition.number", e.Number),

@@ -26,7 +26,8 @@ Dependency direction: `internal/cmd` → `internal/session` → `paintress` (roo
 - `doctor.go` — DoctorCheckResult types
 - `archive_prune.go` — prune types
 - `lang.go` — language constants
-- `logger.go` — structured logger (root exception per S0001)
+- `logger.go` — structured logger (root infrastructure per S0005)
+- `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
 
 ### `internal/session/` — all filesystem, network, subprocess I/O
 - `paintress.go` — Paintress orchestrator (Run, main loop)

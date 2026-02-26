@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/hironow/paintress"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -57,7 +58,7 @@ func NewWorktreePool(git GitExecutor, repoDir, baseBranch, setupCmd string, size
 
 // Init prunes stale worktree references and creates fresh worktrees for each worker.
 func (wp *WorktreePool) Init(ctx context.Context) error {
-	ctx, span := tracer.Start(ctx, "worktree_pool.init",
+	ctx, span := paintress.Tracer.Start(ctx, "worktree_pool.init",
 		trace.WithAttributes(attribute.Int("pool.size", wp.size)),
 	)
 	defer span.End()

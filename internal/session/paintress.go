@@ -128,7 +128,7 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 }
 
 func (p *Paintress) Run(ctx context.Context) int {
-	ctx, rootSpan := tracer.Start(ctx, "paintress.run",
+	ctx, rootSpan := paintress.Tracer.Start(ctx, "paintress.run",
 		trace.WithAttributes(
 			attribute.String("continent", p.config.Continent),
 			attribute.Int("max_expeditions", p.config.MaxExpeditions),
@@ -295,7 +295,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("party_info"), p.reserve.Status()))
 
 		model := p.reserve.ActiveModel()
-		expCtx, expSpan := tracer.Start(ctx, "expedition",
+		expCtx, expSpan := paintress.Tracer.Start(ctx, "expedition",
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
 				attribute.Int("worker.id", workerID),
@@ -305,13 +305,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		var workDir string
 		if p.pool != nil {
-			_, acqSpan := tracer.Start(expCtx, "worktree.acquire")
+			_, acqSpan := paintress.Tracer.Start(expCtx, "worktree.acquire")
 			workDir = p.pool.Acquire()
 			acqSpan.End()
 		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
-				_, relSpan := tracer.Start(expCtx, "worktree.release")
+				_, relSpan := paintress.Tracer.Start(expCtx, "worktree.release")
 				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
@@ -411,7 +411,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
 		} else {
-			_, parseSpan := tracer.Start(expCtx, "report.parse")
+			_, parseSpan := paintress.Tracer.Start(expCtx, "report.parse")
 			report, status := paintress.ParseReport(output, exp)
 			parseSpan.End()
 
@@ -535,7 +535,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 }
 
 func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.ExpeditionReport, budget time.Duration, workDir string) {
-	ctx, loopSpan := tracer.Start(ctx, "review.loop",
+	ctx, loopSpan := paintress.Tracer.Start(ctx, "review.loop",
 		trace.WithAttributes(
 			attribute.String("pr_url", report.PRUrl),
 			attribute.String("branch", report.Branch),
@@ -569,7 +569,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 
 		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("review_running"), cycle, maxReviewCycles))
 
-		_, revSpan := tracer.Start(ctx, "review.command",
+		_, revSpan := paintress.Tracer.Start(ctx, "review.command",
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
@@ -640,7 +640,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 		}
 
 		model := p.reserve.ActiveModel()
-		_, fixSpan := tracer.Start(fixCtx, "reviewfix.claude",
+		_, fixSpan := paintress.Tracer.Start(fixCtx, "reviewfix.claude",
 			trace.WithAttributes(
 				attribute.Int("cycle", cycle),
 				attribute.String("model", model),
@@ -700,7 +700,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []paintress.DMail, w
 	}
 
 	model := p.reserve.ActiveModel()
-	_, followUpSpan := tracer.Start(ctx, "followup.claude",
+	_, followUpSpan := paintress.Tracer.Start(ctx, "followup.claude",
 		trace.WithAttributes(
 			attribute.String("model", model),
 			attribute.Int("matched_dmails", len(dmails)),

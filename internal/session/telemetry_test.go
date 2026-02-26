@@ -23,7 +23,7 @@ func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	shutdown := InitTracer("test-svc", "0.0.1")
 	defer shutdown(context.Background())
 
-	_, span := tracer.Start(context.Background(), "test-span")
+	_, span := paintress.Tracer.Start(context.Background(), "test-span")
 	defer span.End()
 
 	if span.IsRecording() {
@@ -40,12 +40,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer("paintress-test")
+	paintress.Tracer = tp.Tracer("paintress-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
 		// Restore noop tracer so other tests are not affected
-		tracer = prev.Tracer("paintress")
+		paintress.Tracer = prev.Tracer("paintress")
 	})
 	return exp
 }
@@ -53,7 +53,7 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	_, span := tracer.Start(context.Background(), "flushed-span")
+	_, span := paintress.Tracer.Start(context.Background(), "flushed-span")
 	span.End()
 
 	spans := exp.GetSpans()

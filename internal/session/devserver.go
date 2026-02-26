@@ -47,7 +47,7 @@ func (ds *DevServer) setRunning(v bool) {
 }
 
 func (ds *DevServer) Start(ctx context.Context) error {
-	ctx, span := tracer.Start(ctx, "devserver.start",
+	ctx, span := paintress.Tracer.Start(ctx, "devserver.start",
 		trace.WithAttributes(
 			attribute.String("cmd", ds.cmd),
 			attribute.String("url", ds.url),
