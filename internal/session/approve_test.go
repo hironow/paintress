@@ -310,7 +310,7 @@ func TestHighSeverityGate_NoHighSeverity(t *testing.T) {
 	}
 
 	// Approver that would fail if called
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &failApprover{t: t}
 	p.notifier = &paintress.NopNotifier{}
 
@@ -344,7 +344,7 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &paintress.AutoApprover{}
 	p.notifier = &paintress.NopNotifier{}
 
@@ -377,7 +377,7 @@ func TestHighSeverityGate_Denied(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &denyApprover{}
 	p.notifier = &paintress.NopNotifier{}
 
@@ -414,7 +414,7 @@ func TestHighSeverityGate_AutoApprove(t *testing.T) {
 		AutoApprove:    true,
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	// AutoApprove wiring happens in NewPaintress — approver should be AutoApprover
 
 	code := p.Run(context.Background())
@@ -448,7 +448,7 @@ func TestHighSeverityGate_ApproverCalledOnce(t *testing.T) {
 	}
 
 	var callCount atomic.Int32
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &countingApprover{count: &callCount, approve: true}
 	p.notifier = &paintress.NopNotifier{}
 
@@ -479,7 +479,7 @@ func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &denyApprover{}
 	p.notifier = &paintress.NopNotifier{}
 
@@ -517,7 +517,7 @@ func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &failApprover{t: t}
 	p.notifier = &paintress.NopNotifier{}
 
@@ -551,7 +551,7 @@ func TestHighSeverityGate_ApprovalError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &errorApprover{err: fmt.Errorf("exec: command not found")}
 	p.notifier = &paintress.NopNotifier{}
 

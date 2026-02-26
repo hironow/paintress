@@ -619,7 +619,7 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm)
+	err := SendDMail(store, dm, nil)
 
 	// then
 	if err != nil {
@@ -668,7 +668,7 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm)
+	err := SendDMail(store, dm, nil)
 
 	// then
 	if err != nil {
@@ -699,7 +699,7 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm)
+	err := SendDMail(store, dm, nil)
 
 	// then
 	if err != nil {
@@ -859,7 +859,7 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// when
-	err = ArchiveInboxDMail(continent, "move-me")
+	err = ArchiveInboxDMail(continent, "move-me", nil)
 
 	// then
 	if err != nil {
@@ -894,7 +894,7 @@ func TestArchiveInboxDMail_SourceNotFound_NotInArchive(t *testing.T) {
 	os.MkdirAll(paintress.InboxDir(continent), 0755)
 
 	// when
-	err := ArchiveInboxDMail(continent, "nonexistent")
+	err := ArchiveInboxDMail(continent, "nonexistent", nil)
 
 	// then — error: source missing and not in archive means wrong name
 	if err == nil {
@@ -916,7 +916,7 @@ func TestArchiveInboxDMail_SourceNotFound_AlreadyInArchive(t *testing.T) {
 	os.WriteFile(filepath.Join(arcDir, "already-moved.md"), data, 0644)
 
 	// when
-	err := ArchiveInboxDMail(continent, "already-moved")
+	err := ArchiveInboxDMail(continent, "already-moved", nil)
 
 	// then — idempotent: dst exists proves another worker archived it
 	if err != nil {
@@ -938,7 +938,7 @@ func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
 	errs := make(chan error, 2)
 	for range 2 {
 		go func() {
-			errs <- ArchiveInboxDMail(continent, "race-me")
+			errs <- ArchiveInboxDMail(continent, "race-me", nil)
 		}()
 	}
 
@@ -961,7 +961,7 @@ func TestArchiveInboxDMail_CreatesArchiveDir(t *testing.T) {
 	os.WriteFile(filepath.Join(inboxDir, "auto-dir.md"), data, 0644)
 
 	// when
-	err := ArchiveInboxDMail(continent, "auto-dir")
+	err := ArchiveInboxDMail(continent, "auto-dir", nil)
 
 	// then
 	if err != nil {
@@ -989,7 +989,7 @@ func TestSendDMail_ArchiveDirFailure_NoOutbox(t *testing.T) {
 	dm := paintress.DMail{Name: "fail-early", Kind: "report", Description: "Should fail at flush"}
 
 	// when
-	err := SendDMail(store, dm)
+	err := SendDMail(store, dm, nil)
 
 	// then — error at flush stage (atomicWrite to archive fails)
 	if err == nil {
@@ -1019,7 +1019,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm)
+	err := SendDMail(store, dm, nil)
 
 	// then
 	if err != nil {
@@ -1248,7 +1248,7 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm)
+	err := SendDMail(store, dm, nil)
 
 	// then
 	if err != nil {
@@ -1432,7 +1432,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	}
 
 	// Send report via outbox store (Stage → Flush)
-	if err := SendDMail(store, reportDMail); err != nil {
+	if err := SendDMail(store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1455,7 +1455,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	// ── Phase 5: Archive inbox d-mails (post-expedition) ──
 
 	for _, dm := range scanned {
-		if err := ArchiveInboxDMail(continent, dm.Name); err != nil {
+		if err := ArchiveInboxDMail(continent, dm.Name, nil); err != nil {
 			t.Fatalf("ArchiveInboxDMail(%s): %v", dm.Name, err)
 		}
 	}
@@ -1562,7 +1562,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Reason:      "Initial setup complete",
 	}
 	reportDMail := paintress.NewReportDMail(report)
-	if err := SendDMail(store, reportDMail); err != nil {
+	if err := SendDMail(store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1604,10 +1604,10 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report1 := paintress.NewReportDMail(&paintress.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
 	})
-	if err := SendDMail(store, report1); err != nil {
+	if err := SendDMail(store, report1, nil); err != nil {
 		t.Fatalf("Exp1 SendDMail: %v", err)
 	}
-	if err := ArchiveInboxDMail(continent, "spec-my-1"); err != nil {
+	if err := ArchiveInboxDMail(continent, "spec-my-1", nil); err != nil {
 		t.Fatalf("Exp1 ArchiveInboxDMail: %v", err)
 	}
 
@@ -1636,10 +1636,10 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report2 := paintress.NewReportDMail(&paintress.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
 	})
-	if err := SendDMail(store, report2); err != nil {
+	if err := SendDMail(store, report2, nil); err != nil {
 		t.Fatalf("Exp2 SendDMail: %v", err)
 	}
-	if err := ArchiveInboxDMail(continent, "feedback-d-001"); err != nil {
+	if err := ArchiveInboxDMail(continent, "feedback-d-001", nil); err != nil {
 		t.Fatalf("Exp2 ArchiveInboxDMail: %v", err)
 	}
 

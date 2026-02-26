@@ -7,13 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/hironow/paintress"
 )
 
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store paintress.OutboxStore, d paintress.DMail) error {
+func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintress.EventStore) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = paintress.DMailSchemaVersion
 	}
@@ -26,9 +27,12 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail) error {
 	if err := store.Stage(filename, data); err != nil {
 		return fmt.Errorf("dmail: stage: %w", err)
 	}
-	if _, err := store.Flush(); err != nil {
+	emitDMailEvent(eventStore, paintress.EventDMailStaged, paintress.DMailStagedData{Name: d.Name})
+	n, err := store.Flush()
+	if err != nil {
 		return fmt.Errorf("dmail: flush: %w", err)
 	}
+	emitDMailEvent(eventStore, paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: n})
 	return nil
 }
 
@@ -73,7 +77,7 @@ func ScanInbox(continent string) ([]paintress.DMail, error) {
 
 // ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
 // Uses os.Rename for atomic move.
-func ArchiveInboxDMail(continent, name string) error {
+func ArchiveInboxDMail(continent, name string, eventStore paintress.EventStore) error {
 	filename := name + ".md"
 	src := filepath.Join(paintress.InboxDir(continent), filename)
 	arcDir := paintress.ArchiveDir(continent)
@@ -96,5 +100,17 @@ func ArchiveInboxDMail(continent, name string) error {
 		return fmt.Errorf("dmail: archive %s: %w", name, err)
 	}
 
+	emitDMailEvent(eventStore, paintress.EventDMailArchived, paintress.DMailArchivedData{Name: name})
 	return nil
+}
+
+func emitDMailEvent(store paintress.EventStore, eventType paintress.EventType, data any) {
+	if store == nil {
+		return
+	}
+	ev, err := paintress.NewEvent(eventType, data, time.Now())
+	if err != nil {
+		return
+	}
+	store.Append(ev)
 }

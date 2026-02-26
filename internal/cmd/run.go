@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/eventsource"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -108,6 +109,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
 	logger := loggerFrom(cmd)
+	eventsDir := paintress.EventsDir(continent)
+	eventStore := eventsource.NewFileEventStore(eventsDir)
 
 	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err
@@ -134,7 +137,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin())
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
 	exitCode := p.Run(ctx)
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}

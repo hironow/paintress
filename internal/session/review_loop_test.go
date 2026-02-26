@@ -27,7 +27,7 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 		BaseBranch: "main",
 		Model:      "opus",
 	}
-	return NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil)
+	return NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
 }
 
 // TestReviewLoop_ReviewTimeDoesNotConsumeBudget verifies that slow review
