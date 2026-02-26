@@ -4,9 +4,9 @@
 
 - Do NOT use git worktrees (`EnterWorktree`, `isolation: "worktree"`). Work directly on the current branch.
 
-## Repository Structure (ADR 0013: 2-Layer Separation)
+## Repository Structure (ADR 0013/0014: 3-Layer Separation)
 
-Dependency direction: `internal/cmd` → `internal/session` → `paintress` (root)
+Dependency direction: `internal/cmd` → `internal/session` → `internal/eventsource` → `paintress` (root)
 
 ### Root package `paintress` — types, constants, pure functions, go:embed
 - `paintress.go` — Paintress type, core types, pure methods
@@ -28,6 +28,11 @@ Dependency direction: `internal/cmd` → `internal/session` → `paintress` (roo
 - `lang.go` — language constants
 - `logger.go` — structured logger (root infrastructure per S0005)
 - `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
+- `event.go` — Event envelope, EventType constants, EventStore interface, ValidateEvent, NewEvent
+
+### `internal/eventsource/` — event store infrastructure
+- `store_file.go` — FileEventStore (JSONL append-only, implements EventStore)
+- `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles
 
 ### `internal/session/` — all filesystem, network, subprocess I/O
 - `paintress.go` — Paintress orchestrator (Run, main loop)
