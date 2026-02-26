@@ -1,7 +1,7 @@
 # 0013. Root Package Layer Separation
 
 **Date:** 2026-02-26
-**Status:** Accepted
+**Status:** Accepted — correction: InitTracer moved to session (not cmd as stated below)
 
 ## Context
 

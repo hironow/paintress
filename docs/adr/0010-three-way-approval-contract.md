@@ -1,7 +1,7 @@
 # 0010. Three-Way Approval Contract
 
 **Date:** 2026-02-23
-**Status:** Accepted
+**Status:** Accepted — generalized in shared ADR S0003
 
 ## Context
 
