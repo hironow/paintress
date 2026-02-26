@@ -140,10 +140,13 @@ func (p *Paintress) Run(ctx context.Context) int {
 	defer rootSpan.End()
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
-	if err := p.Logger.SetLogFile(logPath); err != nil {
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
 		p.Logger.Warn("log file: %v", err)
+	} else {
+		p.Logger.SetExtraWriter(logFile)
+		defer logFile.Close()
 	}
-	defer p.Logger.CloseLogFile()
 
 	p.printBanner()
 	p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("continent"), p.config.Continent))
@@ -250,7 +253,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		})
 	}
 
-	err := g.Wait()
+	err = g.Wait()
 
 	// Consolidate: write the latest checkpoint back to Continent
 	if latest := reconcileFlags(p.config.Continent, p.config.Workers); latest.LastExpedition > 0 {

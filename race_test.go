@@ -1,9 +1,8 @@
 package paintress
 
 import (
-	"fmt"
+	"bytes"
 	"io"
-	"path/filepath"
 	"sync"
 	"testing"
 )
@@ -150,21 +149,19 @@ func TestGradient_ConcurrentFormatLog(t *testing.T) {
 	}
 }
 
-// === Logger: Concurrent Init/Close/Write ===
+// === Logger: Concurrent SetExtraWriter/Write ===
 
-func TestLogger_ConcurrentInitCloseWrite(t *testing.T) {
-	dir := t.TempDir()
+func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
 	logger := NewLogger(io.Discard, false)
 
 	var wg sync.WaitGroup
-
 	for i := 0; i < 20; i++ {
 		wg.Add(3)
-		go func(n int) {
+		go func() {
 			defer wg.Done()
-			path := filepath.Join(dir, fmt.Sprintf("log_%d.log", n))
-			logger.SetLogFile(path)
-		}(i)
+			var buf bytes.Buffer
+			logger.SetExtraWriter(&buf)
+		}()
 		go func(n int) {
 			defer wg.Done()
 			logger.Info("race test info %d", n)
@@ -172,13 +169,13 @@ func TestLogger_ConcurrentInitCloseWrite(t *testing.T) {
 		}(i)
 		go func() {
 			defer wg.Done()
-			logger.CloseLogFile()
+			logger.SetExtraWriter(nil)
 		}()
 	}
 	wg.Wait()
 
 	// Clean up
-	logger.CloseLogFile()
+	logger.SetExtraWriter(nil)
 }
 
 // === Lang: Concurrent Msg() reads with Lang writes ===

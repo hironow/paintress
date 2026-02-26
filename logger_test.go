@@ -8,43 +8,44 @@ import (
 	"testing"
 )
 
-func TestSetLogFile_CreatesFile(t *testing.T) {
+func TestSetExtraWriter_DualWrite(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 
-	logger := NewLogger(io.Discard, false)
-	err := logger.SetLogFile(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		t.Fatalf("SetLogFile error: %v", err)
+		t.Fatalf("OpenFile error: %v", err)
 	}
-	defer logger.CloseLogFile()
+	defer f.Close()
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Error("log file should be created")
+	logger := NewLogger(io.Discard, false)
+	logger.SetExtraWriter(f)
+
+	logger.Info("dual write test")
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsStr(string(content), "dual write test") {
+		t.Error("log file should contain the message")
 	}
 }
 
-func TestSetLogFile_InvalidPath(t *testing.T) {
+func TestSetExtraWriter_NilSafe(t *testing.T) {
 	logger := NewLogger(io.Discard, false)
-	err := logger.SetLogFile("/nonexistent/dir/test.log")
-	if err == nil {
-		t.Error("expected error for invalid path")
-	}
-}
-
-func TestCloseLogFile_WhenNotOpen(t *testing.T) {
-	logger := NewLogger(io.Discard, false)
-	// Should not panic when called without SetLogFile
-	logger.CloseLogFile()
-	logger.CloseLogFile()
+	// Should not panic when called with nil multiple times
+	logger.SetExtraWriter(nil)
+	logger.SetExtraWriter(nil)
 }
 
 func TestLogFunctions_NoPanic(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 	logger := NewLogger(io.Discard, false)
-	logger.SetLogFile(path)
-	defer logger.CloseLogFile()
+	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f)
+	defer f.Close()
 
 	// These should not panic
 	logger.Info("info %s", "test")
@@ -59,10 +60,11 @@ func TestLogFunctions_WritesToFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 	logger := NewLogger(io.Discard, false)
-	logger.SetLogFile(path)
+	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f)
 
 	logger.Info("hello from test")
-	logger.CloseLogFile()
+	f.Close()
 
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -143,8 +145,9 @@ func TestLogFunctions_QuietMode_SuppressesWriter(t *testing.T) {
 
 	// Quiet mode: pass io.Discard as out to suppress console output.
 	logger := NewLogger(io.Discard, false)
-	logger.SetLogFile(path)
-	defer logger.CloseLogFile()
+	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f)
+	defer f.Close()
 
 	logger.Info("quiet mode")
 

@@ -391,8 +391,9 @@ func TestLogFunctions_ConcurrentLogging(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "concurrent.log")
 	logger := NewLogger(io.Discard, false)
-	logger.SetLogFile(path)
-	defer logger.CloseLogFile()
+	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f)
+	defer f.Close()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
@@ -429,12 +430,14 @@ func TestLogFunctions_ReinitLogFile(t *testing.T) {
 	path2 := filepath.Join(dir, "log2.log")
 
 	logger := NewLogger(io.Discard, false)
-	logger.SetLogFile(path1)
+	f1, _ := os.OpenFile(path1, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f1)
 	logger.Info("to first file")
-	// SetLogFile again — closes old file handle cleanly
-	logger.SetLogFile(path2)
+	f1.Close()
+	f2, _ := os.OpenFile(path2, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f2)
 	logger.Info("to second file")
-	logger.CloseLogFile()
+	f2.Close()
 
 	content2, _ := os.ReadFile(path2)
 	if !containsStr(string(content2), "to second file") {

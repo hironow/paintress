@@ -544,8 +544,9 @@ echo "done"
 
 	logPath := filepath.Join(logDir, "test-watcher.log")
 	logger := paintress.NewLogger(io.Discard, false)
-	logger.SetLogFile(logPath)
-	defer logger.CloseLogFile()
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(logFile)
+	defer logFile.Close()
 
 	exp := &Expedition{
 		Number:    1,
@@ -605,8 +606,9 @@ echo "done"
 
 	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
 	logger := paintress.NewLogger(io.Discard, false)
-	logger.SetLogFile(logPath)
-	defer logger.CloseLogFile()
+	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(logFile)
+	defer logFile.Close()
 
 	exp := &Expedition{
 		Number:    1,
