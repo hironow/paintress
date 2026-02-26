@@ -365,7 +365,6 @@ func TestParseReport_ExpNumZero(t *testing.T) {
 	}
 }
 
-
 func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
 	luminas := []Lumina{
 		{Pattern: "only one pattern", Source: "failure-pattern", Uses: 1},
@@ -444,4 +443,3 @@ func TestLogFunctions_ReinitLogFile(t *testing.T) {
 		t.Error("second log file should contain second message")
 	}
 }
-

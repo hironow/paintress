@@ -36,7 +36,7 @@ type WorktreePool struct {
 	repoDir    string      // original repository
 	poolDir    string      // .expedition/worktrees/
 	setupCmd   string      // command to run after worktree creation
-	workers    chan string  // available worktree paths
+	workers    chan string // available worktree paths
 	size       int
 }
 

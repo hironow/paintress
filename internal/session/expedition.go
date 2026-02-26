@@ -25,8 +25,8 @@ type Expedition struct {
 	Config    paintress.Config
 	LogDir    string
 	Logger    *paintress.Logger
-	DataOut   io.Writer            // stdout-equivalent for streaming Claude output
-	Notifier  paintress.Notifier   // for mid-expedition HIGH severity notifications
+	DataOut   io.Writer          // stdout-equivalent for streaming Claude output
+	Notifier  paintress.Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
 	Luminas     []paintress.Lumina
