@@ -9,11 +9,12 @@
 Dependency direction: `internal/cmd` → `internal/session` → `internal/eventsource` → `paintress` (root)
 
 ### Root package `paintress` — types, constants, pure functions, go:embed
-- `paintress.go` — Paintress type, core types, pure methods
+
+- `paintress.go` — RunSummary, PruneResult, DoctorCheck, JSON formatters
 - `expedition.go` — Expedition types, go:embed templates, pure prompt building
 - `dmail.go` — DMail types, ParseDMail, MarshalDMail, ValidateDMail (pure)
-- `config.go` — Config type, validation
-- `project_config.go` — ProjectConfig type
+- `config.go` — Config, ProjectConfig, LinearConfig, go:embed SkillsFS
+- `interfaces.go` — port interfaces (Approver, Notifier, GitExecutor) + default impls
 - `flag.go` — ExpeditionFlag type, FlagPath
 - `journal.go` — JournalEntry type
 - `lumina.go` — Lumina type, FormatLuminaForPrompt (pure)
@@ -21,20 +22,18 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 - `gradient.go` — GradientGauge type, pure methods
 - `reserve.go` — ReserveParty type, pure methods
 - `report.go` — Report types
-- `approve.go` — Approver interface
-- `notify.go` — Notifier interface
-- `doctor.go` — DoctorCheckResult types
-- `archive_prune.go` — prune types
 - `lang.go` — language constants
 - `logger.go` — structured logger (root infrastructure per S0005)
 - `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
 - `event.go` — Event envelope, EventType constants, EventStore interface, ValidateEvent, NewEvent
 
 ### `internal/eventsource/` — event store infrastructure
+
 - `store_file.go` — FileEventStore (JSONL append-only, implements EventStore)
 - `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles
 
 ### `internal/session/` — all filesystem, network, subprocess I/O
+
 - `paintress.go` — Paintress orchestrator (Run, main loop)
 - `expedition.go` — expedition execution (subprocess, file I/O)
 - `dmail.go` — D-Mail file I/O (archive, inbox, outbox)
@@ -56,6 +55,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 - `devserver.go` — dev server management
 
 ### `internal/cmd/` — cobra CLI commands
+
 - `root.go` — NewRootCommand, PersistentFlags
 - `run.go` — run subcommand (main expedition)
 - `telemetry.go` — initTracer (OTLP HTTP exporter setup, shutdown via cobra.OnFinalize)
@@ -64,6 +64,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 - `errors.go` — ExitError handling
 
 ### Other
+
 - Entry: `cmd/paintress/main.go` (signal.NotifyContext + NeedsDefaultRun + ExitError)
 - Companions: `cmd/paintress-tg/`, `cmd/paintress-discord/`, `cmd/paintress-slack/` (notify/approve)
 - Docker: `docker/compose.yaml` + `docker/jaeger-v2-config.yaml` (Jaeger v2)

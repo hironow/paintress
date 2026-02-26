@@ -1,6 +1,9 @@
 package paintress
 
-import "embed"
+import (
+	"embed"
+	"path/filepath"
+)
 
 //go:embed templates/skills/*/SKILL.md
 var SkillsFS embed.FS
@@ -28,4 +31,20 @@ type Config struct {
 	NotifyCmd      string // External notification command ({title}, {message} placeholders)
 	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
 	AutoApprove    bool   // Skip approval gate for HIGH severity D-Mail
+}
+
+// ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
+type ProjectConfig struct {
+	Linear LinearConfig `yaml:"linear"`
+}
+
+// LinearConfig holds Linear integration settings.
+type LinearConfig struct {
+	Team    string `yaml:"team"`
+	Project string `yaml:"project,omitempty"`
+}
+
+// ProjectConfigPath returns the path to the project config file.
+func ProjectConfigPath(continent string) string {
+	return filepath.Join(continent, ".expedition", "config.yaml")
 }

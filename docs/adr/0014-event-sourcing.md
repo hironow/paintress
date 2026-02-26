@@ -29,6 +29,7 @@ Adopt amadeus-style daily JSONL event sourcing:
 - **Lifecycle**: FindExpiredEventFiles + PruneEventFiles for pruning
 
 The architecture becomes 3-layer:
+
 ```
 cmd → session → eventsource → root
 ```
