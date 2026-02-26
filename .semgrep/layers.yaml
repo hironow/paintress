@@ -1,14 +1,16 @@
 rules:
   # ==========================================================================
   # Layer dependency direction enforcement
-  # 依存方向: cmd → session → root (逆方向禁止)
+  # 依存方向: cmd → session → eventsource → root (逆方向禁止)
   #
-  # paintress は 2 層構造:
-  #   internal/cmd     — cobra CLI (top layer)
-  #   internal/session — I/O orchestration (filesystem, network, subprocess)
-  #   paintress (root) — types, constants, pure functions, go:embed
+  # paintress は 3 層構造:
+  #   internal/cmd          — cobra CLI (top layer)
+  #   internal/session      — I/O orchestration (filesystem, network, subprocess)
+  #   internal/eventsource  — event store infrastructure (JSONL append-only)
+  #   paintress (root)      — types, constants, pure functions, go:embed
   #
-  # Ref: docs/adr/0013-two-layer-separation.md
+  # Ref: docs/adr/0014-event-sourcing.md
+  #      docs/adr/0013-root-package-layer-separation.md
   #      phonewave docs/adr/S0005-root-infrastructure-and-layer-conventions.md
   # ==========================================================================
 
@@ -61,3 +63,26 @@ rules:
     paths:
       include:
         - "/internal/session/**"
+
+  # --- Rule 3: Eventsource must not import session or cmd ---
+
+  - id: layer-eventsource-no-import-session
+    languages: [go]
+    message: |
+      eventsource 層から session 層または cmd 層への import は禁止です。
+      依存方向: cmd → session → eventsource → root（逆方向不可）
+      eventsource は root のみ import できます。
+      Ref: docs/adr/0014-event-sourcing.md
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: |
+              import "$PKG"
+          - pattern: |
+              import $_ALIAS "$PKG"
+      - metavariable-regex:
+          metavariable: $PKG
+          regex: ".*/internal/(session|cmd)"
+    paths:
+      include:
+        - "/internal/eventsource/**"
