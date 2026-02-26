@@ -56,10 +56,10 @@ metadata:
 	if dm.Metadata["created_at"] != "2026-02-20T12:00:00Z" {
 		t.Errorf("Metadata[created_at] = %q, want %q", dm.Metadata["created_at"], "2026-02-20T12:00:00Z")
 	}
-	if !containsStr(dm.Body, "# Rate Limiting Implementation") {
+	if !strings.Contains(dm.Body, "# Rate Limiting Implementation") {
 		t.Errorf("Body should contain heading, got %q", dm.Body)
 	}
-	if !containsStr(dm.Body, "Token bucket algorithm") {
+	if !strings.Contains(dm.Body, "Token bucket algorithm") {
 		t.Errorf("Body should contain DoD content, got %q", dm.Body)
 	}
 }
@@ -226,7 +226,7 @@ func TestDMailMarshal_EmptyBody(t *testing.T) {
 
 	// then — should start with --- and end with --- without extra blank lines
 	s := string(data)
-	if !containsStr(s, "---\n") {
+	if !strings.Contains(s, "---\n") {
 		t.Errorf("marshaled output missing --- delimiter")
 	}
 
@@ -609,6 +609,8 @@ func TestScanInbox_SortedByFilename(t *testing.T) {
 func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	// given
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	dm := paintress.DMail{
 		Name:        "spec-my-42",
 		Kind:        "specification",
@@ -617,7 +619,7 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(continent, dm)
+	err := SendDMail(store, dm)
 
 	// then
 	if err != nil {
@@ -655,8 +657,10 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 }
 
 func TestSendDMail_CreatesDirectories(t *testing.T) {
-	// given — clean temp dir with no .expedition at all
+	// given — clean temp dir; OutboxStore auto-creates dirs
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	dm := paintress.DMail{
 		Name:        "report-create-dirs",
 		Kind:        "report",
@@ -664,7 +668,7 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(continent, dm)
+	err := SendDMail(store, dm)
 
 	// then
 	if err != nil {
@@ -683,38 +687,33 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 }
 
-func TestSendDMail_WritesArchiveBeforeOutbox(t *testing.T) {
-	// given
+func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
+	// given — with OutboxStore, both archive and outbox are written in Flush()
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	dm := paintress.DMail{
 		Name:        "report-order-test",
 		Kind:        "report",
-		Description: "Verify archive-first write order",
+		Description: "Verify both archive and outbox are written",
 	}
-
-	// Pre-create both directories
-	outboxDir := paintress.OutboxDir(continent)
-	archiveDir := paintress.ArchiveDir(continent)
-	os.MkdirAll(outboxDir, 0755)
-	os.MkdirAll(archiveDir, 0755)
-
-	// Make outbox unwritable — if archive is written first, it succeeds;
-	// outbox write then fails. This proves the write order.
-	os.Chmod(outboxDir, 0555)
-	t.Cleanup(func() { os.Chmod(outboxDir, 0755) })
 
 	// when
-	err := SendDMail(continent, dm)
+	err := SendDMail(store, dm)
 
-	// then — error is expected (outbox write fails)
-	if err == nil {
-		t.Fatal("expected error when outbox is unwritable")
+	// then
+	if err != nil {
+		t.Fatalf("SendDMail error: %v", err)
 	}
 
-	// Archive must exist — it was written first (archive-first invariant)
-	archivePath := filepath.Join(archiveDir, "report-order-test.md")
+	// Both files must exist after Flush
+	archivePath := filepath.Join(paintress.ArchiveDir(continent), "report-order-test.md")
 	if _, err := os.Stat(archivePath); err != nil {
-		t.Errorf("archive file should exist (written before outbox): %v", err)
+		t.Errorf("archive file should exist: %v", err)
+	}
+	outboxPath := filepath.Join(paintress.OutboxDir(continent), "report-order-test.md")
+	if _, err := os.Stat(outboxPath); err != nil {
+		t.Errorf("outbox file should exist: %v", err)
 	}
 }
 
@@ -977,37 +976,38 @@ func TestArchiveInboxDMail_CreatesArchiveDir(t *testing.T) {
 // === SendDMail Edge Cases ===
 
 func TestSendDMail_ArchiveDirFailure_NoOutbox(t *testing.T) {
-	// given — archive dir's parent is unwritable
+	// given — archive dir is unwritable so atomicWrite in Flush fails
 	continent := t.TempDir()
-	expDir := filepath.Join(continent, ".expedition")
-	os.MkdirAll(expDir, 0755)
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 
-	// Pre-create archive dir and make it unwritable
+	// Make archive dir unwritable after store creation
 	archiveDir := paintress.ArchiveDir(continent)
-	os.MkdirAll(archiveDir, 0755)
 	os.Chmod(archiveDir, 0555)
 	t.Cleanup(func() { os.Chmod(archiveDir, 0755) })
 
-	dm := paintress.DMail{Name: "fail-early", Kind: "report", Description: "Should fail at archive"}
+	dm := paintress.DMail{Name: "fail-early", Kind: "report", Description: "Should fail at flush"}
 
 	// when
-	err := SendDMail(continent, dm)
+	err := SendDMail(store, dm)
 
-	// then — error at archive stage
+	// then — error at flush stage (atomicWrite to archive fails)
 	if err == nil {
 		t.Fatal("expected error when archive is unwritable")
 	}
 
-	// Outbox file must NOT exist (archive failed first, so outbox never attempted)
+	// Outbox file must NOT exist (flush failed)
 	outboxPath := filepath.Join(paintress.OutboxDir(continent), "fail-early.md")
 	if _, statErr := os.Stat(outboxPath); statErr == nil {
-		t.Error("outbox file should not exist when archive write failed")
+		t.Error("outbox file should not exist when flush failed")
 	}
 }
 
 func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	// given — d-mail with all fields including body and metadata
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	dm := paintress.DMail{
 		Name:        "full-content",
 		Kind:        "feedback",
@@ -1019,7 +1019,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(continent, dm)
+	err := SendDMail(store, dm)
 
 	// then
 	if err != nil {
@@ -1239,6 +1239,8 @@ func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
 func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	// given — DMail without SchemaVersion set
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	dm := paintress.DMail{
 		Name:        "no-version",
 		Kind:        "report",
@@ -1246,7 +1248,7 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(continent, dm)
+	err := SendDMail(store, dm)
 
 	// then
 	if err != nil {
@@ -1337,10 +1339,11 @@ func TestDMailMarshal_UnicodeContent(t *testing.T) {
 
 func TestDMailLifecycle_FullFlow(t *testing.T) {
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	inboxDir := paintress.InboxDir(continent)
 	outboxDir := paintress.OutboxDir(continent)
 	archiveDir := paintress.ArchiveDir(continent)
-	os.MkdirAll(inboxDir, 0755)
 
 	// ── Phase 1: External tool writes specification and feedback to inbox ──
 
@@ -1428,8 +1431,8 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		t.Errorf("report Kind = %q, want report", reportDMail.Kind)
 	}
 
-	// Send report (archive-first, then outbox)
-	if err := SendDMail(continent, reportDMail); err != nil {
+	// Send report via outbox store (Stage → Flush)
+	if err := SendDMail(store, reportDMail); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1528,8 +1531,10 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 	// Full lifecycle with no d-mails — everything should be no-op graceful
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 
-	// ── Phase 1: No inbox dir exists ──
+	// ── Phase 1: Inbox dir is empty ──
 
 	scanned, err := ScanInbox(continent)
 	if err != nil {
@@ -1557,7 +1562,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Reason:      "Initial setup complete",
 	}
 	reportDMail := paintress.NewReportDMail(report)
-	if err := SendDMail(continent, reportDMail); err != nil {
+	if err := SendDMail(store, reportDMail); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1577,8 +1582,9 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	//   Expedition 1: picks up spec → succeeds → archives
 	//   Expedition 2: picks up feedback (arrived between expeditions) → succeeds → archives
 	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
 	inboxDir := paintress.InboxDir(continent)
-	os.MkdirAll(inboxDir, 0755)
 
 	// ── Expedition 1: spec in inbox ──
 
@@ -1598,7 +1604,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report1 := paintress.NewReportDMail(&paintress.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
 	})
-	if err := SendDMail(continent, report1); err != nil {
+	if err := SendDMail(store, report1); err != nil {
 		t.Fatalf("Exp1 SendDMail: %v", err)
 	}
 	if err := ArchiveInboxDMail(continent, "spec-my-1"); err != nil {
@@ -1630,7 +1636,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report2 := paintress.NewReportDMail(&paintress.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
 	})
-	if err := SendDMail(continent, report2); err != nil {
+	if err := SendDMail(store, report2); err != nil {
 		t.Fatalf("Exp2 SendDMail: %v", err)
 	}
 	if err := ArchiveInboxDMail(continent, "feedback-d-001"); err != nil {

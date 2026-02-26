@@ -27,17 +27,18 @@ var (
 )
 
 type Paintress struct {
-	config    paintress.Config
-	logDir    string
-	Logger    *paintress.Logger
-	DataOut   io.Writer // stdout-equivalent for data output
-	StdinIn   io.Reader // stdin-equivalent for interactive input
-	devServer *DevServer
-	gradient  *paintress.GradientGauge
-	reserve   *paintress.ReserveParty
-	pool      *WorktreePool // nil when --workers=0
-	notifier  paintress.Notifier
-	approver  paintress.Approver
+	config      paintress.Config
+	logDir      string
+	Logger      *paintress.Logger
+	DataOut     io.Writer // stdout-equivalent for data output
+	StdinIn     io.Reader // stdin-equivalent for interactive input
+	devServer   *DevServer
+	gradient    *paintress.GradientGauge
+	reserve     *paintress.ReserveParty
+	pool        *WorktreePool // nil when --workers=0
+	notifier    paintress.Notifier
+	approver    paintress.Approver
+	outboxStore paintress.OutboxStore // transactional outbox for D-Mail delivery
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
@@ -147,6 +148,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.SetExtraWriter(logFile)
 		defer logFile.Close()
 	}
+
+	// Initialize transactional outbox store for D-Mail delivery.
+	outboxStore, err := NewOutboxStoreForContinent(p.config.Continent)
+	if err != nil {
+		p.Logger.Error("outbox store: %v", err)
+		rootSpan.End()
+		return 1
+	}
+	defer outboxStore.Close()
+	p.outboxStore = outboxStore
 
 	p.printBanner()
 	p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("continent"), p.config.Continent))
@@ -479,7 +490,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
 				if dm := paintress.NewReportDMail(report); dm.Name != "" {
-					if err := SendDMail(p.config.Continent, dm); err != nil {
+					if err := SendDMail(p.outboxStore, dm); err != nil {
 						p.Logger.Warn("dmail send: %v", err)
 					}
 				}

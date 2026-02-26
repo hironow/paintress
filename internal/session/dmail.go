@@ -11,9 +11,9 @@ import (
 	"github.com/hironow/paintress"
 )
 
-// SendDMail writes a d-mail to archive/ first, then outbox/.
-// Archive-first ensures the permanent record survives even if the outbox write fails.
-func SendDMail(continent string, d paintress.DMail) error {
+// SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
+// archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
+func SendDMail(store paintress.OutboxStore, d paintress.DMail) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = paintress.DMailSchemaVersion
 	}
@@ -23,17 +23,12 @@ func SendDMail(continent string, d paintress.DMail) error {
 	}
 
 	filename := d.Name + ".md"
-
-	for _, dir := range []string{paintress.ArchiveDir(continent), paintress.OutboxDir(continent)} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("dmail: mkdir %s: %w", dir, err)
-		}
-		path := filepath.Join(dir, filename)
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			return fmt.Errorf("dmail: write %s: %w", path, err)
-		}
+	if err := store.Stage(filename, data); err != nil {
+		return fmt.Errorf("dmail: stage: %w", err)
 	}
-
+	if _, err := store.Flush(); err != nil {
+		return fmt.Errorf("dmail: flush: %w", err)
+	}
 	return nil
 }
 
