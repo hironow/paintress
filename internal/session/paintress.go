@@ -289,7 +289,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		p.totalAttempted.Add(1)
-		p.Logger.Exp("%s", fmt.Sprintf(paintress.Msg("departing"), exp))
+		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("departing"), exp))
 		p.reserve.TryRecoverPrimary()
 		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("gradient_info"), p.gradient.FormatForPrompt()))
 		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("party_info"), p.reserve.Status()))
@@ -744,12 +744,12 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []paintress.DMail, w
 
 func (p *Paintress) handleSuccess(report *paintress.ExpeditionReport) {
 	if report.MissionType == "verify" {
-		p.Logger.QA("%s: %s", report.IssueID, report.IssueTitle)
+		p.Logger.Info("%s: %s", report.IssueID, report.IssueTitle)
 		if report.BugsFound > 0 {
-			p.Logger.QA("%s", fmt.Sprintf(paintress.Msg("qa_bugs"), report.BugsFound, report.BugIssues))
+			p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("qa_bugs"), report.BugsFound, report.BugIssues))
 			p.totalBugs.Add(int64(report.BugsFound))
 		} else {
-			p.Logger.QA("%s", paintress.Msg("qa_all_pass"))
+			p.Logger.Info("%s", paintress.Msg("qa_all_pass"))
 		}
 	} else {
 		p.Logger.OK("%s: %s [%s]", report.IssueID, report.IssueTitle, report.MissionType)
@@ -835,7 +835,7 @@ func (p *Paintress) printSummary() {
 		p.Logger.Warn("Mid-expedition HIGH severity D-Mail: %d", p.totalMidHighSeverity.Load())
 	}
 	if p.totalBugs.Load() > 0 {
-		p.Logger.QA("%s", fmt.Sprintf(paintress.Msg("bugs_count"), p.totalBugs.Load()))
+		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("bugs_count"), p.totalBugs.Load()))
 	}
 	fmt.Fprintln(w)
 	p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("gradient_info"), p.gradient.FormatLog()))

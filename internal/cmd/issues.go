@@ -80,8 +80,7 @@ func runIssues(cmd *cobra.Command, args []string) error {
 
 	issues = paintress.FilterIssuesByState(issues, stateFilter)
 
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	logger := paintress.NewLogger(cmd.ErrOrStderr(), verbose)
+	logger := loggerFrom(cmd)
 	logger.Info("fetched %d issues from %s", len(issues), cfg.Linear.Team)
 
 	w := cmd.OutOrStdout()

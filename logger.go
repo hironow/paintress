@@ -13,7 +13,6 @@ type Logger struct {
 	mu      sync.Mutex
 	logFile *os.File
 	verbose bool
-	quiet   bool
 }
 
 func NewLogger(out io.Writer, verbose bool) *Logger {
@@ -23,23 +22,13 @@ func NewLogger(out io.Writer, verbose bool) *Logger {
 	return &Logger{out: out, verbose: verbose}
 }
 
-// NewQuietLogger creates a Logger that suppresses console output but still writes to log files.
-func NewQuietLogger(out io.Writer) *Logger {
-	if out == nil {
-		out = io.Discard
-	}
-	return &Logger{out: out, quiet: true}
-}
-
 func (l *Logger) logLine(prefix, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
 	line := fmt.Sprintf("[%s] %s %s\n", ts, prefix, msg)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if !l.quiet {
-		fmt.Fprint(l.out, line)
-	}
+	fmt.Fprint(l.out, line)
 	if l.logFile != nil {
 		fmt.Fprint(l.logFile, line)
 	}
@@ -49,8 +38,6 @@ func (l *Logger) Info(format string, args ...any)  { l.logLine("INFO", format, a
 func (l *Logger) OK(format string, args ...any)    { l.logLine(" OK ", format, args...) }
 func (l *Logger) Warn(format string, args ...any)  { l.logLine("WARN", format, args...) }
 func (l *Logger) Error(format string, args ...any) { l.logLine(" ERR", format, args...) }
-func (l *Logger) QA(format string, args ...any)    { l.logLine(" QA ", format, args...) }
-func (l *Logger) Exp(format string, args ...any)   { l.logLine(" EXP", format, args...) }
 
 func (l *Logger) Debug(format string, args ...any) {
 	if l.verbose {

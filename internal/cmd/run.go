@@ -107,11 +107,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
 	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	logger := paintress.NewLogger(cmd.ErrOrStderr(), verbose)
-	if os.Getenv("PAINTRESS_QUIET") != "" {
-		logger = paintress.NewQuietLogger(cmd.ErrOrStderr())
-	}
+	logger := loggerFrom(cmd)
 
 	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err

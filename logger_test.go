@@ -51,8 +51,8 @@ func TestLogFunctions_NoPanic(t *testing.T) {
 	logger.OK("ok %d", 42)
 	logger.Warn("warn %v", true)
 	logger.Error("error %s", "oops")
-	logger.QA("qa %s", "check")
-	logger.Exp("exp %d", 1)
+	logger.Info("qa %s", "check")
+	logger.Info("exp %d", 1)
 }
 
 func TestLogFunctions_WritesToFile(t *testing.T) {
@@ -141,17 +141,12 @@ func TestLogFunctions_QuietMode_SuppressesWriter(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "quiet.log")
 
-	var buf bytes.Buffer
-	logger := NewQuietLogger(&buf)
+	// Quiet mode: pass io.Discard as out to suppress console output.
+	logger := NewLogger(io.Discard, false)
 	logger.SetLogFile(path)
 	defer logger.CloseLogFile()
 
 	logger.Info("quiet mode")
-
-	out := buf.String()
-	if len(out) != 0 {
-		t.Errorf("expected no writer output in quiet mode, got %q", out)
-	}
 
 	content, err := os.ReadFile(path)
 	if err != nil {
