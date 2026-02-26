@@ -1,7 +1,17 @@
 package cmd
 
 import (
+	"context"
+	"sync"
+
 	"github.com/spf13/cobra"
+)
+
+// shutdownTracer holds the OTel tracer shutdown function registered by
+// PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
+var (
+	shutdownTracer func(context.Context) error
+	finalizerOnce  sync.Once
 )
 
 func init() {
@@ -18,7 +28,19 @@ func NewRootCommand() *cobra.Command {
 		Version: Version,
 		// Silence usage on RunE errors (cobra prints usage by default on error)
 		SilenceUsage: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			shutdownTracer = initTracer("paintress", Version)
+			return nil
+		},
 	}
+
+	finalizerOnce.Do(func() {
+		cobra.OnFinalize(func() {
+			if shutdownTracer != nil {
+				shutdownTracer(context.Background())
+			}
+		})
+	})
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")

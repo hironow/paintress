@@ -53,7 +53,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `paintress` (roo
 ### `internal/cmd/` — cobra CLI commands
 - `root.go` — NewRootCommand, PersistentFlags
 - `run.go` — run subcommand (main expedition)
-- `telemetry.go` — InitTracer (OTLP HTTP exporter setup)
+- `telemetry.go` — initTracer (OTLP HTTP exporter setup, shutdown via cobra.OnFinalize)
 - `init.go`, `doctor.go`, `issues.go`, `archive_prune.go`, `update.go`, `version.go`
 - `default_run.go` — NeedsDefaultRun logic
 - `errors.go` — ExitError handling
@@ -71,7 +71,7 @@ Dependency direction: `internal/cmd` → `internal/session` → `paintress` (roo
 - All commands use `RunE` (not `Run`)
 - `--output`, `--lang`, `--verbose` are PersistentFlags on root
 - Default subcommand: `paintress [flags] <repo>` → prepends `run` via `NeedsDefaultRun`
-- OTel tracer shutdown: `defer` with 5s timeout from `context.Background()` in run.go (no OnFinalize)
+- OTel tracer shutdown: PersistentPreRunE + `cobra.OnFinalize` + `sync.Once` (consistent across all 4 tools)
 - `run` subcommand: `--timeout`, `--model`, `--base-branch`, `--workers`, `--notify-cmd`, `--approve-cmd`, `--auto-approve`, `--dry-run` local flags
 - Interactive input: `StdinApprover` (bufio.Scanner in goroutine + channel + ctx.Done()) for gate approval
 - `PAINTRESS_QUIET` env var: enables quiet logger mode

@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/session"
@@ -113,13 +112,6 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if os.Getenv("PAINTRESS_QUIET") != "" {
 		logger = paintress.NewQuietLogger(cmd.ErrOrStderr())
 	}
-
-	shutdownTracer := InitTracer("paintress", Version)
-	defer func() {
-		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
-		defer c()
-		shutdownTracer(shutdownCtx)
-	}()
 
 	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err
