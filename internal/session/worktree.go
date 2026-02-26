@@ -11,11 +11,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// GitExecutor abstracts git command execution for testability.
-type GitExecutor interface {
-	Git(ctx context.Context, dir string, args ...string) ([]byte, error)
-	Shell(ctx context.Context, dir string, command string) ([]byte, error)
-}
+// Compile-time check that localGitExecutor implements paintress.GitExecutor.
+var _ paintress.GitExecutor = (*localGitExecutor)(nil)
 
 // localGitExecutor runs git commands on the host filesystem.
 type localGitExecutor struct{}
@@ -34,7 +31,7 @@ func (e *localGitExecutor) Shell(ctx context.Context, dir string, command string
 
 // WorktreePool manages a pool of git worktrees for parallel expedition workers.
 type WorktreePool struct {
-	git        GitExecutor
+	git        paintress.GitExecutor
 	baseBranch string
 	repoDir    string      // original repository
 	poolDir    string      // .expedition/worktrees/
@@ -44,7 +41,7 @@ type WorktreePool struct {
 }
 
 // NewWorktreePool creates a new WorktreePool with the given configuration.
-func NewWorktreePool(git GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool {
+func NewWorktreePool(git paintress.GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool {
 	return &WorktreePool{
 		git:        git,
 		baseBranch: baseBranch,
