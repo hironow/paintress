@@ -104,6 +104,9 @@ func ArchiveInboxDMail(continent, name string, eventStore paintress.EventStore) 
 	return nil
 }
 
+// emitDMailEvent appends an event to the store. Errors are silently dropped
+// because this is a package-level function without logger access. Callers that
+// need diagnostic output should use Paintress.emitEvent instead.
 func emitDMailEvent(store paintress.EventStore, eventType paintress.EventType, data any) {
 	if store == nil {
 		return

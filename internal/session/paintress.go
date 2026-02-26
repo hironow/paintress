@@ -361,6 +361,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		if scanErr != nil {
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
+		for _, dm := range inboxDMails {
+			p.emitEvent(paintress.EventInboxReceived, paintress.InboxReceivedData{
+				Name: dm.Name, Severity: dm.Severity,
+			})
+		}
 
 		flagDir := workDir
 		if flagDir == "" {
