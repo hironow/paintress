@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 )
 
@@ -191,4 +193,93 @@ func TestLogger_Writer(t *testing.T) {
 	if logger.Writer() != &buf {
 		t.Error("Writer() should return the configured writer")
 	}
+}
+
+// --- from edge_cases_test.go ---
+
+func TestLogFunctions_ConcurrentLogging(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "concurrent.log")
+	logger := NewLogger(io.Discard, false)
+	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f)
+	defer f.Close()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(4)
+		go func(n int) {
+			defer wg.Done()
+			logger.Info("concurrent info %d", n)
+		}(i)
+		go func(n int) {
+			defer wg.Done()
+			logger.Warn("concurrent warn %d", n)
+		}(i)
+		go func(n int) {
+			defer wg.Done()
+			logger.OK("concurrent ok %d", n)
+		}(i)
+		go func(n int) {
+			defer wg.Done()
+			logger.Error("concurrent error %d", n)
+		}(i)
+	}
+	wg.Wait()
+
+	content, _ := os.ReadFile(path)
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	if len(lines) != 200 {
+		t.Errorf("expected 200 log lines (50*4), got %d", len(lines))
+	}
+}
+
+func TestLogFunctions_ReinitLogFile(t *testing.T) {
+	dir := t.TempDir()
+	path1 := filepath.Join(dir, "log1.log")
+	path2 := filepath.Join(dir, "log2.log")
+
+	logger := NewLogger(io.Discard, false)
+	f1, _ := os.OpenFile(path1, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f1)
+	logger.Info("to first file")
+	f1.Close()
+	f2, _ := os.OpenFile(path2, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logger.SetExtraWriter(f2)
+	logger.Info("to second file")
+	f2.Close()
+
+	content2, _ := os.ReadFile(path2)
+	if !containsStr(string(content2), "to second file") {
+		t.Error("second log file should contain second message")
+	}
+}
+
+// --- from race_test.go ---
+
+func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
+	logger := NewLogger(io.Discard, false)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			var buf bytes.Buffer
+			logger.SetExtraWriter(&buf)
+		}()
+		go func(n int) {
+			defer wg.Done()
+			logger.Info("race test info %d", n)
+			logger.Warn("race test warn %d", n)
+		}(i)
+		go func() {
+			defer wg.Done()
+			logger.SetExtraWriter(nil)
+		}()
+	}
+	wg.Wait()
+
+	// Clean up
+	logger.SetExtraWriter(nil)
 }
