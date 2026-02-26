@@ -17,20 +17,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
-func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
-	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-
-	shutdown := InitTracer("test-svc", "0.0.1")
-	defer shutdown(context.Background())
-
-	_, span := paintress.Tracer.Start(context.Background(), "test-span")
-	defer span.End()
-
-	if span.IsRecording() {
-		t.Error("span should NOT be recording when endpoint is unset (noop provider)")
-	}
-}
-
 // setupTestTracer installs an InMemoryExporter with a synchronous span processor
 // so spans are immediately available for inspection. It restores the global
 // TracerProvider after the test.

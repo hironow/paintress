@@ -114,7 +114,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		logger = paintress.NewQuietLogger(cmd.ErrOrStderr())
 	}
 
-	shutdownTracer := session.InitTracer("paintress", Version)
+	shutdownTracer := InitTracer("paintress", Version)
 	defer func() {
 		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
 		defer c()

@@ -49,11 +49,11 @@ Dependency direction: `internal/cmd` → `internal/session` → `paintress` (roo
 - `init.go` — InitGateDir
 - `worktree.go` — git worktree operations
 - `devserver.go` — dev server management
-- `telemetry.go` — InitTracer (OTLP HTTP exporter)
 
 ### `internal/cmd/` — cobra CLI commands
 - `root.go` — NewRootCommand, PersistentFlags
 - `run.go` — run subcommand (main expedition)
+- `telemetry.go` — InitTracer (OTLP HTTP exporter setup)
 - `init.go`, `doctor.go`, `issues.go`, `archive_prune.go`, `update.go`, `version.go`
 - `default_run.go` — NeedsDefaultRun logic
 - `errors.go` — ExitError handling
