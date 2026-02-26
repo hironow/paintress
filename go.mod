@@ -9,6 +9,7 @@ require (
 	github.com/creativeprojects/go-selfupdate v1.5.2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
+	github.com/google/uuid v1.6.0
 	github.com/slack-go/slack v0.18.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.9
@@ -19,6 +20,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/sync v0.19.0
 	gopkg.in/yaml.v3 v3.0.1
+	modernc.org/sqlite v1.46.1
 )
 
 require (
@@ -51,7 +53,6 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/google/go-github/v74 v74.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -106,5 +107,4 @@ require (
 	modernc.org/libc v1.67.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.46.1 // indirect
 )
