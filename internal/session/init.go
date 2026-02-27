@@ -1,11 +1,9 @@
 package session
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"path/filepath"
-	"strings"
 
 	"github.com/hironow/paintress"
 )
@@ -47,35 +45,3 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 	return nil
 }
 
-// RunInitWithReader executes the init flow reading input from r
-// and writing prompts/status to w. Used for interactive mode.
-func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
-	if w == nil {
-		w = io.Discard
-	}
-
-	scanner := bufio.NewScanner(r)
-
-	fmt.Fprint(w, "Linear team key (e.g. MY): ")
-	var team string
-	if scanner.Scan() {
-		team = strings.TrimSpace(scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("reading input: %w", err)
-	}
-	if team == "" {
-		return fmt.Errorf("team key is required")
-	}
-
-	fmt.Fprint(w, "Linear project name (optional, press Enter to skip): ")
-	var project string
-	if scanner.Scan() {
-		project = strings.TrimSpace(scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("reading input: %w", err)
-	}
-
-	return InitProject(repoPath, team, project, w)
-}

@@ -4,33 +4,25 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/hironow/paintress"
 )
 
-func TestRunInit_WritesConfig(t *testing.T) {
+func TestInitProject_WritesConfig(t *testing.T) {
+	// given
 	dir := t.TempDir()
 
-	// Simulate user input: team key "ENG", project "backend"
-	input := "ENG\nbackend\n"
-	reader := strings.NewReader(input)
+	// when
+	err := InitProject(dir, "ENG", "backend", io.Discard)
 
-	if err := RunInitWithReader(dir, reader, io.Discard); err != nil {
-		t.Fatalf("RunInitWithReader: %v", err)
-	}
-
-	// Verify config file was created
-	cfgPath := paintress.ProjectConfigPath(dir)
-	if _, err := os.Stat(cfgPath); err != nil {
-		t.Fatalf("config file not created: %v", err)
-	}
-
-	// Verify content
-	cfg, err := LoadProjectConfig(dir)
+	// then
 	if err != nil {
-		t.Fatalf("LoadProjectConfig: %v", err)
+		t.Fatalf("InitProject: %v", err)
+	}
+	cfg, loadErr := LoadProjectConfig(dir)
+	if loadErr != nil {
+		t.Fatalf("LoadProjectConfig: %v", loadErr)
 	}
 	if cfg.Linear.Team != "ENG" {
 		t.Errorf("Team = %q, want %q", cfg.Linear.Team, "ENG")
@@ -40,20 +32,20 @@ func TestRunInit_WritesConfig(t *testing.T) {
 	}
 }
 
-func TestRunInit_SkipOptionalProject(t *testing.T) {
+func TestInitProject_SkipOptionalProject(t *testing.T) {
+	// given
 	dir := t.TempDir()
 
-	// Simulate user input: team key "MY", empty project (press Enter)
-	input := "MY\n\n"
-	reader := strings.NewReader(input)
+	// when
+	err := InitProject(dir, "MY", "", io.Discard)
 
-	if err := RunInitWithReader(dir, reader, io.Discard); err != nil {
-		t.Fatalf("RunInitWithReader: %v", err)
-	}
-
-	cfg, err := LoadProjectConfig(dir)
+	// then
 	if err != nil {
-		t.Fatalf("LoadProjectConfig: %v", err)
+		t.Fatalf("InitProject: %v", err)
+	}
+	cfg, loadErr := LoadProjectConfig(dir)
+	if loadErr != nil {
+		t.Fatalf("LoadProjectConfig: %v", loadErr)
 	}
 	if cfg.Linear.Team != "MY" {
 		t.Errorf("Team = %q, want %q", cfg.Linear.Team, "MY")
@@ -63,23 +55,40 @@ func TestRunInit_SkipOptionalProject(t *testing.T) {
 	}
 }
 
-func TestRunInit_CreatesExpeditionDir(t *testing.T) {
+func TestInitProject_CreatesExpeditionDir(t *testing.T) {
+	// given
 	dir := t.TempDir()
 
-	input := "MY\n\n"
-	reader := strings.NewReader(input)
+	// when
+	err := InitProject(dir, "MY", "", io.Discard)
 
-	if err := RunInitWithReader(dir, reader, io.Discard); err != nil {
-		t.Fatalf("RunInitWithReader: %v", err)
-	}
-
-	// .expedition directory should exist
-	expeditionDir := filepath.Join(dir, ".expedition")
-	info, err := os.Stat(expeditionDir)
+	// then
 	if err != nil {
-		t.Fatalf(".expedition dir not created: %v", err)
+		t.Fatalf("InitProject: %v", err)
+	}
+	expeditionDir := filepath.Join(dir, ".expedition")
+	info, statErr := os.Stat(expeditionDir)
+	if statErr != nil {
+		t.Fatalf(".expedition dir not created: %v", statErr)
 	}
 	if !info.IsDir() {
 		t.Error(".expedition should be a directory")
+	}
+}
+
+func TestInitProject_ConfigFileExists(t *testing.T) {
+	// given
+	dir := t.TempDir()
+
+	// when — first init succeeds
+	err := InitProject(dir, "MY", "", io.Discard)
+	if err != nil {
+		t.Fatalf("first InitProject: %v", err)
+	}
+
+	// then — verify config path exists
+	cfgPath := paintress.ProjectConfigPath(dir)
+	if _, statErr := os.Stat(cfgPath); statErr != nil {
+		t.Fatalf("config file not created: %v", statErr)
 	}
 }
