@@ -35,6 +35,24 @@ func ensureExpeditionDirs(t *testing.T, continent string) {
 	}
 }
 
+func TestSQLiteOutboxStore_PragmaSynchronousNormal(t *testing.T) {
+	// given
+	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
+
+	// when: query PRAGMA on the store's own connection (package-internal access)
+	var synchronous string
+	if err := store.db.QueryRow("PRAGMA synchronous").Scan(&synchronous); err != nil {
+		t.Fatalf("query PRAGMA synchronous: %v", err)
+	}
+
+	// then: synchronous = 1 (NORMAL)
+	if synchronous != "1" {
+		t.Errorf("PRAGMA synchronous: got %q, want %q (NORMAL)", synchronous, "1")
+	}
+}
+
 func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)

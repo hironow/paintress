@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/eventsource"
@@ -125,7 +124,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigCh, shutdownSignals...)
 	defer signal.Stop(sigCh)
 
 	go func() {

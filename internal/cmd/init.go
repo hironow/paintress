@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +30,11 @@ default expedition settings. This must be run once before
 
 func runInit(cmd *cobra.Command, args []string) error {
 	repoPath := args[0]
+
+	cfgPath := paintress.ProjectConfigPath(repoPath)
+	if _, err := os.Stat(cfgPath); err == nil {
+		return fmt.Errorf("%s already exists", cfgPath)
+	}
 
 	w := cmd.ErrOrStderr()
 	fmt.Fprintln(w)

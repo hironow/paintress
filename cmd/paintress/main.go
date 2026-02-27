@@ -5,14 +5,13 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"syscall"
 
 	"github.com/hironow/paintress/internal/cmd"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
+		shutdownSignals...)
 	defer stop()
 
 	rootCmd := cmd.NewRootCommand()
