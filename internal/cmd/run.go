@@ -92,6 +92,17 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not initialized — run 'paintress init %s' first", continent)
 	}
 
+	// Preflight: verify required binaries exist
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	claudeCmd, _ := cmd.Flags().GetString("claude-cmd")
+	bins := []string{"git"}
+	if !dryRun {
+		bins = append(bins, claudeCmd)
+	}
+	if err := session.PreflightCheck(bins...); err != nil {
+		return err
+	}
+
 	cfg := paintress.Config{}
 	cfg.Continent = continent
 	cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
