@@ -45,16 +45,19 @@ ownership of its own `flag.md`:
 ## Consequences
 
 ### Positive
+
 - Mutex (`flagMu`) completely eliminated — no lock contention between workers
 - Workers=0, Workers=1, and Workers>1 all use the same code path
 - Each worker's flag watcher sees only its own state changes
 
 ### Negative
+
 - Worktree cleanup failure could leave stale flag.md files (mitigated by
   `reconcileFlags`'s workers==0 guard that skips worktree scanning when
   `WorktreePool.Init` has not run)
 - Post-run consolidation adds a small I/O operation at shutdown
 
 ### Neutral
+
 - `flag.md` format is unchanged — only the write location changed
 - `ReadFlag`/`WriteFlag`/`FlagPath` functions remain generic (take a base dir)

@@ -5,12 +5,11 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"syscall"
 )
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM)
+		shutdownSignals...)
 	defer stop()
 
 	rootCmd := NewRootCommand()

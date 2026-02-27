@@ -43,12 +43,14 @@ Implement real-time rate limit signal detection with automatic model fallback:
 ## Consequences
 
 ### Positive
+
 - Expeditions continue under rate limits at reduced model quality instead of
   failing entirely
 - Primary model automatically recovers after cooldown without operator action
 - Hit counter and status logging provide visibility into rate limit frequency
 
 ### Negative
+
 - Signal detection is heuristic-based — false positives (e.g., output discussing
   rate limits) may trigger unnecessary fallback
 - Reserve model quality degradation may produce lower-quality implementations,
@@ -57,6 +59,7 @@ Implement real-time rate limit signal detection with automatic model fallback:
   time
 
 ### Neutral
+
 - `ReserveParty` is thread-safe via `sync.RWMutex`, supporting concurrent
   `CheckOutput` calls from multiple expedition workers
 - The reserve list is ordered by preference (`reserve[0]` is the first fallback)

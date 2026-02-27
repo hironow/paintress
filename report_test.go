@@ -501,3 +501,222 @@ __EXPEDITION_END__`
 		t.Errorf("Remaining = %q, want %q", report.Remaining, "5")
 	}
 }
+
+// --- from ralph_test.go ---
+
+func TestParseReport_Success(t *testing.T) {
+	output := `Some output...
+__EXPEDITION_REPORT__
+expedition: 3
+issue_id: AWE-123
+issue_title: Add login form
+mission_type: implement
+branch: feat/AWE-123-add-login-form
+pr_url: https://github.com/org/repo/pull/42
+status: success
+reason: テスト全件 Pass
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__
+Done.`
+
+	report, status := ParseReport(output, 3)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "AWE-123" {
+		t.Errorf("IssueID = %q", report.IssueID)
+	}
+	if report.Remaining != "5" {
+		t.Errorf("Remaining = %q", report.Remaining)
+	}
+}
+
+func TestParseReport_Complete(t *testing.T) {
+	_, status := ParseReport("__EXPEDITION_COMPLETE__", 10)
+	if status != StatusComplete {
+		t.Fatalf("got %v, want StatusComplete", status)
+	}
+}
+
+func TestParseReport_Failed(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 2
+issue_id: AWE-50
+issue_title: Refactor
+mission_type: implement
+branch: none
+pr_url: none
+status: failed
+reason: テスト失敗
+remaining_issues: 8
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	_, status := ParseReport(output, 2)
+	if status != StatusFailed {
+		t.Fatalf("got %v, want StatusFailed", status)
+	}
+}
+
+func TestParseReport_ParseError(t *testing.T) {
+	_, status := ParseReport("no markers here", 1)
+	if status != StatusParseError {
+		t.Fatalf("got %v, want StatusParseError", status)
+	}
+}
+
+// --- from edge_cases_test.go ---
+
+func TestParseReport_DuplicateMarkers(t *testing.T) {
+	// strings.Index returns first occurrence — should parse first report
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: FIRST
+status: success
+__EXPEDITION_END__
+__EXPEDITION_REPORT__
+expedition: 2
+issue_id: SECOND
+status: failed
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "FIRST" {
+		t.Errorf("should parse first report, got IssueID=%q", report.IssueID)
+	}
+}
+
+func TestParseReport_EmptyBlock(t *testing.T) {
+	output := "__EXPEDITION_REPORT__\n__EXPEDITION_END__"
+	_, status := ParseReport(output, 1)
+	// Empty block has no status field -> ParseError
+	if status != StatusParseError {
+		t.Fatalf("empty block should be parse error, got %v", status)
+	}
+}
+
+func TestParseReport_NegativeBugsFound(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: success
+bugs_found: -5
+bug_issues: none
+__EXPEDITION_END__`
+
+	report, _ := ParseReport(output, 1)
+	// fmt.Sscanf will parse -5 as negative — verify behavior
+	if report.BugsFound != -5 {
+		t.Errorf("BugsFound = %d, fmt.Sscanf parses negative values", report.BugsFound)
+	}
+}
+
+func TestParseReport_InvalidBugsFound(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: success
+bugs_found: not_a_number
+bug_issues: none
+__EXPEDITION_END__`
+
+	report, _ := ParseReport(output, 1)
+	if report.BugsFound != 0 {
+		t.Errorf("BugsFound should default to 0 for invalid input, got %d", report.BugsFound)
+	}
+}
+
+func TestParseReport_UnicodeValues(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-日本語
+issue_title: 🔥 機能追加 テスト
+mission_type: implement
+branch: feat/unicode-test
+pr_url: none
+status: success
+reason: 全テスト通過 ✅
+remaining_issues: 0
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "AWE-日本語" {
+		t.Errorf("IssueID = %q", report.IssueID)
+	}
+	if !containsStr(report.Reason, "✅") {
+		t.Errorf("Reason should contain emoji: %q", report.Reason)
+	}
+}
+
+func TestParseReport_MarkerWithExtraWhitespace(t *testing.T) {
+	// Markers with trailing spaces — strings.Index still finds them
+	output := "  __EXPEDITION_REPORT__  \nexpedition: 1\nissue_id: AWE-1\nstatus: success\n  __EXPEDITION_END__  "
+	report, status := ParseReport(output, 1)
+	if status != StatusSuccess {
+		t.Fatalf("got %v, want StatusSuccess", status)
+	}
+	if report.IssueID != "AWE-1" {
+		t.Errorf("IssueID = %q", report.IssueID)
+	}
+}
+
+func TestParseReport_ReasonWithMultipleColons(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: failed
+reason: error: timeout: connection refused: port 5432
+__EXPEDITION_END__`
+
+	report, status := ParseReport(output, 1)
+	if status != StatusFailed {
+		t.Fatalf("got %v", status)
+	}
+	if report.Reason != "error: timeout: connection refused: port 5432" {
+		t.Errorf("Reason should preserve all colons: %q", report.Reason)
+	}
+}
+
+func TestParseReport_ExpNumZero(t *testing.T) {
+	output := "__EXPEDITION_COMPLETE__"
+	report, status := ParseReport(output, 0)
+	if status != StatusComplete {
+		t.Fatalf("got %v", status)
+	}
+	if report.Expedition != 0 {
+		t.Errorf("Expedition = %d, want 0", report.Expedition)
+	}
+}
+
+func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
+	luminas := []Lumina{
+		{Pattern: "only one pattern", Source: "failure-pattern", Uses: 1},
+	}
+	result := FormatLuminaForPrompt(luminas)
+	if !containsStr(result, "only one pattern") {
+		t.Errorf("should contain pattern: %q", result)
+	}
+	// Should contain section header and bullet
+	if !containsStr(result, "Defensive") {
+		t.Errorf("should contain Defensive header: %q", result)
+	}
+	if !containsStr(result, "- only one pattern") {
+		t.Errorf("should contain bulleted pattern: %q", result)
+	}
+}

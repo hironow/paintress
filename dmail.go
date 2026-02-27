@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -42,7 +39,6 @@ func FormatDMailForPrompt(dmails []DMail) string {
 }
 
 // NewReportDMail creates a report d-mail from an ExpeditionReport.
-// The name is normalized to lowercase (e.g., "MY-42" → "report-my-42").
 func NewReportDMail(report *ExpeditionReport) DMail {
 	name := "report-" + strings.ToLower(report.IssueID)
 
@@ -96,12 +92,19 @@ func ArchiveDir(continent string) string {
 	return filepath.Join(continent, ".expedition", "archive")
 }
 
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
+}
+
 // DMailSchemaVersion is the current D-Mail protocol schema version.
-// Bump this when the frontmatter format changes (must match dmail-frontmatter.v1.schema.json).
 const DMailSchemaVersion = "1"
 
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
-// The format uses Jekyll/Hugo-style frontmatter delimiters (---).
 type DMail struct {
 	Name          string            `yaml:"name"`
 	Kind          string            `yaml:"kind"`
@@ -119,45 +122,37 @@ var (
 )
 
 // ParseDMail parses a d-mail from bytes containing YAML frontmatter and optional Markdown body.
-// The input must start with "---\n", followed by YAML, followed by "\n---\n",
-// followed by an optional Markdown body.
 func ParseDMail(data []byte) (DMail, error) {
 	s := string(data)
 
-	// Must start with opening delimiter
 	if !strings.HasPrefix(s, "---\n") {
 		return DMail{}, errMissingOpeningDelimiter
 	}
 
-	// Find closing delimiter after the opening one
-	rest := s[4:] // skip "---\n"
+	rest := s[4:]
 	closingIdx := strings.Index(rest, "\n---\n")
 	if closingIdx < 0 {
-		// Also accept "\n---" at end of input (no trailing newline after closing delimiter)
 		if strings.HasSuffix(rest, "\n---") {
-			closingIdx = len(rest) - 4 // len("\n---") == 4
+			closingIdx = len(rest) - 4
 		} else {
 			return DMail{}, errMissingClosingDelimiter
 		}
 	}
 
 	yamlContent := rest[:closingIdx]
-	afterClosing := rest[closingIdx+4:] // skip "\n---"
+	afterClosing := rest[closingIdx+4:]
 
 	var dm DMail
 	if err := yaml.Unmarshal([]byte(yamlContent), &dm); err != nil {
 		return DMail{}, err
 	}
 
-	// Trim the leading newline/whitespace between closing --- and body content
 	dm.Body = strings.TrimLeft(afterClosing, "\n")
 
 	return dm, nil
 }
 
 // Marshal produces the d-mail wire format: "---\n" + YAML + "---\n\n" + Body.
-// If the body is empty, only the frontmatter is produced (no extra blank lines).
-// A non-empty body is guaranteed to end with a trailing newline.
 func (d DMail) Marshal() ([]byte, error) {
 	yamlData, err := yaml.Marshal(d)
 	if err != nil {
@@ -172,7 +167,6 @@ func (d DMail) Marshal() ([]byte, error) {
 	if d.Body != "" {
 		buf.WriteString("\n")
 		buf.WriteString(d.Body)
-		// Ensure trailing newline
 		if !strings.HasSuffix(d.Body, "\n") {
 			buf.WriteString("\n")
 		}
@@ -181,96 +175,13 @@ func (d DMail) Marshal() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// SendDMail writes a d-mail to archive/ first, then outbox/.
-// Archive-first ensures the permanent record survives even if the outbox write fails.
-// Creates directories if needed. Filename: <d.Name>.md
-func SendDMail(continent string, d DMail) error {
-	if d.SchemaVersion == "" {
-		d.SchemaVersion = DMailSchemaVersion
-	}
-	data, err := d.Marshal()
-	if err != nil {
-		return fmt.Errorf("dmail: marshal: %w", err)
-	}
-
-	filename := d.Name + ".md"
-
-	for _, dir := range []string{ArchiveDir(continent), OutboxDir(continent)} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("dmail: mkdir %s: %w", dir, err)
-		}
-		path := filepath.Join(dir, filename)
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			return fmt.Errorf("dmail: write %s: %w", path, err)
+// FilterHighSeverity returns only HIGH severity d-mails from the input slice.
+func FilterHighSeverity(dmails []DMail) []DMail {
+	var high []DMail
+	for _, dm := range dmails {
+		if dm.Severity == "high" {
+			high = append(high, dm)
 		}
 	}
-
-	return nil
-}
-
-// ScanInbox reads all .md files in inbox/, parses each as DMail.
-// Returns parsed d-mails sorted by filename. Returns empty slice for empty
-// or non-existent directory. Skips non-.md files.
-func ScanInbox(continent string) ([]DMail, error) {
-	dir := InboxDir(continent)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return []DMail{}, nil
-		}
-		return nil, fmt.Errorf("dmail: read inbox: %w", err)
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Name() < entries[j].Name()
-	})
-
-	var dmails []DMail
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".md" {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
-		if err != nil {
-			return nil, fmt.Errorf("dmail: read %s: %w", e.Name(), err)
-		}
-		dm, err := ParseDMail(data)
-		if err != nil {
-			return nil, fmt.Errorf("dmail: parse %s: %w", e.Name(), err)
-		}
-		dmails = append(dmails, dm)
-	}
-
-	if dmails == nil {
-		return []DMail{}, nil
-	}
-	return dmails, nil
-}
-
-// ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
-// Uses os.Rename for atomic move. Creates archive dir if needed.
-func ArchiveInboxDMail(continent, name string) error {
-	filename := name + ".md"
-	src := filepath.Join(InboxDir(continent), filename)
-	arcDir := ArchiveDir(continent)
-	dst := filepath.Join(arcDir, filename)
-
-	if err := os.MkdirAll(arcDir, 0755); err != nil {
-		return fmt.Errorf("dmail: mkdir archive: %w", err)
-	}
-
-	if err := os.Rename(src, dst); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			if _, statErr := os.Stat(dst); statErr == nil {
-				return nil // already archived by another worker
-			} else if errors.Is(statErr, fs.ErrNotExist) {
-				return fmt.Errorf("dmail: archive %s: source not found and not in archive", name)
-			} else {
-				return fmt.Errorf("dmail: archive %s: stat archive dst: %w", name, statErr)
-			}
-		}
-		return fmt.Errorf("dmail: archive %s: %w", name, err)
-	}
-
-	return nil
+	return high
 }

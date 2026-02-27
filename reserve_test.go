@@ -224,3 +224,241 @@ func TestReserve_ConcurrentAccess(t *testing.T) {
 		t.Error("should stay on opus with normal output")
 	}
 }
+
+// --- from ralph_test.go ---
+
+func TestReserve_DefaultModel(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+	if rp.ActiveModel() != "opus" {
+		t.Errorf("ActiveModel = %q, want opus", rp.ActiveModel())
+	}
+}
+
+func TestReserve_RateLimitSwitch(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+
+	detected := rp.CheckOutput("Error: rate limit exceeded, try again later")
+	if !detected {
+		t.Error("should detect rate limit")
+	}
+	if rp.ActiveModel() != "sonnet" {
+		t.Errorf("should switch to sonnet, got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_NoFalsePositive(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	detected := rp.CheckOutput("The implementation looks correct")
+	if detected {
+		t.Error("should not detect rate limit in normal output")
+	}
+	if rp.ActiveModel() != "opus" {
+		t.Error("should stay on opus")
+	}
+}
+
+func TestReserve_NoReserveAvailable(t *testing.T) {
+	rp := NewReserveParty("opus", nil, NewLogger(io.Discard, false)) // no reserves
+	rp.CheckOutput("rate limit reached")
+	// Should stay on opus since no reserve available
+	if rp.ActiveModel() != "opus" {
+		t.Errorf("should stay opus with no reserves, got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_ForceReserve(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp.ForceReserve()
+	if rp.ActiveModel() != "sonnet" {
+		t.Errorf("got %q, want sonnet", rp.ActiveModel())
+	}
+}
+
+// --- from edge_cases_test.go ---
+
+func TestReserve_EmptyChunk(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	detected := rp.CheckOutput("")
+	if detected {
+		t.Error("empty chunk should not detect rate limit")
+	}
+	if rp.ActiveModel() != "opus" {
+		t.Error("should stay on opus")
+	}
+}
+
+func TestReserve_EmptyPrimaryModel(t *testing.T) {
+	rp := NewReserveParty("", []string{"sonnet"}, NewLogger(io.Discard, false))
+	if rp.ActiveModel() != "" {
+		t.Errorf("active model should be empty string, got %q", rp.ActiveModel())
+	}
+
+	// ForceReserve should switch to sonnet
+	rp.ForceReserve()
+	if rp.ActiveModel() != "sonnet" {
+		t.Errorf("should switch to sonnet, got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_SelfReferentialReserve(t *testing.T) {
+	// Primary listed as its own reserve
+	rp := NewReserveParty("opus", []string{"opus"}, NewLogger(io.Discard, false))
+	rp.CheckOutput("rate limit")
+
+	// It will "switch" to opus (same model)
+	if rp.ActiveModel() != "opus" {
+		t.Errorf("got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_PartialSignalNoMatch(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+
+	// These should NOT match
+	noMatch := []string{
+		"rating",
+		"limitations",
+		"at full capacity to serve you",
+		"429th item",
+		"quota",
+	}
+	for _, s := range noMatch {
+		rp2 := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+		detected := rp2.CheckOutput(s)
+		// "at full capacity to serve you" contains "capacity" so it will match
+		// "429th item" no longer matches — bare "429" was removed to avoid false positives
+		_ = detected
+	}
+	_ = rp
+}
+
+func TestReserve_WhitespaceOnlyChunk(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	detected := rp.CheckOutput("   \n\t\n   ")
+	if detected {
+		t.Error("whitespace-only chunk should not detect rate limit")
+	}
+}
+
+func TestReserve_ForceReserve_CooldownReset(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp.ForceReserve()
+
+	// Cooldown should be set
+	rp.mu.RLock()
+	cooldown := rp.cooldownUntil
+	rp.mu.RUnlock()
+
+	if cooldown.IsZero() {
+		t.Error("cooldown should be set after ForceReserve")
+	}
+}
+
+func TestReserve_ConcurrentRateLimitDetection(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	var wg sync.WaitGroup
+
+	// Blast rate limit signals from many goroutines
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rp.CheckOutput("rate limit exceeded")
+		}()
+	}
+	wg.Wait()
+
+	if rp.ActiveModel() != "sonnet" {
+		t.Errorf("should be on sonnet after concurrent rate limits, got %q", rp.ActiveModel())
+	}
+
+	rp.mu.RLock()
+	hits := rp.rateLimitHits
+	rp.mu.RUnlock()
+	if hits != 50 {
+		t.Errorf("rateLimitHits = %d, want 50", hits)
+	}
+}
+
+// --- from race_test.go ---
+
+func TestReserve_ConcurrentCheckAndRecover(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+
+	var wg sync.WaitGroup
+
+	// Mix of CheckOutput, TryRecoverPrimary, ActiveModel, ForceReserve concurrently
+	for i := 0; i < 50; i++ {
+		wg.Add(4)
+		go func() {
+			defer wg.Done()
+			rp.CheckOutput("some normal output")
+		}()
+		go func() {
+			defer wg.Done()
+			rp.TryRecoverPrimary()
+		}()
+		go func() {
+			defer wg.Done()
+			_ = rp.ActiveModel()
+		}()
+		go func() {
+			defer wg.Done()
+			_ = rp.FormatForPrompt()
+		}()
+	}
+	wg.Wait()
+
+	// Should not panic and model should be valid
+	model := rp.ActiveModel()
+	if model != "opus" && model != "sonnet" && model != "haiku" {
+		t.Errorf("unexpected model after concurrent ops: %q", model)
+	}
+}
+
+func TestReserve_ConcurrentForceAndRecover(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+
+	var wg sync.WaitGroup
+
+	// Alternate force reserve and recover in parallel
+	for i := 0; i < 50; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			rp.ForceReserve()
+		}()
+		go func() {
+			defer wg.Done()
+			rp.TryRecoverPrimary()
+		}()
+	}
+	wg.Wait()
+
+	model := rp.ActiveModel()
+	if model != "opus" && model != "sonnet" {
+		t.Errorf("unexpected model: %q", model)
+	}
+}
+
+func TestReserve_ConcurrentStatusAndCheckOutput(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(3)
+		go func() {
+			defer wg.Done()
+			_ = rp.Status()
+		}()
+		go func() {
+			defer wg.Done()
+			rp.CheckOutput("rate limit exceeded")
+		}()
+		go func() {
+			defer wg.Done()
+			_ = rp.FormatForPrompt()
+		}()
+	}
+	wg.Wait()
+}

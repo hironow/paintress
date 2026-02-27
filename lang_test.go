@@ -1,6 +1,9 @@
 package paintress
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestMsg_English_Default(t *testing.T) {
 	orig := Lang
@@ -75,4 +78,26 @@ func TestMsg_AllKeysHaveFrench(t *testing.T) {
 			t.Errorf("key %q is missing French translation", key)
 		}
 	}
+}
+
+// --- from race_test.go ---
+
+func TestLang_ConcurrentMsgReads(t *testing.T) {
+	orig := Lang
+	defer func() { Lang = orig }()
+
+	var wg sync.WaitGroup
+
+	// Concurrent reads of Msg() — all reading the same global Lang
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			msg := Msg("grad_attack")
+			if msg == "" {
+				t.Error("Msg should never return empty")
+			}
+		}()
+	}
+	wg.Wait()
 }

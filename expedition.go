@@ -1,29 +1,44 @@
 package paintress
 
 import (
-	"bufio"
-	"context"
 	"embed"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"text/template"
-	"time"
-
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 //go:embed templates/expedition_*.md.tmpl
 var expeditionFS embed.FS
 
-var expeditionTemplates = template.Must(
+// ExpeditionTemplates is the parsed expedition prompt templates.
+var ExpeditionTemplates = template.Must(
 	template.ParseFS(expeditionFS, "templates/expedition_*.md.tmpl"),
 )
+
+//go:embed templates/mission_*.md.tmpl
+var missionFS embed.FS
+
+var missionTemplates = template.Must(
+	template.ParseFS(missionFS, "templates/mission_*.md.tmpl"),
+)
+
+// MissionText returns the mission rules of engagement in the active language.
+func MissionText() string {
+	tmplName := "mission_en.md.tmpl"
+	switch Lang {
+	case "ja":
+		tmplName = "mission_ja.md.tmpl"
+	case "fr":
+		tmplName = "mission_fr.md.tmpl"
+	}
+
+	var buf strings.Builder
+	if err := missionTemplates.ExecuteTemplate(&buf, tmplName, nil); err != nil {
+		panic(fmt.Sprintf("mission template execution failed: %v", err))
+	}
+	return buf.String()
+}
 
 // PromptData holds all dynamic values injected into the expedition prompt template.
 type PromptData struct {
@@ -43,360 +58,7 @@ type PromptData struct {
 	MissionSection  string
 }
 
-// Expedition represents a single expedition into the Continent.
-type Expedition struct {
-	Number    int
-	Continent string
-	WorkDir   string // execution directory (worktree path or Continent)
-	Config    Config
-	LogDir    string
-	Logger    *Logger
-	DataOut   io.Writer // stdout-equivalent for streaming Claude output
-	Notifier  Notifier  // for mid-expedition HIGH severity notifications
-
-	// Game mechanics
-	Luminas     []Lumina
-	Gradient    *GradientGauge
-	Reserve     *ReserveParty
-	InboxDMails []DMail // d-mails from inbox (for archiving after expedition)
-	inboxOnce   sync.Once
-
-	// Mid-expedition HIGH severity D-Mail tracking
-	midHighMu    sync.Mutex
-	midHighNames []string
-
-	// Mid-expedition issue-matched D-Mail routing (MY-361)
-	currentIssueMu  sync.Mutex
-	currentIssue    string
-	midMatchedMu    sync.Mutex
-	midMatchedMails []DMail
-
-	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
-	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
-}
-
-// containsIssue reports whether issues contains target (case-insensitive).
-func containsIssue(issues []string, target string) bool {
-	if target == "" {
-		return false
-	}
-	for _, id := range issues {
-		if strings.EqualFold(id, target) {
-			return true
-		}
-	}
-	return false
-}
-
-// setCurrentIssue records the issue being worked on (called from watchFlag callback).
-func (e *Expedition) setCurrentIssue(issue string) {
-	e.currentIssueMu.Lock()
-	defer e.currentIssueMu.Unlock()
-	e.currentIssue = issue
-}
-
-// getCurrentIssue returns the issue being worked on (thread-safe).
-func (e *Expedition) getCurrentIssue() string {
-	e.currentIssueMu.Lock()
-	defer e.currentIssueMu.Unlock()
-	return e.currentIssue
-}
-
-// MidMatchedDMails returns a copy of issue-matched D-Mails received mid-expedition.
-func (e *Expedition) MidMatchedDMails() []DMail {
-	e.midMatchedMu.Lock()
-	defer e.midMatchedMu.Unlock()
-	if len(e.midMatchedMails) == 0 {
-		return []DMail{}
-	}
-	return append([]DMail(nil), e.midMatchedMails...)
-}
-
-// appendMidHighName appends a HIGH severity D-Mail name (thread-safe).
-func (e *Expedition) appendMidHighName(name string) {
-	e.midHighMu.Lock()
-	defer e.midHighMu.Unlock()
-	e.midHighNames = append(e.midHighNames, name)
-}
-
-// appendMidMatchedMail appends an issue-matched D-Mail (thread-safe).
-func (e *Expedition) appendMidMatchedMail(dm DMail) {
-	e.midMatchedMu.Lock()
-	defer e.midMatchedMu.Unlock()
-	e.midMatchedMails = append(e.midMatchedMails, dm)
-}
-
-// MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
-func (e *Expedition) MidHighSeverityDMails() []string {
-	e.midHighMu.Lock()
-	defer e.midHighMu.Unlock()
-	return append([]string(nil), e.midHighNames...)
-}
-
-// BuildPrompt generates the expedition prompt in the configured language.
-func (e *Expedition) BuildPrompt() string {
-	projCfg, err := LoadProjectConfig(e.Continent)
-	if err != nil {
-		e.Logger.Warn("project config load failed: %v", err)
-		projCfg = &ProjectConfig{}
-	}
-
-	data := PromptData{
-		Number:          e.Number,
-		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
-		Bt:              "`",
-		Cb:              "```",
-		LuminaSection:   FormatLuminaForPrompt(e.Luminas),
-		GradientSection: e.Gradient.FormatForPrompt(),
-		ReserveSection:  e.Reserve.FormatForPrompt(),
-		BaseBranch:      e.Config.BaseBranch,
-		DevURL:          e.Config.DevURL,
-		ContextSection:  e.loadContextSection(),
-		InboxSection:    e.loadInboxSection(),
-		LinearTeam:      projCfg.Linear.Team,
-		LinearProject:   projCfg.Linear.Project,
-		MissionSection:  MissionText(),
-	}
-
-	tmplName := "expedition_en.md.tmpl"
-	switch Lang {
-	case "ja":
-		tmplName = "expedition_ja.md.tmpl"
-	case "fr":
-		tmplName = "expedition_fr.md.tmpl"
-	}
-
-	var buf strings.Builder
-	if err := expeditionTemplates.ExecuteTemplate(&buf, tmplName, data); err != nil {
-		panic(fmt.Sprintf("prompt template execution failed: %v", err))
-	}
-	return buf.String()
-}
-
-func (e *Expedition) loadInboxSection() string {
-	e.inboxOnce.Do(func() {
-		if len(e.InboxDMails) > 0 {
-			return // already loaded externally (e.g., by HIGH severity gate)
-		}
-		dmails, err := ScanInbox(e.Continent)
-		if err != nil {
-			e.Logger.Warn("inbox scan failed: %v", err)
-			return
-		}
-		e.InboxDMails = dmails
-	})
-	return FormatDMailForPrompt(e.InboxDMails)
-}
-
-func (e *Expedition) loadContextSection() string {
-	ctx, err := ReadContextFiles(e.Continent)
-	if err != nil {
-		e.Logger.Warn("context injection failed: %v", err)
-		return ""
-	}
-	return ctx
-}
-
-// Run executes the expedition with timeout and streaming output.
-// The output streaming goroutine also feeds chunks to ReserveParty
-// for rate-limit detection.
-func (e *Expedition) Run(ctx context.Context) (string, error) {
-	if e.DataOut == nil {
-		e.DataOut = os.Stdout
-	}
-	prompt := e.BuildPrompt()
-
-	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
-	if err := os.WriteFile(promptFile, []byte(prompt), 0644); err != nil {
-		return "", fmt.Errorf("failed to write prompt: %w", err)
-	}
-
-	timeout := time.Duration(e.Config.TimeoutSec) * time.Second
-	expCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	// Use the active model from Reserve Party
-	model := e.Reserve.ActiveModel()
-
-	expCtx, invokeSpan := tracer.Start(expCtx, "claude.invoke",
-		trace.WithAttributes(
-			attribute.String("model", model),
-			attribute.Int("expedition.number", e.Number),
-			attribute.Int("timeout_sec", e.Config.TimeoutSec),
-		),
-	)
-	defer invokeSpan.End()
-
-	newCmd := e.makeCmd
-	if newCmd == nil {
-		newCmd = exec.CommandContext
-	}
-
-	claudeCmd := e.Config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = DefaultClaudeCmd
-	}
-
-	cmd := newCmd(expCtx, claudeCmd,
-		"--model", model,
-		"--dangerously-skip-permissions",
-		"--print",
-		"-p", prompt,
-	)
-	workDir := e.WorkDir
-	if workDir == "" {
-		workDir = e.Continent
-	}
-	cmd.Dir = workDir
-
-	// Ensure .expedition/.run/ exists in the execution directory so that
-	// watchFlag and the Claude process can read/write flag.md there.
-	if err := os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755); err != nil {
-		return "", fmt.Errorf("create expedition run dir: %w", err)
-	}
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", fmt.Errorf("stdout pipe failed: %w", err)
-	}
-	cmd.Stderr = cmd.Stdout
-
-	outputFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-output.txt", e.Number))
-	outFile, err := os.Create(outputFile)
-	if err != nil {
-		return "", fmt.Errorf("output file creation failed: %w", err)
-	}
-	defer outFile.Close()
-
-	// Clear stale current_issue from flag.md before starting the process.
-	// If a previous expedition was interrupted, flag.md may still contain
-	// current_issue from that run. Re-writing via WriteFlag produces a
-	// format that omits current_issue/current_title, effectively clearing them.
-	// Must happen before cmd.Start() to avoid clobbering a legitimate write.
-	//
-	// Operating on workDir (not Continent) ensures each worker clears only
-	// its own worktree's flag.md, not the shared checkpoint (MY-362).
-	if stale := ReadFlag(workDir); stale.CurrentIssue != "" {
-		WriteFlag(workDir, stale.LastExpedition, stale.LastIssue, stale.LastStatus, stale.Remaining, stale.MidHighSeverity)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("%s start failed: %w", claudeCmd, err)
-	}
-
-	// Start flag.md watcher to detect issue selection in real-time
-	watchCtx, watchCancel := context.WithCancel(expCtx)
-	defer watchCancel()
-	go watchFlag(watchCtx, workDir, func(issue, title string) {
-		e.setCurrentIssue(issue)
-		invokeSpan.AddEvent("issue.picked",
-			trace.WithAttributes(
-				attribute.String("issue_id", issue),
-				attribute.String("issue_title", title),
-			),
-		)
-		e.Logger.Info("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
-	}, nil)
-
-	// Start inbox watcher to log d-mails arriving mid-expedition.
-	// Mid-expedition arrivals are NOT appended to InboxDMails — they stay
-	// in inbox/ and will be picked up by the next expedition's ScanInbox.
-	// Only d-mails included in the prompt (initial scan) are archived.
-	seenFiles := make(map[string]bool)
-	for _, dm := range e.InboxDMails {
-		seenFiles[dm.Name] = true
-	}
-	inboxDone := make(chan struct{})
-	go func() {
-		defer close(inboxDone)
-		watchInbox(watchCtx, e.Continent, func(dm DMail) {
-			if seenFiles[dm.Name] {
-				return
-			}
-			seenFiles[dm.Name] = true
-			if dm.Severity == "high" {
-				e.appendMidHighName(dm.Name)
-				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
-				if e.Notifier != nil {
-					_ = e.Notifier.Notify(watchCtx, "Paintress", fmt.Sprintf("HIGH severity D-Mail mid-expedition: %s", dm.Name))
-				}
-			} else {
-				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
-			}
-			// Issue routing runs regardless of severity: collect D-Mails
-			// that match the current expedition's issue for follow-up.
-			if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
-				e.appendMidMatchedMail(dm)
-				e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
-			}
-		}, nil)
-	}()
-
-	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
-	var output strings.Builder
-	done := make(chan struct{})
-
-	go func() {
-		defer close(done)
-		reader := bufio.NewReader(stdout)
-		// In JSON output mode, stream only to the output file to keep
-		// DataOut (stdout) machine-readable. Interface equality cannot
-		// reliably detect stdout wrappers, so file-only is the safest
-		// approach. Human-readable streaming is still available via
-		// `tail -f` on the output file.
-		streamDest := e.DataOut
-		if e.Config.OutputFormat == "json" {
-			streamDest = nil
-		}
-		var writer io.Writer
-		if streamDest != nil {
-			writer = io.MultiWriter(streamDest, outFile)
-		} else {
-			writer = outFile
-		}
-
-		buf := make([]byte, 4096)
-		for {
-			n, err := reader.Read(buf)
-			if n > 0 {
-				chunk := buf[:n]
-				writer.Write(chunk)
-				output.Write(chunk)
-
-				// Reserve Party: scan for rate limit signals in real-time
-				if e.Reserve.CheckOutput(string(chunk)) {
-					invokeSpan.AddEvent("rate_limit.detected")
-				}
-			}
-			if err != nil {
-				break
-			}
-		}
-	}()
-
-	<-done
-
-	// Stop watchers and join inbox watcher to ensure InboxDMails is
-	// stable before callers iterate the slice for archiving.
-	watchCancel()
-	<-inboxDone
-
-	err = cmd.Wait()
-	// Write a trailing newline to visually separate expedition output,
-	// but skip it in JSON mode to avoid corrupting machine-readable stdout.
-	if e.Config.OutputFormat != "json" {
-		fmt.Fprintln(e.Logger.Writer())
-	}
-
-	if expCtx.Err() == context.DeadlineExceeded {
-		invokeSpan.AddEvent("expedition.timeout",
-			trace.WithAttributes(attribute.String("timeout", timeout.String())),
-		)
-		return output.String(), fmt.Errorf("timeout after %v", timeout)
-	}
-	if ctx.Err() == context.Canceled {
-		return output.String(), fmt.Errorf("interrupted")
-	}
-
-	return output.String(), err
+// ContextDir returns the path to the context injection directory.
+func ContextDir(continent string) string {
+	return filepath.Join(continent, ".expedition", "context")
 }

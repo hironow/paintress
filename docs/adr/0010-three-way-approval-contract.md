@@ -1,7 +1,7 @@
 # 0010. Three-Way Approval Contract
 
 **Date:** 2026-02-23
-**Status:** Accepted
+**Status:** Accepted — generalized in shared ADR S0003
 
 ## Context
 
@@ -51,6 +51,7 @@ Adopt a three-way approval contract with session-level gating:
 ## Consequences
 
 ### Positive
+
 - Fail-closed design — infrastructure failures default to the safe path (abort)
 - Companion binary authors only need to follow exit code convention (0 = approve,
   non-zero = deny); the third path (execution error) is handled by paintress
@@ -58,12 +59,14 @@ Adopt a three-way approval contract with session-level gating:
 - All three implementations are testable via the `Approver` interface
 
 ### Negative
+
 - Session-level gate does not re-prompt for HIGH severity D-Mails arriving
   after initial approval (mitigated by notification via `Notifier`)
 - `StdinApprover` blocks the entire session on a single goroutine read — no
   timeout unless the parent context has one
 
 ### Neutral
+
 - `CmdApprover` uses `sh -c` for shell expansion, requiring proper escaping
   of the `{message}` placeholder (handled by `shellQuote`)
 - The three-way contract is documented in `docs/approval-contract.md` with

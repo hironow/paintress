@@ -6,10 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
-	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -87,6 +86,23 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
+	// Pre-flight check: ensure init has been run
+	cfgPath := paintress.ProjectConfigPath(continent)
+	if _, statErr := os.Stat(cfgPath); statErr != nil {
+		return fmt.Errorf("not initialized — run 'paintress init %s' first", continent)
+	}
+
+	// Preflight: verify required binaries exist
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	claudeCmd, _ := cmd.Flags().GetString("claude-cmd")
+	bins := []string{"git"}
+	if !dryRun {
+		bins = append(bins, claudeCmd)
+	}
+	if err := session.PreflightCheck(bins...); err != nil {
+		return err
+	}
+
 	cfg := paintress.Config{}
 	cfg.Continent = continent
 	cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
@@ -107,20 +123,11 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
 	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
-	verbose, _ := cmd.Flags().GetBool("verbose")
-	logger := paintress.NewLogger(cmd.ErrOrStderr(), verbose)
-	if os.Getenv("PAINTRESS_QUIET") != "" {
-		logger = paintress.NewQuietLogger(cmd.ErrOrStderr())
-	}
+	logger := loggerFrom(cmd)
+	eventsDir := paintress.EventsDir(continent)
+	eventStore := session.NewEventStore(eventsDir)
 
-	shutdownTracer := paintress.InitTracer("paintress", Version)
-	defer func() {
-		shutdownCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
-		defer c()
-		shutdownTracer(shutdownCtx)
-	}()
-
-	if err := paintress.ValidateContinent(cfg.Continent); err != nil {
+	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err
 	}
 
@@ -133,7 +140,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigCh, shutdownSignals...)
 	defer signal.Stop(sigCh)
 
 	go func() {
@@ -145,7 +152,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	p := paintress.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin())
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
 	exitCode := p.Run(ctx)
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}

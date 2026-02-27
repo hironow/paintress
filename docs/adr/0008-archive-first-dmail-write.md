@@ -40,15 +40,18 @@ Adopt archive-first write ordering and idempotent archive operations:
 ## Consequences
 
 ### Positive
+
 - Permanent record survives even if outbox write or process crashes mid-operation
 - Concurrent workers archiving the same D-Mail is handled gracefully (idempotent)
 - Three-way stat check distinguishes "already archived" from "genuinely missing"
 
 ### Negative
+
 - `archive/` git history grows with each processed D-Mail (mitigated by
   `archive-prune` CLI subcommand for periodic cleanup)
 
 ### Neutral
+
 - `SendDMail` stamps `DMailSchemaVersion` as a safety net if the caller omits it
 - Archive-first ordering is a durability guarantee, not a consistency guarantee —
   a message may exist in archive without being delivered
