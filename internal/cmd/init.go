@@ -10,41 +10,34 @@ import (
 )
 
 func newInitCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init <repo-path>",
 		Short: "Initialize project configuration",
 		Long: `Initialize a .expedition/ directory in the target repository.
 
-Creates config.yaml with Linear team key, project name, and
-default expedition settings. This must be run once before
+Use --team and --project flags for non-interactive mode, or omit
+flags for interactive prompts. This must be run once before
 'paintress run' can operate on the repository.`,
-		Example: `  # Initialize a new project
-  paintress init /path/to/repo
+		Example: `  # Non-interactive with flags
+  paintress init --team MY --project Hades /path/to/repo
 
-  # Initialize and then run
-  paintress init /path/to/repo && paintress run /path/to/repo`,
+  # Defaults only (no prompts)
+  paintress init /path/to/repo`,
 		Args: cobra.ExactArgs(1),
-		RunE: runInit,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			repoPath := args[0]
+
+			cfgPath := paintress.ProjectConfigPath(repoPath)
+			if _, err := os.Stat(cfgPath); err == nil {
+				return fmt.Errorf("%s already exists", cfgPath)
+			}
+
+			team, _ := cmd.Flags().GetString("team")
+			project, _ := cmd.Flags().GetString("project")
+			return session.InitProject(repoPath, team, project, cmd.ErrOrStderr())
+		},
 	}
-}
-
-func runInit(cmd *cobra.Command, args []string) error {
-	repoPath := args[0]
-
-	cfgPath := paintress.ProjectConfigPath(repoPath)
-	if _, err := os.Stat(cfgPath); err == nil {
-		return fmt.Errorf("%s already exists", cfgPath)
-	}
-
-	w := cmd.ErrOrStderr()
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
-	fmt.Fprintln(w, "║          Paintress Init                      ║")
-	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
-	fmt.Fprintln(w)
-
-	if err := session.RunInitWithReader(repoPath, cmd.InOrStdin(), cmd.ErrOrStderr()); err != nil {
-		return err
-	}
-	return nil
+	cmd.Flags().String("team", "", "Linear team key (e.g. MY)")
+	cmd.Flags().String("project", "", "Linear project name")
+	return cmd
 }

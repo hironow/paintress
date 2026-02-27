@@ -1,10 +1,12 @@
 package session
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/paintress"
 )
@@ -1758,5 +1760,80 @@ func TestFilterHighSeverity_EmptySlice(t *testing.T) {
 	// then
 	if len(high) != 0 {
 		t.Errorf("expected 0 for nil/empty, got %d", len(high))
+	}
+}
+
+// === Event Store Error Propagation Tests ===
+//
+// D-Mail events (dmail.staged, dmail.flushed, dmail.archived) are critical
+// domain events in the event sourcing model. Errors must not be silently dropped.
+
+// failingEventStore is a minimal EventStore that always fails on Append.
+type failingEventStore struct {
+	err error
+}
+
+func (f *failingEventStore) Append(_ ...paintress.Event) error { return f.err }
+func (f *failingEventStore) LoadAll() ([]paintress.Event, error) {
+	return nil, nil
+}
+func (f *failingEventStore) LoadSince(_ time.Time) ([]paintress.Event, error) {
+	return nil, nil
+}
+
+func TestSendDMail_PropagatesEventStoreError(t *testing.T) {
+	// given — an outbox store that works, but an event store that fails
+	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	outboxStore := testOutboxStore(t, continent)
+	evStore := &failingEventStore{err: fmt.Errorf("disk full")}
+
+	dm := paintress.DMail{
+		Name:        "report-es-fail",
+		Kind:        "report",
+		Description: "Test that event store errors propagate",
+	}
+
+	// when
+	err := SendDMail(outboxStore, dm, evStore)
+
+	// then — error from event store must be propagated
+	if err == nil {
+		t.Fatal("expected error from failing event store, got nil")
+	}
+	if !strings.Contains(err.Error(), "disk full") {
+		t.Errorf("error should contain root cause, got: %s", err.Error())
+	}
+}
+
+func TestArchiveInboxDMail_PropagatesEventStoreError(t *testing.T) {
+	// given — a d-mail in inbox, and an event store that fails
+	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	evStore := &failingEventStore{err: fmt.Errorf("readonly fs")}
+
+	// Write a d-mail file into inbox for archiving
+	dm := paintress.DMail{
+		Name:        "spec-es-fail",
+		Kind:        "specification",
+		Description: "Test archive event propagation",
+	}
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(paintress.InboxDir(continent), "spec-es-fail.md"), data, 0644); err != nil {
+		t.Fatalf("write inbox: %v", err)
+	}
+
+	// when
+	err = ArchiveInboxDMail(continent, "spec-es-fail", evStore)
+
+	// then — error from event store must be propagated
+	if err == nil {
+		t.Fatal("expected error from failing event store, got nil")
+	}
+	if !strings.Contains(err.Error(), "readonly fs") {
+		t.Errorf("error should contain root cause, got: %s", err.Error())
 	}
 }

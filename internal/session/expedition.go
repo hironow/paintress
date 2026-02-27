@@ -194,6 +194,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			attribute.String("model", model),
 			attribute.Int("expedition.number", e.Number),
 			attribute.Int("timeout_sec", e.Config.TimeoutSec),
+			attribute.String("gen_ai.operation.name", "chat"),
+			attribute.String("gen_ai.system", "anthropic"),
+			attribute.String("gen_ai.request.model", model),
 		),
 	)
 	defer invokeSpan.End()

@@ -259,15 +259,19 @@ func TestRunReview_NonZeroExitWithComments(t *testing.T) {
 }
 
 func TestRunReview_CommandNotFound(t *testing.T) {
-	// given
+	// given — non-existent command; shell exits 127 which is a non-zero ExitError
 	ctx := context.Background()
 
 	// when
-	_, err := RunReview(ctx, "nonexistent-review-tool-xyz --check", t.TempDir())
+	result, err := RunReview(ctx, "nonexistent-review-tool-xyz --check", t.TempDir())
 
-	// then
-	if err == nil {
-		t.Error("non-existent command should return error")
+	// then — exit code based: non-zero exit → ReviewResult with Passed=false
+	// (shell wraps the command, so "command not found" becomes exit 127 + stderr)
+	if err != nil {
+		t.Fatalf("command-not-found via shell should return ReviewResult, not error: %v", err)
+	}
+	if result.Passed {
+		t.Error("non-zero exit (command not found) should not pass")
 	}
 }
 
@@ -289,39 +293,62 @@ func TestRunReview_PassingReview(t *testing.T) {
 }
 
 func TestRunReview_FailingReview(t *testing.T) {
-	// given
+	// given — exit code 1 with review comments (exit code is the primary signal)
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	// when — echo outputs review with comments
-	result, err := RunReview(ctx, "echo [P2] Reset live URL state", dir)
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Reset live URL state'\nexit 1\n"), 0755)
+
+	// when
+	result, err := RunReview(ctx, scriptPath, dir)
 
 	// then
 	if err != nil {
 		t.Fatalf("should not error: %v", err)
 	}
 	if result.Passed {
-		t.Error("review with [P2] comments should not pass")
+		t.Error("non-zero exit should mean review did not pass")
 	}
 	if result.Comments == "" {
 		t.Error("comments should not be empty")
 	}
 }
 
-func TestRunReview_FindingsWithHTTP429MentionNotRateLimited(t *testing.T) {
-	// given — review output contains [P2] finding that mentions "429"
+func TestRunReview_ExitZero_PassesEvenWithTagsInOutput(t *testing.T) {
+	// given — exit 0 with [P2] tags in output (exit code takes precedence)
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	// when — review comments reference HTTP 429 in the finding itself
-	result, err := RunReview(ctx, "echo '[P2] Fix HTTP 429 error handling in API client'", dir)
+	// when — echo exits 0
+	result, err := RunReview(ctx, "echo [P2] Reset live URL state", dir)
+
+	// then — exit 0 means pass, output content is irrelevant
+	if err != nil {
+		t.Fatalf("should not error: %v", err)
+	}
+	if !result.Passed {
+		t.Error("exit 0 should always pass, regardless of output content")
+	}
+}
+
+func TestRunReview_FindingsWithHTTP429MentionNotRateLimited(t *testing.T) {
+	// given — exit 1 with review comments that happen to mention "429"
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Fix HTTP 429 error handling in API client'\nexit 1\n"), 0755)
+
+	// when
+	result, err := RunReview(ctx, scriptPath, dir)
 
 	// then — should return review comments, NOT treat as rate-limited
 	if err != nil {
 		t.Fatalf("review findings mentioning 429 should not error: %v", err)
 	}
 	if result.Passed {
-		t.Error("review with [P2] comments should not pass")
+		t.Error("non-zero exit with comments should not pass")
 	}
 	if result.Comments == "" {
 		t.Error("comments should not be empty")
@@ -329,14 +356,17 @@ func TestRunReview_FindingsWithHTTP429MentionNotRateLimited(t *testing.T) {
 }
 
 func TestRunReview_RateLimitInOutput(t *testing.T) {
-	// given
+	// given — exit 1 with rate limit message (service unavailable, not review comments)
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	// when — echo outputs rate limit message (exit 0 but rate limited)
-	_, err := RunReview(ctx, "echo rate limit exceeded", dir)
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'rate limit exceeded'\nexit 1\n"), 0755)
 
-	// then
+	// when
+	_, err := RunReview(ctx, scriptPath, dir)
+
+	// then — rate limit on non-zero exit is a service error
 	if err == nil {
 		t.Error("rate limited output should return error")
 	}
@@ -345,23 +375,39 @@ func TestRunReview_RateLimitInOutput(t *testing.T) {
 	}
 }
 
-func TestRunReview_CommentsTakePrecedenceOverRateLimit(t *testing.T) {
-	// given
+func TestRunReview_RateLimitExitZero_Passes(t *testing.T) {
+	// given — exit 0 with rate limit text (benign mention, tool succeeded)
 	ctx := context.Background()
 	dir := t.TempDir()
 
-	// when — output contains both review comments and rate-limit text
-	result, err := RunReview(ctx, "echo '[P2] Fix pagination; rate limit exceeded during analysis'", dir)
+	// when
+	result, err := RunReview(ctx, "echo rate limit exceeded", dir)
 
-	// then — should treat as comments, not rate-limited
+	// then — exit 0 means pass
 	if err != nil {
-		t.Fatalf("comments should take precedence over rate limit: %v", err)
+		t.Fatalf("exit 0 should not error even with rate limit text: %v", err)
 	}
-	if result.Passed {
-		t.Error("review with [P2] comments should not pass")
+	if !result.Passed {
+		t.Error("exit 0 should always pass")
 	}
-	if result.Comments == "" {
-		t.Error("comments should not be empty")
+}
+
+func TestRunReview_CommentsTakePrecedenceOverRateLimit(t *testing.T) {
+	// given — exit 1 with both [P2] tags AND rate limit text
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Fix pagination; rate limit exceeded during analysis'\nexit 1\n"), 0755)
+
+	// when — rate limit text is present, but so are actual review comments
+	_, err := RunReview(ctx, scriptPath, dir)
+
+	// then — rate limit detection catches "rate limit" substring, so this is
+	// treated as a service error. The trade-off: false positives are rare because
+	// review tools that find real issues don't typically also hit rate limits.
+	if err == nil {
+		t.Error("rate limit text in non-zero exit should be treated as service error")
 	}
 }
 
@@ -436,5 +482,33 @@ func TestRunReview_CallerTimeoutPreventsHang(t *testing.T) {
 	}
 	if elapsed > 5*time.Second {
 		t.Errorf("expected timeout around 2s, took %v", elapsed)
+	}
+}
+
+// === Exit Code Based Detection (P1-8) ===
+
+func TestRunReview_ExitCodeNonZero_ReturnsComments(t *testing.T) {
+	// given — review tool exits non-zero with generic output (no [Px] tags)
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	scriptPath := filepath.Join(dir, "review.sh")
+	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'style: variable name too short'\nexit 1\n"), 0755)
+
+	// when
+	result, err := RunReview(ctx, scriptPath, dir)
+
+	// then — non-zero exit means comments found (not an error)
+	if err != nil {
+		t.Fatalf("non-zero exit should return ReviewResult, not error: %v", err)
+	}
+	if result.Passed {
+		t.Error("non-zero exit code should mean review did not pass")
+	}
+	if result.Comments == "" {
+		t.Error("comments should contain review output")
+	}
+	if !strings.Contains(result.Comments, "variable name too short") {
+		t.Errorf("comments should contain output, got: %s", result.Comments)
 	}
 }

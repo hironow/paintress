@@ -78,7 +78,7 @@ func (n *CmdNotifier) factory() cmdFactory {
 func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", shellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", shellQuote(message))
-	return n.factory()(ctx, "sh", "-c", expanded).Run()
+	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
 }
 
 // shellQuote wraps s in single quotes for safe interpolation into sh -c commands.

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress"
-	"github.com/hironow/paintress/internal/eventsource"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -87,6 +86,12 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
+	// Pre-flight check: ensure init has been run
+	cfgPath := paintress.ProjectConfigPath(continent)
+	if _, statErr := os.Stat(cfgPath); statErr != nil {
+		return fmt.Errorf("not initialized — run 'paintress init %s' first", continent)
+	}
+
 	cfg := paintress.Config{}
 	cfg.Continent = continent
 	cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
@@ -109,7 +114,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	logger := loggerFrom(cmd)
 	eventsDir := paintress.EventsDir(continent)
-	eventStore := eventsource.NewFileEventStore(eventsDir)
+	eventStore := session.NewEventStore(eventsDir)
 
 	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err

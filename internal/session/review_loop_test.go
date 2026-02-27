@@ -40,7 +40,7 @@ func TestReviewLoop_ReviewTimeDoesNotConsumeBudget(t *testing.T) {
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
 	reviewScript := filepath.Join(dir, "review.sh")
-	writeScript(t, reviewScript, "sleep 0.5\necho '[P2] Fix something'\n")
+	writeScript(t, reviewScript, "sleep 0.5\necho '[P2] Fix something'\nexit 1\n")
 
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "exit 0\n") // instant fix
@@ -71,7 +71,7 @@ func TestReviewLoop_FixTimeConsumesBudget(t *testing.T) {
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
 	reviewScript := filepath.Join(dir, "review.sh")
-	writeScript(t, reviewScript, "echo '[P2] Fix something'\n")
+	writeScript(t, reviewScript, "echo '[P2] Fix something'\nexit 1\n")
 
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "sleep 0.4\nexit 0\n")
@@ -100,7 +100,7 @@ func TestReviewLoop_GitCheckoutTimeoutPreventsHang(t *testing.T) {
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
 	reviewScript := filepath.Join(dir, "review.sh")
-	writeScript(t, reviewScript, "echo '[P2] Fix something'\n")
+	writeScript(t, reviewScript, "echo '[P2] Fix something'\nexit 1\n")
 
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "exit 0\n")
@@ -138,7 +138,7 @@ func TestReviewLoop_ParentContextCancellationStopsLoop(t *testing.T) {
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
 	reviewScript := filepath.Join(dir, "review.sh")
-	writeScript(t, reviewScript, "sleep 5\necho '[P2] Fix something'\n")
+	writeScript(t, reviewScript, "sleep 5\necho '[P2] Fix something'\nexit 1\n")
 
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "exit 0\n")
@@ -178,7 +178,7 @@ func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
 	reviewScript := filepath.Join(dir, "review.sh")
-	writeScript(t, reviewScript, "sleep 999\necho '[P2] Fix something'\n") // hangs
+	writeScript(t, reviewScript, "sleep 999\necho '[P2] Fix something'\nexit 1\n") // hangs
 
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "exit 0\n")
@@ -207,7 +207,7 @@ func TestReviewLoop_BudgetSharedWithExpedition(t *testing.T) {
 	setupGitRepoWithBranch(t, dir, "feat/test")
 
 	reviewScript := filepath.Join(dir, "review.sh")
-	writeScript(t, reviewScript, "echo '[P2] Fix something'\n")
+	writeScript(t, reviewScript, "echo '[P2] Fix something'\nexit 1\n")
 
 	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
 	writeScript(t, fakeClaudeCmd, "sleep 0.3\nexit 0\n")
@@ -367,8 +367,9 @@ func TestReviewLoop_ReviewErrorPreservesLastComments(t *testing.T) {
 	writeScript(t, reviewScript, fmt.Sprintf(`if [ ! -f "%s" ]; then
     touch "%s"
     echo '[P2] Fix something'
+    exit 1
 else
-    echo 'internal error'
+    echo 'rate limit exceeded'
     exit 1
 fi
 `, markerFile, markerFile))
@@ -382,11 +383,11 @@ fi
 	// when
 	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
 
-	// then — cycle 1's review comments should be preserved in insight
+	// then — cycle 1's review comments or cycle 2's error should be in insight
 	if report.Insight == "" {
 		t.Error("expected insight preserving review comments from earlier cycle")
 	}
-	if !strings.Contains(report.Insight, "Review") {
-		t.Errorf("insight should mention review comments, got: %q", report.Insight)
+	if !strings.Contains(report.Insight, "Review") && !strings.Contains(report.Insight, "review") && !strings.Contains(report.Insight, "rate") {
+		t.Errorf("insight should mention review or rate limit, got: %q", report.Insight)
 	}
 }

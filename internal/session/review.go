@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -29,29 +30,38 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		return &ReviewResult{Passed: true}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, "sh", "-c", reviewCmd)
+	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd)
 	cmd.Dir = dir
 	cmd.WaitDelay = 1 * time.Second
 
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
-	if hasReviewComments(output) {
-		return &ReviewResult{
-			Passed:   false,
-			Output:   output,
-			Comments: output,
-		}, nil
+	// Context cancellation (timeout, signal) is infrastructure, not review result.
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("review command canceled: %w", ctx.Err())
 	}
 
-	if isRateLimited(output) {
-		return nil, fmt.Errorf("review service rate/quota limited")
-	}
-
+	// Exit code is the primary signal (P1-8: exit code based detection).
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// Rate limit on non-zero exit is a service error, not review comments.
+			if isRateLimited(output) {
+				return nil, fmt.Errorf("review service rate/quota limited")
+			}
+			// Non-zero exit → review found comments.
+			return &ReviewResult{
+				Passed:   false,
+				Output:   output,
+				Comments: output,
+			}, nil
+		}
+		// Non-exit errors (failed to start, etc.)
 		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, summarizeReview(output))
 	}
 
+	// Exit 0 → pass, regardless of output content.
 	return &ReviewResult{
 		Passed: true,
 		Output: output,

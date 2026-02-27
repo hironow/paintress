@@ -10,9 +10,10 @@ import (
 	"github.com/hironow/paintress"
 )
 
-// RunInitWithReader executes the init flow reading input from r
-// and writing prompts/status to w.
-func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
+// InitProject creates .expedition/config.yaml using the provided values
+// directly (no interactive prompts). Also runs ValidateContinent to ensure
+// directory structure is set up.
+func InitProject(repoPath, team, project string, w io.Writer) error {
 	if w == nil {
 		w = io.Discard
 	}
@@ -23,6 +24,34 @@ func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
 
 	if err := ValidateContinent(absPath); err != nil {
 		return fmt.Errorf("continent validation: %w", err)
+	}
+
+	cfg := &paintress.ProjectConfig{
+		Linear: paintress.LinearConfig{
+			Team:    team,
+			Project: project,
+		},
+	}
+
+	if err := SaveProjectConfig(absPath, cfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	fmt.Fprintf(w, "\nConfig saved to %s\n", paintress.ProjectConfigPath(absPath))
+	if team != "" {
+		fmt.Fprintf(w, "  Linear team:    %s\n", team)
+	}
+	if project != "" {
+		fmt.Fprintf(w, "  Linear project: %s\n", project)
+	}
+	return nil
+}
+
+// RunInitWithReader executes the init flow reading input from r
+// and writing prompts/status to w. Used for interactive mode.
+func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
+	if w == nil {
+		w = io.Discard
 	}
 
 	scanner := bufio.NewScanner(r)
@@ -48,21 +77,5 @@ func RunInitWithReader(repoPath string, r io.Reader, w io.Writer) error {
 		return fmt.Errorf("reading input: %w", err)
 	}
 
-	cfg := &paintress.ProjectConfig{
-		Linear: paintress.LinearConfig{
-			Team:    team,
-			Project: project,
-		},
-	}
-
-	if err := SaveProjectConfig(absPath, cfg); err != nil {
-		return fmt.Errorf("save config: %w", err)
-	}
-
-	fmt.Fprintf(w, "\nConfig saved to %s\n", paintress.ProjectConfigPath(absPath))
-	fmt.Fprintf(w, "  Linear team:    %s\n", team)
-	if project != "" {
-		fmt.Fprintf(w, "  Linear project: %s\n", project)
-	}
-	return nil
+	return InitProject(repoPath, team, project, w)
 }

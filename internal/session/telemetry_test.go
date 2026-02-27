@@ -178,6 +178,37 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 					found = true
 				}
 			}
+
+			// Verify gen_ai.* semantic convention attributes (P1-3)
+			requiredAttrs := map[string]string{
+				"gen_ai.operation.name": "chat",
+				"gen_ai.system":        "anthropic",
+			}
+			for key, want := range requiredAttrs {
+				var attrFound bool
+				for _, attr := range s.Attributes {
+					if string(attr.Key) == key {
+						attrFound = true
+						if got := attr.Value.AsString(); got != want {
+							t.Errorf("attr %s = %q, want %q", key, got, want)
+						}
+					}
+				}
+				if !attrFound {
+					t.Errorf("missing gen_ai attribute %q on claude.invoke span", key)
+				}
+			}
+
+			// gen_ai.request.model should be present
+			var modelFound bool
+			for _, attr := range s.Attributes {
+				if string(attr.Key) == "gen_ai.request.model" {
+					modelFound = true
+				}
+			}
+			if !modelFound {
+				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
+			}
 		}
 	}
 	if !found {

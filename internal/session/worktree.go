@@ -24,7 +24,7 @@ func (e *localGitExecutor) Git(ctx context.Context, dir string, args ...string) 
 }
 
 func (e *localGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
+	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), command)
 	cmd.Dir = dir
 	return cmd.CombinedOutput()
 }

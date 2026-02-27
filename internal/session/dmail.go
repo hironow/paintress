@@ -27,12 +27,16 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	if err := store.Stage(filename, data); err != nil {
 		return fmt.Errorf("dmail: stage: %w", err)
 	}
-	emitDMailEvent(eventStore, paintress.EventDMailStaged, paintress.DMailStagedData{Name: d.Name})
+	if err := emitDMailEvent(eventStore, paintress.EventDMailStaged, paintress.DMailStagedData{Name: d.Name}); err != nil {
+		return fmt.Errorf("dmail: event staged: %w", err)
+	}
 	n, err := store.Flush()
 	if err != nil {
 		return fmt.Errorf("dmail: flush: %w", err)
 	}
-	emitDMailEvent(eventStore, paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: n})
+	if err := emitDMailEvent(eventStore, paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: n}); err != nil {
+		return fmt.Errorf("dmail: event flushed: %w", err)
+	}
 	return nil
 }
 
@@ -100,20 +104,25 @@ func ArchiveInboxDMail(continent, name string, eventStore paintress.EventStore) 
 		return fmt.Errorf("dmail: archive %s: %w", name, err)
 	}
 
-	emitDMailEvent(eventStore, paintress.EventDMailArchived, paintress.DMailArchivedData{Name: name})
+	if err := emitDMailEvent(eventStore, paintress.EventDMailArchived, paintress.DMailArchivedData{Name: name}); err != nil {
+		return fmt.Errorf("dmail: event archived: %w", err)
+	}
 	return nil
 }
 
-// emitDMailEvent appends an event to the store. Errors are silently dropped
-// because this is a package-level function without logger access. Callers that
-// need diagnostic output should use Paintress.emitEvent instead.
-func emitDMailEvent(store paintress.EventStore, eventType paintress.EventType, data any) {
+// emitDMailEvent appends a critical D-Mail event to the store and returns any
+// error. D-Mail events are part of the transactional outbox and must not be
+// silently dropped — event loss breaks event sourcing replay.
+func emitDMailEvent(store paintress.EventStore, eventType paintress.EventType, data any) error {
 	if store == nil {
-		return
+		return nil
 	}
 	ev, err := paintress.NewEvent(eventType, data, time.Now())
 	if err != nil {
-		return
+		return fmt.Errorf("emit %s: marshal: %w", eventType, err)
 	}
-	store.Append(ev)
+	if err := store.Append(ev); err != nil {
+		return fmt.Errorf("emit %s: append: %w", eventType, err)
+	}
+	return nil
 }

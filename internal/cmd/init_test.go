@@ -56,6 +56,62 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 	}
 }
 
+// === P1-5: Flag-based init (no interactive prompts) ===
+
+func TestInitCmd_FlagsOnly(t *testing.T) {
+	// given — init via cobra command with flags, no stdin
+	dir := t.TempDir()
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader("")) // empty stdin — must NOT hang
+	cmd.SetArgs([]string{"init", "--team", "MY", "--project", "Hades", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init with flags failed: %v", err)
+	}
+	cfgPath := paintress.ProjectConfigPath(dir)
+	data, readErr := os.ReadFile(cfgPath)
+	if readErr != nil {
+		t.Fatalf("config not created: %v", readErr)
+	}
+	content := string(data)
+	if !strings.Contains(content, "MY") {
+		t.Errorf("expected team in config, got:\n%s", content)
+	}
+	if !strings.Contains(content, "Hades") {
+		t.Errorf("expected project in config, got:\n%s", content)
+	}
+}
+
+func TestInitCmd_MissingFlags_UsesDefaults(t *testing.T) {
+	// given — init with no flags, should use defaults (no hang)
+	dir := t.TempDir()
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader("")) // empty stdin
+	cmd.SetArgs([]string{"init", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then — should succeed with empty defaults
+	if err != nil {
+		t.Fatalf("init with defaults failed: %v", err)
+	}
+	cfgPath := paintress.ProjectConfigPath(dir)
+	if _, readErr := os.Stat(cfgPath); readErr != nil {
+		t.Fatalf("config not created: %v", readErr)
+	}
+}
+
 func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	// given — provide deterministic stdin to avoid hanging
 	cmd := NewRootCommand()
