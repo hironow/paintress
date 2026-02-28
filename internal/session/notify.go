@@ -101,8 +101,8 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
 	defer cancel()
-	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", shellQuote(title))
-	expanded = strings.ReplaceAll(expanded, "{message}", shellQuote(message))
+	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", ShellQuote(title))
+	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
 }
 

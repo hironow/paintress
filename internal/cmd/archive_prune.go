@@ -98,6 +98,13 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	if !execute {
 		fmt.Fprintln(w, "\nRun with --execute to delete.")
 	}
+	// Prune flushed outbox DB rows + incremental vacuum.
+	if execute {
+		if pruned, pruneErr := session.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
+			fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
+		}
+	}
+
 	fmt.Fprintln(ew, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.")
 
 	if execute && result.Deleted < len(result.Candidates) {

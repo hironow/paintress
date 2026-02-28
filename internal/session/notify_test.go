@@ -141,7 +141,7 @@ func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// After shellQuote: 'Paintress' and 'HIGH severity D-Mail'
+	// After ShellQuote: 'Paintress' and 'HIGH severity D-Mail'
 	want := `curl -d 'Paintress': 'HIGH severity D-Mail' https://example.com`
 	if capturedShellCmd != want {
 		t.Errorf("shell cmd = %q, want %q", capturedShellCmd, want)
@@ -169,7 +169,7 @@ func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
 	_ = n.Notify(context.Background(), "Title", `"; rm -rf /; echo "`)
 
 	// then: the raw injection string must NOT appear unquoted
-	// After shellQuote, it becomes '"; rm -rf /; echo "' (safely single-quoted)
+	// After ShellQuote, it becomes '"; rm -rf /; echo "' (safely single-quoted)
 	if strings.Contains(capturedShellCmd, `echo "; rm -rf`) {
 		t.Error("shell metacharacters were not escaped — command injection possible")
 	}
@@ -192,9 +192,9 @@ func TestShellQuoteUnix(t *testing.T) {
 		{"", "''"},
 	}
 	for _, tt := range tests {
-		got := shellQuoteUnix(tt.input)
+		got := ShellQuoteUnix(tt.input)
 		if got != tt.want {
-			t.Errorf("shellQuoteUnix(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("ShellQuoteUnix(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
@@ -212,9 +212,9 @@ func TestShellQuoteCmd(t *testing.T) {
 		{"", `""`},
 	}
 	for _, tt := range tests {
-		got := shellQuoteCmd(tt.input)
+		got := ShellQuoteCmd(tt.input)
 		if got != tt.want {
-			t.Errorf("shellQuoteCmd(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("ShellQuoteCmd(%q) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }
