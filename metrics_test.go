@@ -96,3 +96,66 @@ func TestSuccessRate_IgnoresNonCompletedEvents(t *testing.T) {
 		t.Errorf("SuccessRate = %f, want 0.5", rate)
 	}
 }
+
+func TestFormatSuccessRate_NoEvents(t *testing.T) {
+	// given
+	rate := 0.0
+	success := 0
+	total := 0
+
+	// when
+	result := paintress.FormatSuccessRate(rate, success, total)
+
+	// then
+	if result != "no events" {
+		t.Errorf("FormatSuccessRate = %q, want %q", result, "no events")
+	}
+}
+
+func TestFormatSuccessRate_AllSuccess(t *testing.T) {
+	// given
+	rate := 1.0
+	success := 3
+	total := 3
+
+	// when
+	result := paintress.FormatSuccessRate(rate, success, total)
+
+	// then
+	expected := "100.0% (3/3)"
+	if result != expected {
+		t.Errorf("FormatSuccessRate = %q, want %q", result, expected)
+	}
+}
+
+func TestFormatSuccessRate_Mixed(t *testing.T) {
+	// given
+	rate := 2.0 / 3.0
+	success := 2
+	total := 3
+
+	// when
+	result := paintress.FormatSuccessRate(rate, success, total)
+
+	// then
+	expected := "66.7% (2/3)"
+	if result != expected {
+		t.Errorf("FormatSuccessRate = %q, want %q", result, expected)
+	}
+}
+
+func TestFormatSuccessRate_AllFailed(t *testing.T) {
+	// given
+	rate := 0.0
+	success := 0
+	total := 5
+
+	// when
+	result := paintress.FormatSuccessRate(rate, success, total)
+
+	// then
+	expected := "0.0% (0/5)"
+	if result != expected {
+		t.Errorf("FormatSuccessRate = %q, want %q", result, expected)
+	}
+}

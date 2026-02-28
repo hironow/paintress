@@ -1,6 +1,9 @@
 package paintress
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // SuccessRate calculates the success rate from a list of events.
 // It considers only EventExpeditionCompleted events, counting "success"
@@ -28,4 +31,13 @@ func SuccessRate(events []Event) float64 {
 		return 0.0
 	}
 	return float64(success) / float64(total)
+}
+
+// FormatSuccessRate formats a success rate as a human-readable string.
+// Returns "no events" when total is 0.
+func FormatSuccessRate(rate float64, success, total int) string {
+	if total == 0 {
+		return "no events"
+	}
+	return fmt.Sprintf("%.1f%% (%d/%d)", rate*100, success, total)
 }

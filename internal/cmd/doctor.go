@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/hironow/paintress"
@@ -10,18 +11,23 @@ import (
 
 func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "doctor",
+		Use:   "doctor [repo-path]",
 		Short: "Check external command availability",
 		Long: `Check that all external commands required by paintress are installed.
 
 Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and
-docker. Reports version and path for each found command.`,
+docker. Reports version and path for each found command.
+
+If repo-path is provided, also computes expedition success rate metrics.`,
 		Example: `  # Check all dependencies
   paintress doctor
 
   # Machine-readable output
-  paintress doctor -o json`,
-		Args: cobra.NoArgs,
+  paintress doctor -o json
+
+  # Include repo metrics
+  paintress doctor -o json ./my-repo`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: runDoctor,
 	}
 }
@@ -39,8 +45,45 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	var metrics *paintress.DoctorMetrics
+	if len(args) > 0 {
+		repoPath := args[0]
+		eventsDir := paintress.EventsDir(repoPath)
+		store := session.NewEventStore(eventsDir)
+		events, err := store.LoadAll()
+		if err == nil && len(events) > 0 {
+			rate := paintress.SuccessRate(events)
+			var success, total int
+			for _, ev := range events {
+				if ev.Type != paintress.EventExpeditionCompleted {
+					continue
+				}
+				var data paintress.ExpeditionCompletedData
+				if json.Unmarshal(ev.Data, &data) != nil {
+					continue
+				}
+				if data.Status == "skipped" {
+					continue
+				}
+				total++
+				if data.Status == "success" {
+					success++
+				}
+			}
+			metrics = &paintress.DoctorMetrics{
+				SuccessRate: paintress.FormatSuccessRate(rate, success, total),
+			}
+		} else {
+			metrics = &paintress.DoctorMetrics{SuccessRate: "no events"}
+		}
+	}
+
 	if outputFmt == "json" {
-		out, err := paintress.FormatDoctorJSON(checks)
+		output := paintress.DoctorOutput{
+			Checks:  checks,
+			Metrics: metrics,
+		}
+		out, err := paintress.FormatDoctorOutputJSON(output)
 		if err != nil {
 			return err
 		}
@@ -74,8 +117,13 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(w, "  %s  %-12s %s\n", marker, c.Name, label)
 		}
 	}
-	fmt.Fprintln(w)
 
+	if metrics != nil {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "  success-rate: %s\n", metrics.SuccessRate)
+	}
+
+	fmt.Fprintln(w)
 	if !allOK {
 		return fmt.Errorf("some required commands are missing. Install them and try again")
 	}

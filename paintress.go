@@ -75,3 +75,24 @@ func FormatDoctorJSON(checks []DoctorCheck) (string, error) {
 	}
 	return string(data), nil
 }
+
+// DoctorOutput is the structured output for the doctor command.
+// When metrics are not available (no repo-path), Metrics is nil and omitted from JSON.
+type DoctorOutput struct {
+	Checks  []DoctorCheck  `json:"checks"`
+	Metrics *DoctorMetrics `json:"metrics,omitempty"`
+}
+
+// DoctorMetrics holds computed metrics for a repository.
+type DoctorMetrics struct {
+	SuccessRate string `json:"success_rate"`
+}
+
+// FormatDoctorOutputJSON returns the DoctorOutput as a pretty-printed JSON string.
+func FormatDoctorOutputJSON(output DoctorOutput) (string, error) {
+	data, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
