@@ -329,3 +329,71 @@ func TestListJournalFiles_NoDirectory(t *testing.T) {
 		t.Error("expected error when journal dir doesn't exist")
 	}
 }
+
+func TestWritePRIndex_AppendsEntry(t *testing.T) {
+	// given
+	continent := t.TempDir()
+	report := &paintress.ExpeditionReport{
+		Expedition: 1,
+		IssueID:    "AWE-42",
+		PRUrl:      "https://github.com/org/repo/pull/1",
+	}
+
+	// when
+	if err := WritePRIndex(continent, report); err != nil {
+		t.Fatalf("WritePRIndex: %v", err)
+	}
+
+	// then
+	path := filepath.Join(paintress.JournalDir(continent), "pr-index.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read pr-index: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "https://github.com/org/repo/pull/1") {
+		t.Errorf("expected PR URL in index, got: %s", content)
+	}
+	if !strings.Contains(content, "AWE-42") {
+		t.Errorf("expected issue ID in index, got: %s", content)
+	}
+}
+
+func TestWritePRIndex_SkipsNone(t *testing.T) {
+	continent := t.TempDir()
+	report := &paintress.ExpeditionReport{
+		Expedition: 1,
+		IssueID:    "AWE-42",
+		PRUrl:      "none",
+	}
+	if err := WritePRIndex(continent, report); err != nil {
+		t.Fatalf("WritePRIndex: %v", err)
+	}
+	path := filepath.Join(paintress.JournalDir(continent), "pr-index.jsonl")
+	if _, err := os.Stat(path); err == nil {
+		t.Error("expected no index file for PRUrl=none")
+	}
+}
+
+func TestWritePRIndex_AppendsMultiple(t *testing.T) {
+	continent := t.TempDir()
+	for i := 1; i <= 3; i++ {
+		report := &paintress.ExpeditionReport{
+			Expedition: i,
+			IssueID:    "AWE-" + string(rune('0'+i)),
+			PRUrl:      "https://github.com/org/repo/pull/" + string(rune('0'+i)),
+		}
+		if err := WritePRIndex(continent, report); err != nil {
+			t.Fatalf("WritePRIndex #%d: %v", i, err)
+		}
+	}
+	path := filepath.Join(paintress.JournalDir(continent), "pr-index.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 3 {
+		t.Errorf("expected 3 lines, got %d: %s", len(lines), string(data))
+	}
+}

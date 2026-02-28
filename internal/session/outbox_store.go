@@ -45,6 +45,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 	// Set PRAGMAs explicitly — modernc.org/sqlite does not support
 	// underscore-prefixed query parameters like mattn/go-sqlite3.
 	for _, pragma := range []string{
+		"PRAGMA auto_vacuum=INCREMENTAL",
 		"PRAGMA journal_mode=WAL",
 		"PRAGMA synchronous=NORMAL",
 		"PRAGMA busy_timeout=5000",
@@ -109,6 +110,9 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	}
 	defer conn.Close()
 
+	// BEGIN IMMEDIATE acquires a RESERVED lock immediately, preventing
+	// the SHARED→EXCLUSIVE deadlock that occurs with DEFERRED transactions
+	// when two connections SELECT then UPDATE concurrently.
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		return 0, fmt.Errorf("outbox store: begin immediate: %w", err)
 	}
@@ -173,6 +177,14 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	}
 	committed = true
 	return flushed, nil
+}
+
+// IncrementalVacuum reclaims free pages without acquiring an exclusive lock.
+// Call after bulk deletes (e.g., archive-prune) to shrink the DB file.
+// Requires PRAGMA auto_vacuum=INCREMENTAL set at DB open time.
+func (s *SQLiteOutboxStore) IncrementalVacuum() error {
+	_, err := s.db.Exec("PRAGMA incremental_vacuum")
+	return err
 }
 
 // Close closes the underlying database connection.

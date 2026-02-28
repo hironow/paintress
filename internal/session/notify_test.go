@@ -72,10 +72,42 @@ func TestLocalNotifier_Linux_CommandShape(t *testing.T) {
 	}
 }
 
+func TestLocalNotifier_Windows_CommandShape(t *testing.T) {
+	// given: force windows
+	var capturedName string
+	var capturedArgs []string
+	n := &LocalNotifier{
+		forceOS: "windows",
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			capturedName = name
+			capturedArgs = args
+			return &fakeCmd{}
+		},
+	}
+
+	// when
+	err := n.Notify(context.Background(), "Test Title", "Test Message")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedName != "powershell" {
+		t.Errorf("command = %q, want powershell", capturedName)
+	}
+	joined := strings.Join(capturedArgs, " ")
+	if !strings.Contains(joined, "Test Title") {
+		t.Errorf("args should contain title, got: %s", joined)
+	}
+	if !strings.Contains(joined, "Test Message") {
+		t.Errorf("args should contain message, got: %s", joined)
+	}
+}
+
 func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	// given: force unsupported OS
 	n := &LocalNotifier{
-		forceOS: "windows",
+		forceOS: "freebsd",
 		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
 			t.Error("should not invoke command for unsupported OS")
 			return &fakeCmd{}

@@ -199,13 +199,13 @@ func TestDMailMarshal_RoundTrip(t *testing.T) {
 	if parsed.Severity != original.Severity {
 		t.Errorf("Severity = %q, want %q", parsed.Severity, original.Severity)
 	}
-	if len(parsed.Metadata) != len(original.Metadata) {
-		t.Fatalf("Metadata length = %d, want %d", len(parsed.Metadata), len(original.Metadata))
-	}
 	for k, v := range original.Metadata {
 		if parsed.Metadata[k] != v {
 			t.Errorf("Metadata[%s] = %q, want %q", k, parsed.Metadata[k], v)
 		}
+	}
+	if _, ok := parsed.Metadata["idempotency_key"]; !ok {
+		t.Error("expected idempotency_key in metadata")
 	}
 	if parsed.Body != original.Body {
 		t.Errorf("Body = %q, want %q", parsed.Body, original.Body)

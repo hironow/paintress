@@ -32,6 +32,30 @@ type ExpeditionReport struct {
 	HighSeverityDMails string // comma-separated names of mid-expedition HIGH severity d-mails
 }
 
+// PRIndexEntry represents a single PR URL entry extracted from an expedition report.
+type PRIndexEntry struct {
+	Expedition int    `json:"expedition"`
+	IssueID    string `json:"issue_id"`
+	PRUrl      string `json:"pr_url"`
+}
+
+// ExtractPRURLs collects PR URLs from expedition reports, filtering out empty
+// and "none" values. Returns entries in input order.
+func ExtractPRURLs(reports []*ExpeditionReport) []PRIndexEntry {
+	var entries []PRIndexEntry
+	for _, r := range reports {
+		if r == nil || r.PRUrl == "" || r.PRUrl == "none" {
+			continue
+		}
+		entries = append(entries, PRIndexEntry{
+			Expedition: r.Expedition,
+			IssueID:    r.IssueID,
+			PRUrl:      r.PRUrl,
+		})
+	}
+	return entries
+}
+
 func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
 	if strings.Contains(output, "__EXPEDITION_COMPLETE__") {
 		return &ExpeditionReport{Expedition: expNum}, StatusComplete

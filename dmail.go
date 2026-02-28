@@ -2,6 +2,8 @@ package paintress
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -92,15 +94,6 @@ func ArchiveDir(continent string) string {
 	return filepath.Join(continent, ".expedition", "archive")
 }
 
-// OutboxStore is the transactional outbox interface for D-Mail delivery.
-// Stage writes to a write-ahead log (SQLite); Flush materialises staged
-// items to archive/ and outbox/ using atomic file writes.
-type OutboxStore interface {
-	Stage(name string, data []byte) error
-	Flush() (int, error)
-	Close() error
-}
-
 // DMailSchemaVersion is the current D-Mail protocol schema version.
 const DMailSchemaVersion = "1"
 
@@ -152,9 +145,32 @@ func ParseDMail(data []byte) (DMail, error) {
 	return dm, nil
 }
 
+// DMailIdempotencyKey computes a SHA256 content-based idempotency key from
+// the core fields of a DMail (name, kind, description, body).
+func DMailIdempotencyKey(d DMail) string {
+	h := sha256.New()
+	h.Write([]byte(d.Name))
+	h.Write([]byte{0})
+	h.Write([]byte(d.Kind))
+	h.Write([]byte{0})
+	h.Write([]byte(d.Description))
+	h.Write([]byte{0})
+	h.Write([]byte(d.Body))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // Marshal produces the d-mail wire format: "---\n" + YAML + "---\n\n" + Body.
+// Automatically injects an idempotency_key into metadata based on content hash.
 func (d DMail) Marshal() ([]byte, error) {
-	yamlData, err := yaml.Marshal(d)
+	cp := d
+	meta := make(map[string]string, len(d.Metadata)+1)
+	for k, v := range d.Metadata {
+		meta[k] = v
+	}
+	meta["idempotency_key"] = DMailIdempotencyKey(d)
+	cp.Metadata = meta
+
+	yamlData, err := yaml.Marshal(cp)
 	if err != nil {
 		return nil, err
 	}

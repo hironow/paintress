@@ -23,7 +23,7 @@ rules:
       依存方向: cmd → session → root（逆方向不可）
       root は types, constants, pure functions, go:embed のみ。
       I/O が必要な場合は internal/session/ に実装してください。
-      Ref: docs/adr/0013-two-layer-separation.md
+      Ref: docs/adr/0013-root-package-layer-separation.md
     severity: ERROR
     patterns:
       - pattern-either:

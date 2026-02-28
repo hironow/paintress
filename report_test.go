@@ -1,7 +1,9 @@
-package paintress
+package paintress_test
 
 import (
 	"testing"
+
+	"github.com/hironow/paintress"
 )
 
 func TestParseReport_FailureType_Blocker(t *testing.T) {
@@ -23,9 +25,9 @@ insight: External service was down
 __EXPEDITION_END__
 trailing output`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusFailed {
-		t.Fatalf("expected StatusFailed, got %v", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusFailed {
+		t.Fatalf("expected paintress.StatusFailed, got %v", status)
 	}
 	if report.FailureType != "blocker" {
 		t.Errorf("expected failure_type='blocker', got %q", report.FailureType)
@@ -49,9 +51,9 @@ bug_issues: none
 insight: Clean approach
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusSuccess {
-		t.Fatalf("expected StatusSuccess, got %v", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("expected paintress.StatusSuccess, got %v", status)
 	}
 	if report.FailureType != "none" {
 		t.Errorf("expected failure_type='none', got %q", report.FailureType)
@@ -74,9 +76,9 @@ bugs_found: 0
 bug_issues: none
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusSkipped {
-		t.Fatalf("got %v, want StatusSkipped", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSkipped {
+		t.Fatalf("got %v, want paintress.StatusSkipped", status)
 	}
 	if report.IssueID != "AWE-77" {
 		t.Errorf("IssueID = %q", report.IssueID)
@@ -102,9 +104,9 @@ bugs_found: 2
 bug_issues: AWE-89,AWE-90
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 4)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 4)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.BugsFound != 2 {
 		t.Errorf("BugsFound = %d, want 2", report.BugsFound)
@@ -134,9 +136,9 @@ bug_issues: none
 insight: This project uses Tailwind CSS v4 with @apply directives in module CSS files
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 7)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 7)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 
 	if report.Expedition != 7 {
@@ -182,9 +184,9 @@ bug_issues: none
 insight: The auth module requires Redis connection and tests need REDIS_URL env var set
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 3)
-	if status != StatusFailed {
-		t.Fatalf("got %v, want StatusFailed", status)
+	report, status := paintress.ParseReport(output, 3)
+	if status != paintress.StatusFailed {
+		t.Fatalf("got %v, want paintress.StatusFailed", status)
 	}
 	if report.Insight != "The auth module requires Redis connection and tests need REDIS_URL env var set" {
 		t.Errorf("Insight = %q", report.Insight)
@@ -208,9 +210,9 @@ bug_issues: none
 insight: Dev server config: host must be 0.0.0.0: not localhost for Docker
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 2)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 2)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.Insight != "Dev server config: host must be 0.0.0.0: not localhost for Docker" {
 		t.Errorf("Insight = %q", report.Insight)
@@ -218,31 +220,31 @@ __EXPEDITION_END__`
 }
 
 func TestParseReport_EmptyOutput(t *testing.T) {
-	_, status := ParseReport("", 1)
-	if status != StatusParseError {
-		t.Fatalf("got %v, want StatusParseError", status)
+	_, status := paintress.ParseReport("", 1)
+	if status != paintress.StatusParseError {
+		t.Fatalf("got %v, want paintress.StatusParseError", status)
 	}
 }
 
 func TestParseReport_OnlyStartMarker(t *testing.T) {
-	_, status := ParseReport("__EXPEDITION_REPORT__\nsome data", 1)
-	if status != StatusParseError {
-		t.Fatalf("got %v, want StatusParseError for missing end marker", status)
+	_, status := paintress.ParseReport("__EXPEDITION_REPORT__\nsome data", 1)
+	if status != paintress.StatusParseError {
+		t.Fatalf("got %v, want paintress.StatusParseError for missing end marker", status)
 	}
 }
 
 func TestParseReport_OnlyEndMarker(t *testing.T) {
-	_, status := ParseReport("some data\n__EXPEDITION_END__", 1)
-	if status != StatusParseError {
-		t.Fatalf("got %v, want StatusParseError for missing start marker", status)
+	_, status := paintress.ParseReport("some data\n__EXPEDITION_END__", 1)
+	if status != paintress.StatusParseError {
+		t.Fatalf("got %v, want paintress.StatusParseError for missing start marker", status)
 	}
 }
 
 func TestParseReport_MarkersReversed(t *testing.T) {
 	output := "__EXPEDITION_END__\ndata\n__EXPEDITION_REPORT__"
-	_, status := ParseReport(output, 1)
-	if status != StatusParseError {
-		t.Fatalf("got %v, want StatusParseError for reversed markers", status)
+	_, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusParseError {
+		t.Fatalf("got %v, want paintress.StatusParseError for reversed markers", status)
 	}
 }
 
@@ -254,9 +256,9 @@ issue_id: AWE-1
 status: unknown_status
 __EXPEDITION_END__`
 
-	_, status := ParseReport(output, 1)
-	if status != StatusParseError {
-		t.Fatalf("got %v, want StatusParseError for unknown status", status)
+	_, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusParseError {
+		t.Fatalf("got %v, want paintress.StatusParseError for unknown status", status)
 	}
 }
 
@@ -268,8 +270,8 @@ expedition: 1
 status: success
 __EXPEDITION_END__`
 
-	_, status := ParseReport(output, 1)
-	if status != StatusComplete {
+	_, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusComplete {
 		t.Fatalf("COMPLETE should take precedence, got %v", status)
 	}
 }
@@ -286,9 +288,9 @@ bugs_found: 0
 bug_issues: none
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 5)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 5)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-55" {
 		t.Errorf("IssueID = %q, should be trimmed", report.IssueID)
@@ -320,9 +322,9 @@ __EXPEDITION_END__
 Session ended.
 Goodbye.`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-1" {
 		t.Errorf("IssueID = %q", report.IssueID)
@@ -342,9 +344,9 @@ status: success
 reason: ok
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 9)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 9)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.BugsFound != 0 {
 		t.Errorf("BugsFound = %d, want 0 when missing", report.BugsFound)
@@ -371,9 +373,9 @@ reason: ok
 bugs_found: 3
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 10)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 10)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.BugsFound != 3 {
 		t.Errorf("BugsFound = %d, want 3", report.BugsFound)
@@ -401,9 +403,9 @@ bugs_found: 0
 bug_issues: none
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 11)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 11)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-11" {
 		t.Errorf("IssueID = %q", report.IssueID)
@@ -433,9 +435,9 @@ bug_issues: AWE-100
 bug_issues: AWE-101
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 12)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 12)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.Reason != "final reason" {
 		t.Errorf("Reason = %q, want %q", report.Reason, "final reason")
@@ -467,8 +469,8 @@ bugs_found: 0
 bug_issues: none
 __EXPEDITION_END__`
 
-	_, status := ParseReport(output, 1)
-	if status != StatusParseError {
+	_, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusParseError {
 		t.Fatalf("first invalid block should yield parse error, got %v", status)
 	}
 }
@@ -490,9 +492,9 @@ status: failed
 reason: later failure
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-1" {
 		t.Errorf("IssueID = %q, want %q", report.IssueID, "AWE-1")
@@ -521,9 +523,9 @@ bug_issues: none
 __EXPEDITION_END__
 Done.`
 
-	report, status := ParseReport(output, 3)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 3)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-123" {
 		t.Errorf("IssueID = %q", report.IssueID)
@@ -534,9 +536,9 @@ Done.`
 }
 
 func TestParseReport_Complete(t *testing.T) {
-	_, status := ParseReport("__EXPEDITION_COMPLETE__", 10)
-	if status != StatusComplete {
-		t.Fatalf("got %v, want StatusComplete", status)
+	_, status := paintress.ParseReport("__EXPEDITION_COMPLETE__", 10)
+	if status != paintress.StatusComplete {
+		t.Fatalf("got %v, want paintress.StatusComplete", status)
 	}
 }
 
@@ -555,16 +557,16 @@ remaining_issues: 8
 bugs_found: 0
 bug_issues: none
 __EXPEDITION_END__`
-	_, status := ParseReport(output, 2)
-	if status != StatusFailed {
-		t.Fatalf("got %v, want StatusFailed", status)
+	_, status := paintress.ParseReport(output, 2)
+	if status != paintress.StatusFailed {
+		t.Fatalf("got %v, want paintress.StatusFailed", status)
 	}
 }
 
 func TestParseReport_ParseError(t *testing.T) {
-	_, status := ParseReport("no markers here", 1)
-	if status != StatusParseError {
-		t.Fatalf("got %v, want StatusParseError", status)
+	_, status := paintress.ParseReport("no markers here", 1)
+	if status != paintress.StatusParseError {
+		t.Fatalf("got %v, want paintress.StatusParseError", status)
 	}
 }
 
@@ -584,9 +586,9 @@ issue_id: SECOND
 status: failed
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "FIRST" {
 		t.Errorf("should parse first report, got IssueID=%q", report.IssueID)
@@ -595,9 +597,9 @@ __EXPEDITION_END__`
 
 func TestParseReport_EmptyBlock(t *testing.T) {
 	output := "__EXPEDITION_REPORT__\n__EXPEDITION_END__"
-	_, status := ParseReport(output, 1)
+	_, status := paintress.ParseReport(output, 1)
 	// Empty block has no status field -> ParseError
-	if status != StatusParseError {
+	if status != paintress.StatusParseError {
 		t.Fatalf("empty block should be parse error, got %v", status)
 	}
 }
@@ -612,7 +614,7 @@ bugs_found: -5
 bug_issues: none
 __EXPEDITION_END__`
 
-	report, _ := ParseReport(output, 1)
+	report, _ := paintress.ParseReport(output, 1)
 	// fmt.Sscanf will parse -5 as negative — verify behavior
 	if report.BugsFound != -5 {
 		t.Errorf("BugsFound = %d, fmt.Sscanf parses negative values", report.BugsFound)
@@ -629,7 +631,7 @@ bugs_found: not_a_number
 bug_issues: none
 __EXPEDITION_END__`
 
-	report, _ := ParseReport(output, 1)
+	report, _ := paintress.ParseReport(output, 1)
 	if report.BugsFound != 0 {
 		t.Errorf("BugsFound should default to 0 for invalid input, got %d", report.BugsFound)
 	}
@@ -651,9 +653,9 @@ bugs_found: 0
 bug_issues: none
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-日本語" {
 		t.Errorf("IssueID = %q", report.IssueID)
@@ -666,9 +668,9 @@ __EXPEDITION_END__`
 func TestParseReport_MarkerWithExtraWhitespace(t *testing.T) {
 	// Markers with trailing spaces — strings.Index still finds them
 	output := "  __EXPEDITION_REPORT__  \nexpedition: 1\nissue_id: AWE-1\nstatus: success\n  __EXPEDITION_END__  "
-	report, status := ParseReport(output, 1)
-	if status != StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusSuccess {
+		t.Fatalf("got %v, want paintress.StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-1" {
 		t.Errorf("IssueID = %q", report.IssueID)
@@ -684,8 +686,8 @@ status: failed
 reason: error: timeout: connection refused: port 5432
 __EXPEDITION_END__`
 
-	report, status := ParseReport(output, 1)
-	if status != StatusFailed {
+	report, status := paintress.ParseReport(output, 1)
+	if status != paintress.StatusFailed {
 		t.Fatalf("got %v", status)
 	}
 	if report.Reason != "error: timeout: connection refused: port 5432" {
@@ -695,8 +697,8 @@ __EXPEDITION_END__`
 
 func TestParseReport_ExpNumZero(t *testing.T) {
 	output := "__EXPEDITION_COMPLETE__"
-	report, status := ParseReport(output, 0)
-	if status != StatusComplete {
+	report, status := paintress.ParseReport(output, 0)
+	if status != paintress.StatusComplete {
 		t.Fatalf("got %v", status)
 	}
 	if report.Expedition != 0 {
@@ -705,10 +707,10 @@ func TestParseReport_ExpNumZero(t *testing.T) {
 }
 
 func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
-	luminas := []Lumina{
+	luminas := []paintress.Lumina{
 		{Pattern: "only one pattern", Source: "failure-pattern", Uses: 1},
 	}
-	result := FormatLuminaForPrompt(luminas)
+	result := paintress.FormatLuminaForPrompt(luminas)
 	if !containsStr(result, "only one pattern") {
 		t.Errorf("should contain pattern: %q", result)
 	}
@@ -718,5 +720,44 @@ func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
 	}
 	if !containsStr(result, "- only one pattern") {
 		t.Errorf("should contain bulleted pattern: %q", result)
+	}
+}
+
+func TestExtractPRURLs_FiltersNone(t *testing.T) {
+	// given
+	reports := []*paintress.ExpeditionReport{
+		{Expedition: 1, IssueID: "AWE-1", PRUrl: "https://github.com/org/repo/pull/1"},
+		{Expedition: 2, IssueID: "AWE-2", PRUrl: "none"},
+		{Expedition: 3, IssueID: "AWE-3", PRUrl: ""},
+		{Expedition: 4, IssueID: "AWE-4", PRUrl: "https://github.com/org/repo/pull/4"},
+	}
+
+	// when
+	entries := paintress.ExtractPRURLs(reports)
+
+	// then
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	if entries[0].PRUrl != "https://github.com/org/repo/pull/1" {
+		t.Errorf("entry[0].PRUrl = %q", entries[0].PRUrl)
+	}
+	if entries[1].Expedition != 4 {
+		t.Errorf("entry[1].Expedition = %d, want 4", entries[1].Expedition)
+	}
+}
+
+func TestExtractPRURLs_Empty(t *testing.T) {
+	entries := paintress.ExtractPRURLs(nil)
+	if len(entries) != 0 {
+		t.Errorf("expected 0, got %d", len(entries))
+	}
+}
+
+func TestExtractPRURLs_NilReport(t *testing.T) {
+	reports := []*paintress.ExpeditionReport{nil, nil}
+	entries := paintress.ExtractPRURLs(reports)
+	if len(entries) != 0 {
+		t.Errorf("expected 0, got %d", len(entries))
 	}
 }
