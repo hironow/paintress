@@ -182,7 +182,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			// Verify gen_ai.* semantic convention attributes (P1-3)
 			requiredAttrs := map[string]string{
 				"gen_ai.operation.name": "chat",
-				"gen_ai.system":        "anthropic",
+				"gen_ai.system":         "anthropic",
 			}
 			for key, want := range requiredAttrs {
 				var attrFound bool

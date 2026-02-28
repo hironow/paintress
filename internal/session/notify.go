@@ -105,4 +105,3 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
 }
-

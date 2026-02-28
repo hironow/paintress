@@ -46,8 +46,8 @@ func TestSuccessRate_Mixed(t *testing.T) {
 	events := []paintress.Event{
 		makeCompletedEvent("success", now),
 		makeCompletedEvent("failed", now.Add(time.Minute)),
-		makeCompletedEvent("success", now.Add(2 * time.Minute)),
-		makeCompletedEvent("skipped", now.Add(3 * time.Minute)),
+		makeCompletedEvent("success", now.Add(2*time.Minute)),
+		makeCompletedEvent("skipped", now.Add(3*time.Minute)),
 	}
 
 	// 2 success out of 3 non-skipped = 0.666...
@@ -87,7 +87,7 @@ func TestSuccessRate_IgnoresNonCompletedEvents(t *testing.T) {
 		{ID: "1", Type: paintress.EventExpeditionStarted, Timestamp: now},
 		makeCompletedEvent("success", now.Add(time.Minute)),
 		{ID: "3", Type: paintress.EventDMailStaged, Timestamp: now.Add(2 * time.Minute)},
-		makeCompletedEvent("failed", now.Add(3 * time.Minute)),
+		makeCompletedEvent("failed", now.Add(3*time.Minute)),
 	}
 
 	rate := paintress.SuccessRate(events)

@@ -38,9 +38,9 @@ type Paintress struct {
 	pool        *WorktreePool // nil when --workers=0
 	notifier    paintress.Notifier
 	approver    paintress.Approver
-	outboxStore paintress.OutboxStore      // transactional outbox for D-Mail delivery
-	eventStore  paintress.EventStore       // append-only event log (fire-and-forget)
-	Dispatcher  paintress.EventDispatcher  // policy engine (best-effort dispatch after emit)
+	outboxStore paintress.OutboxStore     // transactional outbox for D-Mail delivery
+	eventStore  paintress.EventStore      // append-only event log (fire-and-forget)
+	Dispatcher  paintress.EventDispatcher // policy engine (best-effort dispatch after emit)
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
