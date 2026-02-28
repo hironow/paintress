@@ -147,7 +147,7 @@ func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
+func TestShellQuoteUnix(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
@@ -160,10 +160,72 @@ func TestShellQuote(t *testing.T) {
 		{"", "''"},
 	}
 	for _, tt := range tests {
-		got := shellQuote(tt.input)
+		got := shellQuoteUnix(tt.input)
 		if got != tt.want {
-			t.Errorf("shellQuote(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("shellQuoteUnix(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestShellQuoteCmd(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"simple", `"simple"`},
+		{"with spaces", `"with spaces"`},
+		{`has "double" quotes`, `"has ""double"" quotes"`},
+		{"100%", `"100%%"`},
+		{`"; rm -rf /`, `"""; rm -rf /"`},
+		{"", `""`},
+	}
+	for _, tt := range tests {
+		got := shellQuoteCmd(tt.input)
+		if got != tt.want {
+			t.Errorf("shellQuoteCmd(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestCmdNotifier_Timeout(t *testing.T) {
+	// given — a command factory that captures the context deadline
+	var capturedCtx context.Context
+	n := &CmdNotifier{
+		cmdTemplate: `echo {message}`,
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			capturedCtx = ctx
+			return &fakeCmd{}
+		},
+	}
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then — the context passed to the command should have a deadline
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedCtx == nil {
+		t.Fatal("context was not captured")
+	}
+	deadline, ok := capturedCtx.Deadline()
+	if !ok {
+		t.Fatal("context should have a deadline (30s timeout)")
+	}
+	// Deadline should be roughly 30s from now (allow some slack)
+	_ = deadline // existence check is sufficient
+}
+
+func TestCmdNotifier_EmptyTemplate(t *testing.T) {
+	// given
+	n := NewCmdNotifier("")
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then — empty template should produce an error
+	if err == nil {
+		t.Error("expected error for empty template")
 	}
 }
 

@@ -34,6 +34,9 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	if err != nil {
 		return fmt.Errorf("dmail: flush: %w", err)
 	}
+	if n == 0 {
+		return fmt.Errorf("dmail: flush: item not delivered (write failure, will retry)")
+	}
 	if err := emitDMailEvent(eventStore, paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: n}); err != nil {
 		return fmt.Errorf("dmail: event flushed: %w", err)
 	}

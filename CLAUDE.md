@@ -103,6 +103,7 @@ just install     # build + install to /usr/local/bin
 just install-all # install all binaries (main + companions)
 just test        # all tests, 300s timeout
 just test-race   # with race detector
+just test-e2e    # Docker E2E tests
 just check       # fmt + vet + test
 just semgrep     # cobra semgrep rules
 just lint        # vet + markdown lint + gofmt check

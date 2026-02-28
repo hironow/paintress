@@ -99,6 +99,17 @@ func isRateLimited(output string) bool {
 	return false
 }
 
+// ExpandReviewCmd replaces placeholders in the review command string.
+// Supported placeholders:
+//
+//	{file}   → review working directory
+//	{branch} → current git branch name
+func ExpandReviewCmd(cmd, dir, branch string) string {
+	cmd = strings.ReplaceAll(cmd, "{file}", dir)
+	cmd = strings.ReplaceAll(cmd, "{branch}", branch)
+	return cmd
+}
+
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.
 func BuildReviewFixPrompt(branch string, comments string) string {
 	return fmt.Sprintf(`You are on branch %s with an open PR. A code review found the following issues:

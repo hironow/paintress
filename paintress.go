@@ -1,6 +1,10 @@
 package paintress
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+)
 
 // RunSummary holds the results of a paintress loop run.
 type RunSummary struct {
@@ -20,6 +24,32 @@ func FormatSummaryJSON(s RunSummary) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// DeviationError is returned when expedition finds deviations (failures detected).
+// Callers can use errors.As to distinguish deviation from runtime errors.
+type DeviationError struct {
+	Failed int
+}
+
+func (e *DeviationError) Error() string {
+	return fmt.Sprintf("deviation detected: %d failure(s)", e.Failed)
+}
+
+// ExitCode maps an error to a process exit code.
+//
+//	nil             → 0 (success)
+//	DeviationError  → 2 (deviation detected)
+//	other           → 1 (runtime error)
+func ExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var de *DeviationError
+	if errors.As(err, &de) {
+		return 2
+	}
+	return 1
 }
 
 // PruneResult holds the outcome of an archive prune operation.

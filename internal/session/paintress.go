@@ -73,10 +73,10 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 		logger = paintress.NewLogger(nil, false)
 	}
 	if dataOut == nil {
-		dataOut = os.Stdout
+		dataOut = io.Discard
 	}
 	if stdinIn == nil {
-		stdinIn = os.Stdin
+		stdinIn = strings.NewReader("")
 	}
 	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -115,7 +115,7 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 	default:
 		promptOut := logger.Writer()
 		if promptOut == io.Discard || promptOut == dataOut {
-			promptOut = os.Stderr
+			promptOut = os.Stderr // nosemgrep: adr0002-no-os-stderr-in-internal — fallback for quiet-mode + interactive approval; cmd layer cannot predict this condition
 		}
 		approver = NewStdinApprover(stdinIn, promptOut)
 	}
@@ -579,6 +579,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
+			p.stageEscalation(exp, maxConsecutiveFailures)
 			expSpan.AddEvent("gommage",
 				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
 			)
@@ -647,7 +648,8 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		result, err := RunReview(reviewCtx, p.config.ReviewCmd, reviewDir)
+		expandedCmd := ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
+		result, err := RunReview(reviewCtx, expandedCmd, reviewDir)
 		reviewCancel()
 		if err != nil {
 			revSpan.End()
@@ -918,4 +920,17 @@ func (p *Paintress) printSummary() {
 	p.Logger.Info("Flag:     %s", paintress.FlagPath(p.config.Continent))
 	p.Logger.Info("Journals: %s", paintress.JournalDir(p.config.Continent))
 	p.Logger.Info("Logs:     %s", p.logDir)
+}
+
+// stageEscalation creates and stages a feedback D-Mail for escalation when
+// consecutive failures reach the threshold. Errors are logged but not
+// propagated — escalation is best-effort observability.
+func (p *Paintress) stageEscalation(expedition, failureCount int) {
+	if p.outboxStore == nil {
+		return
+	}
+	dm := paintress.NewEscalationDMail(expedition, failureCount)
+	if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
+		p.Logger.Warn("escalation dmail: %v", err)
+	}
 }

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/hironow/paintress"
 )
@@ -75,13 +76,16 @@ func (n *CmdNotifier) factory() cmdFactory {
 	return defaultCmdFactory
 }
 
+const notifyTimeout = 30 * time.Second
+
 func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
+	if n.cmdTemplate == "" {
+		return fmt.Errorf("notify: empty command template")
+	}
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
+	defer cancel()
 	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", shellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", shellQuote(message))
 	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
 }
 
-// shellQuote wraps s in single quotes for safe interpolation into sh -c commands.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-}
