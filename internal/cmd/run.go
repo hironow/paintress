@@ -9,6 +9,7 @@ import (
 
 	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -152,8 +153,12 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
-	exitCode := p.Run(ctx)
+	exitCode, ucErr := usecase.RunExpeditions(ctx, paintress.RunExpeditionCommand{
+		RepoPath: continent,
+	}, cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
+	if ucErr != nil {
+		return ucErr
+	}
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
 	}

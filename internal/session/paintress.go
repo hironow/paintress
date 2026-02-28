@@ -38,8 +38,9 @@ type Paintress struct {
 	pool        *WorktreePool // nil when --workers=0
 	notifier    paintress.Notifier
 	approver    paintress.Approver
-	outboxStore paintress.OutboxStore // transactional outbox for D-Mail delivery
-	eventStore  paintress.EventStore  // append-only event log (fire-and-forget)
+	outboxStore paintress.OutboxStore      // transactional outbox for D-Mail delivery
+	eventStore  paintress.EventStore       // append-only event log (fire-and-forget)
+	Dispatcher  paintress.EventDispatcher  // policy engine (best-effort dispatch after emit)
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
@@ -54,6 +55,7 @@ type Paintress struct {
 
 // emitEvent appends a single event to the event store. Errors are logged
 // but never propagated — the event log is observational, not critical.
+// After persistence, the event is dispatched to the PolicyEngine best-effort.
 func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
 	if p.eventStore == nil {
 		return
@@ -65,6 +67,12 @@ func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
 	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Debug("event emit append: %v", err)
+	}
+	// Best-effort policy dispatch
+	if p.Dispatcher != nil {
+		if dispatchErr := p.Dispatcher.Dispatch(context.Background(), ev); dispatchErr != nil {
+			p.Logger.Debug("policy dispatch %s: %v", eventType, dispatchErr)
+		}
 	}
 }
 
