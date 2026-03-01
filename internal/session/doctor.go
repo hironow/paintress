@@ -30,7 +30,7 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 		{"docker", false},
 	}
 
-	checks := make([]paintress.DoctorCheck, 0, len(commands)+2)
+	checks := make([]paintress.DoctorCheck, 0, len(commands)+6)
 	for _, cmd := range commands {
 		check := paintress.DoctorCheck{
 			Name:     cmd.name,
@@ -61,6 +61,10 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 	if strings.TrimSpace(continent) != "" {
 		checks = append(checks, checkContinent(continent))
 		checks = append(checks, checkConfig(continent))
+		checks = append(checks, checkGitRepo(continent))
+		checks = append(checks, checkWritability(continent))
+		checks = append(checks, checkSkills(continent))
+		checks = append(checks, checkEventStore(continent))
 	}
 
 	return checks
