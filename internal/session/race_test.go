@@ -13,7 +13,7 @@ import (
 
 // === Lumina: Parallel Journal Scan ===
 
-func TestLumina_ConcurrentScan_ManyJournals(t *testing.T) {
+func TestRace_Lumina_ConcurrentScan_ManyJournals(t *testing.T) {
 	dir := t.TempDir()
 	jDir := filepath.Join(dir, ".expedition", "journal")
 	os.MkdirAll(jDir, 0755)
@@ -60,7 +60,7 @@ func TestLumina_ConcurrentScan_ManyJournals(t *testing.T) {
 	}
 }
 
-func TestLumina_ConcurrentScan_CalledFromMultipleGoroutines(t *testing.T) {
+func TestRace_Lumina_ConcurrentScan(t *testing.T) {
 	dir := t.TempDir()
 	jDir := filepath.Join(dir, ".expedition", "journal")
 	os.MkdirAll(jDir, 0755)
@@ -97,7 +97,7 @@ func TestLumina_ConcurrentScan_CalledFromMultipleGoroutines(t *testing.T) {
 
 // === DevServer: Start/Stop Race ===
 
-func TestDevServer_ConcurrentStopCalls(t *testing.T) {
+func TestRace_DevServer_ConcurrentStopCalls(t *testing.T) {
 	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), paintress.NewLogger(io.Discard, false))
 
 	// Multiple concurrent Stop calls should not panic
@@ -112,7 +112,7 @@ func TestDevServer_ConcurrentStopCalls(t *testing.T) {
 	wg.Wait()
 }
 
-func TestDevServer_ConcurrentFieldAccess(t *testing.T) {
+func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), paintress.NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
@@ -137,7 +137,7 @@ func TestDevServer_ConcurrentFieldAccess(t *testing.T) {
 
 // === Expedition: Streaming + Reserve integration ===
 
-func TestExpedition_ConcurrentReserveCheckDuringBuild(t *testing.T) {
+func TestRace_Expedition_ConcurrentReserveCheck(t *testing.T) {
 	dir := t.TempDir()
 	rp := paintress.NewReserveParty("opus", []string{"sonnet"}, paintress.NewLogger(io.Discard, false))
 	g := paintress.NewGradientGauge(5)

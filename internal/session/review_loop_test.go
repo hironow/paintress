@@ -165,8 +165,8 @@ func TestReviewLoop_ParentContextCancellationStopsLoop(t *testing.T) {
 }
 
 // TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig verifies that each
-// review command call is bounded by TimeoutSec / maxReviewCycles.
-// With TimeoutSec=6 and maxReviewCycles=3, each review gets 2s.
+// review command call is bounded by TimeoutSec / maxReviewGateCycles.
+// With TimeoutSec=6 and maxReviewGateCycles=3, each review gets 2s.
 // minReviewTimeout is lowered so the computed 2s is not clamped.
 func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
 	// given — lower clamp so computed timeout (2s) is used

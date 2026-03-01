@@ -634,11 +634,11 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 	var consumed time.Duration
 
 	reviewTimeout := max(
-		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewCycles),
+		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewGateCycles),
 		minReviewTimeout,
 	)
 	var lastComments string
-	for cycle := 1; cycle <= maxReviewCycles; cycle++ {
+	for cycle := 1; cycle <= maxReviewGateCycles; cycle++ {
 		if ctx.Err() != nil {
 			if lastComments != "" {
 				if report.Insight != "" {
@@ -650,7 +650,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 			return
 		}
 
-		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("review_running"), cycle, maxReviewCycles))
+		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("review_running"), cycle, maxReviewGateCycles))
 
 		_, revSpan := paintress.Tracer.Start(ctx, "review.command",
 			trace.WithAttributes(attribute.Int("cycle", cycle)),

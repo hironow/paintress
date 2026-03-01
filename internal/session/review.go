@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const maxReviewCycles = 3
+const maxReviewGateCycles = 3
 
 // minReviewTimeout is the floor for the per-cycle review timeout.
 var minReviewTimeout = 30 * time.Second
