@@ -288,6 +288,86 @@ func TestStdinApprover_Timeout(t *testing.T) {
 
 // --- High Severity Gate integration tests (moved from gate_test.go) ---
 
+func TestStdinApprover_NilInput(t *testing.T) {
+	// given: StdinApprover with nil input (library/non-interactive usage)
+	a := &StdinApprover{reader: nil, writer: new(bytes.Buffer)}
+
+	// when: should not panic
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then: safe default = deny, no error
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected denial for nil input")
+	}
+}
+
+func TestStdinApprover_EOFTerminatedYes(t *testing.T) {
+	// given: piped input "y" without trailing newline (echo -n "y" | paintress run)
+	in := strings.NewReader("y")
+	out := new(bytes.Buffer)
+	a := &StdinApprover{reader: in, writer: out}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then: should approve even without trailing newline
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Error("expected approval for EOF-terminated 'y' input")
+	}
+}
+
+func TestStdinApprover_EOFTerminatedNo(t *testing.T) {
+	// given: piped "n" without trailing newline — should deny (not error)
+	in := strings.NewReader("n")
+	out := new(bytes.Buffer)
+	a := &StdinApprover{reader: in, writer: out}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if approved {
+		t.Error("expected denial for EOF-terminated 'n' input")
+	}
+}
+
+func TestStdinApprover_SharedReader(t *testing.T) {
+	// given: a shared reader with approval line + subsequent data.
+	// After RequestApproval consumes "y\n", the remaining "next-line\n"
+	// must still be readable from the same reader.
+	in := strings.NewReader("y\nnext-line\n")
+	out := new(bytes.Buffer)
+	a := &StdinApprover{reader: in, writer: out}
+
+	// when
+	approved, err := a.RequestApproval(context.Background(), "msg")
+
+	// then: approved
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !approved {
+		t.Fatal("expected approval")
+	}
+
+	// then: remaining data is still available from the shared reader
+	remaining := make([]byte, 64)
+	n, _ := in.Read(remaining)
+	got := string(remaining[:n])
+	if got != "next-line\n" {
+		t.Errorf("shared reader lost data: got %q, want %q", got, "next-line\n")
+	}
+}
+
 // TestHighSeverityGate_NoHighSeverity verifies no gate is triggered
 // when inbox has no HIGH severity d-mails.
 func TestHighSeverityGate_NoHighSeverity(t *testing.T) {

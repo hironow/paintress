@@ -2,22 +2,36 @@ package session
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/hironow/paintress"
 )
 
 // ExpeditionState is the materialized READ MODEL projected from events.
 type ExpeditionState struct {
-	TotalExpeditions int
-	Succeeded        int
-	Failed           int
-	Skipped          int
-	LastExpedition   int
-	LastStatus       string
-	GradientLevel    int
-	DMailsStaged     int
-	DMailsFlushed    int
-	InboxReceived    int
+	TotalExpeditions    int
+	Succeeded           int
+	Failed              int
+	Skipped             int
+	LastExpedition      int
+	LastStatus          string
+	LastExpeditionAt    time.Time
+	LastIssueID         string
+	ConsecutiveFailures int
+	GommageCount        int
+	GradientLevel       int
+	DMailsStaged        int
+	DMailsFlushed       int
+	InboxReceived       int
+}
+
+// ErrorRate returns the fraction of failed expeditions (0.0 to 1.0).
+// Returns 0.0 when no expeditions have been recorded.
+func (s *ExpeditionState) ErrorRate() float64 {
+	if s.TotalExpeditions == 0 {
+		return 0.0
+	}
+	return float64(s.Failed) / float64(s.TotalExpeditions)
 }
 
 // ProjectState replays events to produce an ExpeditionState.
@@ -41,11 +55,17 @@ func applyEvent(state *ExpeditionState, ev paintress.Event) {
 		state.TotalExpeditions++
 		state.LastExpedition = data.Expedition
 		state.LastStatus = data.Status
+		state.LastExpeditionAt = ev.Timestamp
+		if data.IssueID != "" {
+			state.LastIssueID = data.IssueID
+		}
 		switch data.Status {
 		case "success":
 			state.Succeeded++
+			state.ConsecutiveFailures = 0
 		case "failed":
 			state.Failed++
+			state.ConsecutiveFailures++
 		case "skipped":
 			state.Skipped++
 		}
@@ -70,7 +90,10 @@ func applyEvent(state *ExpeditionState, ev paintress.Event) {
 	case paintress.EventInboxReceived:
 		state.InboxReceived++
 
-	case paintress.EventExpeditionStarted, paintress.EventDMailArchived, paintress.EventGommageTriggered:
+	case paintress.EventGommageTriggered:
+		state.GommageCount++
+
+	case paintress.EventExpeditionStarted, paintress.EventDMailArchived:
 		// Audit-only events: no state mutation needed.
 
 	default:

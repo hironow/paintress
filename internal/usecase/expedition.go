@@ -16,6 +16,7 @@ func RunExpeditions(ctx context.Context, cmd paintress.RunExpeditionCommand, cfg
 		return 1, fmt.Errorf("command validation: %w", errs[0])
 	}
 	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger)
 	p := session.NewPaintress(cfg, logger, dataOut, stdinIn, eventStore)
 	p.Dispatcher = engine
 	return p.Run(ctx), nil
