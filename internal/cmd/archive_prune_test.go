@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestArchivePruneCommand_RequiresRepoPath(t *testing.T) {
@@ -160,5 +164,90 @@ func TestArchivePruneCommand_DryRunJSON(t *testing.T) {
 	out := buf.String()
 	if out == "" {
 		t.Error("expected JSON output, got empty")
+	}
+}
+
+func TestArchivePruneCommand_PrunesEventFiles(t *testing.T) {
+	// given: repo with .expedition/events containing expired and recent files
+	repoDir := t.TempDir()
+	eventsDir := filepath.Join(repoDir, ".expedition", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldFile := filepath.Join(eventsDir, "2025-12-01.jsonl")
+	if err := os.WriteFile(oldFile, []byte(`{"id":"old"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-40 * 24 * time.Hour)
+	if err := os.Chtimes(oldFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	recentFile := filepath.Join(eventsDir, "2026-02-28.jsonl")
+	if err := os.WriteFile(recentFile, []byte(`{"id":"recent"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", repoDir, "--execute"})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
+		t.Error("expected old event file to be deleted")
+	}
+	if _, statErr := os.Stat(recentFile); statErr != nil {
+		t.Error("expected recent event file to remain")
+	}
+	output := errBuf.String()
+	if !strings.Contains(output, "event") {
+		t.Errorf("expected output to mention events, got: %q", output)
+	}
+}
+
+func TestArchivePruneCommand_EventOnlyPrune(t *testing.T) {
+	// given: repo with NO archive candidates but expired event files
+	// This tests the codex-found bug: archive candidates=0 must NOT block event pruning
+	repoDir := t.TempDir()
+	eventsDir := filepath.Join(repoDir, ".expedition", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldEventFile := filepath.Join(eventsDir, "2025-11-01.jsonl")
+	if err := os.WriteFile(oldEventFile, []byte(`{"id":"old"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-40 * 24 * time.Hour)
+	if err := os.Chtimes(oldEventFile, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", repoDir, "--execute"})
+
+	// when
+	err := root.Execute()
+
+	// then — event pruning must fire even with 0 archive candidates
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, statErr := os.Stat(oldEventFile); !os.IsNotExist(statErr) {
+		t.Error("expected event file to be pruned even with no archive candidates")
 	}
 }

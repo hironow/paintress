@@ -51,65 +51,113 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	days, _ := cmd.Flags().GetInt("days")
 	execute, _ := cmd.Flags().GetBool("execute")
 	outputFmt, _ := cmd.Flags().GetString("output")
+	stateDir := filepath.Join(repoPath, ".expedition")
 
-	result, err := session.ArchivePrune(repoPath, days, execute)
+	// Collect archive candidates (dry-run to list only).
+	archiveResult, err := session.ArchivePrune(repoPath, days, false)
 	if err != nil {
 		return err
+	}
+
+	// Collect event file candidates.
+	eventFiles, eventErr := session.ListExpiredEventFiles(stateDir, days)
+	if eventErr != nil {
+		return fmt.Errorf("failed to list expired events: %w", eventErr)
 	}
 
 	w := cmd.OutOrStdout()
 	ew := cmd.ErrOrStderr()
 
+	totalCandidates := len(archiveResult.Candidates) + len(eventFiles)
+
 	if outputFmt == "json" {
 		out := struct {
-			Candidates int      `json:"candidates"`
-			Deleted    int      `json:"deleted"`
-			Files      []string `json:"files"`
+			Candidates      int      `json:"candidates"`
+			Deleted         int      `json:"deleted"`
+			Files           []string `json:"files"`
+			EventCandidates int      `json:"event_candidates"`
+			EventDeleted    int      `json:"event_deleted"`
+			EventFiles      []string `json:"event_files"`
 		}{
-			Candidates: len(result.Candidates),
-			Deleted:    result.Deleted,
-			Files:      result.Candidates,
+			Candidates:      len(archiveResult.Candidates),
+			Files:           archiveResult.Candidates,
+			EventCandidates: len(eventFiles),
+			EventFiles:      eventFiles,
 		}
-		data, err := json.Marshal(out)
-		if err != nil {
-			return err
+		if execute {
+			execResult, execErr := session.ArchivePrune(repoPath, days, true)
+			if execErr != nil {
+				return execErr
+			}
+			out.Deleted = execResult.Deleted
+
+			if len(eventFiles) > 0 {
+				deleted, delErr := session.PruneEventFiles(stateDir, eventFiles)
+				if delErr != nil {
+					return fmt.Errorf("event prune failed: %w", delErr)
+				}
+				out.EventDeleted = len(deleted)
+			}
+		}
+		data, jsonErr := json.Marshal(out)
+		if jsonErr != nil {
+			return jsonErr
 		}
 		fmt.Fprintln(w, string(data))
-		if execute && result.Deleted < len(result.Candidates) {
-			return fmt.Errorf("%d file(s) could not be deleted", len(result.Candidates)-result.Deleted)
-		}
 		return nil
 	}
 
 	// text output
-	if len(result.Candidates) == 0 {
+	if totalCandidates == 0 {
 		fmt.Fprintln(w, "No files older than", days, "days.")
 		return nil
 	}
 
-	if execute {
-		fmt.Fprintf(w, "Deleted %d file(s):\n", result.Deleted)
-	} else {
-		fmt.Fprintf(w, "Files older than %d days (%d file(s), dry-run):\n", days, len(result.Candidates))
-	}
-	for _, f := range result.Candidates {
-		fmt.Fprintln(w, "  "+f)
-	}
-	if !execute {
-		fmt.Fprintln(w, "\nRun with --execute to delete.")
-	}
-	// Prune flushed outbox DB rows + incremental vacuum.
-	if execute {
-		if pruned, pruneErr := session.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
-			fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
+	if len(archiveResult.Candidates) > 0 {
+		fmt.Fprintf(ew, "Expired archive files (%d):\n", len(archiveResult.Candidates))
+		for _, f := range archiveResult.Candidates {
+			fmt.Fprintln(ew, "  "+f)
 		}
 	}
-
-	fmt.Fprintln(ew, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.")
-
-	if execute && result.Deleted < len(result.Candidates) {
-		failed := len(result.Candidates) - result.Deleted
-		return fmt.Errorf("%d file(s) could not be deleted (permission denied or locked)", failed)
+	if len(eventFiles) > 0 {
+		fmt.Fprintf(ew, "Expired event files (%d):\n", len(eventFiles))
+		for _, f := range eventFiles {
+			fmt.Fprintln(ew, "  "+f)
+		}
 	}
+	fmt.Fprintf(ew, "%d file(s) older than %d days.\n", totalCandidates, days)
+
+	if !execute {
+		fmt.Fprintln(ew, "(dry-run — pass --execute to delete)")
+		return nil
+	}
+
+	// Execute: archive deletion
+	if len(archiveResult.Candidates) > 0 {
+		execResult, execErr := session.ArchivePrune(repoPath, days, true)
+		if execErr != nil {
+			return execErr
+		}
+		fmt.Fprintf(ew, "Pruned %d archive file(s).\n", execResult.Deleted)
+	}
+
+	// Execute: event file deletion
+	if len(eventFiles) > 0 {
+		deleted, delErr := session.PruneEventFiles(stateDir, eventFiles)
+		if delErr != nil {
+			return fmt.Errorf("event prune failed: %w", delErr)
+		}
+		fmt.Fprintf(ew, "Pruned %d event file(s).\n", len(deleted))
+	}
+
+	// Prune flushed outbox DB rows + incremental vacuum.
+	if pruned, pruneErr := session.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
+		fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
+	}
+
+	if len(archiveResult.Candidates) > 0 {
+		fmt.Fprintln(ew, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.")
+	}
+
 	return nil
 }
