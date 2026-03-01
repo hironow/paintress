@@ -353,6 +353,46 @@ func TestRunFollowUp_ZeroBudget_Skipped(t *testing.T) {
 	}
 }
 
+// TestReviewLoop_ReviewCommentsPropagatedToFix verifies that review comments
+// are included in the Claude fix prompt via the -p argument.
+func TestReviewLoop_ReviewCommentsPropagatedToFix(t *testing.T) {
+	// given — review outputs specific comments, verify they reach the fix prompt
+	dir := t.TempDir()
+	setupGitRepoWithBranch(t, dir, "feat/test")
+
+	promptCapture := filepath.Join(dir, "captured-prompt.txt")
+
+	reviewScript := filepath.Join(dir, "review.sh")
+	writeScript(t, reviewScript, "echo 'UNIQUE-PAINTRESS-REVIEW-COMMENT-XYZ-456'\nexit 1\n")
+
+	// Fake claude captures -p argument to file
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, `while [ $# -gt 0 ]; do
+  if [ "$1" = "-p" ]; then
+    echo "$2" > `+promptCapture+`
+    break
+  fi
+  shift
+done
+exit 0
+`)
+
+	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
+
+	// when — review fails, fix is called with review comments in prompt
+	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
+
+	// then — captured prompt should contain the review comments
+	captured, err := os.ReadFile(promptCapture)
+	if err != nil {
+		t.Fatalf("fix was not called (no captured prompt): %v", err)
+	}
+	if !strings.Contains(string(captured), "UNIQUE-PAINTRESS-REVIEW-COMMENT-XYZ-456") {
+		t.Errorf("review comments not propagated to fix prompt, got: %s", string(captured))
+	}
+}
+
 // TestReviewLoop_ReviewErrorPreservesLastComments verifies that when
 // the review command fails on a later cycle, the review comments found
 // in earlier cycles are still recorded in the report insight.
