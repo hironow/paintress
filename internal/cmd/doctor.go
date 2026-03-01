@@ -115,6 +115,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			label := "MISSING (required)"
 			if !c.Required {
 				label = "not found (optional)"
+				if c.Version != "" {
+					label = c.Version + " (optional)"
+				}
 			} else {
 				allOK = false
 			}
