@@ -1,9 +1,25 @@
 package paintress
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
+
+// RecordExpedition increments the paintress.expedition.total OTel counter.
+func RecordExpedition(ctx context.Context, status string) {
+	c, _ := Meter.Int64Counter("paintress.expedition.total",
+		metric.WithDescription("Total expedition completions"),
+	)
+	c.Add(ctx, 1,
+		metric.WithAttributes(
+			attribute.String("status", status),
+		),
+	)
+}
 
 // SuccessRate calculates the success rate from a list of events.
 // It considers only EventExpeditionCompleted events, counting "success"

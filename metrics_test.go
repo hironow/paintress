@@ -1,11 +1,14 @@
 package paintress_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/hironow/paintress"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
 func makeCompletedEvent(status string, t time.Time) paintress.Event {
@@ -95,6 +98,49 @@ func TestSuccessRate_IgnoresNonCompletedEvents(t *testing.T) {
 	if rate != 0.5 {
 		t.Errorf("SuccessRate = %f, want 0.5", rate)
 	}
+}
+
+func TestRecordExpedition_IncreasesCounter(t *testing.T) {
+	// given
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	origMeter := paintress.Meter
+	paintress.Meter = mp.Meter("test")
+	defer func() { paintress.Meter = origMeter }()
+	ctx := context.Background()
+
+	// when
+	paintress.RecordExpedition(ctx, "success")
+	paintress.RecordExpedition(ctx, "failed")
+	paintress.RecordExpedition(ctx, "success")
+
+	// then
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	total := sumCounter(t, rm, "paintress.expedition.total")
+	if total != 3 {
+		t.Errorf("total = %d, want 3", total)
+	}
+}
+
+func sumCounter(t *testing.T, rm metricdata.ResourceMetrics, name string) int64 {
+	t.Helper()
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name == name {
+				sum := m.Data.(metricdata.Sum[int64])
+				var total int64
+				for _, dp := range sum.DataPoints {
+					total += dp.Value
+				}
+				return total
+			}
+		}
+	}
+	t.Fatalf("metric %q not found", name)
+	return 0
 }
 
 func TestFormatSuccessRate_NoEvents(t *testing.T) {
