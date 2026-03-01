@@ -35,7 +35,11 @@ If repo-path is provided, also computes expedition success rate metrics.`,
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
 	claudeCmd := paintress.DefaultClaudeCmd
-	checks := session.RunDoctor(claudeCmd)
+	var continent string
+	if len(args) > 0 {
+		continent = args[0]
+	}
+	checks := session.RunDoctor(claudeCmd, continent)
 
 	allRequired := true
 	for _, c := range checks {
