@@ -18,6 +18,7 @@ var loggerKey loggerKeyType
 // PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
 var (
 	shutdownTracer func(context.Context) error
+	shutdownMeter  func(context.Context) error
 	finalizerOnce  sync.Once
 )
 
@@ -44,6 +45,7 @@ func NewRootCommand() *cobra.Command {
 			logger := paintress.NewLogger(out, verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("paintress", Version)
+			shutdownMeter = initMeter("paintress", Version)
 			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 			return nil
@@ -53,6 +55,9 @@ func NewRootCommand() *cobra.Command {
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
 			endRootSpan()
+			if shutdownMeter != nil {
+				shutdownMeter(context.Background())
+			}
 			if shutdownTracer != nil {
 				shutdownTracer(context.Background())
 			}
