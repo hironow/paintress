@@ -11,6 +11,25 @@ import (
 	"github.com/hironow/paintress"
 )
 
+// setupTestTracer installs an InMemoryExporter with a synchronous span processor
+// so spans are immediately available for inspection. It restores the global
+// TracerProvider after the test.
+func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+	prev := otel.GetTracerProvider()
+	otel.SetTracerProvider(tp)
+	oldTracer := paintress.Tracer
+	paintress.Tracer = tp.Tracer("paintress-test")
+	t.Cleanup(func() {
+		tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prev)
+		paintress.Tracer = oldTracer
+	})
+	return exp
+}
+
 func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
@@ -69,4 +88,39 @@ func TestParseExtraEndpoints_Empty(t *testing.T) {
 	if len(eps) != 0 {
 		t.Errorf("got %d endpoints, want 0", len(eps))
 	}
+}
+
+func TestStartRootSpan_CreatesNamedSpan(t *testing.T) {
+	// given
+	exp := setupTestTracer(t)
+
+	// when
+	_ = startRootSpan(context.Background(), "run")
+	endRootSpan()
+
+	// then
+	spans := exp.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least 1 span")
+	}
+	if spans[0].Name != "paintress.run" {
+		t.Errorf("span name = %q, want %q", spans[0].Name, "paintress.run")
+	}
+	var found bool
+	for _, attr := range spans[0].Attributes {
+		if string(attr.Key) == "paintress.command" && attr.Value.AsString() == "run" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected paintress.command=run attribute on root span")
+	}
+}
+
+func TestEndRootSpan_NilSafe(t *testing.T) {
+	// given — rootSpan is nil (no startRootSpan called)
+	rootSpan = nil
+
+	// when / then — must not panic
+	endRootSpan()
 }

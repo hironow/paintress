@@ -44,13 +44,15 @@ func NewRootCommand() *cobra.Command {
 			logger := paintress.NewLogger(out, verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("paintress", Version)
-			cmd.SetContext(ctx)
+			spanCtx := startRootSpan(ctx, cmd.Name())
+			cmd.SetContext(spanCtx)
 			return nil
 		},
 	}
 
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
+			endRootSpan()
 			if shutdownTracer != nil {
 				shutdownTracer(context.Background())
 			}
