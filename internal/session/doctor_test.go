@@ -266,3 +266,108 @@ func TestCheckWritability_ReadOnly(t *testing.T) {
 		t.Error("writable check should NOT be required")
 	}
 }
+
+func TestCheckSkills_Valid(t *testing.T) {
+	// given — SKILL.md with dmail-schema-version
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".expedition", "skills", "test-skill")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: test\nmetadata:\n  dmail-schema-version: \"1\"\n---\n"), 0644)
+
+	// when
+	check := checkSkills(dir)
+
+	// then
+	if !check.OK {
+		t.Errorf("skills check should pass, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("skills check should NOT be required")
+	}
+	if check.Name != "skills" {
+		t.Errorf("expected name 'skills', got %q", check.Name)
+	}
+}
+
+func TestCheckSkills_MissingFile(t *testing.T) {
+	// given — no skills directory
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// when
+	check := checkSkills(dir)
+
+	// then
+	if check.OK {
+		t.Error("skills check should fail when no SKILL.md files exist")
+	}
+}
+
+func TestCheckSkills_MissingVersion(t *testing.T) {
+	// given — SKILL.md without dmail-schema-version
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".expedition", "skills", "bad-skill")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: bad\n---\n"), 0644)
+
+	// when
+	check := checkSkills(dir)
+
+	// then
+	if check.OK {
+		t.Error("skills check should fail when dmail-schema-version is missing")
+	}
+}
+
+func TestCheckEventStore_Valid(t *testing.T) {
+	// given — valid JSONL event file
+	dir := t.TempDir()
+	eventsDir := filepath.Join(dir, ".expedition", "events")
+	os.MkdirAll(eventsDir, 0755)
+	os.WriteFile(filepath.Join(eventsDir, "2026-03-02.jsonl"),
+		[]byte("{\"type\":\"expedition.completed\",\"timestamp\":\"2026-03-02T00:00:00Z\"}\n"), 0644)
+
+	// when
+	check := checkEventStore(dir)
+
+	// then
+	if !check.OK {
+		t.Errorf("events check should pass, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("events check should NOT be required")
+	}
+	if check.Name != "events" {
+		t.Errorf("expected name 'events', got %q", check.Name)
+	}
+}
+
+func TestCheckEventStore_Corrupt(t *testing.T) {
+	// given — corrupt JSONL (not valid JSON)
+	dir := t.TempDir()
+	eventsDir := filepath.Join(dir, ".expedition", "events")
+	os.MkdirAll(eventsDir, 0755)
+	os.WriteFile(filepath.Join(eventsDir, "bad.jsonl"), []byte("not json\n"), 0644)
+
+	// when
+	check := checkEventStore(dir)
+
+	// then
+	if check.OK {
+		t.Error("events check should fail for corrupt JSONL")
+	}
+}
+
+func TestCheckEventStore_NoDir(t *testing.T) {
+	// given — no events directory
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// when
+	check := checkEventStore(dir)
+
+	// then
+	if check.OK {
+		t.Error("events check should fail when events directory missing")
+	}
+}

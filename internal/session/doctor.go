@@ -1,7 +1,10 @@
 package session
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -171,5 +174,111 @@ func checkConfig(continent string) paintress.DoctorCheck {
 	} else {
 		check.Version = "loaded OK"
 	}
+	return check
+}
+
+// checkSkills verifies that SKILL.md files exist and contain dmail-schema-version.
+// Searches .expedition/skills/*/SKILL.md for valid skill definitions.
+// Returns a Warning-level check (Required=false).
+func checkSkills(continent string) paintress.DoctorCheck {
+	check := paintress.DoctorCheck{
+		Name:     "skills",
+		Required: false,
+	}
+
+	skillsDir := filepath.Join(continent, ".expedition", "skills")
+	entries, err := os.ReadDir(skillsDir)
+	if err != nil {
+		check.Version = "skills/ not found"
+		return check
+	}
+
+	var found, valid int
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		skillFile := filepath.Join(skillsDir, entry.Name(), "SKILL.md")
+		data, err := os.ReadFile(skillFile)
+		if err != nil {
+			continue
+		}
+		found++
+		if strings.Contains(string(data), "dmail-schema-version:") {
+			valid++
+		}
+	}
+
+	if found == 0 {
+		check.Version = "no SKILL.md files found"
+		return check
+	}
+
+	if valid < found {
+		check.Version = fmt.Sprintf("%d/%d skills missing dmail-schema-version", found-valid, found)
+		return check
+	}
+
+	check.OK = true
+	check.Path = skillsDir
+	check.Version = fmt.Sprintf("%d skills OK", found)
+	return check
+}
+
+// checkEventStore verifies that event JSONL files are parseable.
+// Scans .expedition/events/*.jsonl and validates each line is valid JSON.
+// Returns a Warning-level check (Required=false).
+func checkEventStore(continent string) paintress.DoctorCheck {
+	check := paintress.DoctorCheck{
+		Name:     "events",
+		Required: false,
+	}
+
+	eventsDir := filepath.Join(continent, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		check.Version = "events/ not found"
+		return check
+	}
+
+	var files, lines int
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		f, err := os.Open(filepath.Join(eventsDir, entry.Name()))
+		if err != nil {
+			check.Version = "read error: " + err.Error()
+			return check
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				continue
+			}
+			if !json.Valid([]byte(line)) {
+				f.Close()
+				check.Version = fmt.Sprintf("corrupt JSON in %s", entry.Name())
+				return check
+			}
+			lines++
+		}
+		f.Close()
+		if err := scanner.Err(); err != nil {
+			check.Version = "scan error: " + err.Error()
+			return check
+		}
+		files++
+	}
+
+	if files == 0 {
+		check.Version = "no .jsonl files found"
+		return check
+	}
+
+	check.OK = true
+	check.Path = eventsDir
+	check.Version = fmt.Sprintf("%d files, %d events OK", files, lines)
 	return check
 }
