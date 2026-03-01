@@ -146,6 +146,66 @@ func TestArchivePruneCommand_DryRunText(t *testing.T) {
 	}
 }
 
+func TestArchivePruneCommand_TextOutput_StdoutClean(t *testing.T) {
+	// given: temp dir with no candidates — "No files older" message
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", t.TempDir()})
+
+	// when
+	err := root.Execute()
+
+	// then — text mode: stdout must be empty (all output to stderr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if outBuf.Len() != 0 {
+		t.Errorf("text mode should not write to stdout, got: %q", outBuf.String())
+	}
+	if !strings.Contains(errBuf.String(), "No files older") {
+		t.Errorf("expected 'No files older' in stderr, got: %q", errBuf.String())
+	}
+}
+
+func TestArchivePruneCommand_TextOutput_WithCandidates_StdoutClean(t *testing.T) {
+	// given: repo with expired event files
+	repoDir := t.TempDir()
+	eventsDir := filepath.Join(repoDir, ".expedition", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	oldFile := filepath.Join(eventsDir, "2025-12-01.jsonl")
+	if err := os.WriteFile(oldFile, []byte(`{"id":"old"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-40 * 24 * time.Hour)
+	os.Chtimes(oldFile, oldTime, oldTime)
+
+	root := NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", repoDir})
+
+	// when
+	err := root.Execute()
+
+	// then — text mode with candidates: stdout must still be empty
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if outBuf.Len() != 0 {
+		t.Errorf("text mode should not write to stdout, got: %q", outBuf.String())
+	}
+	if !strings.Contains(errBuf.String(), "dry-run") {
+		t.Errorf("expected dry-run message in stderr, got: %q", errBuf.String())
+	}
+}
+
 func TestArchivePruneCommand_DryRunJSON(t *testing.T) {
 	// given
 	cmd := NewRootCommand()

@@ -107,9 +107,9 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// text output
+	// text output — all metadata to stderr
 	if totalCandidates == 0 {
-		fmt.Fprintln(w, "No files older than", days, "days.")
+		fmt.Fprintln(ew, "No files older than", days, "days.")
 		return nil
 	}
 
