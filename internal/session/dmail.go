@@ -18,6 +18,9 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = paintress.DMailSchemaVersion
 	}
+	if err := paintress.ValidateDMail(d); err != nil {
+		return fmt.Errorf("dmail: validate: %w", err)
+	}
 	data, err := d.Marshal()
 	if err != nil {
 		return fmt.Errorf("dmail: marshal: %w", err)

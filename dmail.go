@@ -191,6 +191,26 @@ func (d DMail) Marshal() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
+func ValidateDMail(d DMail) error {
+	if d.SchemaVersion == "" {
+		return fmt.Errorf("dmail: dmail-schema-version is required")
+	}
+	if d.SchemaVersion != DMailSchemaVersion {
+		return fmt.Errorf("dmail: unsupported dmail-schema-version: %q (want %q)", d.SchemaVersion, DMailSchemaVersion)
+	}
+	if d.Name == "" {
+		return fmt.Errorf("dmail: name is required")
+	}
+	if d.Kind == "" {
+		return fmt.Errorf("dmail: kind is required")
+	}
+	if d.Description == "" {
+		return fmt.Errorf("dmail: description is required")
+	}
+	return nil
+}
+
 // FilterHighSeverity returns only HIGH severity d-mails from the input slice.
 func FilterHighSeverity(dmails []DMail) []DMail {
 	var high []DMail

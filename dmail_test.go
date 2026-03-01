@@ -83,6 +83,80 @@ func TestDMailMarshal_IdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestValidateDMail(t *testing.T) {
+	tests := []struct {
+		name    string
+		dmail   paintress.DMail
+		wantErr bool
+	}{
+		{
+			name: "valid dmail",
+			dmail: paintress.DMail{
+				SchemaVersion: paintress.DMailSchemaVersion,
+				Name:          "report-001",
+				Kind:          "report",
+				Description:   "test",
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing name",
+			dmail: paintress.DMail{
+				SchemaVersion: paintress.DMailSchemaVersion,
+				Kind:          "report",
+				Description:   "test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing kind",
+			dmail: paintress.DMail{
+				SchemaVersion: paintress.DMailSchemaVersion,
+				Name:          "report-001",
+				Description:   "test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing description",
+			dmail: paintress.DMail{
+				SchemaVersion: paintress.DMailSchemaVersion,
+				Name:          "report-001",
+				Kind:          "report",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing schema version",
+			dmail: paintress.DMail{
+				Name:        "report-001",
+				Kind:        "report",
+				Description: "test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "wrong schema version",
+			dmail: paintress.DMail{
+				SchemaVersion: "99",
+				Name:          "report-001",
+				Kind:          "report",
+				Description:   "test",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := paintress.ValidateDMail(tt.dmail)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateDMail() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestDMailMarshal_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given
 	dm := paintress.DMail{
