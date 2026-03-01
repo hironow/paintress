@@ -57,6 +57,12 @@ type Paintress struct {
 // but never propagated — the event log is observational, not critical.
 // After persistence, the event is dispatched to the PolicyEngine best-effort.
 func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
+	// Record OTel metric for expedition completions (fire-and-forget, independent of event store)
+	if eventType == paintress.EventExpeditionCompleted {
+		if d, ok := data.(paintress.ExpeditionCompletedData); ok {
+			paintress.RecordExpedition(context.Background(), d.Status)
+		}
+	}
 	if p.eventStore == nil {
 		return
 	}
