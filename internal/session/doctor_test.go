@@ -2,6 +2,7 @@ package session
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -184,4 +185,84 @@ func TestRunDoctor_CheckConfig_MissingConfig(t *testing.T) {
 		}
 	}
 	t.Error("expected config check in doctor output")
+}
+
+func TestCheckGitRepo_InRepo(t *testing.T) {
+	// given — a directory inside a git repo
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", dir)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+
+	// when
+	check := checkGitRepo(dir)
+
+	// then
+	if !check.OK {
+		t.Error("git-repo check should pass inside a git repo")
+	}
+	if check.Required {
+		t.Error("git-repo check should NOT be required (warning)")
+	}
+	if check.Name != "git-repo" {
+		t.Errorf("expected name 'git-repo', got %q", check.Name)
+	}
+}
+
+func TestCheckGitRepo_NotRepo(t *testing.T) {
+	// given — a plain directory (not a git repo)
+	dir := t.TempDir()
+
+	// when
+	check := checkGitRepo(dir)
+
+	// then
+	if check.OK {
+		t.Error("git-repo check should fail outside a git repo")
+	}
+	if check.Required {
+		t.Error("git-repo check should NOT be required")
+	}
+}
+
+func TestCheckWritability_OK(t *testing.T) {
+	// given — writable .expedition/
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
+
+	// when
+	check := checkWritability(dir)
+
+	// then
+	if !check.OK {
+		t.Errorf("writable check should pass, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("writable check should NOT be required")
+	}
+	if check.Name != "writable" {
+		t.Errorf("expected name 'writable', got %q", check.Name)
+	}
+}
+
+func TestCheckWritability_ReadOnly(t *testing.T) {
+	// given — read-only .expedition/
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, ".expedition")
+	os.MkdirAll(expDir, 0555)
+	t.Cleanup(func() { os.Chmod(expDir, 0755) })
+
+	// when
+	check := checkWritability(dir)
+
+	// then
+	if check.OK {
+		t.Error("writable check should fail for read-only .expedition/")
+	}
+	if check.Required {
+		t.Error("writable check should NOT be required")
+	}
 }

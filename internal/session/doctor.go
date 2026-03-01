@@ -98,6 +98,52 @@ func checkContinent(continent string) paintress.DoctorCheck {
 	return check
 }
 
+// checkGitRepo verifies that the continent directory is inside a git repository.
+// Returns a Warning-level check (Required=false).
+func checkGitRepo(continent string) paintress.DoctorCheck {
+	check := paintress.DoctorCheck{
+		Name:     "git-repo",
+		Required: false,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	cmd := exec.CommandContext(ctx, "git", "-C", continent, "rev-parse", "--git-dir")
+	out, err := cmd.Output()
+	cancel()
+	if err != nil {
+		check.Version = "not a git repository"
+		return check
+	}
+
+	check.OK = true
+	check.Path = strings.TrimSpace(string(out))
+	check.Version = "git repo OK"
+	return check
+}
+
+// checkWritability verifies that the .expedition/ directory is writable.
+// Creates and removes a probe file to test write access.
+// Returns a Warning-level check (Required=false).
+func checkWritability(continent string) paintress.DoctorCheck {
+	check := paintress.DoctorCheck{
+		Name:     "writable",
+		Required: false,
+	}
+
+	expeditionDir := filepath.Join(continent, ".expedition")
+	probe := filepath.Join(expeditionDir, ".doctor-probe")
+	if err := os.WriteFile(probe, []byte("probe"), 0644); err != nil {
+		check.Version = "not writable: " + err.Error()
+		return check
+	}
+	os.Remove(probe)
+
+	check.OK = true
+	check.Path = expeditionDir
+	check.Version = "writable OK"
+	return check
+}
+
 // checkConfig verifies that config.yaml exists and can be loaded.
 // Returns a Warning-level check (Required=false).
 func checkConfig(continent string) paintress.DoctorCheck {
