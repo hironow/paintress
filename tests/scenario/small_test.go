@@ -4,6 +4,7 @@ package scenario_test
 
 import (
 	"context"
+	"os/exec"
 	"testing"
 	"time"
 )
@@ -22,27 +23,20 @@ func TestScenario_L2_Small(t *testing.T) {
 	defer ws.StopPhonewave(t, pw)
 	defer ws.DumpPhonewaveLog(t, pw)
 
-	// Inject 2 specification D-Mails with different priorities
-	spec1 := FormatDMail(map[string]string{
-		"dmail-schema-version": "1",
-		"name":                 "spec-high-001",
-		"kind":                 "specification",
-		"description":          "High priority specification",
-		"priority":             "1",
-	}, "# High Priority Spec\n\n## Actions\n\n- [add_dod] AUTH-001: critical auth fix")
-	ws.InjectDMail(t, ".expedition", "inbox", "spec-high-001.md", spec1)
+	// 1. Sightjack scan → specification delivered to .expedition/inbox via phonewave
+	err := ws.RunSightjackScan(t, ctx)
+	if err != nil {
+		t.Fatalf("sightjack scan failed: %v", err)
+	}
 
-	spec2 := FormatDMail(map[string]string{
-		"dmail-schema-version": "1",
-		"name":                 "spec-low-002",
-		"kind":                 "specification",
-		"description":          "Low priority specification",
-		"priority":             "3",
-	}, "# Low Priority Spec\n\n## Actions\n\n- [add_dod] UI-002: minor UI tweak")
-	ws.InjectDMail(t, ".expedition", "inbox", "spec-low-002.md", spec2)
+	// Wait for specification(s) routed from .siren/outbox → phonewave → .expedition/inbox
+	ws.WaitForDMailCount(t, ".expedition", "inbox", 1, 30*time.Second)
 
-	// Run paintress expedition -- processes specs
-	err := ws.RunPaintressExpedition(t, ctx)
+	// Verify siren outbox is cleaned up (phonewave consumed the specs)
+	ws.WaitForAbsent(t, ".siren", "outbox", 15*time.Second)
+
+	// 2. Paintress processes specification(s) → report in .expedition/outbox → phonewave → .gate/inbox
+	err = ws.RunPaintressExpedition(t, ctx)
 	if err != nil {
 		t.Logf("first paintress expedition: %v", err)
 	}
@@ -53,21 +47,31 @@ func TestScenario_L2_Small(t *testing.T) {
 	// Verify outbox cleanup
 	ws.WaitForAbsent(t, ".expedition", "outbox", 15*time.Second)
 
-	// Inject feedback D-Mail (simulates amadeus retry response)
-	feedback := FormatDMail(map[string]string{
-		"dmail-schema-version": "1",
-		"name":                 "feedback-retry-001",
-		"kind":                 "feedback",
-		"description":          "Retry feedback",
-	}, "# Feedback\n\n## Action: retry\n\nPlease retry the specification.")
-	ws.InjectDMail(t, ".expedition", "inbox", "feedback-retry-001.md", feedback)
+	// 3. Amadeus processes report → feedback in .gate/outbox → phonewave → .expedition/inbox + .siren/inbox
+	err = ws.RunAmadeusCheck(t, ctx)
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
+			t.Logf("amadeus check returned exit code 2 (drift detected) — expected")
+		} else {
+			t.Fatalf("amadeus check failed: %v", err)
+		}
+	}
 
-	// Second expedition (follow-up from feedback)
+	// Wait for feedback routed to .expedition/inbox
+	ws.WaitForDMailCount(t, ".expedition", "inbox", 1, 30*time.Second)
+
+	// Wait for feedback routed to .siren/inbox
+	ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
+
+	// Verify .gate outbox cleaned up
+	ws.WaitForAbsent(t, ".gate", "outbox", 15*time.Second)
+
+	// 4. Second expedition (processes feedback from amadeus)
 	err = ws.RunPaintressExpedition(t, ctx)
 	if err != nil {
 		t.Logf("second paintress expedition: %v", err)
 	}
 
-	// Verify final state
+	// Verify final state: all outboxes empty
 	obs.AssertAllOutboxEmpty()
 }
