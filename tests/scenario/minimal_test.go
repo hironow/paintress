@@ -4,19 +4,23 @@ package scenario_test
 
 import (
 	"context"
+	"os/exec"
 	"testing"
 	"time"
 )
 
-// TestScenario_L1_Minimal verifies the paintress expedition closed loop:
+// TestScenario_L1_Minimal verifies the full closed loop: spec -> report -> feedback.
 //
 //  1. specification D-Mail is injected into .expedition/inbox (upstream from sightjack via phonewave)
-//  2. paintress expedition processes the specification
-//  3. report D-Mail is produced in .expedition/outbox
-//  4. phonewave routes the report to .gate/inbox
-//  5. .expedition/outbox is cleaned up after delivery
+//  2. paintress expedition processes the specification, produces report in .expedition/outbox
+//  3. phonewave routes the report to .gate/inbox, cleans .expedition/outbox
+//  4. amadeus check consumes report from .gate/inbox, produces feedback in .gate/outbox
+//  5. phonewave routes feedback to .expedition/inbox + .siren/inbox
+//  6. all outboxes empty at the end
 //
-// Route exercised: .expedition/inbox (consume) -> paintress -> .expedition/outbox (produce) -> phonewave -> .gate/inbox
+// Route exercised:
+//   .expedition/inbox -> paintress -> .expedition/outbox -> phonewave -> .gate/inbox
+//   .gate/inbox -> amadeus -> .gate/outbox -> phonewave -> .expedition/inbox + .siren/inbox
 func TestScenario_L1_Minimal(t *testing.T) {
 	if testing.Short() {
 		t.Skip("scenario tests are not short")
@@ -55,6 +59,24 @@ func TestScenario_L1_Minimal(t *testing.T) {
 
 	// Verify report kind in frontmatter
 	obs.AssertDMailKind(reportPath, "report")
+
+	// 3. Run amadeus → feedback in .gate/outbox → phonewave → .expedition/inbox + .siren/inbox
+	err = ws.RunAmadeusCheck(t, ctx)
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
+			t.Logf("amadeus exit code 2 (drift) — expected")
+		} else {
+			t.Fatalf("amadeus check failed: %v", err)
+		}
+	}
+
+	// 4. Verify feedback arrived in .expedition/inbox and .siren/inbox
+	// .expedition/inbox: feedback only (spec was consumed/archived by paintress)
+	// .siren/inbox: feedback delivered by phonewave
+	// .gate/inbox: empty (amadeus consumed the report)
+	feedbackPath := ws.WaitForDMail(t, ".expedition", "inbox", 30*time.Second)
+	obs.AssertDMailKind(feedbackPath, "feedback")
+	ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
 
 	// Final state: all outboxes empty
 	obs.AssertAllOutboxEmpty()
