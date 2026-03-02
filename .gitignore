@@ -15,4 +15,5 @@ coverage.out
 docs/plans/
 # golang
 .gocache/
-fake-claude
+# fake-claude binary (not source in testdata/)
+/fake-claude
