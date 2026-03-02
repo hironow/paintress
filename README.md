@@ -350,52 +350,55 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 |   +-- default_run.go       NeedsDefaultRun (bare path → run delegation)
 |   +-- errors.go            ExitError type
 |   +-- *_test.go            Tests
-+-- config.go                Config struct + ValidateContinent
-+-- project_config.go        ProjectConfig (LoadProjectConfig, .expedition/config.yaml)
-+-- paintress.go             Gommage loop
-+-- expedition.go            Single Expedition + prompt generation
-+-- gradient.go              Gradient Gauge
-+-- lumina.go                Lumina scanning (goroutines)
-+-- reserve.go               Reserve Party (goroutine)
-+-- devserver.go             Dev server (goroutine)
-+-- worktree.go              WorktreePool for Swarm Mode
-+-- review.go                Code review gate (exec + parse)
-+-- notify.go                Notifier interface (LocalNotifier, CmdNotifier, NopNotifier)
-+-- approve.go               Approver interface (StdinApprover, CmdApprover, AutoApprover)
-+-- gate.go                  HIGH severity D-Mail gate (FilterHighSeverity)
-+-- dmail.go                 D-Mail protocol (scan, send, archive, parse)
-+-- issues.go                Linear issue fetcher (API + formatting)
-+-- mission.go               Mission type detection + prompt templates
-+-- journal.go               Journal read/write
-+-- report.go                Expedition report generation (D-Mail outbound)
-+-- context.go               Context file scanner (.expedition/context/)
-+-- flag.go                  Flag file read/write (.expedition/.run/flag.md)
-+-- flag_watcher.go          fsnotify: real-time flag change detection
-+-- inbox_watcher.go         fsnotify: real-time inbox d-mail detection
-+-- init.go                  Init logic (interactive config creation)
-+-- doctor.go                Doctor logic (external command checks)
-+-- archive_prune.go         Archive pruning logic (age-based d-mail cleanup)
-+-- logger.go                Structured logger (verbose/quiet modes)
-+-- telemetry.go             OpenTelemetry tracer setup
-+-- lang.go                  i18n message map (en/ja/fr)
-+-- *_test.go                Tests
++-- internal/usecase/         Use case layer (PolicyEngine + handlers)
++-- internal/session/         I/O orchestration layer
+|   +-- paintress.go          Paintress orchestrator (Run, main loop)
+|   +-- expedition.go         Expedition execution (subprocess, file I/O)
+|   +-- dmail.go              D-Mail file I/O (archive, inbox, outbox)
+|   +-- config.go             LoadConfig, SaveConfig
+|   +-- project_config.go     LoadProjectConfig (.expedition/config.yaml)
+|   +-- flag.go               ReadFlag, WriteFlag
+|   +-- flag_watcher.go       FlagWatcher (filesystem polling)
+|   +-- inbox_watcher.go      InboxWatcher (filesystem polling)
+|   +-- issues.go             FetchIssues (HTTP)
+|   +-- review.go             RunReview (subprocess)
+|   +-- approve.go            StdinApprover, CmdApprover, AutoApprover
+|   +-- notify.go             CmdNotifier, NullNotifier
+|   +-- doctor.go             RunDoctor, health checks
+|   +-- archive_prune.go      Archive file discovery/deletion
+|   +-- worktree.go           Git worktree operations
+|   +-- devserver.go          Dev server management
++-- internal/eventsource/     Event store infrastructure (JSONL append-only)
++-- internal/domain/          Pure domain functions
++-- internal/tools/docgen/    CLI documentation generator
++-- Root package (paintress)  Types, interfaces, pure functions, go:embed
+|   +-- paintress.go          RunSummary, PruneResult, DoctorCheck
+|   +-- expedition.go         Expedition types, go:embed templates
+|   +-- dmail.go              DMail types, ParseDMail, MarshalDMail, ValidateDMail
+|   +-- config.go             Config, ProjectConfig, LinearConfig, go:embed SkillsFS
+|   +-- interfaces.go         Port interfaces (Approver, Notifier, GitExecutor)
+|   +-- event.go              Event envelope, EventType constants
+|   +-- flag.go               ExpeditionFlag type
+|   +-- gradient.go           GradientGauge type
+|   +-- lumina.go             Lumina type, FormatLuminaForPrompt
+|   +-- reserve.go            ReserveParty type
+|   +-- report.go             Report types
+|   +-- journal.go            JournalEntry type
+|   +-- logger.go             Structured logger (noop default)
+|   +-- telemetry.go          OTel tracer (noop default)
++-- templates/                AI prompt templates ({en,ja,fr})
+|   +-- skills/               D-Mail SKILL.md templates
++-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
++-- tests/e2e/                Docker E2E tests (//go:build e2e)
 +-- docs/
-|   +-- dmail-protocol.md    D-Mail wire format, schema versioning, function map
-|   +-- expedition-directory.md  .expedition/ directory structure and prompt injection map
-|   +-- approval-contract.md HIGH severity gate three-way approval contract
-|   +-- cli/                 Auto-generated CLI reference (docgen)
-+-- internal/tools/docgen/
-|   +-- main.go              CLI documentation generator (docs/cli/)
-+-- docker/
-|   +-- compose.yaml         Jaeger all-in-one for trace viewing
-+-- templates/
-|   +-- expedition_*.md.tmpl Expedition prompt (en/ja/fr)
-|   +-- mission_*.md.tmpl    Mission rules (en/ja/fr)
-|   +-- skills/              Agent skill manifests (Agent Skills spec, embedded via go:embed)
-+-- .goreleaser.yaml         GoReleaser v2 config (multi-platform + Homebrew)
-+-- .github/workflows/
-    +-- ci.yaml              CI (test + vet)
-    +-- release.yaml         Release on tag push (GoReleaser)
+|   +-- dmail-protocol.md    D-Mail wire format, schema versioning
+|   +-- expedition-directory.md  .expedition/ directory structure
+|   +-- approval-contract.md Approval contract
+|   +-- cli/                 Auto-generated CLI reference
++-- .semgrep/                 Semgrep rules (layer enforcement)
++-- .goreleaser.yaml          GoReleaser v2 config (multi-platform + Homebrew)
++-- .github/workflows/        CI + Release
++-- docker/                   Jaeger v2 for trace viewing
 ```
 
 ## Companion Binaries
@@ -434,6 +437,8 @@ just install-all     # install all to /usr/local/bin
 
 ## Prerequisites
 
+- Go 1.26+
+- [just](https://just.systems/) task runner
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
 - A code review CLI (for code review gate, customizable via `--review-cmd`, e.g. tools that output `[P0]`–`[P4]` priorities)
 - [GitHub CLI](https://cli.github.com/) for Pull Request operations

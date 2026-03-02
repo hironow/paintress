@@ -1,0 +1,244 @@
+package session
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/hironow/paintress"
+)
+
+func TestStatus_EmptyState(t *testing.T) {
+	// given — fresh directory with no events, no inbox, no archive
+	baseDir := t.TempDir()
+
+	// when
+	report := Status(baseDir)
+
+	// then
+	if report.Expeditions != 0 {
+		t.Errorf("Expeditions = %d, want 0", report.Expeditions)
+	}
+	if report.Successes != 0 {
+		t.Errorf("Successes = %d, want 0", report.Successes)
+	}
+	if report.Failures != 0 {
+		t.Errorf("Failures = %d, want 0", report.Failures)
+	}
+	if report.SuccessRate != 0.0 {
+		t.Errorf("SuccessRate = %f, want 0.0", report.SuccessRate)
+	}
+	if report.GradientLevel != 0 {
+		t.Errorf("GradientLevel = %d, want 0", report.GradientLevel)
+	}
+	if report.InboxCount != 0 {
+		t.Errorf("InboxCount = %d, want 0", report.InboxCount)
+	}
+	if report.ArchiveCount != 0 {
+		t.Errorf("ArchiveCount = %d, want 0", report.ArchiveCount)
+	}
+	if !report.LastExpedition.IsZero() {
+		t.Errorf("LastExpedition should be zero, got %v", report.LastExpedition)
+	}
+	if report.Continent != baseDir {
+		t.Errorf("Continent = %q, want %q", report.Continent, baseDir)
+	}
+}
+
+func TestStatus_WithMailDirs(t *testing.T) {
+	// given — create inbox and archive with files
+	baseDir := t.TempDir()
+	inboxDir := paintress.InboxDir(baseDir)
+	archiveDir := paintress.ArchiveDir(baseDir)
+
+	if err := os.MkdirAll(inboxDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(archiveDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create 2 inbox files
+	for _, name := range []string{"report-proj-1.md", "report-proj-2.md"} {
+		if err := os.WriteFile(filepath.Join(inboxDir, name), []byte("---\nname: test\nkind: report\ndescription: test\n---\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create 3 archive files
+	for _, name := range []string{"report-a1.md", "report-a2.md", "report-a3.md"} {
+		if err := os.WriteFile(filepath.Join(archiveDir, name), []byte("---\nname: test\nkind: report\ndescription: test\n---\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// when
+	report := Status(baseDir)
+
+	// then
+	if report.InboxCount != 2 {
+		t.Errorf("InboxCount = %d, want 2", report.InboxCount)
+	}
+	if report.ArchiveCount != 3 {
+		t.Errorf("ArchiveCount = %d, want 3", report.ArchiveCount)
+	}
+}
+
+func TestStatus_WithEvents(t *testing.T) {
+	// given — create event store with expedition events
+	baseDir := t.TempDir()
+	eventsDir := paintress.EventsDir(baseDir)
+	store := NewEventStore(eventsDir)
+
+	ts := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
+
+	events := []paintress.Event{
+		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+			Expedition: 1, Status: "success", IssueID: "PROJ-1",
+		}, ts),
+		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+			Expedition: 2, Status: "success", IssueID: "PROJ-2",
+		}, ts.Add(time.Minute)),
+		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+			Expedition: 3, Status: "failed", IssueID: "PROJ-3",
+		}, ts.Add(2*time.Minute)),
+		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+			Expedition: 4, Status: "skipped", IssueID: "PROJ-4",
+		}, ts.Add(3*time.Minute)),
+		makeStatusEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+			Level: 3, Operator: "charge",
+		}, ts.Add(4*time.Minute)),
+	}
+
+	if err := store.Append(events...); err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	report := Status(baseDir)
+
+	// then
+	if report.Expeditions != 4 {
+		t.Errorf("Expeditions = %d, want 4", report.Expeditions)
+	}
+	if report.Successes != 2 {
+		t.Errorf("Successes = %d, want 2", report.Successes)
+	}
+	if report.Failures != 1 {
+		t.Errorf("Failures = %d, want 1", report.Failures)
+	}
+	// SuccessRate excludes skipped: 2 success / 3 (success+failed)
+	wantRate := 2.0 / 3.0
+	if report.SuccessRate < wantRate-0.01 || report.SuccessRate > wantRate+0.01 {
+		t.Errorf("SuccessRate = %f, want ~%f", report.SuccessRate, wantRate)
+	}
+	if report.GradientLevel != 3 {
+		t.Errorf("GradientLevel = %d, want 3", report.GradientLevel)
+	}
+	if !report.LastExpedition.Equal(ts.Add(3 * time.Minute)) {
+		t.Errorf("LastExpedition = %v, want %v", report.LastExpedition, ts.Add(3*time.Minute))
+	}
+}
+
+func TestStatusReport_FormatText(t *testing.T) {
+	// given
+	report := StatusReport{
+		Continent:      "/path/to/repo",
+		Expeditions:    15,
+		Successes:      12,
+		Failures:       2,
+		SuccessRate:    0.857,
+		GradientLevel:  3,
+		InboxCount:     1,
+		ArchiveCount:   10,
+		LastExpedition: time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
+	}
+
+	// when
+	text := report.FormatText()
+
+	// then — verify key lines are present
+	expected := []string{
+		"paintress status:",
+		"Continent:",
+		"/path/to/repo",
+		"Expeditions:",
+		"15",
+		"12 success",
+		"2 failed",
+		"Success rate:",
+		"85.7%",
+		"Gradient:",
+		"level 3",
+		"Inbox:",
+		"1 pending",
+		"Archive:",
+		"10 processed",
+		"Last expedition:",
+	}
+	for _, s := range expected {
+		if !strings.Contains(text, s) {
+			t.Errorf("expected output to contain %q, got:\n%s", s, text)
+		}
+	}
+}
+
+func TestStatusReport_FormatText_NoEvents(t *testing.T) {
+	// given — zero-value report
+	report := StatusReport{}
+
+	// when
+	text := report.FormatText()
+
+	// then
+	if !strings.Contains(text, "no expeditions yet") {
+		t.Errorf("expected 'no expeditions yet' for zero time, got:\n%s", text)
+	}
+}
+
+func TestStatusReport_FormatJSON(t *testing.T) {
+	// given
+	report := StatusReport{
+		Continent:      "/path/to/repo",
+		Expeditions:    15,
+		Successes:      12,
+		Failures:       2,
+		SuccessRate:    0.857,
+		GradientLevel:  3,
+		InboxCount:     1,
+		ArchiveCount:   10,
+		LastExpedition: time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
+	}
+
+	// when
+	data := report.FormatJSON()
+
+	// then — verify it's valid JSON with expected fields
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(data), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, data)
+	}
+	if parsed["expeditions"] != float64(15) {
+		t.Errorf("expected expeditions=15, got %v", parsed["expeditions"])
+	}
+	if parsed["successes"] != float64(12) {
+		t.Errorf("expected successes=12, got %v", parsed["successes"])
+	}
+	if parsed["inbox_count"] != float64(1) {
+		t.Errorf("expected inbox_count=1, got %v", parsed["inbox_count"])
+	}
+	if parsed["continent"] != "/path/to/repo" {
+		t.Errorf("expected continent=/path/to/repo, got %v", parsed["continent"])
+	}
+}
+
+func makeStatusEvent(eventType paintress.EventType, data any, ts time.Time) paintress.Event {
+	ev, err := paintress.NewEvent(eventType, data, ts)
+	if err != nil {
+		panic(err)
+	}
+	return ev
+}

@@ -165,8 +165,8 @@ func TestReviewLoop_ParentContextCancellationStopsLoop(t *testing.T) {
 }
 
 // TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig verifies that each
-// review command call is bounded by TimeoutSec / maxReviewCycles.
-// With TimeoutSec=6 and maxReviewCycles=3, each review gets 2s.
+// review command call is bounded by TimeoutSec / maxReviewGateCycles.
+// With TimeoutSec=6 and maxReviewGateCycles=3, each review gets 2s.
 // minReviewTimeout is lowered so the computed 2s is not clamped.
 func TestReviewLoop_ReviewCmdTimeoutDerivedFromConfig(t *testing.T) {
 	// given — lower clamp so computed timeout (2s) is used
@@ -350,6 +350,46 @@ func TestRunFollowUp_ZeroBudget_Skipped(t *testing.T) {
 	// then — command should NOT have been executed
 	if _, err := os.Stat(markerFile); err == nil {
 		t.Error("follow-up should not execute when remaining budget is zero")
+	}
+}
+
+// TestReviewLoop_ReviewCommentsPropagatedToFix verifies that review comments
+// are included in the Claude fix prompt via the -p argument.
+func TestReviewLoop_ReviewCommentsPropagatedToFix(t *testing.T) {
+	// given — review outputs specific comments, verify they reach the fix prompt
+	dir := t.TempDir()
+	setupGitRepoWithBranch(t, dir, "feat/test")
+
+	promptCapture := filepath.Join(dir, "captured-prompt.txt")
+
+	reviewScript := filepath.Join(dir, "review.sh")
+	writeScript(t, reviewScript, "echo 'UNIQUE-PAINTRESS-REVIEW-COMMENT-XYZ-456'\nexit 1\n")
+
+	// Fake claude captures -p argument to file
+	fakeClaudeCmd := filepath.Join(dir, "fakeclaude.sh")
+	writeScript(t, fakeClaudeCmd, `while [ $# -gt 0 ]; do
+  if [ "$1" = "-p" ]; then
+    echo "$2" > `+promptCapture+`
+    break
+  fi
+  shift
+done
+exit 0
+`)
+
+	p := newTestPaintress(t, dir, 30, reviewScript, fakeClaudeCmd)
+	report := &paintress.ExpeditionReport{Branch: "feat/test"}
+
+	// when — review fails, fix is called with review comments in prompt
+	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
+
+	// then — captured prompt should contain the review comments
+	captured, err := os.ReadFile(promptCapture)
+	if err != nil {
+		t.Fatalf("fix was not called (no captured prompt): %v", err)
+	}
+	if !strings.Contains(string(captured), "UNIQUE-PAINTRESS-REVIEW-COMMENT-XYZ-456") {
+		t.Errorf("review comments not propagated to fix prompt, got: %s", string(captured))
 	}
 }
 

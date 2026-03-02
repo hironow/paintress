@@ -33,7 +33,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 			return nil, fmt.Errorf("outbox store: create dir %s: %w", dir, err)
 		}
 	}
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", dbPath) // nosemgrep: d4-sql-open-without-defer-close — stored in struct, closed via Close()
 	if err != nil {
 		return nil, fmt.Errorf("outbox store: open db: %w", err)
 	}
@@ -45,6 +45,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 	// Set PRAGMAs explicitly — modernc.org/sqlite does not support
 	// underscore-prefixed query parameters like mattn/go-sqlite3.
 	for _, pragma := range []string{
+		"PRAGMA auto_vacuum=INCREMENTAL",
 		"PRAGMA journal_mode=WAL",
 		"PRAGMA synchronous=NORMAL",
 		"PRAGMA busy_timeout=5000",
@@ -58,6 +59,10 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 		db.Close()
 		return nil, err
 	}
+	if err := os.Chmod(dbPath, 0o600); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("outbox store: chmod db: %w", err)
+	}
 	return &SQLiteOutboxStore{
 		db:         db,
 		archiveDir: archiveDir,
@@ -65,11 +70,16 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 	}, nil
 }
 
+// maxRetryCount is the maximum number of flush attempts per item. Items
+// that exceed this limit are treated as dead-letter and skipped.
+const maxRetryCount = 3
+
 func createOutboxSchema(db *sql.DB) error {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS staged (
-		name    TEXT PRIMARY KEY,
-		data    BLOB    NOT NULL,
-		flushed INTEGER NOT NULL DEFAULT 0
+		name        TEXT PRIMARY KEY,
+		data        BLOB    NOT NULL,
+		flushed     INTEGER NOT NULL DEFAULT 0,
+		retry_count INTEGER NOT NULL DEFAULT 0
 	)`)
 	if err != nil {
 		return fmt.Errorf("outbox store: create schema: %w", err)
@@ -100,6 +110,9 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	}
 	defer conn.Close()
 
+	// BEGIN IMMEDIATE acquires a RESERVED lock immediately, preventing
+	// the SHARED→EXCLUSIVE deadlock that occurs with DEFERRED transactions
+	// when two connections SELECT then UPDATE concurrently.
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		return 0, fmt.Errorf("outbox store: begin immediate: %w", err)
 	}
@@ -110,7 +123,8 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 		}
 	}()
 
-	rows, err := conn.QueryContext(ctx, `SELECT name, data FROM staged WHERE flushed = 0`)
+	rows, err := conn.QueryContext(ctx,
+		`SELECT name, data FROM staged WHERE flushed = 0 AND retry_count < ?`, maxRetryCount)
 	if err != nil {
 		return 0, fmt.Errorf("outbox store: query staged: %w", err)
 	}
@@ -138,28 +152,58 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 		return 0, nil
 	}
 
+	flushed := 0
 	for _, it := range items {
 		archivePath := filepath.Join(s.archiveDir, it.name)
-		if err := atomicWrite(archivePath, it.data); err != nil {
-			return 0, fmt.Errorf("outbox store: atomic write archive %s: %w", it.name, err)
+		if writeErr := atomicWrite(archivePath, it.data); writeErr != nil {
+			conn.ExecContext(ctx, //nolint:errcheck
+				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
+			continue
 		}
 		outboxPath := filepath.Join(s.outboxDir, it.name)
-		if err := atomicWrite(outboxPath, it.data); err != nil {
-			return 0, fmt.Errorf("outbox store: atomic write outbox %s: %w", it.name, err)
+		if writeErr := atomicWrite(outboxPath, it.data); writeErr != nil {
+			conn.ExecContext(ctx, //nolint:errcheck
+				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
+			continue
 		}
-	}
-
-	for _, it := range items {
 		if _, err := conn.ExecContext(ctx, `UPDATE staged SET flushed = 1 WHERE name = ?`, it.name); err != nil {
 			return 0, fmt.Errorf("outbox store: mark flushed %s: %w", it.name, err)
 		}
+		flushed++
 	}
 
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
-	return len(items), nil
+	return flushed, nil
+}
+
+// PruneFlushed deletes all flushed rows from the staging table and runs
+// incremental vacuum to reclaim disk space. Returns the number of deleted rows.
+func (s *SQLiteOutboxStore) PruneFlushed() (int, error) {
+	result, err := s.db.Exec(`DELETE FROM staged WHERE flushed = 1`)
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: prune flushed: %w", err)
+	}
+	deleted, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("outbox store: rows affected: %w", err)
+	}
+	if deleted > 0 {
+		if vacErr := s.IncrementalVacuum(); vacErr != nil {
+			return int(deleted), fmt.Errorf("outbox store: vacuum after prune: %w", vacErr)
+		}
+	}
+	return int(deleted), nil
+}
+
+// IncrementalVacuum reclaims free pages without acquiring an exclusive lock.
+// Call after bulk deletes (e.g., archive-prune) to shrink the DB file.
+// Requires PRAGMA auto_vacuum=INCREMENTAL set at DB open time.
+func (s *SQLiteOutboxStore) IncrementalVacuum() error {
+	_, err := s.db.Exec("PRAGMA incremental_vacuum")
+	return err
 }
 
 // Close closes the underlying database connection.
@@ -175,6 +219,21 @@ func NewOutboxStoreForContinent(continent string) (*SQLiteOutboxStore, error) {
 	archiveDir := paintress.ArchiveDir(continent)
 	outboxDir := paintress.OutboxDir(continent)
 	return NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+}
+
+// PruneFlushedOutbox opens the outbox DB, deletes flushed rows, runs
+// incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
+func PruneFlushedOutbox(continent string) (int, error) {
+	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return 0, nil
+	}
+	store, err := NewOutboxStoreForContinent(continent)
+	if err != nil {
+		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
+	}
+	defer store.Close()
+	return store.PruneFlushed()
 }
 
 // atomicWrite writes data to a temporary file in the same directory, then

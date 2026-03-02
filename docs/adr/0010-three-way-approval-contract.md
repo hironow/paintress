@@ -1,7 +1,7 @@
 # 0010. Three-Way Approval Contract
 
 **Date:** 2026-02-23
-**Status:** Accepted — generalized in shared ADR S0003
+**Status:** Accepted
 
 ## Context
 
@@ -68,6 +68,6 @@ Adopt a three-way approval contract with session-level gating:
 ### Neutral
 
 - `CmdApprover` uses `sh -c` for shell expansion, requiring proper escaping
-  of the `{message}` placeholder (handled by `shellQuote`)
+  of the `{message}` placeholder (handled by `ShellQuote`)
 - The three-way contract is documented in `docs/approval-contract.md` with
   test coverage matrix

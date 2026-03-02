@@ -44,4 +44,3 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 	}
 	return nil
 }
-

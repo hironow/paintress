@@ -33,6 +33,8 @@ dmail-schema-version: "1"
 | `description` | string | Yes | Human-readable summary |
 | `issues` | string[] | No | Related Linear issue IDs |
 | `severity` | string | No | `HIGH` triggers the approval gate |
+| `action` | string | No | Requested action (e.g., `implement`, `review`, `fix`) |
+| `priority` | int | No | Priority level (0 = unset, higher = more urgent) |
 | `dmail-schema-version` | string | No | Protocol version (currently `"1"`) |
 | `metadata` | map | No | Arbitrary key-value pairs |
 

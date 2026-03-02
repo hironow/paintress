@@ -72,10 +72,42 @@ func TestLocalNotifier_Linux_CommandShape(t *testing.T) {
 	}
 }
 
+func TestLocalNotifier_Windows_CommandShape(t *testing.T) {
+	// given: force windows
+	var capturedName string
+	var capturedArgs []string
+	n := &LocalNotifier{
+		forceOS: "windows",
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			capturedName = name
+			capturedArgs = args
+			return &fakeCmd{}
+		},
+	}
+
+	// when
+	err := n.Notify(context.Background(), "Test Title", "Test Message")
+
+	// then
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedName != "powershell" {
+		t.Errorf("command = %q, want powershell", capturedName)
+	}
+	joined := strings.Join(capturedArgs, " ")
+	if !strings.Contains(joined, "Test Title") {
+		t.Errorf("args should contain title, got: %s", joined)
+	}
+	if !strings.Contains(joined, "Test Message") {
+		t.Errorf("args should contain message, got: %s", joined)
+	}
+}
+
 func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	// given: force unsupported OS
 	n := &LocalNotifier{
-		forceOS: "windows",
+		forceOS: "freebsd",
 		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
 			t.Error("should not invoke command for unsupported OS")
 			return &fakeCmd{}
@@ -109,7 +141,7 @@ func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// After shellQuote: 'Paintress' and 'HIGH severity D-Mail'
+	// After ShellQuote: 'Paintress' and 'HIGH severity D-Mail'
 	want := `curl -d 'Paintress': 'HIGH severity D-Mail' https://example.com`
 	if capturedShellCmd != want {
 		t.Errorf("shell cmd = %q, want %q", capturedShellCmd, want)
@@ -137,7 +169,7 @@ func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
 	_ = n.Notify(context.Background(), "Title", `"; rm -rf /; echo "`)
 
 	// then: the raw injection string must NOT appear unquoted
-	// After shellQuote, it becomes '"; rm -rf /; echo "' (safely single-quoted)
+	// After ShellQuote, it becomes '"; rm -rf /; echo "' (safely single-quoted)
 	if strings.Contains(capturedShellCmd, `echo "; rm -rf`) {
 		t.Error("shell metacharacters were not escaped — command injection possible")
 	}
@@ -147,7 +179,7 @@ func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
 	}
 }
 
-func TestShellQuote(t *testing.T) {
+func TestShellQuoteUnix(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
@@ -160,10 +192,72 @@ func TestShellQuote(t *testing.T) {
 		{"", "''"},
 	}
 	for _, tt := range tests {
-		got := shellQuote(tt.input)
+		got := ShellQuoteUnix(tt.input)
 		if got != tt.want {
-			t.Errorf("shellQuote(%q) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("ShellQuoteUnix(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestShellQuoteCmd(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"simple", `"simple"`},
+		{"with spaces", `"with spaces"`},
+		{`has "double" quotes`, `"has ""double"" quotes"`},
+		{"100%", `"100%%"`},
+		{`"; rm -rf /`, `"""; rm -rf /"`},
+		{"", `""`},
+	}
+	for _, tt := range tests {
+		got := ShellQuoteCmd(tt.input)
+		if got != tt.want {
+			t.Errorf("ShellQuoteCmd(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestCmdNotifier_Timeout(t *testing.T) {
+	// given — a command factory that captures the context deadline
+	var capturedCtx context.Context
+	n := &CmdNotifier{
+		cmdTemplate: `echo {message}`,
+		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+			capturedCtx = ctx
+			return &fakeCmd{}
+		},
+	}
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then — the context passed to the command should have a deadline
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedCtx == nil {
+		t.Fatal("context was not captured")
+	}
+	deadline, ok := capturedCtx.Deadline()
+	if !ok {
+		t.Fatal("context should have a deadline (30s timeout)")
+	}
+	// Deadline should be roughly 30s from now (allow some slack)
+	_ = deadline // existence check is sufficient
+}
+
+func TestCmdNotifier_EmptyTemplate(t *testing.T) {
+	// given
+	n := NewCmdNotifier("")
+
+	// when
+	err := n.Notify(context.Background(), "Title", "Message")
+
+	// then — empty template should produce an error
+	if err == nil {
+		t.Error("expected error for empty template")
 	}
 }
 

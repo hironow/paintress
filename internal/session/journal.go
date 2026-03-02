@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,6 +51,36 @@ func WriteJournal(continent string, report *paintress.ExpeditionReport) error {
 	)
 
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// WritePRIndex appends a PR URL index entry to the pr-index.jsonl file
+// in the journal directory. Skips entries with empty or "none" PR URLs.
+func WritePRIndex(continent string, report *paintress.ExpeditionReport) error {
+	if report.PRUrl == "" || report.PRUrl == "none" {
+		return nil
+	}
+	dir := paintress.JournalDir(continent)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	entry := paintress.PRIndexEntry{
+		Expedition: report.Expedition,
+		IssueID:    report.IssueID,
+		PRUrl:      report.PRUrl,
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("pr index: marshal: %w", err)
+	}
+	data = append(data, '\n')
+	path := filepath.Join(dir, "pr-index.jsonl")
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("pr index: open: %w", err)
+	}
+	defer f.Close()
+	_, err = f.Write(data)
+	return err
 }
 
 // ListJournalFiles returns journal file paths sorted by name (ascending).

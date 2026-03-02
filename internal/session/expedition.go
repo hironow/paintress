@@ -174,7 +174,7 @@ func (e *Expedition) loadContextSection() string {
 // Run executes the expedition with timeout and streaming output.
 func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if e.DataOut == nil {
-		e.DataOut = os.Stdout
+		e.DataOut = io.Discard
 	}
 	prompt := e.BuildPrompt()
 

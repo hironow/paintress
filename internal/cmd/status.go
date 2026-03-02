@@ -1,0 +1,54 @@
+package cmd
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+
+	"github.com/hironow/paintress/internal/session"
+	"github.com/spf13/cobra"
+)
+
+// newStatusCommand creates the status subcommand that displays operational status.
+func newStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status [repo-path]",
+		Short: "Show paintress operational status",
+		Long: `Display operational status including expedition history, success rate,
+gradient level, and pending d-mail counts.
+
+Output goes to stderr (human-readable) by default.
+Use -o json for machine-readable JSON output to stdout.`,
+		Example: `  # Show status for a specific project
+  paintress status /path/to/repo
+
+  # JSON output for scripting
+  paintress status -o json /path/to/repo`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("repo-path argument is required")
+			}
+			baseDir, err := filepath.Abs(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid path: %w", err)
+			}
+
+			report := session.Status(baseDir)
+
+			outputFmt, _ := cmd.Flags().GetString("output")
+			if outputFmt == "json" {
+				data, jsonErr := json.Marshal(report)
+				if jsonErr != nil {
+					return fmt.Errorf("marshal status: %w", jsonErr)
+				}
+				fmt.Fprintln(cmd.OutOrStdout(), string(data))
+				return nil
+			}
+
+			// Text output to stderr (human-readable metadata)
+			fmt.Fprint(cmd.ErrOrStderr(), report.FormatText())
+			return nil
+		},
+	}
+}

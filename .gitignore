@@ -5,6 +5,8 @@
 coverage.out
 # paintress runtime state on target repository
 .expedition/
+# environment-specific local files (must not contain full paths)
+*.local.*
 # claude local settings
 .claude/*.local.*
 # git worktrees
@@ -13,3 +15,5 @@ coverage.out
 docs/plans/
 # golang
 .gocache/
+# fake-claude binary (not source in testdata/)
+/fake-claude

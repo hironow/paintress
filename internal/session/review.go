@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const maxReviewCycles = 3
+const maxReviewGateCycles = 3
 
 // minReviewTimeout is the floor for the per-cycle review timeout.
 var minReviewTimeout = 30 * time.Second
@@ -97,6 +97,17 @@ func isRateLimited(output string) bool {
 		}
 	}
 	return false
+}
+
+// ExpandReviewCmd replaces placeholders in the review command string.
+// Supported placeholders:
+//
+//	{file}   → review working directory
+//	{branch} → current git branch name
+func ExpandReviewCmd(cmd, dir, branch string) string {
+	cmd = strings.ReplaceAll(cmd, "{file}", dir)
+	cmd = strings.ReplaceAll(cmd, "{branch}", branch)
+	return cmd
 }
 
 // BuildReviewFixPrompt creates a focused prompt for fixing review comments.

@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,8 +40,13 @@ type Paintress struct {
 	pool        *WorktreePool // nil when --workers=0
 	notifier    paintress.Notifier
 	approver    paintress.Approver
-	outboxStore paintress.OutboxStore // transactional outbox for D-Mail delivery
-	eventStore  paintress.EventStore  // append-only event log (fire-and-forget)
+	outboxStore paintress.OutboxStore     // transactional outbox for D-Mail delivery
+	eventStore  paintress.EventStore      // append-only event log (fire-and-forget)
+	Dispatcher  paintress.EventDispatcher // policy engine (best-effort dispatch after emit)
+
+	// Retry tracking: maps sorted issue keys to attempt count
+	retryMu      sync.Mutex
+	retryTracker map[string]int
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
@@ -54,7 +61,14 @@ type Paintress struct {
 
 // emitEvent appends a single event to the event store. Errors are logged
 // but never propagated — the event log is observational, not critical.
+// After persistence, the event is dispatched to the PolicyEngine best-effort.
 func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
+	// Record OTel metric for expedition completions (fire-and-forget, independent of event store)
+	if eventType == paintress.EventExpeditionCompleted {
+		if d, ok := data.(paintress.ExpeditionCompletedData); ok {
+			paintress.RecordExpedition(context.Background(), d.Status)
+		}
+	}
 	if p.eventStore == nil {
 		return
 	}
@@ -65,6 +79,13 @@ func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
 	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Debug("event emit append: %v", err)
+		paintress.RecordEventEmitError(context.Background(), string(eventType))
+	}
+	// Best-effort policy dispatch
+	if p.Dispatcher != nil {
+		if dispatchErr := p.Dispatcher.Dispatch(context.Background(), ev); dispatchErr != nil {
+			p.Logger.Debug("policy dispatch %s: %v", eventType, dispatchErr)
+		}
 	}
 }
 
@@ -73,10 +94,10 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 		logger = paintress.NewLogger(nil, false)
 	}
 	if dataOut == nil {
-		dataOut = os.Stdout
+		dataOut = io.Discard
 	}
 	if stdinIn == nil {
-		stdinIn = os.Stdin
+		stdinIn = strings.NewReader("")
 	}
 	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -115,22 +136,30 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 	default:
 		promptOut := logger.Writer()
 		if promptOut == io.Discard || promptOut == dataOut {
-			promptOut = os.Stderr
+			promptOut = os.Stderr // nosemgrep: adr0002-no-os-stderr-in-internal — fallback for quiet-mode + interactive approval; cmd layer cannot predict this condition
 		}
 		approver = NewStdinApprover(stdinIn, promptOut)
 	}
 
+	maxRetries := cfg.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	cfgCopy := cfg
+	cfgCopy.MaxRetries = maxRetries
+
 	p := &Paintress{
-		config:     cfg,
-		logDir:     logDir,
-		Logger:     logger,
-		DataOut:    dataOut,
-		StdinIn:    stdinIn,
-		gradient:   paintress.NewGradientGauge(gradientMax),
-		reserve:    paintress.NewReserveParty(primary, reserves, logger),
-		notifier:   notifier,
-		approver:   approver,
-		eventStore: eventStore,
+		config:       cfgCopy,
+		logDir:       logDir,
+		Logger:       logger,
+		DataOut:      dataOut,
+		StdinIn:      stdinIn,
+		gradient:     paintress.NewGradientGauge(gradientMax),
+		reserve:      paintress.NewReserveParty(primary, reserves, logger),
+		notifier:     notifier,
+		approver:     approver,
+		eventStore:   eventStore,
+		retryTracker: make(map[string]int),
 	}
 
 	if !cfg.NoDev {
@@ -519,7 +548,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 					followUpBudget := totalTimeout - time.Since(expStart)
-					p.runFollowUp(ctx, matched, workDir, followUpBudget)
+					for _, dm := range matched {
+						if dm.Action != "" {
+							p.handleFeedbackAction(ctx, dm, workDir, followUpBudget)
+						} else {
+							p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, followUpBudget)
+						}
+					}
 				}
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
@@ -579,6 +614,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
+			p.stageEscalation(exp, maxConsecutiveFailures)
 			expSpan.AddEvent("gommage",
 				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
 			)
@@ -625,11 +661,11 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 	var consumed time.Duration
 
 	reviewTimeout := max(
-		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewCycles),
+		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewGateCycles),
 		minReviewTimeout,
 	)
 	var lastComments string
-	for cycle := 1; cycle <= maxReviewCycles; cycle++ {
+	for cycle := 1; cycle <= maxReviewGateCycles; cycle++ {
 		if ctx.Err() != nil {
 			if lastComments != "" {
 				if report.Insight != "" {
@@ -641,13 +677,14 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 			return
 		}
 
-		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("review_running"), cycle, maxReviewCycles))
+		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("review_running"), cycle, maxReviewGateCycles))
 
 		_, revSpan := paintress.Tracer.Start(ctx, "review.command",
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		result, err := RunReview(reviewCtx, p.config.ReviewCmd, reviewDir)
+		expandedCmd := ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
+		result, err := RunReview(reviewCtx, expandedCmd, reviewDir)
 		reviewCancel()
 		if err != nil {
 			revSpan.End()
@@ -724,6 +761,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 		cmd := exec.CommandContext(fixCtx, claudeCmd,
 			"--model", model,
 			"--continue",
+			"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
 			"--dangerously-skip-permissions",
 			"--print",
 			"-p", prompt,
@@ -794,6 +832,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []paintress.DMail, w
 	cmd := exec.CommandContext(followCtx, claudeCmd,
 		"--model", model,
 		"--continue",
+		"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
 		"--dangerously-skip-permissions",
 		"--print",
 		"-p", prompt,
@@ -918,4 +957,61 @@ func (p *Paintress) printSummary() {
 	p.Logger.Info("Flag:     %s", paintress.FlagPath(p.config.Continent))
 	p.Logger.Info("Journals: %s", paintress.JournalDir(p.config.Continent))
 	p.Logger.Info("Logs:     %s", p.logDir)
+}
+
+// stageEscalation creates and stages a feedback D-Mail for escalation when
+// consecutive failures reach the threshold. Errors are logged but not
+// propagated — escalation is best-effort observability.
+func (p *Paintress) stageEscalation(expedition, failureCount int) {
+	if p.outboxStore == nil {
+		return
+	}
+	dm := paintress.NewEscalationDMail(expedition, failureCount)
+	if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
+		p.Logger.Warn("escalation dmail: %v", err)
+	}
+}
+
+// handleFeedbackAction dispatches a D-Mail based on its Action field.
+// Actions: "retry" (with retry counting), "escalate", "resolve", or fallthrough.
+func (p *Paintress) handleFeedbackAction(ctx context.Context, dm paintress.DMail, workDir string, remaining time.Duration) {
+	switch dm.Action {
+	case "retry":
+		if len(dm.Issues) == 0 {
+			p.Logger.Warn("Retry action without issues, falling through: %s", dm.Name)
+			p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
+			return
+		}
+		sorted := make([]string, len(dm.Issues))
+		copy(sorted, dm.Issues)
+		sort.Strings(sorted)
+		retryKey := strings.Join(sorted, ",")
+
+		p.retryMu.Lock()
+		p.retryTracker[retryKey]++
+		count := p.retryTracker[retryKey]
+		p.retryMu.Unlock()
+
+		if count > p.config.MaxRetries {
+			p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)
+			p.handleEscalation(dm)
+			return
+		}
+		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
+		p.emitEvent(paintress.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
+		p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
+	case "escalate":
+		p.handleEscalation(dm)
+	case "resolve":
+		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
+	default:
+		p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
+	}
+}
+
+// handleEscalation logs and emits an escalation event for a D-Mail that
+// requires human attention.
+func (p *Paintress) handleEscalation(dm paintress.DMail) {
+	p.Logger.Warn("ESCALATION: %s requires human attention (issues: %v)", dm.Name, dm.Issues)
+	p.emitEvent(paintress.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues})
 }

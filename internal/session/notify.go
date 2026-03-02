@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/hironow/paintress"
 )
@@ -52,9 +53,26 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		return mk(ctx, "osascript", "-e", script).Run()
 	case "linux":
 		return mk(ctx, "notify-send", title, message).Run()
+	case "windows":
+		script := fmt.Sprintf(
+			`Add-Type -AssemblyName System.Windows.Forms; `+
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+
+				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
+				`$n.BalloonTipTitle = '%s'; `+
+				`$n.BalloonTipText = '%s'; `+
+				`$n.Visible = $true; `+
+				`$n.ShowBalloonTip(5000)`,
+			psEscapeSingleQuote(title), psEscapeSingleQuote(message),
+		)
+		return mk(ctx, "powershell", "-NoProfile", "-Command", script).Run()
 	default:
 		return paintress.ErrUnsupportedOS
 	}
+}
+
+// psEscapeSingleQuote escapes single quotes for PowerShell single-quoted strings.
+func psEscapeSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 // CmdNotifier executes a user-provided shell command for notifications.
@@ -75,13 +93,15 @@ func (n *CmdNotifier) factory() cmdFactory {
 	return defaultCmdFactory
 }
 
-func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
-	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", shellQuote(title))
-	expanded = strings.ReplaceAll(expanded, "{message}", shellQuote(message))
-	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
-}
+const notifyTimeout = 30 * time.Second
 
-// shellQuote wraps s in single quotes for safe interpolation into sh -c commands.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
+	if n.cmdTemplate == "" {
+		return fmt.Errorf("notify: empty command template")
+	}
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeout)
+	defer cancel()
+	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", ShellQuote(title))
+	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
+	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
 }

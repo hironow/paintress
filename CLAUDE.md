@@ -30,7 +30,8 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 ### `internal/eventsource/` — event store infrastructure
 
 - `store_file.go` — FileEventStore (JSONL append-only, implements EventStore)
-- `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles
+- `lifecycle.go` — FindExpiredEventFiles, PruneEventFiles (flat `.jsonl` storage, `os.Remove` pruning)
+- `path.go` — EventsDir path helper
 
 ### `internal/session/` — all filesystem, network, subprocess I/O
 
@@ -97,13 +98,17 @@ Dependency direction: `internal/cmd` → `internal/session` → `internal/events
 ## Build & Test
 
 ```bash
-just build       # build with version from git tags
-just build-all   # build all binaries (main + companions)
-just install     # build + install to /usr/local/bin
-just install-all # install all binaries (main + companions)
-just test        # all tests, 300s timeout
-just test-race   # with race detector
-just check       # fmt + vet + test
-just semgrep     # cobra semgrep rules
-just lint        # vet + markdown lint + gofmt check
+just build              # build with version from git tags
+just build-all          # build all binaries (main + companions)
+just install            # build + install to /usr/local/bin
+just install-all        # install all binaries (main + companions)
+just test               # all tests, 300s timeout
+just test-race          # with race detector
+just test-e2e           # Docker E2E tests
+just test-scenario-min  # L1 scenario test (minimal closed loop)
+just test-scenario      # L1+L2 scenario tests (CI default)
+just test-scenario-all  # all scenario tests (L1-L4)
+just check              # fmt + vet + test
+just semgrep            # cobra semgrep rules
+just lint               # vet + markdown lint + gofmt check
 ```

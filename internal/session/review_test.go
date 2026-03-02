@@ -512,3 +512,69 @@ func TestRunReview_ExitCodeNonZero_ReturnsComments(t *testing.T) {
 		t.Errorf("comments should contain output, got: %s", result.Comments)
 	}
 }
+
+// === ExpandReviewCmd ===
+
+func TestExpandReviewCmd_FilePlaceholder(t *testing.T) {
+	// given
+	cmd := "lint {file}"
+	dir := "/tmp/myrepo"
+
+	// when
+	got := ExpandReviewCmd(cmd, dir, "feature/auth")
+
+	// then
+	if got != "lint /tmp/myrepo" {
+		t.Errorf("ExpandReviewCmd = %q, want %q", got, "lint /tmp/myrepo")
+	}
+}
+
+func TestExpandReviewCmd_BranchPlaceholder(t *testing.T) {
+	// given
+	cmd := "codex review --base {branch}"
+
+	// when
+	got := ExpandReviewCmd(cmd, "/repo", "main")
+
+	// then
+	if got != "codex review --base main" {
+		t.Errorf("ExpandReviewCmd = %q, want %q", got, "codex review --base main")
+	}
+}
+
+func TestExpandReviewCmd_MultiplePlaceholders(t *testing.T) {
+	// given
+	cmd := "review --dir {file} --branch {branch}"
+
+	// when
+	got := ExpandReviewCmd(cmd, "/work", "dev")
+
+	// then
+	want := "review --dir /work --branch dev"
+	if got != want {
+		t.Errorf("ExpandReviewCmd = %q, want %q", got, want)
+	}
+}
+
+func TestExpandReviewCmd_NoPlaceholders(t *testing.T) {
+	// given
+	cmd := "eslint ."
+
+	// when
+	got := ExpandReviewCmd(cmd, "/repo", "main")
+
+	// then
+	if got != "eslint ." {
+		t.Errorf("ExpandReviewCmd = %q, want %q", got, "eslint .")
+	}
+}
+
+func TestExpandReviewCmd_EmptyCommand(t *testing.T) {
+	// given / when
+	got := ExpandReviewCmd("", "/repo", "main")
+
+	// then
+	if got != "" {
+		t.Errorf("ExpandReviewCmd = %q, want empty", got)
+	}
+}

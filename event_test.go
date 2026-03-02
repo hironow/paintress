@@ -1,22 +1,24 @@
-package paintress
+package paintress_test
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress"
 )
 
 func TestValidateEvent_Valid(t *testing.T) {
 	// given
-	event := Event{
+	event := paintress.Event{
 		ID:        "test-001",
-		Type:      EventExpeditionStarted,
+		Type:      paintress.EventExpeditionStarted,
 		Timestamp: time.Now(),
 		Data:      json.RawMessage(`{"expedition":1}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := paintress.ValidateEvent(event)
 
 	// then
 	if err != nil {
@@ -26,14 +28,14 @@ func TestValidateEvent_Valid(t *testing.T) {
 
 func TestValidateEvent_EmptyID(t *testing.T) {
 	// given
-	event := Event{
-		Type:      EventExpeditionStarted,
+	event := paintress.Event{
+		Type:      paintress.EventExpeditionStarted,
 		Timestamp: time.Now(),
 		Data:      json.RawMessage(`{}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := paintress.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -43,14 +45,14 @@ func TestValidateEvent_EmptyID(t *testing.T) {
 
 func TestValidateEvent_EmptyType(t *testing.T) {
 	// given
-	event := Event{
+	event := paintress.Event{
 		ID:        "test-001",
 		Timestamp: time.Now(),
 		Data:      json.RawMessage(`{}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := paintress.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -60,14 +62,14 @@ func TestValidateEvent_EmptyType(t *testing.T) {
 
 func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 	// given
-	event := Event{
+	event := paintress.Event{
 		ID:   "test-001",
-		Type: EventExpeditionStarted,
+		Type: paintress.EventExpeditionStarted,
 		Data: json.RawMessage(`{}`),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := paintress.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -77,14 +79,14 @@ func TestValidateEvent_ZeroTimestamp(t *testing.T) {
 
 func TestValidateEvent_NilData(t *testing.T) {
 	// given
-	event := Event{
+	event := paintress.Event{
 		ID:        "test-001",
-		Type:      EventExpeditionStarted,
+		Type:      paintress.EventExpeditionStarted,
 		Timestamp: time.Now(),
 	}
 
 	// when
-	err := ValidateEvent(event)
+	err := paintress.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -94,10 +96,10 @@ func TestValidateEvent_NilData(t *testing.T) {
 
 func TestValidateEvent_AllFieldsInvalid(t *testing.T) {
 	// given
-	event := Event{}
+	event := paintress.Event{}
 
 	// when
-	err := ValidateEvent(event)
+	err := paintress.ValidateEvent(event)
 
 	// then
 	if err == nil {
@@ -108,10 +110,10 @@ func TestValidateEvent_AllFieldsInvalid(t *testing.T) {
 func TestNewEvent_CreatesValidEvent(t *testing.T) {
 	// given
 	now := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
-	payload := ExpeditionStartedData{Expedition: 1, Worker: 0, Model: "opus"}
+	payload := paintress.ExpeditionStartedData{Expedition: 1, Worker: 0, Model: "opus"}
 
 	// when
-	event, err := NewEvent(EventExpeditionStarted, payload, now)
+	event, err := paintress.NewEvent(paintress.EventExpeditionStarted, payload, now)
 
 	// then
 	if err != nil {
@@ -120,13 +122,13 @@ func TestNewEvent_CreatesValidEvent(t *testing.T) {
 	if event.ID == "" {
 		t.Error("expected non-empty ID")
 	}
-	if event.Type != EventExpeditionStarted {
-		t.Errorf("Type = %q, want %q", event.Type, EventExpeditionStarted)
+	if event.Type != paintress.EventExpeditionStarted {
+		t.Errorf("Type = %q, want %q", event.Type, paintress.EventExpeditionStarted)
 	}
 	if !event.Timestamp.Equal(now) {
 		t.Errorf("Timestamp = %v, want %v", event.Timestamp, now)
 	}
-	if err := ValidateEvent(event); err != nil {
+	if err := paintress.ValidateEvent(event); err != nil {
 		t.Errorf("NewEvent produced invalid event: %v", err)
 	}
 }
@@ -134,9 +136,9 @@ func TestNewEvent_CreatesValidEvent(t *testing.T) {
 func TestEventMarshalRoundTrip(t *testing.T) {
 	// given
 	now := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
-	event := Event{
+	event := paintress.Event{
 		ID:        "test-roundtrip",
-		Type:      EventExpeditionCompleted,
+		Type:      paintress.EventExpeditionCompleted,
 		Timestamp: now,
 		Data:      json.RawMessage(`{"expedition":1,"status":"success"}`),
 	}
@@ -146,7 +148,7 @@ func TestEventMarshalRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	var got Event
+	var got paintress.Event
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -165,18 +167,18 @@ func TestEventMarshalRoundTrip(t *testing.T) {
 
 func TestEventTypeConstants_Distinct(t *testing.T) {
 	// then: all event types are distinct non-empty strings
-	types := []EventType{
-		EventExpeditionStarted,
-		EventExpeditionCompleted,
-		EventDMailStaged,
-		EventDMailFlushed,
-		EventDMailArchived,
-		EventGradientChanged,
-		EventGommageTriggered,
-		EventInboxReceived,
+	types := []paintress.EventType{
+		paintress.EventExpeditionStarted,
+		paintress.EventExpeditionCompleted,
+		paintress.EventDMailStaged,
+		paintress.EventDMailFlushed,
+		paintress.EventDMailArchived,
+		paintress.EventGradientChanged,
+		paintress.EventGommageTriggered,
+		paintress.EventInboxReceived,
 	}
 
-	seen := make(map[EventType]bool)
+	seen := make(map[paintress.EventType]bool)
 	for _, et := range types {
 		if et == "" {
 			t.Error("found empty EventType constant")
@@ -190,7 +192,7 @@ func TestEventTypeConstants_Distinct(t *testing.T) {
 
 func TestEventsDir(t *testing.T) {
 	// when
-	dir := EventsDir("/repo")
+	dir := paintress.EventsDir("/repo")
 
 	// then
 	if dir != "/repo/.expedition/events" {

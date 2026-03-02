@@ -37,3 +37,12 @@ type GitExecutor interface {
 	Git(ctx context.Context, dir string, args ...string) ([]byte, error)
 	Shell(ctx context.Context, dir string, command string) ([]byte, error)
 }
+
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
+}

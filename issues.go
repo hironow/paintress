@@ -3,6 +3,7 @@ package paintress
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -64,6 +65,22 @@ func FilterIssuesByState(issues []Issue, states []string) []Issue {
 		}
 	}
 	return filtered
+}
+
+// SortByPriority sorts issues in-place by ascending priority.
+// Priority 0 (unset) is treated as lowest and sorted to the end.
+// The sort is stable, preserving the original order for equal priorities.
+func SortByPriority(issues []Issue) {
+	sort.SliceStable(issues, func(i, j int) bool {
+		pi, pj := issues[i].Priority, issues[j].Priority
+		if pi == 0 {
+			return false
+		}
+		if pj == 0 {
+			return true
+		}
+		return pi < pj
+	})
 }
 
 // FormatIssuesJSON returns issues as a JSON array string.

@@ -18,6 +18,9 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = paintress.DMailSchemaVersion
 	}
+	if err := paintress.ValidateDMail(d); err != nil {
+		return fmt.Errorf("dmail: validate: %w", err)
+	}
 	data, err := d.Marshal()
 	if err != nil {
 		return fmt.Errorf("dmail: marshal: %w", err)
@@ -33,6 +36,9 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	n, err := store.Flush()
 	if err != nil {
 		return fmt.Errorf("dmail: flush: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("dmail: flush: item not delivered (write failure, will retry)")
 	}
 	if err := emitDMailEvent(eventStore, paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: n}); err != nil {
 		return fmt.Errorf("dmail: event flushed: %w", err)
