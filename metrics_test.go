@@ -143,6 +143,31 @@ func sumCounter(t *testing.T, rm metricdata.ResourceMetrics, name string) int64 
 	return 0
 }
 
+func TestRecordEventEmitError_IncrementsCounter(t *testing.T) {
+	// given
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	origMeter := paintress.Meter
+	paintress.Meter = mp.Meter("test")
+	defer func() { paintress.Meter = origMeter }()
+	ctx := context.Background()
+
+	// when
+	paintress.RecordEventEmitError(ctx, "expedition.completed")
+	paintress.RecordEventEmitError(ctx, "expedition.completed")
+	paintress.RecordEventEmitError(ctx, "expedition.started")
+
+	// then
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	total := sumCounter(t, rm, "paintress.event.emit_error.total")
+	if total != 3 {
+		t.Errorf("total = %d, want 3", total)
+	}
+}
+
 func TestFormatSuccessRate_NoEvents(t *testing.T) {
 	// given
 	rate := 0.0

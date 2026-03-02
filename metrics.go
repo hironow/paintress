@@ -21,6 +21,18 @@ func RecordExpedition(ctx context.Context, status string) {
 	)
 }
 
+// RecordEventEmitError increments the paintress.event.emit_error.total OTel counter.
+func RecordEventEmitError(ctx context.Context, eventType string) {
+	c, _ := Meter.Int64Counter("paintress.event.emit_error.total",
+		metric.WithDescription("Count of event emission failures"),
+	)
+	c.Add(ctx, 1,
+		metric.WithAttributes(
+			attribute.String("event_type", eventType),
+		),
+	)
+}
+
 // SuccessRate calculates the success rate from a list of events.
 // It considers only EventExpeditionCompleted events, counting "success"
 // vs "failed" outcomes. "skipped" events are excluded from the denominator.

@@ -73,6 +73,7 @@ func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
 	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Debug("event emit append: %v", err)
+		paintress.RecordEventEmitError(context.Background(), string(eventType))
 	}
 	// Best-effort policy dispatch
 	if p.Dispatcher != nil {
