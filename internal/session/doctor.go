@@ -36,7 +36,7 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 		{"docker", false},
 	}
 
-	checks := make([]paintress.DoctorCheck, 0, len(commands)+6)
+	checks := make([]paintress.DoctorCheck, 0, len(commands)+8)
 	for _, cmd := range commands {
 		check := paintress.DoctorCheck{
 			Name:     cmd.name,
@@ -71,6 +71,33 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 		checks = append(checks, checkWritability(continent))
 		checks = append(checks, checkSkills(continent))
 		checks = append(checks, checkEventStore(continent))
+
+		// External connectivity checks (skip if claude binary not found)
+		claudeOK := false
+		for _, c := range checks {
+			if c.Name == claudeCmd && c.OK {
+				claudeOK = true
+				break
+			}
+		}
+		if !claudeOK {
+			checks = append(checks, paintress.DoctorCheck{
+				Name: "claude-auth", Required: false,
+				Version: "skipped (claude not available)",
+			})
+			checks = append(checks, paintress.DoctorCheck{
+				Name: "linear-mcp", Required: false,
+				Version: "skipped (claude not available)",
+			})
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			cmd := makeMCPListCmd(ctx, claudeCmd)
+			out, err := cmd.Output()
+			cancel()
+			mcpOutput := string(out)
+			checks = append(checks, checkClaudeAuth(mcpOutput, err))
+			checks = append(checks, checkLinearMCP(mcpOutput, err))
+		}
 	}
 
 	return checks

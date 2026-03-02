@@ -469,3 +469,56 @@ func TestCheckLinearMCP_MCPListFailed(t *testing.T) {
 		t.Errorf("version should indicate skipped, got %q", check.Version)
 	}
 }
+
+func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
+	// given — nonexistent claude command, valid continent
+	dir := t.TempDir()
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
+	}
+
+	// when
+	checks := RunDoctor("nonexistent-claude-xyz-12345", dir)
+
+	// then — claude-auth and linear-mcp should exist with skip message
+	var authFound, mcpFound bool
+	for _, c := range checks {
+		switch c.Name {
+		case "claude-auth":
+			authFound = true
+			if c.OK {
+				t.Error("claude-auth should not be OK when claude unavailable")
+			}
+			if !strings.Contains(c.Version, "skipped") {
+				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			}
+		case "linear-mcp":
+			mcpFound = true
+			if c.OK {
+				t.Error("linear-mcp should not be OK when claude unavailable")
+			}
+			if !strings.Contains(c.Version, "skipped") {
+				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			}
+		}
+	}
+	if !authFound {
+		t.Error("expected claude-auth check in doctor output")
+	}
+	if !mcpFound {
+		t.Error("expected linear-mcp check in doctor output")
+	}
+}
+
+func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
+	// given — no continent path
+	// when
+	checks := RunDoctor("claude", "")
+
+	// then — MCP checks should not appear
+	for _, c := range checks {
+		if c.Name == "claude-auth" || c.Name == "linear-mcp" {
+			t.Errorf("MCP check %q should not appear without continent", c.Name)
+		}
+	}
+}
