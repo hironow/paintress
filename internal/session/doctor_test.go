@@ -1,9 +1,11 @@
 package session
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hironow/paintress"
@@ -369,5 +371,101 @@ func TestCheckEventStore_NoDir(t *testing.T) {
 	// then
 	if check.OK {
 		t.Error("events check should fail when events directory missing")
+	}
+}
+
+func TestCheckClaudeAuth_Authenticated(t *testing.T) {
+	// given: successful mcp list output
+	mcpOutput := "plugin:filesystem:filesystem: /path (stdio) - ✓ Connected\n"
+
+	// when
+	check := checkClaudeAuth(mcpOutput, nil)
+
+	// then
+	if !check.OK {
+		t.Errorf("claude-auth should be OK when mcp list succeeds, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("claude-auth should NOT be required (warning)")
+	}
+	if check.Name != "claude-auth" {
+		t.Errorf("expected name 'claude-auth', got %q", check.Name)
+	}
+}
+
+func TestCheckClaudeAuth_Failed(t *testing.T) {
+	// given: mcp list command failed
+	mcpErr := fmt.Errorf("exit status 1")
+
+	// when
+	check := checkClaudeAuth("", mcpErr)
+
+	// then
+	if check.OK {
+		t.Error("claude-auth should fail when mcp list errors")
+	}
+	if check.Version == "" {
+		t.Error("version should contain diagnostic message")
+	}
+}
+
+func TestCheckLinearMCP_Connected(t *testing.T) {
+	// given: mcp list output showing linear connected
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected\n"
+
+	// when
+	check := checkLinearMCP(mcpOutput, nil)
+
+	// then
+	if !check.OK {
+		t.Errorf("linear-mcp should be OK when connected, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("linear-mcp should NOT be required")
+	}
+	if check.Name != "linear-mcp" {
+		t.Errorf("expected name 'linear-mcp', got %q", check.Name)
+	}
+}
+
+func TestCheckLinearMCP_NotFound(t *testing.T) {
+	// given: mcp list output without linear
+	mcpOutput := "plugin:filesystem:filesystem: /path (stdio) - ✓ Connected\n"
+
+	// when
+	check := checkLinearMCP(mcpOutput, nil)
+
+	// then
+	if check.OK {
+		t.Error("linear-mcp should fail when linear not in output")
+	}
+}
+
+func TestCheckLinearMCP_Disconnected(t *testing.T) {
+	// given: mcp list output showing linear disconnected (no ✓)
+	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected\n"
+
+	// when
+	check := checkLinearMCP(mcpOutput, nil)
+
+	// then
+	if check.OK {
+		t.Error("linear-mcp should fail when linear is disconnected")
+	}
+}
+
+func TestCheckLinearMCP_MCPListFailed(t *testing.T) {
+	// given: mcp list command itself failed
+	mcpErr := fmt.Errorf("exit status 1")
+
+	// when
+	check := checkLinearMCP("", mcpErr)
+
+	// then
+	if check.OK {
+		t.Error("linear-mcp should fail when mcp list errors")
+	}
+	if !strings.Contains(check.Version, "skipped") {
+		t.Errorf("version should indicate skipped, got %q", check.Version)
 	}
 }

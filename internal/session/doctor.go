@@ -292,3 +292,46 @@ func checkEventStore(continent string) paintress.DoctorCheck {
 	check.Version = fmt.Sprintf("%d files, %d events OK", files, lines)
 	return check
 }
+
+// checkClaudeAuth determines if the Claude CLI is authenticated by
+// interpreting the result of running `claude mcp list`. A successful
+// command execution (no error) indicates the CLI is authenticated.
+func checkClaudeAuth(mcpOutput string, mcpErr error) paintress.DoctorCheck {
+	check := paintress.DoctorCheck{
+		Name:     "claude-auth",
+		Required: false,
+	}
+	if mcpErr != nil {
+		check.Version = "not authenticated: " + mcpErr.Error()
+		return check
+	}
+	check.OK = true
+	check.Version = "authenticated"
+	return check
+}
+
+// checkLinearMCP parses `claude mcp list` output for Linear MCP connection.
+// Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
+// Requires "✓" to avoid false positives from "disconnected" or "not connected".
+func checkLinearMCP(mcpOutput string, mcpErr error) paintress.DoctorCheck {
+	check := paintress.DoctorCheck{
+		Name:     "linear-mcp",
+		Required: false,
+	}
+	if mcpErr != nil {
+		check.Version = "skipped (claude not available)"
+		return check
+	}
+	output := strings.ToLower(mcpOutput)
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "linear") &&
+			strings.Contains(line, "✓") &&
+			strings.Contains(line, "connected") {
+			check.OK = true
+			check.Version = "Linear MCP connected"
+			return check
+		}
+	}
+	check.Version = "Linear MCP not found or not connected"
+	return check
+}
