@@ -6,8 +6,8 @@ Initialize project configuration
 
 Initialize a .expedition/ directory in the target repository.
 
-Creates config.yaml with Linear team key, project name, and
-default expedition settings. This must be run once before
+Use --team and --project flags for non-interactive mode, or omit
+flags for interactive prompts. This must be run once before
 'paintress run' can operate on the repository.
 
 ```
@@ -17,17 +17,19 @@ paintress init <repo-path> [flags]
 ### Examples
 
 ```
-  # Initialize a new project
-  paintress init /path/to/repo
+  # Non-interactive with flags
+  paintress init --team MY --project Hades /path/to/repo
 
-  # Initialize and then run
-  paintress init /path/to/repo && paintress run /path/to/repo
+  # Defaults only (no prompts)
+  paintress init /path/to/repo
 ```
 
 ### Options
 
 ```
-  -h, --help   help for init
+  -h, --help             help for init
+      --project string   Linear project name
+      --team string      Linear team key (e.g. MY)
 ```
 
 ### Options inherited from parent commands
@@ -40,4 +42,5 @@ paintress init <repo-path> [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+

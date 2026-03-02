@@ -9,8 +9,10 @@ Check that all external commands required by paintress are installed.
 Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and
 docker. Reports version and path for each found command.
 
+If repo-path is provided, also computes expedition success rate metrics.
+
 ```
-paintress doctor [flags]
+paintress doctor [repo-path] [flags]
 ```
 
 ### Examples
@@ -21,6 +23,9 @@ paintress doctor [flags]
 
   # Machine-readable output
   paintress doctor -o json
+
+  # Include repo metrics
+  paintress doctor -o json ./my-repo
 ```
 
 ### Options
@@ -39,4 +44,5 @@ paintress doctor [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+
