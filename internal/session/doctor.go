@@ -14,6 +14,12 @@ import (
 	"github.com/hironow/paintress"
 )
 
+// makeMCPListCmd creates the exec.Cmd for `claude mcp list`.
+// Package-level variable for test injection.
+var makeMCPListCmd = func(ctx context.Context, claudeCmd string) *exec.Cmd {
+	return exec.CommandContext(ctx, claudeCmd, "mcp", "list")
+}
+
 // RunDoctor checks all required external commands and returns the results.
 // claudeCmd is the configured Claude CLI command name (e.g. "claude", "cc-p").
 // continent is the optional .expedition/ root directory. When non-empty,
