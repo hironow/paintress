@@ -25,14 +25,16 @@ func TestScenario_ApproveCmdPath(t *testing.T) {
 	defer ws.StopPhonewave(t, pw)
 	defer ws.DumpPhonewaveLog(t, pw)
 
-	// Inject a specification D-Mail for paintress to consume
+	// Inject a HIGH severity specification so paintress fires the notify hook.
+	// (paintress only notifies on HIGH severity D-Mails in inbox.)
 	specContent := FormatDMail(map[string]string{
 		"dmail-schema-version": "1",
-		"name":                 "test-spec",
+		"name":                 "test-spec-high",
 		"kind":                 "specification",
-		"description":          "Test specification for approve-cmd",
-	}, "# Test Specification\n\nThis is a test specification for the approve-cmd scenario test.")
-	ws.InjectDMail(t, ".expedition", "inbox", "test-spec.md", specContent)
+		"description":          "High severity spec for approve-cmd",
+		"severity":             "high",
+	}, "# Test Specification (HIGH)\n\nThis is a high-severity specification for the approve-cmd scenario test.")
+	ws.InjectDMail(t, ".expedition", "inbox", "test-spec-high.md", specContent)
 
 	// Create approve script (exit 0 = approve all)
 	approveScript := filepath.Join(ws.Root, "approve.sh")
@@ -66,13 +68,13 @@ func TestScenario_ApproveCmdPath(t *testing.T) {
 	// Verify outbox was flushed
 	ws.WaitForAbsent(t, ".expedition", "outbox", 10*time.Second)
 
-	// Verify notify script was invoked (notify.log should exist and be non-empty)
+	// Verify notify script was invoked (paintress notifies on HIGH severity D-Mails)
 	data, err := os.ReadFile(notifyLog)
 	if err != nil {
-		t.Logf("notify.log not found (notification may not have fired): %v", err)
-	} else if len(data) == 0 {
-		t.Log("notify.log exists but is empty")
-	} else {
-		t.Logf("notify.log content:\n%s", string(data))
+		t.Fatalf("notify.log not found — notify-cmd was not invoked: %v", err)
 	}
+	if len(data) == 0 {
+		t.Fatal("notify.log exists but is empty — notify-cmd produced no output")
+	}
+	t.Logf("notify.log content:\n%s", string(data))
 }
