@@ -48,6 +48,8 @@ const (
 	EventGradientChanged     EventType = "gradient.changed"
 	EventGommageTriggered    EventType = "gommage.triggered"
 	EventInboxReceived       EventType = "inbox.received"
+	EventRetryAttempted      EventType = "retry.attempted"
+	EventEscalated           EventType = "escalated"
 )
 
 // Event is the envelope for all domain events in the event store.

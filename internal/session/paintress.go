@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -41,6 +43,10 @@ type Paintress struct {
 	outboxStore paintress.OutboxStore     // transactional outbox for D-Mail delivery
 	eventStore  paintress.EventStore      // append-only event log (fire-and-forget)
 	Dispatcher  paintress.EventDispatcher // policy engine (best-effort dispatch after emit)
+
+	// Retry tracking: maps sorted issue keys to attempt count
+	retryMu      sync.Mutex
+	retryTracker map[string]int
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
@@ -135,17 +141,25 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 		approver = NewStdinApprover(stdinIn, promptOut)
 	}
 
+	maxRetries := cfg.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+	cfgCopy := cfg
+	cfgCopy.MaxRetries = maxRetries
+
 	p := &Paintress{
-		config:     cfg,
-		logDir:     logDir,
-		Logger:     logger,
-		DataOut:    dataOut,
-		StdinIn:    stdinIn,
-		gradient:   paintress.NewGradientGauge(gradientMax),
-		reserve:    paintress.NewReserveParty(primary, reserves, logger),
-		notifier:   notifier,
-		approver:   approver,
-		eventStore: eventStore,
+		config:       cfgCopy,
+		logDir:       logDir,
+		Logger:       logger,
+		DataOut:      dataOut,
+		StdinIn:      stdinIn,
+		gradient:     paintress.NewGradientGauge(gradientMax),
+		reserve:      paintress.NewReserveParty(primary, reserves, logger),
+		notifier:     notifier,
+		approver:     approver,
+		eventStore:   eventStore,
+		retryTracker: make(map[string]int),
 	}
 
 	if !cfg.NoDev {
@@ -534,7 +548,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 					followUpBudget := totalTimeout - time.Since(expStart)
-					p.runFollowUp(ctx, matched, workDir, followUpBudget)
+					for _, dm := range matched {
+						if dm.Action != "" {
+							p.handleFeedbackAction(ctx, dm, workDir, followUpBudget)
+						} else {
+							p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, followUpBudget)
+						}
+					}
 				}
 				if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 					totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
@@ -950,4 +970,48 @@ func (p *Paintress) stageEscalation(expedition, failureCount int) {
 	if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
 		p.Logger.Warn("escalation dmail: %v", err)
 	}
+}
+
+// handleFeedbackAction dispatches a D-Mail based on its Action field.
+// Actions: "retry" (with retry counting), "escalate", "resolve", or fallthrough.
+func (p *Paintress) handleFeedbackAction(ctx context.Context, dm paintress.DMail, workDir string, remaining time.Duration) {
+	switch dm.Action {
+	case "retry":
+		if len(dm.Issues) == 0 {
+			p.Logger.Warn("Retry action without issues, falling through: %s", dm.Name)
+			p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
+			return
+		}
+		sorted := make([]string, len(dm.Issues))
+		copy(sorted, dm.Issues)
+		sort.Strings(sorted)
+		retryKey := strings.Join(sorted, ",")
+
+		p.retryMu.Lock()
+		p.retryTracker[retryKey]++
+		count := p.retryTracker[retryKey]
+		p.retryMu.Unlock()
+
+		if count > p.config.MaxRetries {
+			p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)
+			p.handleEscalation(dm)
+			return
+		}
+		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
+		p.emitEvent(paintress.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
+		p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
+	case "escalate":
+		p.handleEscalation(dm)
+	case "resolve":
+		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
+	default:
+		p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
+	}
+}
+
+// handleEscalation logs and emits an escalation event for a D-Mail that
+// requires human attention.
+func (p *Paintress) handleEscalation(dm paintress.DMail) {
+	p.Logger.Warn("ESCALATION: %s requires human attention (issues: %v)", dm.Name, dm.Issues)
+	p.emitEvent(paintress.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues})
 }

@@ -31,6 +31,7 @@ type Config struct {
 	NotifyCmd      string // External notification command ({title}, {message} placeholders)
 	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
 	AutoApprove    bool   // Skip approval gate for HIGH severity D-Mail
+	MaxRetries     int    // Maximum retry attempts per unique issue set (default: 3)
 }
 
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
