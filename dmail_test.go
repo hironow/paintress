@@ -157,6 +157,96 @@ func TestValidateDMail(t *testing.T) {
 	}
 }
 
+func TestDMailMarshal_ActionFieldRoundTrip(t *testing.T) {
+	// given
+	dm := paintress.DMail{
+		Name:          "task-ISSUE-99",
+		Kind:          "specification",
+		Description:   "implement login feature",
+		SchemaVersion: paintress.DMailSchemaVersion,
+		Action:        "implement",
+	}
+
+	// when
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	parsed, err := paintress.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+
+	// then
+	if parsed.Action != "implement" {
+		t.Errorf("Action round-trip: got %q, want %q", parsed.Action, "implement")
+	}
+}
+
+func TestDMailMarshal_PriorityFieldRoundTrip(t *testing.T) {
+	// given
+	dm := paintress.DMail{
+		Name:          "task-ISSUE-100",
+		Kind:          "specification",
+		Description:   "fix critical bug",
+		SchemaVersion: paintress.DMailSchemaVersion,
+		Priority:      3,
+	}
+
+	// when
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	parsed, err := paintress.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+
+	// then
+	if parsed.Priority != 3 {
+		t.Errorf("Priority round-trip: got %d, want %d", parsed.Priority, 3)
+	}
+}
+
+func TestDMailMarshal_OmitEmptyActionAndPriority(t *testing.T) {
+	// given — DMail with zero-value action and priority
+	dm := paintress.DMail{
+		Name:          "report-ISSUE-50",
+		Kind:          "report",
+		Description:   "simple report",
+		SchemaVersion: paintress.DMailSchemaVersion,
+	}
+
+	// when
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	// then — action and priority should not appear in output
+	s := string(data)
+	if contains(s, "action:") {
+		t.Error("empty action should be omitted from marshalled output")
+	}
+	if contains(s, "priority:") {
+		t.Error("zero priority should be omitted from marshalled output")
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) > 0 && len(substr) > 0 && stringContains(s, substr)
+}
+
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 func TestDMailMarshal_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given
 	dm := paintress.DMail{

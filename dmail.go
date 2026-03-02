@@ -104,6 +104,8 @@ type DMail struct {
 	Description   string            `yaml:"description"`
 	Issues        []string          `yaml:"issues,omitempty"`
 	Severity      string            `yaml:"severity,omitempty"`
+	Action        string            `yaml:"action,omitempty"`
+	Priority      int               `yaml:"priority,omitempty"`
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Body          string            `yaml:"-"`
