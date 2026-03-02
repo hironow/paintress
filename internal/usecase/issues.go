@@ -30,5 +30,7 @@ func FetchIssues(ctx context.Context, absPath string, stateFilter []string) ([]p
 		return nil, err
 	}
 
-	return paintress.FilterIssuesByState(issues, stateFilter), nil
+	filtered := paintress.FilterIssuesByState(issues, stateFilter)
+	paintress.SortByPriority(filtered)
+	return filtered, nil
 }
