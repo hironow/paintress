@@ -37,19 +37,24 @@ git-tracked, so deletions should be reviewed and committed.`,
 		RunE: runArchivePrune,
 	}
 
-	cmd.Flags().IntP("days", "d", 30, "Number of days threshold")
-	cmd.Flags().BoolP("execute", "x", false, "Execute deletion (dry-run by default)")
+	cmd.Flags().IntP("days", "d", 30, "Retention days")
+	cmd.Flags().BoolP("execute", "x", false, "Execute pruning (default: dry-run)")
+	cmd.Flags().BoolP("dry-run", "n", false, "Dry-run mode (default behavior, explicit for scripting)")
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }
 
 func runArchivePrune(cmd *cobra.Command, args []string) error {
+	execute, _ := cmd.Flags().GetBool("execute")
+	if execute && cmd.Flags().Changed("dry-run") {
+		return fmt.Errorf("--execute and --dry-run are mutually exclusive")
+	}
 	repoPath, err := filepath.Abs(args[0])
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 	days, _ := cmd.Flags().GetInt("days")
-	execute, _ := cmd.Flags().GetBool("execute")
 	outputFmt, _ := cmd.Flags().GetString("output")
 	stateDir := filepath.Join(repoPath, ".expedition")
 

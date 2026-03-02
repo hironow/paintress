@@ -61,14 +61,14 @@ func TestStatusCommand_TextOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Text goes to stderr
-	text := stderr.String()
+	// Text goes to stdout (per S0027)
+	text := stdout.String()
 	if !strings.Contains(text, "paintress status:") {
-		t.Errorf("expected stderr to contain 'paintress status:', got:\n%s", text)
+		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
-	// stdout should be empty for text mode
-	if stdout.Len() != 0 {
-		t.Errorf("expected empty stdout for text mode, got:\n%s", stdout.String())
+	// stderr should be empty for text mode
+	if stderr.Len() != 0 {
+		t.Errorf("expected empty stderr for text mode, got:\n%s", stderr.String())
 	}
 }
 

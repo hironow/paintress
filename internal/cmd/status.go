@@ -17,7 +17,7 @@ func newStatusCommand() *cobra.Command {
 		Long: `Display operational status including expedition history, success rate,
 gradient level, and pending d-mail counts.
 
-Output goes to stderr (human-readable) by default.
+Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.`,
 		Example: `  # Show status for a specific project
   paintress status /path/to/repo
@@ -46,8 +46,8 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return nil
 			}
 
-			// Text output to stderr (human-readable metadata)
-			fmt.Fprint(cmd.ErrOrStderr(), report.FormatText())
+			// Text output to stdout (human-readable, per S0027)
+			fmt.Fprint(cmd.OutOrStdout(), report.FormatText())
 			return nil
 		},
 	}
