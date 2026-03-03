@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestJournalDir(t *testing.T) {
-	p := paintress.JournalDir("/some/repo")
+	p := domain.JournalDir("/some/repo")
 	want := filepath.Join("/some/repo", ".expedition", "journal")
 	if p != want {
 		t.Errorf("JournalDir = %q, want %q", p, want)
@@ -21,7 +21,7 @@ func TestWriteJournal_CreatesDirectoryIfMissing(t *testing.T) {
 	dir := t.TempDir()
 	// Do not pre-create journal dir — WriteJournal should create it
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "AWE-1",
 		IssueTitle:  "Test Issue",
@@ -45,7 +45,7 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  5,
 		IssueID:     "AWE-42",
 		IssueTitle:  "Add dark mode",
@@ -91,7 +91,7 @@ func TestWriteJournal_IncludesFailureType(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "AWE-99",
 		IssueTitle:  "Fix auth",
@@ -119,7 +119,7 @@ func TestWriteJournal_EmptyInsightField(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  2,
 		IssueID:     "AWE-12",
 		IssueTitle:  "No insight",
@@ -146,7 +146,7 @@ func TestWriteJournal_InsightNotSetDefaultsToEmptyLine(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  3,
 		IssueID:     "AWE-13",
 		IssueTitle:  "Insight omitted",
@@ -182,7 +182,7 @@ func TestWriteJournal_FilenamePadding(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		report := &paintress.ExpeditionReport{
+		report := &domain.ExpeditionReport{
 			Expedition: tt.expedition, IssueID: "X", Status: "success",
 			PRUrl: "none", BugIssues: "none",
 		}
@@ -272,7 +272,7 @@ func TestWriteJournal_HighSeverityDMailField(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:         1,
 		IssueID:            "AWE-50",
 		IssueTitle:         "Fix login",
@@ -301,7 +301,7 @@ func TestWriteJournal_HighSeverityDMailEmpty(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  2,
 		IssueID:     "AWE-51",
 		IssueTitle:  "No alerts",
@@ -333,7 +333,7 @@ func TestListJournalFiles_NoDirectory(t *testing.T) {
 func TestWritePRIndex_AppendsEntry(t *testing.T) {
 	// given
 	continent := t.TempDir()
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition: 1,
 		IssueID:    "AWE-42",
 		PRUrl:      "https://github.com/org/repo/pull/1",
@@ -345,7 +345,7 @@ func TestWritePRIndex_AppendsEntry(t *testing.T) {
 	}
 
 	// then
-	path := filepath.Join(paintress.JournalDir(continent), "pr-index.jsonl")
+	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read pr-index: %v", err)
@@ -361,7 +361,7 @@ func TestWritePRIndex_AppendsEntry(t *testing.T) {
 
 func TestWritePRIndex_SkipsNone(t *testing.T) {
 	continent := t.TempDir()
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition: 1,
 		IssueID:    "AWE-42",
 		PRUrl:      "none",
@@ -369,7 +369,7 @@ func TestWritePRIndex_SkipsNone(t *testing.T) {
 	if err := WritePRIndex(continent, report); err != nil {
 		t.Fatalf("WritePRIndex: %v", err)
 	}
-	path := filepath.Join(paintress.JournalDir(continent), "pr-index.jsonl")
+	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl")
 	if _, err := os.Stat(path); err == nil {
 		t.Error("expected no index file for PRUrl=none")
 	}
@@ -378,7 +378,7 @@ func TestWritePRIndex_SkipsNone(t *testing.T) {
 func TestWritePRIndex_AppendsMultiple(t *testing.T) {
 	continent := t.TempDir()
 	for i := 1; i <= 3; i++ {
-		report := &paintress.ExpeditionReport{
+		report := &domain.ExpeditionReport{
 			Expedition: i,
 			IssueID:    "AWE-" + string(rune('0'+i)),
 			PRUrl:      "https://github.com/org/repo/pull/" + string(rune('0'+i)),
@@ -387,7 +387,7 @@ func TestWritePRIndex_AppendsMultiple(t *testing.T) {
 			t.Fatalf("WritePRIndex #%d: %v", i, err)
 		}
 	}
-	path := filepath.Join(paintress.JournalDir(continent), "pr-index.jsonl")
+	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read: %v", err)

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +27,7 @@ flags for interactive prompts. This must be run once before
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoPath := args[0]
 
-			cfgPath := paintress.ProjectConfigPath(repoPath)
+			cfgPath := domain.ProjectConfigPath(repoPath)
 			if _, err := os.Stat(cfgPath); err == nil {
 				return fmt.Errorf("%s already exists", cfgPath)
 			}

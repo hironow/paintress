@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -52,8 +51,8 @@ func TestStatus_EmptyState(t *testing.T) {
 func TestStatus_WithMailDirs(t *testing.T) {
 	// given — create inbox and archive with files
 	baseDir := t.TempDir()
-	inboxDir := paintress.InboxDir(baseDir)
-	archiveDir := paintress.ArchiveDir(baseDir)
+	inboxDir := domain.InboxDir(baseDir)
+	archiveDir := domain.ArchiveDir(baseDir)
 
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)

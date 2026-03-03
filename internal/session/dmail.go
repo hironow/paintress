@@ -9,17 +9,16 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore domain.EventStore) error {
+func SendDMail(store domain.OutboxStore, d domain.DMail, eventStore domain.EventStore) error {
 	if d.SchemaVersion == "" {
-		d.SchemaVersion = paintress.DMailSchemaVersion
+		d.SchemaVersion = domain.DMailSchemaVersion
 	}
-	if err := paintress.ValidateDMail(d); err != nil {
+	if err := domain.ValidateDMail(d); err != nil {
 		return fmt.Errorf("dmail: validate: %w", err)
 	}
 	data, err := d.Marshal()
@@ -50,12 +49,12 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore domain
 // ScanInbox reads all .md files in inbox/, parses each as DMail.
 // Returns parsed d-mails sorted by filename. Returns empty slice for empty
 // or non-existent directory.
-func ScanInbox(continent string) ([]paintress.DMail, error) {
-	dir := paintress.InboxDir(continent)
+func ScanInbox(continent string) ([]domain.DMail, error) {
+	dir := domain.InboxDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return []paintress.DMail{}, nil
+			return []domain.DMail{}, nil
 		}
 		return nil, fmt.Errorf("dmail: read inbox: %w", err)
 	}
@@ -64,7 +63,7 @@ func ScanInbox(continent string) ([]paintress.DMail, error) {
 		return entries[i].Name() < entries[j].Name()
 	})
 
-	var dmails []paintress.DMail
+	var dmails []domain.DMail
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".md" {
 			continue
@@ -73,7 +72,7 @@ func ScanInbox(continent string) ([]paintress.DMail, error) {
 		if err != nil {
 			return nil, fmt.Errorf("dmail: read %s: %w", e.Name(), err)
 		}
-		dm, err := paintress.ParseDMail(data)
+		dm, err := domain.ParseDMail(data)
 		if err != nil {
 			return nil, fmt.Errorf("dmail: parse %s: %w", e.Name(), err)
 		}
@@ -81,7 +80,7 @@ func ScanInbox(continent string) ([]paintress.DMail, error) {
 	}
 
 	if dmails == nil {
-		return []paintress.DMail{}, nil
+		return []domain.DMail{}, nil
 	}
 	return dmails, nil
 }
@@ -90,8 +89,8 @@ func ScanInbox(continent string) ([]paintress.DMail, error) {
 // Uses os.Rename for atomic move.
 func ArchiveInboxDMail(continent, name string, eventStore domain.EventStore) error {
 	filename := name + ".md"
-	src := filepath.Join(paintress.InboxDir(continent), filename)
-	arcDir := paintress.ArchiveDir(continent)
+	src := filepath.Join(domain.InboxDir(continent), filename)
+	arcDir := domain.ArchiveDir(continent)
 	dst := filepath.Join(arcDir, filename)
 
 	if err := os.MkdirAll(arcDir, 0755); err != nil {

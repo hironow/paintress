@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel"
@@ -59,7 +58,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 1,
 		TimeoutSec:     30,
@@ -94,7 +93,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 1,
 		TimeoutSec:     30,
@@ -154,7 +153,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			Continent:  dir,
 			TimeoutSec: 1, // 1 second timeout
 			ClaudeCmd:  sleepScript,
@@ -163,7 +162,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 		},
 		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
 		Logger:   domain.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 

@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // ReadFlag reads the expedition flag from the Continent's flag.md file.
-func ReadFlag(continent string) paintress.ExpeditionFlag {
-	f := paintress.ExpeditionFlag{Remaining: "?"}
-	path := paintress.FlagPath(continent)
+func ReadFlag(continent string) domain.ExpeditionFlag {
+	f := domain.ExpeditionFlag{Remaining: "?"}
+	path := domain.FlagPath(continent)
 	file, err := os.Open(path)
 	if err != nil {
 		return f
@@ -66,7 +66,7 @@ remaining_issues: %s
 mid_high_severity: %d
 `, expNum, expNum, time.Now().Format("2006-01-02 15:04:05"), issueID, status, remaining, midHighSeverity)
 
-	return os.WriteFile(paintress.FlagPath(continent), []byte(content), 0644)
+	return os.WriteFile(domain.FlagPath(continent), []byte(content), 0644)
 }
 
 func parseKV(line string) (string, string, bool) {

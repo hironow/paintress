@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestInitCommand_RequiresRepoPath(t *testing.T) {
@@ -33,7 +33,7 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 	if err := os.MkdirAll(cfgDir, 0755); err != nil {
 		t.Fatalf("create expedition dir: %v", err)
 	}
-	cfgPath := paintress.ProjectConfigPath(dir)
+	cfgPath := domain.ProjectConfigPath(dir)
 	if err := os.WriteFile(cfgPath, []byte("linear:\n  team: MY\n"), 0644); err != nil {
 		t.Fatalf("create config: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestInitCmd_FlagsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init with flags failed: %v", err)
 	}
-	cfgPath := paintress.ProjectConfigPath(dir)
+	cfgPath := domain.ProjectConfigPath(dir)
 	data, readErr := os.ReadFile(cfgPath)
 	if readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
@@ -106,7 +106,7 @@ func TestInitCmd_MissingFlags_UsesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init with defaults failed: %v", err)
 	}
-	cfgPath := paintress.ProjectConfigPath(dir)
+	cfgPath := domain.ProjectConfigPath(dir)
 	if _, readErr := os.Stat(cfgPath); readErr != nil {
 		t.Fatalf("config not created: %v", readErr)
 	}

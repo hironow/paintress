@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func testOutboxStore(t *testing.T, continent string) *SQLiteOutboxStore {
@@ -24,9 +24,9 @@ func testOutboxStore(t *testing.T, continent string) *SQLiteOutboxStore {
 func ensureExpeditionDirs(t *testing.T, continent string) {
 	t.Helper()
 	for _, dir := range []string{
-		paintress.ArchiveDir(continent),
-		paintress.OutboxDir(continent),
-		paintress.InboxDir(continent),
+		domain.ArchiveDir(continent),
+		domain.OutboxDir(continent),
+		domain.InboxDir(continent),
 		filepath.Join(continent, ".expedition", ".run"),
 	} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -71,7 +71,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 		t.Errorf("flushed count: got %d, want 1", n)
 	}
 
-	archivePath := filepath.Join(paintress.ArchiveDir(continent), "test-mail.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "test-mail.md")
 	data, err := os.ReadFile(archivePath)
 	if err != nil {
 		t.Fatalf("read archive: %v", err)
@@ -80,7 +80,7 @@ func TestSQLiteOutboxStore_StageAndFlush(t *testing.T) {
 		t.Errorf("archive content: got %q, want %q", string(data), "hello")
 	}
 
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "test-mail.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "test-mail.md")
 	data, err = os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -110,7 +110,7 @@ func TestSQLiteOutboxStore_StageIdempotent(t *testing.T) {
 		t.Errorf("flushed count: got %d, want 1", n)
 	}
 
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "dup.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "dup.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
@@ -153,7 +153,7 @@ func TestSQLiteOutboxStore_FlushOnlyUnflushed(t *testing.T) {
 	}
 
 	for _, name := range []string{"first.md", "second.md"} {
-		outboxPath := filepath.Join(paintress.OutboxDir(continent), name)
+		outboxPath := filepath.Join(domain.OutboxDir(continent), name)
 		if _, err := os.Stat(outboxPath); err != nil {
 			t.Errorf("outbox %s missing: %v", name, err)
 		}
@@ -178,7 +178,7 @@ func TestSQLiteOutboxStore_MultipleStageThenFlush(t *testing.T) {
 	}
 
 	for _, name := range []string{"a.md", "b.md", "c.md"} {
-		for _, dir := range []string{paintress.ArchiveDir(continent), paintress.OutboxDir(continent)} {
+		for _, dir := range []string{domain.ArchiveDir(continent), domain.OutboxDir(continent)} {
 			p := filepath.Join(dir, name)
 			if _, err := os.Stat(p); err != nil {
 				t.Errorf("%s/%s missing: %v", dir, name, err)
@@ -192,8 +192,8 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 
 	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
-	archiveDir := paintress.ArchiveDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 
 	storeA, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -303,8 +303,8 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 
 	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
-	archiveDir := paintress.ArchiveDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 
 	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -344,8 +344,8 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 
 	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
-	archiveDir := paintress.ArchiveDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 
 	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -386,8 +386,8 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 
 	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
-	archiveDir := paintress.ArchiveDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 
 	storeSetup, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
@@ -437,7 +437,7 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 		t.Errorf("total flushed: got %d (A=%d, B=%d), want 1 or 2", total, nA, nB)
 	}
 
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "shared.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "shared.md")
 	data, err := os.ReadFile(outboxPath)
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)

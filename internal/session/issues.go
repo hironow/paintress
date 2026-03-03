@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // FetchIssues queries Linear GraphQL API and returns issues for the given team.
-// endpoint can be overridden for testing; pass paintress.LinearAPIEndpoint for production.
+// endpoint can be overridden for testing; pass domain.LinearAPIEndpoint for production.
 // When stateFilter is non-empty, completed/canceled issues are included in the
 // GraphQL query so that local filtering can match them.
-func FetchIssues(ctx context.Context, endpoint, apiKey, teamKey, project string, stateFilter []string) ([]paintress.Issue, error) {
+func FetchIssues(ctx context.Context, endpoint, apiKey, teamKey, project string, stateFilter []string) ([]domain.Issue, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("LINEAR_API_KEY is required")
 	}
@@ -52,7 +52,7 @@ func FetchIssues(ctx context.Context, endpoint, apiKey, teamKey, project string,
 		}
 	}
 
-	var allIssues []paintress.Issue
+	var allIssues []domain.Issue
 	var cursor string
 
 	for {
@@ -139,7 +139,7 @@ func FetchIssues(ctx context.Context, endpoint, apiKey, teamKey, project string,
 			for _, l := range node.Labels.Nodes {
 				labels = append(labels, l.Name)
 			}
-			allIssues = append(allIssues, paintress.Issue{
+			allIssues = append(allIssues, domain.Issue{
 				ID:       node.Identifier,
 				Title:    node.Title,
 				Priority: node.Priority,

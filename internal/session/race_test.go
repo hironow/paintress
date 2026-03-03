@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -78,7 +77,7 @@ func TestRace_Lumina_ConcurrentScan(t *testing.T) {
 
 	// Multiple goroutines call ScanJournalsForLumina concurrently on same dir
 	var wg sync.WaitGroup
-	results := make([][]paintress.Lumina, 10)
+	results := make([][]domain.Lumina, 10)
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -141,12 +140,12 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 func TestRace_Expedition_ConcurrentReserveCheck(t *testing.T) {
 	dir := t.TempDir()
 	rp := domain.NewReserveParty("opus", []string{"sonnet"}, domain.NewLogger(io.Discard, false))
-	g := paintress.NewGradientGauge(5)
+	g := domain.NewGradientGauge(5)
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  g,
 		Reserve:   rp,

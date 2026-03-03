@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // watchInbox watches the inbox/ directory for new or updated D-Mail files.
-func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintress.DMail), ready chan<- struct{}) {
-	inboxDir := paintress.InboxDir(continent)
+func watchInbox(ctx context.Context, continent string, onNewDMail func(dm domain.DMail), ready chan<- struct{}) {
+	inboxDir := domain.InboxDir(continent)
 
 	if _, err := os.Stat(inboxDir); err != nil {
 		return
@@ -37,7 +37,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintr
 		if err != nil {
 			continue
 		}
-		dm, err := paintress.ParseDMail(data)
+		dm, err := domain.ParseDMail(data)
 		if err != nil {
 			continue
 		}
@@ -66,7 +66,7 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintr
 			if err != nil {
 				continue
 			}
-			dm, err := paintress.ParseDMail(data)
+			dm, err := domain.ParseDMail(data)
 			if err != nil {
 				continue
 			}

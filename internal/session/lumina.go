@@ -7,12 +7,12 @@ import (
 	"strings"
 
 	"github.com/alitto/pond/v2"
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // ScanJournalsForLumina reads all journal files in parallel goroutines,
 // extracts failure reasons and success patterns, and returns Luminas.
-func ScanJournalsForLumina(continent string) []paintress.Lumina {
+func ScanJournalsForLumina(continent string) []domain.Lumina {
 	files, err := ListJournalFiles(continent)
 	if err != nil || len(files) == 0 {
 		return nil
@@ -96,11 +96,11 @@ func ScanJournalsForLumina(continent string) []paintress.Lumina {
 		}
 	}
 
-	var luminas []paintress.Lumina
+	var luminas []domain.Lumina
 
 	// HIGH severity D-Mail alerts become immediate Luminas (threshold = 1)
 	for names, count := range highSeverityAlerts {
-		luminas = append(luminas, paintress.Lumina{
+		luminas = append(luminas, domain.Lumina{
 			Pattern: fmt.Sprintf("[ALERT] HIGH severity D-Mail in past expedition: %s", names),
 			Source:  "high-severity-alert",
 			Uses:    count,
@@ -110,7 +110,7 @@ func ScanJournalsForLumina(continent string) []paintress.Lumina {
 	// Failures that repeat become defensive Luminas
 	for reason, count := range failureReasons {
 		if count >= 2 {
-			luminas = append(luminas, paintress.Lumina{
+			luminas = append(luminas, domain.Lumina{
 				Pattern: fmt.Sprintf("[WARN] Avoid — failed %d times: %s", count, reason),
 				Source:  "failure-pattern",
 				Uses:    count,
@@ -121,7 +121,7 @@ func ScanJournalsForLumina(continent string) []paintress.Lumina {
 	// Successful patterns become offensive Luminas
 	for pattern, count := range successPatterns {
 		if count >= 3 {
-			luminas = append(luminas, paintress.Lumina{
+			luminas = append(luminas, domain.Lumina{
 				Pattern: fmt.Sprintf("[OK] Proven approach (%dx successful): %s", count, pattern),
 				Source:  "success-pattern",
 				Uses:    count,

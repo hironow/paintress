@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // watchFlag watches flag.md for current_issue changes using filesystem
@@ -41,7 +41,7 @@ func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, 
 		onIssueChange(flag.CurrentIssue, flag.CurrentTitle)
 	}
 
-	flagName := filepath.Base(paintress.FlagPath(continent))
+	flagName := filepath.Base(domain.FlagPath(continent))
 	for {
 		select {
 		case <-ctx.Done():

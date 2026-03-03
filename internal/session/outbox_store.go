@@ -7,13 +7,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 
 	_ "modernc.org/sqlite"
 )
 
-// Compile-time check that SQLiteOutboxStore implements paintress.OutboxStore.
-var _ paintress.OutboxStore = (*SQLiteOutboxStore)(nil)
+// Compile-time check that SQLiteOutboxStore implements domain.OutboxStore.
+var _ domain.OutboxStore = (*SQLiteOutboxStore)(nil)
 
 // SQLiteOutboxStore implements OutboxStore using a SQLite database as the
 // transactional write-ahead log. Staged D-Mails are flushed to archive/ and
@@ -216,8 +216,8 @@ func (s *SQLiteOutboxStore) Close() error {
 // targets at .expedition/archive/ and .expedition/outbox/.
 func NewOutboxStoreForContinent(continent string) (*SQLiteOutboxStore, error) {
 	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
-	archiveDir := paintress.ArchiveDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 	return NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 }
 

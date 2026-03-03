@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
@@ -68,11 +67,11 @@ func (ds *DevServer) Start(ctx context.Context) error {
 		resp.Body.Close()
 		ds.setRunning(true)
 		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", true)))
-		ds.logger.OK("%s", fmt.Sprintf(paintress.Msg("devserver_already"), ds.url))
+		ds.logger.OK("%s", fmt.Sprintf(domain.Msg("devserver_already"), ds.url))
 		return nil
 	}
 
-	ds.logger.Info("%s", fmt.Sprintf(paintress.Msg("devserver_start"), ds.cmd, ds.dir))
+	ds.logger.Info("%s", fmt.Sprintf(domain.Msg("devserver_start"), ds.cmd, ds.dir))
 	logFile, err := os.Create(ds.logPath)
 	if err != nil {
 		return fmt.Errorf("log file creation failed: %w", err)
@@ -102,7 +101,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 
 	ds.setRunning(true)
 	span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
-	ds.logger.OK("%s", fmt.Sprintf(paintress.Msg("devserver_ready"), ds.url))
+	ds.logger.OK("%s", fmt.Sprintf(domain.Msg("devserver_ready"), ds.url))
 	return nil
 }
 
@@ -116,7 +115,7 @@ func (ds *DevServer) waitReady(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-deadline:
-			return fmt.Errorf("%s", paintress.Msg("devserver_timeout"))
+			return fmt.Errorf("%s", domain.Msg("devserver_timeout"))
 		case <-ticker.C:
 			resp, err := client.Get(ds.url)
 			if err == nil {
@@ -131,7 +130,7 @@ func (ds *DevServer) Stop() {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	if ds.process != nil && ds.process.Process != nil {
-		ds.logger.Info("%s", paintress.Msg("devserver_stop"))
+		ds.logger.Info("%s", domain.Msg("devserver_stop"))
 		_ = ds.process.Process.Signal(os.Interrupt)
 		done := make(chan struct{})
 		go func() {

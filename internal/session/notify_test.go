@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestLocalNotifier_Darwin_CommandShape(t *testing.T) {
@@ -118,7 +118,7 @@ func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	err := n.Notify(context.Background(), "Title", "Message")
 
 	// then: returns ErrUnsupportedOS, does not panic or invoke command
-	if err != paintress.ErrUnsupportedOS {
+	if err != domain.ErrUnsupportedOS {
 		t.Errorf("err = %v, want ErrUnsupportedOS", err)
 	}
 }
@@ -263,7 +263,7 @@ func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 
 func TestNopNotifier_NoError(t *testing.T) {
 	// given
-	n := &paintress.NopNotifier{}
+	n := &domain.NopNotifier{}
 
 	// when
 	err := n.Notify(context.Background(), "Any", "Thing")

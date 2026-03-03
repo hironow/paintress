@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestProjectConfigPath(t *testing.T) {
-	got := paintress.ProjectConfigPath("/tmp/repo")
+	got := domain.ProjectConfigPath("/tmp/repo")
 	want := "/tmp/repo/.expedition/config.yaml"
 	if got != want {
 		t.Errorf("ProjectConfigPath = %q, want %q", got, want)
@@ -20,8 +20,8 @@ func TestSaveAndLoadProjectConfig(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
-	cfg := &paintress.ProjectConfig{
-		Linear: paintress.LinearConfig{
+	cfg := &domain.ProjectConfig{
+		Linear: domain.LinearConfig{
 			Team:    "MY",
 			Project: "paintress",
 		},
@@ -48,8 +48,8 @@ func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
 	dir := t.TempDir()
 	// .expedition/ does NOT exist — SaveProjectConfig should create it
 
-	cfg := &paintress.ProjectConfig{
-		Linear: paintress.LinearConfig{Team: "TEST"},
+	cfg := &domain.ProjectConfig{
+		Linear: domain.LinearConfig{Team: "TEST"},
 	}
 
 	if err := SaveProjectConfig(dir, cfg); err != nil {

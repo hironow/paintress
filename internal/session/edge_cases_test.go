@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -85,7 +84,7 @@ func TestWriteFlag_SpecialCharactersInIssueID(t *testing.T) {
 func TestWriteJournal_HighExpeditionNumber(t *testing.T) {
 	dir := t.TempDir()
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition: 1234, IssueID: "X", Status: "success",
 		PRUrl: "none", BugIssues: "none",
 	}
@@ -101,7 +100,7 @@ func TestWriteJournal_HighExpeditionNumber(t *testing.T) {
 func TestWriteJournal_NewlinesInFields(t *testing.T) {
 	dir := t.TempDir()
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "AWE-1",
 		IssueTitle:  "Title with\nnewline",
@@ -209,9 +208,9 @@ func TestExpedition_BuildPrompt_ZeroNumber(t *testing.T) {
 	e := &Expedition{
 		Number:    0,
 		Continent: "/tmp",
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -225,9 +224,9 @@ func TestExpedition_BuildPrompt_EmptyConfig(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: "",
-		Config:    paintress.Config{}, // all empty
+		Config:    domain.Config{}, // all empty
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("", nil, domain.NewLogger(io.Discard, false)),
 	}
 

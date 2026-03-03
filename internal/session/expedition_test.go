@@ -11,7 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -58,14 +57,14 @@ func newTestExpedition(t *testing.T, output string, exitCode int) *Expedition {
 	return &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", []string{"sonnet"}, domain.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(output, exitCode),
 	}
@@ -76,12 +75,12 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 	e := &Expedition{
 		Number:    42,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 		},
 		Logger:   domain.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -105,20 +104,20 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 }
 
 func TestExpedition_BuildPrompt_French(t *testing.T) {
-	orig := paintress.Lang
-	defer func() { paintress.Lang = orig }()
-	paintress.Lang = "fr"
+	orig := domain.Lang
+	defer func() { domain.Lang = orig }()
+	domain.Lang = "fr"
 
 	dir := t.TempDir()
 	e := &Expedition{
 		Number:    7,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 		},
 		Logger:   domain.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -143,14 +142,14 @@ func TestExpedition_BuildPrompt_French(t *testing.T) {
 
 func TestExpedition_BuildPrompt_ContainsGradient(t *testing.T) {
 	dir := t.TempDir()
-	g := paintress.NewGradientGauge(5)
+	g := domain.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  g,
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
@@ -167,11 +166,11 @@ func TestExpedition_BuildPrompt_ContainsLuminas(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
-		Luminas: []paintress.Lumina{
+		Luminas: []domain.Lumina{
 			{Pattern: "[WARN] Failed 3 times: timeout", Source: "failure-pattern", Uses: 3},
 		},
 	}
@@ -187,9 +186,9 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -207,9 +206,9 @@ func TestExpedition_BuildPrompt_ReserveInfo(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "develop", DevURL: "http://localhost:5173"},
+		Config:    domain.Config{BaseBranch: "develop", DevURL: "http://localhost:5173"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   rp,
 	}
 
@@ -230,9 +229,9 @@ func TestExpedition_BuildPrompt_OutputFormat(t *testing.T) {
 	e := &Expedition{
 		Number:    3,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -259,10 +258,10 @@ func TestBuildPrompt_IncludesContextFiles(t *testing.T) {
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -283,10 +282,10 @@ func TestBuildPrompt_NoContextSection_WhenEmpty(t *testing.T) {
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -327,8 +326,8 @@ __EXPEDITION_END__`
 		t.Error("output should contain report markers")
 	}
 
-	report, status := paintress.ParseReport(output, 1)
-	if status != paintress.StatusSuccess {
+	report, status := domain.ParseReport(output, 1)
+	if status != domain.StatusSuccess {
 		t.Fatalf("got %v, want StatusSuccess", status)
 	}
 	if report.IssueID != "AWE-42" {
@@ -345,8 +344,8 @@ func TestExpedition_Run_Complete(t *testing.T) {
 		t.Fatalf("Run() error: %v", err)
 	}
 
-	_, status := paintress.ParseReport(output, 1)
-	if status != paintress.StatusComplete {
+	_, status := domain.ParseReport(output, 1)
+	if status != domain.StatusComplete {
 		t.Fatalf("got %v, want StatusComplete", status)
 	}
 }
@@ -461,7 +460,7 @@ func TestExpedition_Run_RateLimitDetection(t *testing.T) {
 
 func TestNewPaintress_BasicConfig(t *testing.T) {
 	dir := t.TempDir()
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 10,
 		TimeoutSec:     60,
@@ -488,7 +487,7 @@ func TestNewPaintress_BasicConfig(t *testing.T) {
 
 func TestNewPaintress_MultiModelConfig(t *testing.T) {
 	dir := t.TempDir()
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent: dir,
 		Model:     "opus,sonnet,haiku",
 		DevCmd:    "npm run dev",
@@ -509,7 +508,7 @@ func TestNewPaintress_MultiModelConfig(t *testing.T) {
 
 func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 	dir := t.TempDir()
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent: dir,
 		Model:     "opus , sonnet , haiku",
 		DevCmd:    "npm run dev",
@@ -552,7 +551,7 @@ echo "done"
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -560,7 +559,7 @@ echo "done"
 		},
 		LogDir:   logDir,
 		Logger:   logger,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, logger),
 	}
 
@@ -615,7 +614,7 @@ echo "done"
 		Number:    1,
 		Continent: continent,
 		WorkDir:   workDir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -623,7 +622,7 @@ echo "done"
 		},
 		LogDir:   logDir,
 		Logger:   logger,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, logger),
 	}
 
@@ -648,17 +647,17 @@ func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	for _, lang := range []string{"en", "ja", "fr"} {
 		t.Run(lang, func(t *testing.T) {
-			orig := paintress.Lang
-			defer func() { paintress.Lang = orig }()
-			paintress.Lang = lang
+			orig := domain.Lang
+			defer func() { domain.Lang = orig }()
+			domain.Lang = lang
 
 			prompt := e.BuildPrompt()
 			if !containsStr(prompt, "current_issue") {
@@ -676,18 +675,18 @@ func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: ""},
+		Config:    domain.Config{BaseBranch: "main", DevURL: ""},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// Test all 3 languages
 	for _, lang := range []string{"en", "ja", "fr"} {
 		t.Run(lang, func(t *testing.T) {
-			orig := paintress.Lang
-			defer func() { paintress.Lang = orig }()
-			paintress.Lang = lang
+			orig := domain.Lang
+			defer func() { domain.Lang = orig }()
+			domain.Lang = lang
 
 			prompt := e.BuildPrompt()
 
@@ -706,8 +705,8 @@ func TestBuildPrompt_WithLinearConfig(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	// Write a config.yaml with Linear scope
-	cfg := &paintress.ProjectConfig{
-		Linear: paintress.LinearConfig{
+	cfg := &domain.ProjectConfig{
+		Linear: domain.LinearConfig{
 			Team:    "ENG",
 			Project: "backend",
 		},
@@ -719,9 +718,9 @@ func TestBuildPrompt_WithLinearConfig(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -741,9 +740,9 @@ func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -768,9 +767,9 @@ func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -793,8 +792,8 @@ func TestLifecycle_Init_Then_Expedition(t *testing.T) {
 	logDir := t.TempDir()
 
 	// Phase 1: set up config as if `paintress init` was run
-	initCfg := &paintress.ProjectConfig{
-		Linear: paintress.LinearConfig{
+	initCfg := &domain.ProjectConfig{
+		Linear: domain.LinearConfig{
 			Team:    "MY",
 			Project: "paintress",
 		},
@@ -834,14 +833,14 @@ __EXPEDITION_END__`
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(reportOutput, 0),
 	}
@@ -853,8 +852,8 @@ __EXPEDITION_END__`
 	}
 
 	// Phase 3: verify expedition output is valid
-	report, status := paintress.ParseReport(output, 1)
-	if status != paintress.StatusSuccess {
+	report, status := domain.ParseReport(output, 1)
+	if status != domain.StatusSuccess {
 		t.Fatalf("got %v, want StatusSuccess", status)
 	}
 	if report.IssueID != "MY-100" {
@@ -890,14 +889,14 @@ func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
 	}
@@ -925,9 +924,9 @@ func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    domain.NewLogger(io.Discard, false),
-		Gradient:  paintress.NewGradientGauge(5),
+		Gradient:  domain.NewGradientGauge(5),
 		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -986,7 +985,7 @@ func TestMidMatchedDMails_Empty(t *testing.T) {
 func TestMidMatchedDMails_ReturnsCopy(t *testing.T) {
 	exp := &Expedition{}
 	exp.midMatchedMu.Lock()
-	exp.midMatchedMails = []paintress.DMail{{Name: "spec-1", Kind: "specification"}}
+	exp.midMatchedMails = []domain.DMail{{Name: "spec-1", Kind: "specification"}}
 	exp.midMatchedMu.Unlock()
 
 	got := exp.MidMatchedDMails()
@@ -1058,7 +1057,7 @@ echo "done"
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1067,7 +1066,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1119,7 +1118,7 @@ echo "done"
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1128,7 +1127,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1188,7 +1187,7 @@ echo "done"
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1197,7 +1196,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1261,7 +1260,7 @@ echo "done"
 	exp := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1270,7 +1269,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1306,7 +1305,7 @@ func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
 		go func(n int) {
 			defer wg.Done()
 			exp.midMatchedMu.Lock()
-			exp.midMatchedMails = append(exp.midMatchedMails, paintress.DMail{Name: fmt.Sprintf("dm-%d", n)})
+			exp.midMatchedMails = append(exp.midMatchedMails, domain.DMail{Name: fmt.Sprintf("dm-%d", n)})
 			exp.midMatchedMu.Unlock()
 		}(i)
 	}
@@ -1369,7 +1368,7 @@ echo "done"
 		Number:    1,
 		Continent: continent,
 		WorkDir:   workDir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1378,7 +1377,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1442,7 +1441,7 @@ echo "done"
 		Number:    1,
 		Continent: continent,
 		WorkDir:   workDir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1451,7 +1450,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1548,7 +1547,7 @@ echo "done"
 		Number:    1,
 		Continent: continent,
 		WorkDir:   workDir1,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1557,14 +1556,14 @@ echo "done"
 		LogDir:   logDir1,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 	exp2 := &Expedition{
 		Number:    2,
 		Continent: continent,
 		WorkDir:   workDir2,
-		Config: paintress.Config{
+		Config: domain.Config{
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 			TimeoutSec: 30,
@@ -1573,7 +1572,7 @@ echo "done"
 		LogDir:   logDir2,
 		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: paintress.NewGradientGauge(5),
+		Gradient: domain.NewGradientGauge(5),
 		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
@@ -1620,7 +1619,7 @@ echo "done"
 
 func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 	dir := t.TempDir()
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent: dir,
 		Model:     "opus",
 		DevCmd:    "npm run dev",
@@ -1762,11 +1761,11 @@ func TestReadContextFiles_EmptyFileStillCreatesHeader(t *testing.T) {
 // --- MissionText tests (merged from mission_test.go) ---
 
 func TestMissionText_English(t *testing.T) {
-	orig := paintress.Lang
-	defer func() { paintress.Lang = orig }()
-	paintress.Lang = "en"
+	orig := domain.Lang
+	defer func() { domain.Lang = orig }()
+	domain.Lang = "en"
 
-	text := paintress.MissionText()
+	text := domain.MissionText()
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("English mission should contain 'Rules of Engagement'")
 	}
@@ -1785,11 +1784,11 @@ func TestMissionText_English(t *testing.T) {
 }
 
 func TestMissionText_Japanese(t *testing.T) {
-	orig := paintress.Lang
-	defer func() { paintress.Lang = orig }()
-	paintress.Lang = "ja"
+	orig := domain.Lang
+	defer func() { domain.Lang = orig }()
+	domain.Lang = "ja"
 
-	text := paintress.MissionText()
+	text := domain.MissionText()
 	if !containsStr(text, "行動規範") {
 		t.Error("Japanese mission should contain '行動規範'")
 	}
@@ -1802,11 +1801,11 @@ func TestMissionText_Japanese(t *testing.T) {
 }
 
 func TestMissionText_French(t *testing.T) {
-	orig := paintress.Lang
-	defer func() { paintress.Lang = orig }()
-	paintress.Lang = "fr"
+	orig := domain.Lang
+	defer func() { domain.Lang = orig }()
+	domain.Lang = "fr"
 
-	text := paintress.MissionText()
+	text := domain.MissionText()
 	if !containsStr(text, "engagement") {
 		t.Error("French mission should contain 'engagement'")
 	}
@@ -1816,11 +1815,11 @@ func TestMissionText_French(t *testing.T) {
 }
 
 func TestMissionText_FallbackToEnglish(t *testing.T) {
-	orig := paintress.Lang
-	defer func() { paintress.Lang = orig }()
-	paintress.Lang = "de"
+	orig := domain.Lang
+	defer func() { domain.Lang = orig }()
+	domain.Lang = "de"
 
-	text := paintress.MissionText()
+	text := domain.MissionText()
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("unsupported lang should fall back to English")
 	}

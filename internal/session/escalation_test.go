@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -15,7 +14,7 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
 	p := &Paintress{
-		config:      paintress.Config{Continent: continent},
+		config:      domain.Config{Continent: continent},
 		outboxStore: store,
 		Logger:      domain.NewLogger(nil, false),
 	}
@@ -24,7 +23,7 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	p.stageEscalation(5, 3)
 
 	// then — verify file exists in outbox (SendDMail already flushed)
-	outboxDir := paintress.OutboxDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 	entries, err := os.ReadDir(outboxDir)
 	if err != nil {
 		t.Fatalf("ReadDir outbox: %v", err)
@@ -38,7 +37,7 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
-	dm, err := paintress.ParseDMail(data)
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail: %v", err)
 	}
@@ -56,7 +55,7 @@ func TestStageEscalation_ArchiveAndOutbox(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
 	p := &Paintress{
-		config:      paintress.Config{Continent: continent},
+		config:      domain.Config{Continent: continent},
 		outboxStore: store,
 		Logger:      domain.NewLogger(nil, false),
 	}
@@ -65,8 +64,8 @@ func TestStageEscalation_ArchiveAndOutbox(t *testing.T) {
 	p.stageEscalation(5, 3)
 
 	// then — both archive and outbox should have the file
-	archiveDir := paintress.ArchiveDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 
 	archiveEntries, _ := os.ReadDir(archiveDir)
 	outboxEntries, _ := os.ReadDir(outboxDir)
@@ -85,7 +84,7 @@ func TestStageEscalation_Idempotent(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
 	p := &Paintress{
-		config:      paintress.Config{Continent: continent},
+		config:      domain.Config{Continent: continent},
 		outboxStore: store,
 		Logger:      domain.NewLogger(nil, false),
 	}
@@ -95,7 +94,7 @@ func TestStageEscalation_Idempotent(t *testing.T) {
 	p.stageEscalation(5, 3)
 
 	// then — only one D-Mail in outbox (INSERT OR IGNORE + already flushed)
-	outboxDir := paintress.OutboxDir(continent)
+	outboxDir := domain.OutboxDir(continent)
 	entries, _ := os.ReadDir(outboxDir)
 	if len(entries) != 1 {
 		t.Errorf("outbox file count = %d, want 1 (idempotent)", len(entries))
@@ -105,7 +104,7 @@ func TestStageEscalation_Idempotent(t *testing.T) {
 func TestStageEscalation_NilOutboxStore(t *testing.T) {
 	// given — no outbox store configured
 	p := &Paintress{
-		config: paintress.Config{Continent: t.TempDir()},
+		config: domain.Config{Continent: t.TempDir()},
 		Logger: domain.NewLogger(nil, false),
 	}
 

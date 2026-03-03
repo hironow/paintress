@@ -1,6 +1,6 @@
 //go:build contract
 
-package paintress
+package domain
 
 import (
 	"os"

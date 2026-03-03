@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // ValidateContinent ensures the .expedition directory structure exists.
@@ -44,7 +44,7 @@ func ValidateContinent(continent string) error {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
-			content, err := fs.ReadFile(paintress.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
+			content, err := fs.ReadFile(domain.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
 			if err != nil {
 				return fmt.Errorf("read embedded skill %s: %w", dir, err)
 			}

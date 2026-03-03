@@ -1,4 +1,4 @@
-package paintress
+package domain
 
 import "fmt"
 

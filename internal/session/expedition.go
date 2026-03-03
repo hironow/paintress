@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,17 +23,17 @@ type Expedition struct {
 	Number    int
 	Continent string
 	WorkDir   string // execution directory (worktree path or Continent)
-	Config    paintress.Config
+	Config    domain.Config
 	LogDir    string
 	Logger    *domain.Logger
-	DataOut   io.Writer          // stdout-equivalent for streaming Claude output
-	Notifier  paintress.Notifier // for mid-expedition HIGH severity notifications
+	DataOut   io.Writer       // stdout-equivalent for streaming Claude output
+	Notifier  domain.Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
-	Luminas     []paintress.Lumina
-	Gradient    *paintress.GradientGauge
+	Luminas     []domain.Lumina
+	Gradient    *domain.GradientGauge
 	Reserve     *domain.ReserveParty
-	InboxDMails []paintress.DMail // d-mails from inbox (for archiving after expedition)
+	InboxDMails []domain.DMail // d-mails from inbox (for archiving after expedition)
 	inboxOnce   sync.Once
 
 	// Mid-expedition HIGH severity D-Mail tracking
@@ -45,7 +44,7 @@ type Expedition struct {
 	currentIssueMu  sync.Mutex
 	currentIssue    string
 	midMatchedMu    sync.Mutex
-	midMatchedMails []paintress.DMail
+	midMatchedMails []domain.DMail
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
@@ -79,13 +78,13 @@ func (e *Expedition) getCurrentIssue() string {
 }
 
 // MidMatchedDMails returns a copy of issue-matched D-Mails received mid-expedition.
-func (e *Expedition) MidMatchedDMails() []paintress.DMail {
+func (e *Expedition) MidMatchedDMails() []domain.DMail {
 	e.midMatchedMu.Lock()
 	defer e.midMatchedMu.Unlock()
 	if len(e.midMatchedMails) == 0 {
-		return []paintress.DMail{}
+		return []domain.DMail{}
 	}
-	return append([]paintress.DMail(nil), e.midMatchedMails...)
+	return append([]domain.DMail(nil), e.midMatchedMails...)
 }
 
 // appendMidHighName appends a HIGH severity D-Mail name (thread-safe).
@@ -96,7 +95,7 @@ func (e *Expedition) appendMidHighName(name string) {
 }
 
 // appendMidMatchedMail appends an issue-matched D-Mail (thread-safe).
-func (e *Expedition) appendMidMatchedMail(dm paintress.DMail) {
+func (e *Expedition) appendMidMatchedMail(dm domain.DMail) {
 	e.midMatchedMu.Lock()
 	defer e.midMatchedMu.Unlock()
 	e.midMatchedMails = append(e.midMatchedMails, dm)
@@ -114,15 +113,15 @@ func (e *Expedition) BuildPrompt() string {
 	projCfg, err := LoadProjectConfig(e.Continent)
 	if err != nil {
 		e.Logger.Warn("project config load failed: %v", err)
-		projCfg = &paintress.ProjectConfig{}
+		projCfg = &domain.ProjectConfig{}
 	}
 
-	data := paintress.PromptData{
+	data := domain.PromptData{
 		Number:          e.Number,
 		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
 		Bt:              "`",
 		Cb:              "```",
-		LuminaSection:   paintress.FormatLuminaForPrompt(e.Luminas),
+		LuminaSection:   domain.FormatLuminaForPrompt(e.Luminas),
 		GradientSection: e.Gradient.FormatForPrompt(),
 		ReserveSection:  e.Reserve.FormatForPrompt(),
 		BaseBranch:      e.Config.BaseBranch,
@@ -131,11 +130,11 @@ func (e *Expedition) BuildPrompt() string {
 		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.Linear.Team,
 		LinearProject:   projCfg.Linear.Project,
-		MissionSection:  paintress.MissionText(),
+		MissionSection:  domain.MissionText(),
 	}
 
 	tmplName := "expedition_en.md.tmpl"
-	switch paintress.Lang {
+	switch domain.Lang {
 	case "ja":
 		tmplName = "expedition_ja.md.tmpl"
 	case "fr":
@@ -143,7 +142,7 @@ func (e *Expedition) BuildPrompt() string {
 	}
 
 	var buf strings.Builder
-	if err := paintress.ExpeditionTemplates.ExecuteTemplate(&buf, tmplName, data); err != nil {
+	if err := domain.ExpeditionTemplates.ExecuteTemplate(&buf, tmplName, data); err != nil {
 		panic(fmt.Sprintf("prompt template execution failed: %v", err))
 	}
 	return buf.String()
@@ -161,7 +160,7 @@ func (e *Expedition) loadInboxSection() string {
 		}
 		e.InboxDMails = dmails
 	})
-	return paintress.FormatDMailForPrompt(e.InboxDMails)
+	return domain.FormatDMailForPrompt(e.InboxDMails)
 }
 
 func (e *Expedition) loadContextSection() string {
@@ -210,7 +209,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	claudeCmd := e.Config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = paintress.DefaultClaudeCmd
+		claudeCmd = domain.DefaultClaudeCmd
 	}
 
 	cmd := newCmd(expCtx, claudeCmd,
@@ -273,7 +272,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	inboxDone := make(chan struct{})
 	go func() {
 		defer close(inboxDone)
-		watchInbox(watchCtx, e.Continent, func(dm paintress.DMail) {
+		watchInbox(watchCtx, e.Continent, func(dm domain.DMail) {
 			if seenFiles[dm.Name] {
 				return
 			}
@@ -356,7 +355,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 // ReadContextFiles reads all .md files from .expedition/context/ and
 // concatenates them into a single string for prompt injection.
 func ReadContextFiles(continent string) (string, error) {
-	dir := paintress.ContextDir(continent)
+	dir := domain.ContextDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // === Flag Tests ===
@@ -31,7 +31,7 @@ func TestWriteJournal(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition: 3, IssueID: "AWE-10", IssueTitle: "Test",
 		MissionType: "implement", Status: "success", Reason: "done",
 		PRUrl: "https://example.com/pr/1", BugIssues: "none",

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -32,10 +31,10 @@ func Status(baseDir string) StatusReport {
 	}
 
 	// Count inbox files
-	report.InboxCount = countDirFiles(paintress.InboxDir(baseDir))
+	report.InboxCount = countDirFiles(domain.InboxDir(baseDir))
 
 	// Count archive files
-	report.ArchiveCount = countDirFiles(paintress.ArchiveDir(baseDir))
+	report.ArchiveCount = countDirFiles(domain.ArchiveDir(baseDir))
 
 	// Load all events for expedition stats
 	eventsDir := domain.EventsDir(baseDir)

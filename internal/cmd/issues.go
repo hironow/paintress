@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -65,7 +65,7 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 	if cfg.Linear.Team == "" {
-		return fmt.Errorf("linear.team not set in %s\nRun 'paintress init %s' first", paintress.ProjectConfigPath(absPath), repoPath)
+		return fmt.Errorf("linear.team not set in %s\nRun 'paintress init %s' first", domain.ProjectConfigPath(absPath), repoPath)
 	}
 
 	apiKey := os.Getenv("LINEAR_API_KEY")
@@ -73,13 +73,13 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("LINEAR_API_KEY environment variable is required")
 	}
 
-	issues, err := session.FetchIssues(cmd.Context(), paintress.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	issues, err := session.FetchIssues(cmd.Context(), domain.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
 	if err != nil {
 		return err
 	}
 
-	issues = paintress.FilterIssuesByState(issues, stateFilter)
-	paintress.SortByPriority(issues)
+	issues = domain.FilterIssuesByState(issues, stateFilter)
+	domain.SortByPriority(issues)
 
 	logger := loggerFrom(cmd)
 	logger.Info("fetched %d issues from %s", len(issues), cfg.Linear.Team)
@@ -87,15 +87,15 @@ func runIssues(cmd *cobra.Command, args []string) error {
 	w := cmd.OutOrStdout()
 	switch outputFmt {
 	case "json":
-		out, err := paintress.FormatIssuesJSON(issues)
+		out, err := domain.FormatIssuesJSON(issues)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintln(w, out)
 	case "text":
-		fmt.Fprintln(w, paintress.FormatIssuesTable(issues))
+		fmt.Fprintln(w, domain.FormatIssuesTable(issues))
 	default:
-		out, err := paintress.FormatIssuesJSONL(issues)
+		out, err := domain.FormatIssuesJSONL(issues)
 		if err != nil {
 			return err
 		}

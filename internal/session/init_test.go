@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestInitProject_WritesConfig(t *testing.T) {
@@ -87,7 +87,7 @@ func TestInitProject_ConfigFileExists(t *testing.T) {
 	}
 
 	// then — verify config path exists
-	cfgPath := paintress.ProjectConfigPath(dir)
+	cfgPath := domain.ProjectConfigPath(dir)
 	if _, statErr := os.Stat(cfgPath); statErr != nil {
 		t.Fatalf("config file not created: %v", statErr)
 	}

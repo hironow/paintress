@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
@@ -35,7 +34,7 @@ If repo-path is provided, also computes expedition success rate metrics.`,
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
-	claudeCmd := paintress.DefaultClaudeCmd
+	claudeCmd := domain.DefaultClaudeCmd
 	var continent string
 	if len(args) > 0 {
 		continent = args[0]
@@ -50,7 +49,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var metrics *paintress.DoctorMetrics
+	var metrics *domain.DoctorMetrics
 	if len(args) > 0 {
 		repoPath := args[0]
 		eventsDir := domain.EventsDir(repoPath)
@@ -75,20 +74,20 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 					success++
 				}
 			}
-			metrics = &paintress.DoctorMetrics{
+			metrics = &domain.DoctorMetrics{
 				SuccessRate: domain.FormatSuccessRate(rate, success, total),
 			}
 		} else {
-			metrics = &paintress.DoctorMetrics{SuccessRate: "no events"}
+			metrics = &domain.DoctorMetrics{SuccessRate: "no events"}
 		}
 	}
 
 	if outputFmt == "json" {
-		output := paintress.DoctorOutput{
+		output := domain.DoctorOutput{
 			Checks:  checks,
 			Metrics: metrics,
 		}
-		out, err := paintress.FormatDoctorOutputJSON(output)
+		out, err := domain.FormatDoctorOutputJSON(output)
 		if err != nil {
 			return err
 		}

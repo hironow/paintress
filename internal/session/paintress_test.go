@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -49,7 +48,7 @@ func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 5,
 		TimeoutSec:     30,
@@ -87,7 +86,7 @@ func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 	// Plant a flag indicating expedition 7 was the last
 	WriteFlag(dir, 7, "AWE-50", "success", "3", 0)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 5,
 		TimeoutSec:     30,
@@ -131,7 +130,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 
 	// Simulate 3 previous expeditions with journals
 	for i := 1; i <= 3; i++ {
-		WriteJournal(dir, &paintress.ExpeditionReport{
+		WriteJournal(dir, &domain.ExpeditionReport{
 			Expedition: i, IssueID: "AWE-" + string(rune('0'+i)),
 			IssueTitle: "past", MissionType: "implement",
 			Status: "success", Reason: "done", PRUrl: "none", BugIssues: "none",
@@ -145,7 +144,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 		t.Fatalf("pre-existing journal 001.md missing: %v", err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 5,
 		TimeoutSec:     30,
@@ -231,7 +230,7 @@ func TestWriteJournal_ResumedNumbering(t *testing.T) {
 	dir := t.TempDir()
 
 	// Write journal at expedition 8 (simulating a resumed run)
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  8,
 		IssueID:     "AWE-50",
 		IssueTitle:  "Fix login",
@@ -284,7 +283,7 @@ func TestSentinelErrors_AreDistinct(t *testing.T) {
 func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        3,
 		MaxExpeditions: 3,
@@ -330,7 +329,7 @@ func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 func TestSwarmMode_DryRun_SingleWorker(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        0,
 		MaxExpeditions: 1,
@@ -361,7 +360,7 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        2,
 		MaxExpeditions: 20,
@@ -397,7 +396,7 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        3,
 		MaxExpeditions: 2, // fewer than workers
@@ -427,7 +426,7 @@ func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        2,
 		MaxExpeditions: 100,
@@ -471,7 +470,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	// Plant flag at expedition 4
 	WriteFlag(dir, 4, "AWE-10", "success", "10", 0)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        3,
 		MaxExpeditions: 3,
@@ -515,7 +514,7 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1,
 		MaxExpeditions: 100,
@@ -556,7 +555,7 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1,
 		MaxExpeditions: 1,
@@ -591,7 +590,7 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1, // single worker WITH worktree pool
 		MaxExpeditions: 2,
@@ -632,7 +631,7 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1,
 		MaxExpeditions: 5,
@@ -669,7 +668,7 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 func TestSwarmMode_RunResetsCounters(t *testing.T) {
 	dir := setupTestRepo(t)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1,
 		MaxExpeditions: 2,
@@ -722,7 +721,7 @@ func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1,
 		MaxExpeditions: 1,
@@ -761,7 +760,7 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 	dir := setupTestRepo(t)
 
 	// Directly test the monotonic guard via Paintress.writeFlag
-	cfg := paintress.Config{Continent: dir, BaseBranch: "main", Model: "opus"}
+	cfg := domain.Config{Continent: dir, BaseBranch: "main", Model: "opus"}
 	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 
 	// Write flag for expedition 5
@@ -784,7 +783,7 @@ func TestPaintressRun_NoDev_SkipsDevServer(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 1,
 		TimeoutSec:     30,
@@ -809,7 +808,7 @@ func TestPaintressRun_NoDev_SkipsDevServer(t *testing.T) {
 
 func TestFormatSummaryJSON(t *testing.T) {
 	// given
-	summary := paintress.RunSummary{
+	summary := domain.RunSummary{
 		Total:    5,
 		Success:  4,
 		Skipped:  0,
@@ -819,13 +818,13 @@ func TestFormatSummaryJSON(t *testing.T) {
 	}
 
 	// when
-	out, err := paintress.FormatSummaryJSON(summary)
+	out, err := domain.FormatSummaryJSON(summary)
 	if err != nil {
 		t.Fatalf("FormatSummaryJSON: %v", err)
 	}
 
 	// then — must be valid JSON
-	var parsed paintress.RunSummary
+	var parsed domain.RunSummary
 	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
 		t.Fatalf("output is not valid JSON: %v\nraw: %s", err, out)
 	}
@@ -845,7 +844,7 @@ func TestFormatSummaryJSON(t *testing.T) {
 
 func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
 	// given
-	summary := paintress.RunSummary{
+	summary := domain.RunSummary{
 		Total:           3,
 		Success:         2,
 		Failed:          1,
@@ -854,13 +853,13 @@ func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
 	}
 
 	// when
-	out, err := paintress.FormatSummaryJSON(summary)
+	out, err := domain.FormatSummaryJSON(summary)
 	if err != nil {
 		t.Fatalf("FormatSummaryJSON: %v", err)
 	}
 
 	// then — mid_high_severity must appear in JSON
-	var parsed paintress.RunSummary
+	var parsed domain.RunSummary
 	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
 		t.Fatalf("output is not valid JSON: %v\nraw: %s", err, out)
 	}
@@ -902,7 +901,7 @@ echo '__EXPEDITION_END__'
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        2,
 		MaxExpeditions: 2,
@@ -976,7 +975,7 @@ echo '__EXPEDITION_END__'
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        2,
 		MaxExpeditions: 2,
@@ -1061,7 +1060,7 @@ echo '__EXPEDITION_END__'
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        2,
 		MaxExpeditions: 2,
@@ -1113,7 +1112,7 @@ echo '__EXPEDITION_COMPLETE__'
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        2,
 		MaxExpeditions: 2,
@@ -1194,7 +1193,7 @@ echo '__EXPEDITION_END__'
 		t.Fatal(err)
 	}
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		Workers:        1,
 		MaxExpeditions: 3, // startExp=3 from continent flag (exp 2), runs exp 3,4,5

@@ -1,10 +1,10 @@
-package paintress_test
+package domain_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestNewEscalationDMail_Kind(t *testing.T) {
@@ -13,7 +13,7 @@ func TestNewEscalationDMail_Kind(t *testing.T) {
 	failures := 3
 
 	// when
-	dm := paintress.NewEscalationDMail(exp, failures)
+	dm := domain.NewEscalationDMail(exp, failures)
 
 	// then
 	if dm.Kind != "feedback" {
@@ -27,7 +27,7 @@ func TestNewEscalationDMail_Severity(t *testing.T) {
 	failures := 3
 
 	// when
-	dm := paintress.NewEscalationDMail(exp, failures)
+	dm := domain.NewEscalationDMail(exp, failures)
 
 	// then
 	if dm.Severity != "high" {
@@ -37,17 +37,17 @@ func TestNewEscalationDMail_Severity(t *testing.T) {
 
 func TestNewEscalationDMail_SchemaVersion(t *testing.T) {
 	// when
-	dm := paintress.NewEscalationDMail(3, 3)
+	dm := domain.NewEscalationDMail(3, 3)
 
 	// then
-	if dm.SchemaVersion != paintress.DMailSchemaVersion {
-		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, paintress.DMailSchemaVersion)
+	if dm.SchemaVersion != domain.DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
 func TestNewEscalationDMail_NameContainsExpedition(t *testing.T) {
 	// when
-	dm := paintress.NewEscalationDMail(7, 3)
+	dm := domain.NewEscalationDMail(7, 3)
 
 	// then
 	if !strings.Contains(dm.Name, "7") {
@@ -60,7 +60,7 @@ func TestNewEscalationDMail_NameContainsExpedition(t *testing.T) {
 
 func TestNewEscalationDMail_BodyContainsFailureCount(t *testing.T) {
 	// when
-	dm := paintress.NewEscalationDMail(5, 3)
+	dm := domain.NewEscalationDMail(5, 3)
 
 	// then
 	if !strings.Contains(dm.Body, "3") {
@@ -70,7 +70,7 @@ func TestNewEscalationDMail_BodyContainsFailureCount(t *testing.T) {
 
 func TestNewEscalationDMail_DescriptionMentionsEscalation(t *testing.T) {
 	// when
-	dm := paintress.NewEscalationDMail(10, 3)
+	dm := domain.NewEscalationDMail(10, 3)
 
 	// then
 	if !strings.Contains(strings.ToLower(dm.Description), "escalation") {
@@ -80,14 +80,14 @@ func TestNewEscalationDMail_DescriptionMentionsEscalation(t *testing.T) {
 
 func TestNewEscalationDMail_Marshal_Roundtrip(t *testing.T) {
 	// given
-	dm := paintress.NewEscalationDMail(5, 3)
+	dm := domain.NewEscalationDMail(5, 3)
 
 	// when
 	data, err := dm.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail: %v", err)
 	}
