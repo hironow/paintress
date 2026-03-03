@@ -14,6 +14,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -25,9 +26,9 @@ type Expedition struct {
 	WorkDir   string // execution directory (worktree path or Continent)
 	Config    domain.Config
 	LogDir    string
-	Logger    *domain.Logger
+	Logger    domain.Logger
 	DataOut   io.Writer       // stdout-equivalent for streaming Claude output
-	Notifier  domain.Notifier // for mid-expedition HIGH severity notifications
+	Notifier  port.Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
 	Luminas     []domain.Lumina

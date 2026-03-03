@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/port"
 	"github.com/testcontainers/testcontainers-go"
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -198,8 +198,8 @@ func TestContainerGitExecutor_Shell_EchoCommand(t *testing.T) {
 	}
 }
 
-// Verify that containerGitExecutor satisfies the domain.GitExecutor interface at compile time.
-var _ domain.GitExecutor = (*containerGitExecutor)(nil)
+// Verify that containerGitExecutor satisfies the port.GitExecutor interface at compile time.
+var _ port.GitExecutor = (*containerGitExecutor)(nil)
 
 func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
 	if testing.Short() {

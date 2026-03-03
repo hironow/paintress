@@ -21,16 +21,16 @@ type DevServer struct {
 	url     string
 	dir     string
 	logPath string
-	logger  *domain.Logger
+	logger  domain.Logger
 
 	mu      sync.Mutex
 	process *exec.Cmd
 	running bool
 }
 
-func NewDevServer(cmd, url, dir, logPath string, logger *domain.Logger) *DevServer {
+func NewDevServer(cmd, url, dir, logPath string, logger domain.Logger) *DevServer {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	return &DevServer{cmd: cmd, url: url, dir: dir, logPath: logPath, logger: logger}
 }

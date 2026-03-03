@@ -16,6 +16,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -32,18 +33,18 @@ var (
 type Paintress struct {
 	config      domain.Config
 	logDir      string
-	Logger      *domain.Logger
+	Logger      domain.Logger
 	DataOut     io.Writer // stdout-equivalent for data output
 	StdinIn     io.Reader // stdin-equivalent for interactive input
 	devServer   *DevServer
 	gradient    *domain.GradientGauge
 	reserve     *domain.ReserveParty
 	pool        *WorktreePool // nil when --workers=0
-	notifier    domain.Notifier
-	approver    domain.Approver
+	notifier    port.Notifier
+	approver    port.Approver
 	outboxStore domain.OutboxStore     // transactional outbox for D-Mail delivery
 	eventStore  domain.EventStore      // append-only event log (fire-and-forget)
-	Dispatcher  domain.EventDispatcher // policy engine (best-effort dispatch after emit)
+	Dispatcher  port.EventDispatcher   // policy engine (best-effort dispatch after emit)
 
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryMu      sync.Mutex
@@ -75,11 +76,11 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 	}
 	ev, err := domain.NewEvent(eventType, data, time.Now())
 	if err != nil {
-		p.Logger.Debug("event emit marshal: %v", err)
+		p.Logger.Warn("event emit marshal: %v", err)
 		return
 	}
 	if err := p.eventStore.Append(ev); err != nil {
-		p.Logger.Debug("event emit append: %v", err)
+		p.Logger.Warn("event emit append: %v", err)
 		platform.RecordEventEmitError(context.Background(), string(eventType))
 	}
 	// Best-effort policy dispatch
@@ -90,9 +91,26 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 	}
 }
 
-func NewPaintress(cfg domain.Config, logger *domain.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
+// emitExpeditionCompleted generates an expedition.completed event via the aggregate
+// and persists it through emitEvent. OTel metric is recorded directly since
+// aggregate events use json.RawMessage (not the typed struct emitEvent expects).
+func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound string) {
+	platform.RecordExpedition(context.Background(), status)
+
+	agg := domain.NewExpeditionAggregate()
+	events, err := agg.CompleteExpedition(exp, status, issueID, bugsFound, time.Now())
+	if err != nil {
+		p.Logger.Warn("aggregate expedition: %v", err)
+		return
+	}
+	for _, ev := range events {
+		p.emitEvent(ev.Type, ev.Data)
+	}
+}
+
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
 	if logger == nil {
-		logger = domain.NewLogger(nil, false)
+		logger = &domain.NopLogger{}
 	}
 	if dataOut == nil {
 		dataOut = io.Discard
@@ -120,7 +138,7 @@ func NewPaintress(cfg domain.Config, logger *domain.Logger, dataOut io.Writer, s
 	}
 
 	// Wire notifier based on config
-	var notifier domain.Notifier
+	var notifier port.Notifier
 	if cfg.NotifyCmd != "" {
 		notifier = NewCmdNotifier(cfg.NotifyCmd)
 	} else {
@@ -128,10 +146,10 @@ func NewPaintress(cfg domain.Config, logger *domain.Logger, dataOut io.Writer, s
 	}
 
 	// Wire approver based on config
-	var approver domain.Approver
+	var approver port.Approver
 	switch {
 	case cfg.AutoApprove:
-		approver = &domain.AutoApprover{}
+		approver = &port.AutoApprover{}
 	case cfg.ApproveCmd != "":
 		approver = NewCmdApprover(cfg.ApproveCmd)
 	default:
@@ -193,7 +211,12 @@ func (p *Paintress) Run(ctx context.Context) int {
 	if err != nil {
 		p.Logger.Warn("log file: %v", err)
 	} else {
-		p.Logger.SetExtraWriter(logFile)
+		type extraWriterSetter interface {
+			SetExtraWriter(w io.Writer)
+		}
+		if setter, ok := p.Logger.(extraWriterSetter); ok {
+			setter.SetExtraWriter(logFile)
+		}
 		defer logFile.Close()
 	}
 
@@ -478,9 +501,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 			}
 			WriteJournal(p.config.Continent, errReport)
-			p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
-				Expedition: exp, Status: "failed",
-			})
+			p.emitExpeditionCompleted(exp, "failed", "", "")
 			if midHighCount > 0 {
 				p.Logger.Warn("Expedition #%d: %d HIGH severity D-Mail received mid-expedition", exp, midHighCount)
 			}
@@ -528,9 +549,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 					parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 				}
 				WriteJournal(p.config.Continent, parseErrReport)
-				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
-					Expedition: exp, Status: "parse_error",
-				})
+				p.emitExpeditionCompleted(exp, "parse_error", "", "")
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
 			case domain.StatusSuccess:
@@ -566,10 +585,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 				p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
-				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
-					Expedition: exp, Status: "success",
-					IssueID: report.IssueID, BugsFound: fmt.Sprintf("%d", report.BugsFound),
-				})
+				p.emitExpeditionCompleted(exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound))
 				if dm := domain.NewReportDMail(report); dm.Name != "" {
 					if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
 						p.Logger.Warn("dmail send: %v", err)
@@ -590,9 +606,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				})
 				p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
-				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
-					Expedition: exp, Status: "skipped", IssueID: report.IssueID,
-				})
+				p.emitExpeditionCompleted(exp, "skipped", report.IssueID, "")
 				p.totalSkipped.Add(1)
 			case domain.StatusFailed:
 				p.Logger.Error("%s", fmt.Sprintf(domain.Msg("issue_failed"), report.IssueID, report.Reason))
@@ -602,9 +616,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				})
 				p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
-				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
-					Expedition: exp, Status: "failed", IssueID: report.IssueID,
-				})
+				p.emitExpeditionCompleted(exp, "failed", report.IssueID, "")
 				p.consecutiveFailures.Add(1)
 				p.totalFailed.Add(1)
 			}

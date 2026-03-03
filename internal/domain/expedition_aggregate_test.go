@@ -52,7 +52,7 @@ func TestExpeditionAggregate_CompleteExpedition_Failure(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 
 	// when
-	events, err := agg.CompleteExpedition(1, "failure", "", "", time.Now().UTC())
+	events, err := agg.CompleteExpedition(1, "failed", "", "", time.Now().UTC())
 
 	// then
 	if err != nil {
@@ -72,7 +72,7 @@ func TestExpeditionAggregate_ShouldGommage(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
-		agg.CompleteExpedition(i+1, "failure", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", now)
 	}
 
 	// when
@@ -89,7 +89,7 @@ func TestExpeditionAggregate_ShouldGommage_BelowThreshold(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 2 {
-		agg.CompleteExpedition(i+1, "failure", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", now)
 	}
 
 	// when
@@ -106,7 +106,7 @@ func TestExpeditionAggregate_GommageEvent(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
-		agg.CompleteExpedition(i+1, "failure", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", now)
 	}
 
 	// when
@@ -121,12 +121,61 @@ func TestExpeditionAggregate_GommageEvent(t *testing.T) {
 	}
 }
 
+func TestExpeditionAggregate_StatusVocabulary(t *testing.T) {
+	tests := []struct {
+		name             string
+		status           string
+		wantFailuresDelta int // 0 = no change, 1 = increment
+	}{
+		{"success resets failures", "success", 0},
+		{"failed increments failures", "failed", 1},
+		{"parse_error increments failures", "parse_error", 1},
+		{"skipped does not affect failures", "skipped", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// given: aggregate with 1 pre-existing failure
+			agg := domain.NewExpeditionAggregate()
+			now := time.Now().UTC()
+			agg.CompleteExpedition(1, "failed", "", "", now)
+			before := agg.ConsecutiveFailures()
+
+			// when
+			events, err := agg.CompleteExpedition(2, tt.status, "", "", now)
+
+			// then
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(events) < 1 {
+				t.Fatal("expected at least 1 event")
+			}
+			if events[0].Type != domain.EventExpeditionCompleted {
+				t.Errorf("expected type %s, got %s", domain.EventExpeditionCompleted, events[0].Type)
+			}
+
+			after := agg.ConsecutiveFailures()
+			switch tt.status {
+			case "success":
+				if after != 0 {
+					t.Errorf("success should reset failures to 0, got %d", after)
+				}
+			default:
+				wantAfter := before + tt.wantFailuresDelta
+				if after != wantAfter {
+					t.Errorf("status %q: expected failures %d, got %d", tt.status, wantAfter, after)
+				}
+			}
+		})
+	}
+}
+
 func TestExpeditionAggregate_SuccessResetsFailures(t *testing.T) {
 	// given: 2 consecutive failures then a success
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
-	agg.CompleteExpedition(1, "failure", "", "", now)
-	agg.CompleteExpedition(2, "failure", "", "", now)
+	agg.CompleteExpedition(1, "failed", "", "", now)
+	agg.CompleteExpedition(2, "failed", "", "", now)
 	agg.CompleteExpedition(3, "success", "ISS-1", "", now)
 
 	// when

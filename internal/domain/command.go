@@ -33,6 +33,20 @@ func (c *InitCommand) Validate() []error {
 	return errs
 }
 
+// RebuildCommand represents the intent to rebuild projections from the event store.
+type RebuildCommand struct {
+	RepoPath string
+}
+
+// Validate checks that the command has valid required fields.
+func (c *RebuildCommand) Validate() []error {
+	var errs []error
+	if c.RepoPath == "" {
+		errs = append(errs, fmt.Errorf("RepoPath is required"))
+	}
+	return errs
+}
+
 // ArchivePruneCommand represents the intent to prune old archive files.
 type ArchivePruneCommand struct {
 	RepoPath string

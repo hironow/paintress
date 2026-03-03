@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // newTestPaintress creates a minimal Paintress for review loop tests.
@@ -27,7 +28,7 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 		BaseBranch: "main",
 		Model:      "opus",
 	}
-	return NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	return NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 }
 
 // TestReviewLoop_ReviewTimeDoesNotConsumeBudget verifies that slow review

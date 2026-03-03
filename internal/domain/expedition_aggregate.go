@@ -45,10 +45,10 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 	switch status {
 	case "success":
 		a.consecutiveFailures = 0
-	case "failure":
+	case "failed", "parse_error":
 		a.consecutiveFailures++
-	case "skip":
-		// skip does not affect consecutive failures
+	case "skipped":
+		// skipped does not affect consecutive failures
 	}
 
 	return events, nil

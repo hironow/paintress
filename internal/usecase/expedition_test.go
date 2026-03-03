@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 func TestRunExpeditions_InvalidCommand(t *testing.T) {
@@ -13,7 +14,7 @@ func TestRunExpeditions_InvalidCommand(t *testing.T) {
 	cmd := domain.RunExpeditionCommand{}
 
 	// when
-	exitCode, err := RunExpeditions(context.Background(), cmd, domain.Config{}, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	exitCode, err := RunExpeditions(context.Background(), cmd, domain.Config{}, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 
 	// then
 	if err == nil {

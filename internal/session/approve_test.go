@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/port"
 )
 
 func TestStdinApprover_Yes(t *testing.T) {
@@ -227,7 +229,7 @@ func TestCmdApprover_EscapesShellMetacharacters(t *testing.T) {
 
 func TestAutoApprover(t *testing.T) {
 	// given
-	a := &domain.AutoApprover{}
+	a := &port.AutoApprover{}
 
 	// when
 	approved, err := a.RequestApproval(context.Background(), "anything")
@@ -390,9 +392,9 @@ func TestHighSeverityGate_NoHighSeverity(t *testing.T) {
 	}
 
 	// Approver that would fail if called
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &failApprover{t: t}
-	p.notifier = &domain.NopNotifier{}
+	p.notifier = &port.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -424,9 +426,9 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
-	p.approver = &domain.AutoApprover{}
-	p.notifier = &domain.NopNotifier{}
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p.approver = &port.AutoApprover{}
+	p.notifier = &port.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -457,9 +459,9 @@ func TestHighSeverityGate_Denied(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &denyApprover{}
-	p.notifier = &domain.NopNotifier{}
+	p.notifier = &port.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -494,7 +496,7 @@ func TestHighSeverityGate_AutoApprove(t *testing.T) {
 		AutoApprove:    true,
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	// AutoApprove wiring happens in NewPaintress — approver should be AutoApprover
 
 	code := p.Run(context.Background())
@@ -528,9 +530,9 @@ func TestHighSeverityGate_ApproverCalledOnce(t *testing.T) {
 	}
 
 	var callCount atomic.Int32
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &countingApprover{count: &callCount, approve: true}
-	p.notifier = &domain.NopNotifier{}
+	p.notifier = &port.NopNotifier{}
 
 	p.Run(context.Background())
 
@@ -559,9 +561,9 @@ func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &denyApprover{}
-	p.notifier = &domain.NopNotifier{}
+	p.notifier = &port.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -597,9 +599,9 @@ func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &failApprover{t: t}
-	p.notifier = &domain.NopNotifier{}
+	p.notifier = &port.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 1 {
@@ -631,9 +633,9 @@ func TestHighSeverityGate_ApprovalError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.approver = &errorApprover{err: fmt.Errorf("exec: command not found")}
-	p.notifier = &domain.NopNotifier{}
+	p.notifier = &port.NopNotifier{}
 
 	code := p.Run(context.Background())
 	if code != 1 {

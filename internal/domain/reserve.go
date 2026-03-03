@@ -19,7 +19,7 @@ type ReserveParty struct {
 	primary string   // e.g. "opus"
 	reserve []string // e.g. ["sonnet", "haiku"]
 	active  string   // currently active model
-	logger  *Logger
+	logger  Logger
 
 	// Rate limit tracking
 	rateLimitHits int
@@ -27,9 +27,9 @@ type ReserveParty struct {
 	cooldownUntil time.Time
 }
 
-func NewReserveParty(primary string, reserves []string, logger *Logger) *ReserveParty {
+func NewReserveParty(primary string, reserves []string, logger Logger) *ReserveParty {
 	if logger == nil {
-		logger = NewLogger(nil, false)
+		logger = &NopLogger{}
 	}
 	return &ReserveParty{
 		primary: primary,

@@ -1,12 +1,20 @@
-package domain
+package platform
 
 import (
 	"fmt"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/hironow/paintress/internal/domain"
 )
 
+// compile-time interface check
+var _ domain.Logger = (*Logger)(nil)
+
+// Logger is the concrete structured logger. It writes timestamped log lines
+// to a primary writer and an optional extra writer (for dual-write to file).
+// All methods are goroutine-safe.
 type Logger struct {
 	out         io.Writer
 	mu          sync.Mutex
@@ -14,6 +22,7 @@ type Logger struct {
 	verbose     bool
 }
 
+// NewLogger creates a new Logger. If out is nil, io.Discard is used.
 func NewLogger(out io.Writer, verbose bool) *Logger {
 	if out == nil {
 		out = io.Discard

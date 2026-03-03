@@ -67,7 +67,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -102,7 +102,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -161,9 +161,9 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			Model:      "opus",
 		},
 		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
-		Logger:   domain.NewLogger(io.Discard, false),
+		Logger:   platform.NewLogger(io.Discard, false),
 		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

@@ -1,14 +1,13 @@
 package domain
 
 import (
-	"io"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestReserve_Status_Primary(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	s := rp.Status()
 	if !containsStr(s, "primary") {
 		t.Errorf("status should say primary: %q", s)
@@ -22,7 +21,7 @@ func TestReserve_Status_Primary(t *testing.T) {
 }
 
 func TestReserve_Status_AfterSwitch(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.CheckOutput("rate limit exceeded")
 	s := rp.Status()
 	if !containsStr(s, "RESERVE") {
@@ -40,7 +39,7 @@ func TestReserve_Status_AfterSwitch(t *testing.T) {
 }
 
 func TestReserve_FormatForPrompt_Primary(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	s := rp.FormatForPrompt()
 	if !containsStr(s, "opus") {
 		t.Errorf("should mention opus: %q", s)
@@ -51,7 +50,7 @@ func TestReserve_FormatForPrompt_Primary(t *testing.T) {
 }
 
 func TestReserve_FormatForPrompt_Reserve(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.CheckOutput("429 too many requests")
 	s := rp.FormatForPrompt()
 	if !containsStr(s, "sonnet") {
@@ -66,7 +65,7 @@ func TestReserve_FormatForPrompt_Reserve(t *testing.T) {
 }
 
 func TestReserve_TryRecoverPrimary_BeforeCooldown(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.CheckOutput("rate limit")
 	if rp.ActiveModel() != "sonnet" {
 		t.Fatalf("should be on sonnet, got %q", rp.ActiveModel())
@@ -80,7 +79,7 @@ func TestReserve_TryRecoverPrimary_BeforeCooldown(t *testing.T) {
 }
 
 func TestReserve_TryRecoverPrimary_AfterCooldown(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.CheckOutput("rate limit")
 
 	// Manually set cooldown to past
@@ -95,7 +94,7 @@ func TestReserve_TryRecoverPrimary_AfterCooldown(t *testing.T) {
 }
 
 func TestReserve_TryRecoverPrimary_AlreadyOnPrimary(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.TryRecoverPrimary() // No-op when already on primary
 	if rp.ActiveModel() != "opus" {
 		t.Errorf("should stay on opus: %q", rp.ActiveModel())
@@ -103,7 +102,7 @@ func TestReserve_TryRecoverPrimary_AlreadyOnPrimary(t *testing.T) {
 }
 
 func TestReserve_MultipleRateLimits(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, &NopLogger{})
 	rp.CheckOutput("rate limit")
 	rp.CheckOutput("429 again")
 
@@ -122,7 +121,7 @@ func TestReserve_MultipleRateLimits(t *testing.T) {
 }
 
 func TestReserve_ForceReserve_NoReserves(t *testing.T) {
-	rp := NewReserveParty("opus", nil, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", nil, &NopLogger{})
 	rp.ForceReserve()
 	if rp.ActiveModel() != "opus" {
 		t.Errorf("with no reserves, should stay on opus: %q", rp.ActiveModel())
@@ -130,7 +129,7 @@ func TestReserve_ForceReserve_NoReserves(t *testing.T) {
 }
 
 func TestReserve_ForceReserve_AlreadyOnReserve(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.ForceReserve()
 	if rp.ActiveModel() != "sonnet" {
 		t.Fatalf("should be on sonnet: %q", rp.ActiveModel())
@@ -156,7 +155,7 @@ func TestReserve_AllRateLimitSignals(t *testing.T) {
 	}
 
 	for _, sig := range signals {
-		rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+		rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 		detected := rp.CheckOutput(sig)
 		if !detected {
 			t.Errorf("should detect rate limit in %q", sig)
@@ -168,7 +167,7 @@ func TestReserve_AllRateLimitSignals(t *testing.T) {
 }
 
 func TestReserve_CaseInsensitive(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	detected := rp.CheckOutput("RATE LIMIT EXCEEDED")
 	if !detected {
 		t.Error("should detect rate limit case-insensitively")
@@ -176,7 +175,7 @@ func TestReserve_CaseInsensitive(t *testing.T) {
 }
 
 func TestReserve_NoFalsePositiveOnPartialMatches(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 
 	// These should not trigger rate-limit detection.
 	noMatch := []string{
@@ -199,7 +198,7 @@ func TestReserve_NoFalsePositiveOnPartialMatches(t *testing.T) {
 }
 
 func TestReserve_ConcurrentAccess(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	var wg sync.WaitGroup
 
 	for i := 0; i < 20; i++ {
@@ -228,14 +227,14 @@ func TestReserve_ConcurrentAccess(t *testing.T) {
 // --- from ralph_test.go ---
 
 func TestReserve_DefaultModel(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, &NopLogger{})
 	if rp.ActiveModel() != "opus" {
 		t.Errorf("ActiveModel = %q, want opus", rp.ActiveModel())
 	}
 }
 
 func TestReserve_RateLimitSwitch(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, &NopLogger{})
 
 	detected := rp.CheckOutput("Error: rate limit exceeded, try again later")
 	if !detected {
@@ -247,7 +246,7 @@ func TestReserve_RateLimitSwitch(t *testing.T) {
 }
 
 func TestReserve_NoFalsePositive(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	detected := rp.CheckOutput("The implementation looks correct")
 	if detected {
 		t.Error("should not detect rate limit in normal output")
@@ -258,7 +257,7 @@ func TestReserve_NoFalsePositive(t *testing.T) {
 }
 
 func TestReserve_NoReserveAvailable(t *testing.T) {
-	rp := NewReserveParty("opus", nil, NewLogger(io.Discard, false)) // no reserves
+	rp := NewReserveParty("opus", nil, &NopLogger{}) // no reserves
 	rp.CheckOutput("rate limit reached")
 	// Should stay on opus since no reserve available
 	if rp.ActiveModel() != "opus" {
@@ -267,7 +266,7 @@ func TestReserve_NoReserveAvailable(t *testing.T) {
 }
 
 func TestReserve_ForceReserve(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.ForceReserve()
 	if rp.ActiveModel() != "sonnet" {
 		t.Errorf("got %q, want sonnet", rp.ActiveModel())
@@ -277,7 +276,7 @@ func TestReserve_ForceReserve(t *testing.T) {
 // --- from edge_cases_test.go ---
 
 func TestReserve_EmptyChunk(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	detected := rp.CheckOutput("")
 	if detected {
 		t.Error("empty chunk should not detect rate limit")
@@ -288,7 +287,7 @@ func TestReserve_EmptyChunk(t *testing.T) {
 }
 
 func TestReserve_EmptyPrimaryModel(t *testing.T) {
-	rp := NewReserveParty("", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("", []string{"sonnet"}, &NopLogger{})
 	if rp.ActiveModel() != "" {
 		t.Errorf("active model should be empty string, got %q", rp.ActiveModel())
 	}
@@ -302,7 +301,7 @@ func TestReserve_EmptyPrimaryModel(t *testing.T) {
 
 func TestReserve_SelfReferentialReserve(t *testing.T) {
 	// Primary listed as its own reserve
-	rp := NewReserveParty("opus", []string{"opus"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"opus"}, &NopLogger{})
 	rp.CheckOutput("rate limit")
 
 	// It will "switch" to opus (same model)
@@ -312,7 +311,7 @@ func TestReserve_SelfReferentialReserve(t *testing.T) {
 }
 
 func TestReserve_PartialSignalNoMatch(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 
 	// These should NOT match
 	noMatch := []string{
@@ -323,7 +322,7 @@ func TestReserve_PartialSignalNoMatch(t *testing.T) {
 		"quota",
 	}
 	for _, s := range noMatch {
-		rp2 := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+		rp2 := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 		detected := rp2.CheckOutput(s)
 		// "at full capacity to serve you" contains "capacity" so it will match
 		// "429th item" no longer matches — bare "429" was removed to avoid false positives
@@ -333,7 +332,7 @@ func TestReserve_PartialSignalNoMatch(t *testing.T) {
 }
 
 func TestReserve_WhitespaceOnlyChunk(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	detected := rp.CheckOutput("   \n\t\n   ")
 	if detected {
 		t.Error("whitespace-only chunk should not detect rate limit")
@@ -341,7 +340,7 @@ func TestReserve_WhitespaceOnlyChunk(t *testing.T) {
 }
 
 func TestReserve_ForceReserve_CooldownReset(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.ForceReserve()
 
 	// Cooldown should be set
@@ -355,7 +354,7 @@ func TestReserve_ForceReserve_CooldownReset(t *testing.T) {
 }
 
 func TestReserve_ConcurrentRateLimitDetection(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	var wg sync.WaitGroup
 
 	// Blast rate limit signals from many goroutines
@@ -383,7 +382,7 @@ func TestReserve_ConcurrentRateLimitDetection(t *testing.T) {
 // --- from race_test.go ---
 
 func TestReserve_ConcurrentCheckAndRecover(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, &NopLogger{})
 
 	var wg sync.WaitGroup
 
@@ -417,7 +416,7 @@ func TestReserve_ConcurrentCheckAndRecover(t *testing.T) {
 }
 
 func TestReserve_ConcurrentForceAndRecover(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 
 	var wg sync.WaitGroup
 
@@ -442,7 +441,7 @@ func TestReserve_ConcurrentForceAndRecover(t *testing.T) {
 }
 
 func TestReserve_ConcurrentStatusAndCheckOutput(t *testing.T) {
-	rp := NewReserveParty("opus", []string{"sonnet"}, NewLogger(io.Discard, false))
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/port"
 )
 
 // cmdRunner abstracts exec.Cmd.Run for testing.
@@ -66,7 +66,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		)
 		return mk(ctx, "powershell", "-NoProfile", "-Command", script).Run()
 	default:
-		return domain.ErrUnsupportedOS
+		return port.ErrUnsupportedOS
 	}
 }
 

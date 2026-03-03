@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // ═══════════════════════════════════════════════
@@ -209,9 +210,9 @@ func TestExpedition_BuildPrompt_ZeroNumber(t *testing.T) {
 		Number:    0,
 		Continent: "/tmp",
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    domain.NewLogger(io.Discard, false),
+		Logger:    platform.NewLogger(io.Discard, false),
 		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -225,9 +226,9 @@ func TestExpedition_BuildPrompt_EmptyConfig(t *testing.T) {
 		Number:    1,
 		Continent: "",
 		Config:    domain.Config{}, // all empty
-		Logger:    domain.NewLogger(io.Discard, false),
+		Logger:    platform.NewLogger(io.Discard, false),
 		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("", nil, domain.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// Should not panic with empty config
@@ -254,7 +255,7 @@ func TestExpedition_Run_ShortTimeout(t *testing.T) {
 // ═══════════════════════════════════════════════
 
 func TestDevServer_StopMultipleTimes(t *testing.T) {
-	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null", domain.NewLogger(io.Discard, false))
+	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null", platform.NewLogger(io.Discard, false))
 	// Multiple stops should not panic
 	ds.Stop()
 	ds.Stop()

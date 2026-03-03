@@ -1,5 +1,5 @@
-// Package domain contains domain types, events, commands, policies, and pure
-// domain logic. Functions here have no I/O and no context.Context except for
-// OTel metric recording which is fire-and-forget.
-// I/O operations belong in the session layer; orchestration belongs in usecase.
+// Package domain contains pure types, events, commands, policies, aggregates,
+// and domain logic. No I/O syscalls, no context.Context.
+// Context-aware port interfaces live in internal/port.
+// Infrastructure (logger, telemetry) lives in internal/platform.
 package domain
