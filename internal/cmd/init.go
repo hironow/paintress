@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +34,11 @@ flags for interactive prompts. This must be run once before
 
 			team, _ := cmd.Flags().GetString("team")
 			project, _ := cmd.Flags().GetString("project")
-			return session.InitProject(repoPath, team, project, cmd.ErrOrStderr())
+			return usecase.InitProject(domain.InitCommand{
+				RepoPath: repoPath,
+				Team:     team,
+				Project:  project,
+			}, cmd.ErrOrStderr())
 		},
 	}
 	cmd.Flags().String("team", "", "Linear team key (e.g. MY)")

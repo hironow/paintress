@@ -1,11 +1,10 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +38,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		continent = args[0]
 	}
-	checks := session.RunDoctor(claudeCmd, continent)
+	checks := usecase.RunDoctor(claudeCmd, continent)
 
 	allRequired := true
 	for _, c := range checks {
@@ -51,35 +50,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	var metrics *domain.DoctorMetrics
 	if len(args) > 0 {
-		repoPath := args[0]
-		eventsDir := domain.EventsDir(repoPath)
-		store := session.NewEventStore(eventsDir)
-		events, err := store.LoadAll()
-		if err == nil && len(events) > 0 {
-			rate := domain.SuccessRate(events)
-			var success, total int
-			for _, ev := range events {
-				if ev.Type != domain.EventExpeditionCompleted {
-					continue
-				}
-				var data domain.ExpeditionCompletedData
-				if json.Unmarshal(ev.Data, &data) != nil {
-					continue
-				}
-				if data.Status == "skipped" {
-					continue
-				}
-				total++
-				if data.Status == "success" {
-					success++
-				}
-			}
-			metrics = &domain.DoctorMetrics{
-				SuccessRate: domain.FormatSuccessRate(rate, success, total),
-			}
-		} else {
-			metrics = &domain.DoctorMetrics{SuccessRate: "no events"}
-		}
+		metrics = usecase.ComputeSuccessRate(args[0])
 	}
 
 	if outputFmt == "json" {

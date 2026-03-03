@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -60,29 +59,13 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	cfg, err := session.LoadProjectConfig(absPath)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-	if cfg.Linear.Team == "" {
-		return fmt.Errorf("linear.team not set in %s\nRun 'paintress init %s' first", domain.ProjectConfigPath(absPath), repoPath)
-	}
-
-	apiKey := os.Getenv("LINEAR_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("LINEAR_API_KEY environment variable is required")
-	}
-
-	issues, err := session.FetchIssues(cmd.Context(), domain.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	issues, err := usecase.FetchIssues(cmd.Context(), absPath, stateFilter)
 	if err != nil {
 		return err
 	}
 
-	issues = domain.FilterIssuesByState(issues, stateFilter)
-	domain.SortByPriority(issues)
-
 	logger := loggerFrom(cmd)
-	logger.Info("fetched %d issues from %s", len(issues), cfg.Linear.Team)
+	logger.Info("fetched %d issues from %s", len(issues), absPath)
 
 	w := cmd.OutOrStdout()
 	switch outputFmt {

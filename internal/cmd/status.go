@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +34,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return fmt.Errorf("invalid path: %w", err)
 			}
 
-			report := session.Status(baseDir)
+			report := usecase.GetStatus(baseDir)
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {

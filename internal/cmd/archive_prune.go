@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -59,13 +60,17 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	stateDir := filepath.Join(repoPath, ".expedition")
 
 	// Collect archive candidates (dry-run to list only).
-	archiveResult, err := session.ArchivePrune(repoPath, days, false)
+	archiveResult, err := usecase.ArchivePrune(domain.ArchivePruneCommand{
+		RepoPath: repoPath,
+		Days:     days,
+		Execute:  false,
+	})
 	if err != nil {
 		return err
 	}
 
 	// Collect event file candidates.
-	eventFiles, eventErr := session.ListExpiredEventFiles(stateDir, days)
+	eventFiles, eventErr := usecase.ListExpiredEventFiles(stateDir, days)
 	if eventErr != nil {
 		return fmt.Errorf("failed to list expired events: %w", eventErr)
 	}
@@ -90,14 +95,18 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 			EventFiles:      eventFiles,
 		}
 		if execute {
-			execResult, execErr := session.ArchivePrune(repoPath, days, true)
+			execResult, execErr := usecase.ArchivePrune(domain.ArchivePruneCommand{
+				RepoPath: repoPath,
+				Days:     days,
+				Execute:  true,
+			})
 			if execErr != nil {
 				return execErr
 			}
 			out.Deleted = execResult.Deleted
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := session.PruneEventFiles(stateDir, eventFiles)
+				deleted, delErr := usecase.PruneEventFiles(stateDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}
@@ -139,7 +148,11 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 
 	// Execute: archive deletion
 	if len(archiveResult.Candidates) > 0 {
-		execResult, execErr := session.ArchivePrune(repoPath, days, true)
+		execResult, execErr := usecase.ArchivePrune(domain.ArchivePruneCommand{
+			RepoPath: repoPath,
+			Days:     days,
+			Execute:  true,
+		})
 		if execErr != nil {
 			return execErr
 		}
@@ -148,7 +161,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 
 	// Execute: event file deletion
 	if len(eventFiles) > 0 {
-		deleted, delErr := session.PruneEventFiles(stateDir, eventFiles)
+		deleted, delErr := usecase.PruneEventFiles(stateDir, eventFiles)
 		if delErr != nil {
 			return fmt.Errorf("event prune failed: %w", delErr)
 		}
@@ -156,7 +169,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
-	if pruned, pruneErr := session.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
+	if pruned, pruneErr := usecase.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
 		fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
 	}
 
