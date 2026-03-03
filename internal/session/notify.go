@@ -105,3 +105,12 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
 }
+
+// BuildNotifier creates the appropriate Notifier based on config.
+// If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
+func BuildNotifier(notifyCmd string) port.Notifier {
+	if notifyCmd != "" {
+		return NewCmdNotifier(notifyCmd)
+	}
+	return &LocalNotifier{}
+}

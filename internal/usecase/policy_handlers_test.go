@@ -9,14 +9,29 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/port"
 )
+
+type notifyCall struct {
+	title   string
+	message string
+}
+
+type spyNotifier struct {
+	calls []notifyCall
+}
+
+func (s *spyNotifier) Notify(_ context.Context, title, message string) error {
+	s.calls = append(s.calls, notifyCall{title: title, message: message})
+	return nil
+}
 
 func TestPolicyHandler_ExpeditionCompleted_InfoOutput(t *testing.T) {
 	// given
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger)
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{})
 
 	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 42, Status: "success",
@@ -41,12 +56,46 @@ func TestPolicyHandler_ExpeditionCompleted_InfoOutput(t *testing.T) {
 	}
 }
 
+func TestPolicyHandler_ExpeditionCompleted_NotifiesSideEffect(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyNotifier{}
+	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger, spy)
+
+	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
+		Expedition: 42, Status: "success",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then: Notify should have been called once
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 Notify call, got %d", len(spy.calls))
+	}
+	call := spy.calls[0]
+	if !strings.Contains(call.title, "Paintress") {
+		t.Errorf("expected title to contain 'Paintress', got: %s", call.title)
+	}
+	if !strings.Contains(call.message, "#42") {
+		t.Errorf("expected message to contain expedition number, got: %s", call.message)
+	}
+	if !strings.Contains(call.message, "success") {
+		t.Errorf("expected message to contain status, got: %s", call.message)
+	}
+}
+
 func TestPolicyHandler_ExpeditionCompleted_DebugOnly_NoInfoOutput(t *testing.T) {
 	// given: Debug-only handler (gradient.changed) should NOT produce Info output
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false) // verbose=false so Debug is suppressed
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger)
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{})
 
 	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
 		Level: 3, Operator: "auto",
