@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/usecase"
@@ -144,6 +146,24 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	if !execute {
 		fmt.Fprintln(ew, "(dry-run — pass --execute to delete)")
 		return nil
+	}
+
+	yes, _ := cmd.Flags().GetBool("yes")
+	if !yes {
+		fmt.Fprintf(ew, "\nDelete these %d file(s)? [y/N] ", totalCandidates)
+		scanner := bufio.NewScanner(cmd.InOrStdin())
+		if !scanner.Scan() {
+			if scanErr := scanner.Err(); scanErr != nil {
+				return fmt.Errorf("read confirmation: %w", scanErr)
+			}
+			fmt.Fprintln(ew, "Cancelled.")
+			return nil
+		}
+		answer := strings.TrimSpace(scanner.Text())
+		if answer != "y" && answer != "Y" {
+			fmt.Fprintln(ew, "Cancelled.")
+			return nil
+		}
 	}
 
 	// Execute: archive deletion

@@ -254,7 +254,7 @@ func TestArchivePruneCommand_PrunesEventFiles(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
 	root.SetErr(errBuf)
-	root.SetArgs([]string{"archive-prune", repoDir, "--execute"})
+	root.SetArgs([]string{"archive-prune", repoDir, "--execute", "--yes"})
 
 	// when
 	err := root.Execute()
@@ -298,7 +298,7 @@ func TestArchivePruneCommand_EventOnlyPrune(t *testing.T) {
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
 	root.SetErr(errBuf)
-	root.SetArgs([]string{"archive-prune", repoDir, "--execute"})
+	root.SetArgs([]string{"archive-prune", repoDir, "--execute", "--yes"})
 
 	// when
 	err := root.Execute()
