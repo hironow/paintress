@@ -360,7 +360,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: exp, Worker: workerID, Model: model,
 		})
-		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition",
+		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition", // nosemgrep: adr0003-otel-span-without-defer-end — expSpan.End() called after expedition loop body
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
 				attribute.Int("worker.id", workerID),
@@ -370,13 +370,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		var workDir string
 		if p.pool != nil {
-			_, acqSpan := platform.Tracer.Start(expCtx, "worktree.acquire")
+			_, acqSpan := platform.Tracer.Start(expCtx, "worktree.acquire") // nosemgrep: adr0003-otel-span-without-defer-end — acqSpan.End() called immediately after Acquire()
 			workDir = p.pool.Acquire()
 			acqSpan.End()
 		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
-				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release")
+				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release()
 				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
