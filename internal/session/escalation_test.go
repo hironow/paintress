@@ -1,8 +1,10 @@
 package session
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -111,4 +113,92 @@ func TestStageEscalation_NilOutboxStore(t *testing.T) {
 
 	// when / then — should not panic
 	p.stageEscalation(5, 3)
+}
+
+func TestHandleEscalation_ReturnsErrorOnEventStoreFail(t *testing.T) {
+	// given — event store that always fails
+	evStore := &failingEventStore{err: fmt.Errorf("disk full")}
+	p := &Paintress{
+		config:     domain.Config{Continent: t.TempDir()},
+		Logger:     platform.NewLogger(nil, false),
+		eventStore: evStore,
+	}
+	dm := domain.DMail{Name: "esc-fail", Issues: []string{"MY-99"}}
+
+	// when
+	err := p.handleEscalation(dm)
+
+	// then — error must be propagated (escalation events are critical)
+	if err == nil {
+		t.Fatal("expected error from failing event store, got nil")
+	}
+	if !strings.Contains(err.Error(), "disk full") {
+		t.Errorf("error should contain root cause, got: %s", err.Error())
+	}
+}
+
+func TestHandleEscalation_SucceedsWithWorkingStore(t *testing.T) {
+	// given — event store that works
+	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	eventsDir := filepath.Join(continent, ".run", "events")
+	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
+		t.Fatalf("mkdir events: %v", err)
+	}
+	evStore := NewEventStore(eventsDir)
+	p := &Paintress{
+		config:     domain.Config{Continent: continent},
+		Logger:     platform.NewLogger(nil, false),
+		eventStore: evStore,
+	}
+	dm := domain.DMail{Name: "esc-ok", Issues: []string{"MY-100"}}
+
+	// when
+	err := p.handleEscalation(dm)
+
+	// then — no error
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEmitEvent_ReturnsErrorOnAppendFail(t *testing.T) {
+	// given — event store that always fails
+	evStore := &failingEventStore{err: fmt.Errorf("readonly fs")}
+	p := &Paintress{
+		config:     domain.Config{Continent: t.TempDir()},
+		Logger:     platform.NewLogger(nil, false),
+		eventStore: evStore,
+	}
+
+	// when
+	err := p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+		Level: 5, Operator: "test",
+	})
+
+	// then — error must be returned
+	if err == nil {
+		t.Fatal("expected error from failing event store, got nil")
+	}
+	if !strings.Contains(err.Error(), "readonly fs") {
+		t.Errorf("error should contain root cause, got: %s", err.Error())
+	}
+}
+
+func TestEmitEvent_NilEventStoreReturnsNil(t *testing.T) {
+	// given — no event store
+	p := &Paintress{
+		config: domain.Config{Continent: t.TempDir()},
+		Logger: platform.NewLogger(nil, false),
+	}
+
+	// when
+	err := p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+		Level: 5, Operator: "test",
+	})
+
+	// then — nil event store is not an error
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
