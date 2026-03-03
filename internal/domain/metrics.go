@@ -1,9 +1,11 @@
-package paintress
+package domain
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	paintress "github.com/hironow/paintress"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -11,7 +13,7 @@ import (
 
 // RecordExpedition increments the paintress.expedition.total OTel counter.
 func RecordExpedition(ctx context.Context, status string) {
-	c, _ := Meter.Int64Counter("paintress.expedition.total",
+	c, _ := paintress.Meter.Int64Counter("paintress.expedition.total",
 		metric.WithDescription("Total expedition completions"),
 	)
 	c.Add(ctx, 1,
@@ -23,7 +25,7 @@ func RecordExpedition(ctx context.Context, status string) {
 
 // RecordEventEmitError increments the paintress.event.emit_error.total OTel counter.
 func RecordEventEmitError(ctx context.Context, eventType string) {
-	c, _ := Meter.Int64Counter("paintress.event.emit_error.total",
+	c, _ := paintress.Meter.Int64Counter("paintress.event.emit_error.total",
 		metric.WithDescription("Count of event emission failures"),
 	)
 	c.Add(ctx, 1,

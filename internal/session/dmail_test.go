@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestParseDMail_ValidFrontmatter(t *testing.T) {
@@ -1773,11 +1774,11 @@ type failingEventStore struct {
 	err error
 }
 
-func (f *failingEventStore) Append(_ ...paintress.Event) error { return f.err }
-func (f *failingEventStore) LoadAll() ([]paintress.Event, error) {
+func (f *failingEventStore) Append(_ ...domain.Event) error { return f.err }
+func (f *failingEventStore) LoadAll() ([]domain.Event, error) {
 	return nil, nil
 }
-func (f *failingEventStore) LoadSince(_ time.Time) ([]paintress.Event, error) {
+func (f *failingEventStore) LoadSince(_ time.Time) ([]domain.Event, error) {
 	return nil, nil
 }
 

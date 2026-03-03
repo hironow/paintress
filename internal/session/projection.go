@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // ExpeditionState is the materialized READ MODEL projected from events.
@@ -37,7 +37,7 @@ func (s *ExpeditionState) ErrorRate() float64 {
 // ProjectState replays events to produce an ExpeditionState.
 // Unknown event types are silently skipped for forward compatibility.
 // Returns a zero-value ExpeditionState for nil/empty input.
-func ProjectState(events []paintress.Event) *ExpeditionState {
+func ProjectState(events []domain.Event) *ExpeditionState {
 	state := &ExpeditionState{}
 	for _, ev := range events {
 		applyEvent(state, ev)
@@ -45,10 +45,10 @@ func ProjectState(events []paintress.Event) *ExpeditionState {
 	return state
 }
 
-func applyEvent(state *ExpeditionState, ev paintress.Event) {
+func applyEvent(state *ExpeditionState, ev domain.Event) {
 	switch ev.Type {
-	case paintress.EventExpeditionCompleted:
-		var data paintress.ExpeditionCompletedData
+	case domain.EventExpeditionCompleted:
+		var data domain.ExpeditionCompletedData
 		if err := json.Unmarshal(ev.Data, &data); err != nil {
 			return
 		}
@@ -70,30 +70,30 @@ func applyEvent(state *ExpeditionState, ev paintress.Event) {
 			state.Skipped++
 		}
 
-	case paintress.EventGradientChanged:
-		var data paintress.GradientChangedData
+	case domain.EventGradientChanged:
+		var data domain.GradientChangedData
 		if err := json.Unmarshal(ev.Data, &data); err != nil {
 			return
 		}
 		state.GradientLevel = data.Level
 
-	case paintress.EventDMailStaged:
+	case domain.EventDMailStaged:
 		state.DMailsStaged++
 
-	case paintress.EventDMailFlushed:
-		var data paintress.DMailFlushedData
+	case domain.EventDMailFlushed:
+		var data domain.DMailFlushedData
 		if err := json.Unmarshal(ev.Data, &data); err != nil {
 			return
 		}
 		state.DMailsFlushed += data.Count
 
-	case paintress.EventInboxReceived:
+	case domain.EventInboxReceived:
 		state.InboxReceived++
 
-	case paintress.EventGommageTriggered:
+	case domain.EventGommageTriggered:
 		state.GommageCount++
 
-	case paintress.EventExpeditionStarted, paintress.EventDMailArchived:
+	case domain.EventExpeditionStarted, domain.EventDMailArchived:
 		// Audit-only events: no state mutation needed.
 
 	default:

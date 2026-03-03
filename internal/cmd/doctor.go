@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -52,17 +53,17 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	var metrics *paintress.DoctorMetrics
 	if len(args) > 0 {
 		repoPath := args[0]
-		eventsDir := paintress.EventsDir(repoPath)
+		eventsDir := domain.EventsDir(repoPath)
 		store := session.NewEventStore(eventsDir)
 		events, err := store.LoadAll()
 		if err == nil && len(events) > 0 {
-			rate := paintress.SuccessRate(events)
+			rate := domain.SuccessRate(events)
 			var success, total int
 			for _, ev := range events {
-				if ev.Type != paintress.EventExpeditionCompleted {
+				if ev.Type != domain.EventExpeditionCompleted {
 					continue
 				}
-				var data paintress.ExpeditionCompletedData
+				var data domain.ExpeditionCompletedData
 				if json.Unmarshal(ev.Data, &data) != nil {
 					continue
 				}
@@ -75,7 +76,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				}
 			}
 			metrics = &paintress.DoctorMetrics{
-				SuccessRate: paintress.FormatSuccessRate(rate, success, total),
+				SuccessRate: domain.FormatSuccessRate(rate, success, total),
 			}
 		} else {
 			metrics = &paintress.DoctorMetrics{SuccessRate: "no events"}

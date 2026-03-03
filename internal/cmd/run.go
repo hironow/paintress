@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
@@ -125,7 +126,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
 	logger := loggerFrom(cmd)
-	eventsDir := paintress.EventsDir(continent)
+	eventsDir := domain.EventsDir(continent)
 	eventStore := session.NewEventStore(eventsDir)
 
 	if err := session.ValidateContinent(cfg.Continent); err != nil {
@@ -153,7 +154,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	exitCode, ucErr := usecase.RunExpeditions(ctx, paintress.RunExpeditionCommand{
+	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.RunExpeditionCommand{
 		RepoPath: continent,
 	}, cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
 	if ucErr != nil {

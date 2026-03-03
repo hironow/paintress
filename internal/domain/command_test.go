@@ -1,14 +1,14 @@
-package paintress_test
+package domain_test
 
 import (
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestRunExpeditionCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := paintress.RunExpeditionCommand{
+	cmd := domain.RunExpeditionCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -23,7 +23,7 @@ func TestRunExpeditionCommand_Validate_Valid(t *testing.T) {
 
 func TestRunExpeditionCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := paintress.RunExpeditionCommand{}
+	cmd := domain.RunExpeditionCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -36,7 +36,7 @@ func TestRunExpeditionCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestInitCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := paintress.InitCommand{
+	cmd := domain.InitCommand{
 		RepoPath: "/tmp/repo",
 	}
 
@@ -51,7 +51,7 @@ func TestInitCommand_Validate_Valid(t *testing.T) {
 
 func TestInitCommand_Validate_MissingRepoPath(t *testing.T) {
 	// given
-	cmd := paintress.InitCommand{}
+	cmd := domain.InitCommand{}
 
 	// when
 	errs := cmd.Validate()
@@ -64,7 +64,7 @@ func TestInitCommand_Validate_MissingRepoPath(t *testing.T) {
 
 func TestArchivePruneCommand_Validate_Valid(t *testing.T) {
 	// given
-	cmd := paintress.ArchivePruneCommand{
+	cmd := domain.ArchivePruneCommand{
 		RepoPath: "/tmp/repo",
 		Days:     30,
 	}
@@ -80,7 +80,7 @@ func TestArchivePruneCommand_Validate_Valid(t *testing.T) {
 
 func TestArchivePruneCommand_Validate_InvalidDays(t *testing.T) {
 	// given
-	cmd := paintress.ArchivePruneCommand{
+	cmd := domain.ArchivePruneCommand{
 		RepoPath: "/tmp/repo",
 		Days:     0,
 	}

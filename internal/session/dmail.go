@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintress.EventStore) error {
+func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore domain.EventStore) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = paintress.DMailSchemaVersion
 	}
@@ -30,7 +31,7 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	if err := store.Stage(filename, data); err != nil {
 		return fmt.Errorf("dmail: stage: %w", err)
 	}
-	if err := emitDMailEvent(eventStore, paintress.EventDMailStaged, paintress.DMailStagedData{Name: d.Name}); err != nil {
+	if err := emitDMailEvent(eventStore, domain.EventDMailStaged, domain.DMailStagedData{Name: d.Name}); err != nil {
 		return fmt.Errorf("dmail: event staged: %w", err)
 	}
 	n, err := store.Flush()
@@ -40,7 +41,7 @@ func SendDMail(store paintress.OutboxStore, d paintress.DMail, eventStore paintr
 	if n == 0 {
 		return fmt.Errorf("dmail: flush: item not delivered (write failure, will retry)")
 	}
-	if err := emitDMailEvent(eventStore, paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: n}); err != nil {
+	if err := emitDMailEvent(eventStore, domain.EventDMailFlushed, domain.DMailFlushedData{Count: n}); err != nil {
 		return fmt.Errorf("dmail: event flushed: %w", err)
 	}
 	return nil
@@ -87,7 +88,7 @@ func ScanInbox(continent string) ([]paintress.DMail, error) {
 
 // ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
 // Uses os.Rename for atomic move.
-func ArchiveInboxDMail(continent, name string, eventStore paintress.EventStore) error {
+func ArchiveInboxDMail(continent, name string, eventStore domain.EventStore) error {
 	filename := name + ".md"
 	src := filepath.Join(paintress.InboxDir(continent), filename)
 	arcDir := paintress.ArchiveDir(continent)
@@ -110,7 +111,7 @@ func ArchiveInboxDMail(continent, name string, eventStore paintress.EventStore) 
 		return fmt.Errorf("dmail: archive %s: %w", name, err)
 	}
 
-	if err := emitDMailEvent(eventStore, paintress.EventDMailArchived, paintress.DMailArchivedData{Name: name}); err != nil {
+	if err := emitDMailEvent(eventStore, domain.EventDMailArchived, domain.DMailArchivedData{Name: name}); err != nil {
 		return fmt.Errorf("dmail: event archived: %w", err)
 	}
 	return nil
@@ -119,11 +120,11 @@ func ArchiveInboxDMail(continent, name string, eventStore paintress.EventStore) 
 // emitDMailEvent appends a critical D-Mail event to the store and returns any
 // error. D-Mail events are part of the transactional outbox and must not be
 // silently dropped — event loss breaks event sourcing replay.
-func emitDMailEvent(store paintress.EventStore, eventType paintress.EventType, data any) error {
+func emitDMailEvent(store domain.EventStore, eventType domain.EventType, data any) error {
 	if store == nil {
 		return nil
 	}
-	ev, err := paintress.NewEvent(eventType, data, time.Now())
+	ev, err := domain.NewEvent(eventType, data, time.Now())
 	if err != nil {
 		return fmt.Errorf("emit %s: marshal: %w", eventType, err)
 	}

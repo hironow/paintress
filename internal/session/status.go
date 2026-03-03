@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // StatusReport holds operational status information for the paintress tool.
@@ -37,7 +38,7 @@ func Status(baseDir string) StatusReport {
 	report.ArchiveCount = countDirFiles(paintress.ArchiveDir(baseDir))
 
 	// Load all events for expedition stats
-	eventsDir := paintress.EventsDir(baseDir)
+	eventsDir := domain.EventsDir(baseDir)
 	store := NewEventStore(eventsDir)
 	allEvents, err := store.LoadAll()
 	if err != nil || len(allEvents) == 0 {
@@ -52,8 +53,8 @@ func Status(baseDir string) StatusReport {
 	report.GradientLevel = state.GradientLevel
 	report.LastExpedition = state.LastExpeditionAt
 
-	// Compute success rate using the root package pure function
-	report.SuccessRate = paintress.SuccessRate(allEvents)
+	// Compute success rate using the domain package pure function
+	report.SuccessRate = domain.SuccessRate(allEvents)
 
 	return report
 }

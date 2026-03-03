@@ -1,15 +1,15 @@
-package paintress_test
+package domain_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestExpeditionAggregate_StartExpedition(t *testing.T) {
 	// given
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 
 	// when
 	ev, err := agg.StartExpedition(1, 0, "claude-sonnet-4-6", time.Now().UTC())
@@ -18,14 +18,14 @@ func TestExpeditionAggregate_StartExpedition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != paintress.EventExpeditionStarted {
-		t.Errorf("expected type %s, got %s", paintress.EventExpeditionStarted, ev.Type)
+	if ev.Type != domain.EventExpeditionStarted {
+		t.Errorf("expected type %s, got %s", domain.EventExpeditionStarted, ev.Type)
 	}
 }
 
 func TestExpeditionAggregate_CompleteExpedition_Success(t *testing.T) {
 	// given
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 
 	// when
 	events, err := agg.CompleteExpedition(1, "success", "ISS-123", "", time.Now().UTC())
@@ -38,8 +38,8 @@ func TestExpeditionAggregate_CompleteExpedition_Success(t *testing.T) {
 	if len(events) < 1 {
 		t.Fatalf("expected at least 1 event, got %d", len(events))
 	}
-	if events[0].Type != paintress.EventExpeditionCompleted {
-		t.Errorf("expected type %s, got %s", paintress.EventExpeditionCompleted, events[0].Type)
+	if events[0].Type != domain.EventExpeditionCompleted {
+		t.Errorf("expected type %s, got %s", domain.EventExpeditionCompleted, events[0].Type)
 	}
 	// consecutive failures should be 0 after success
 	if agg.ConsecutiveFailures() != 0 {
@@ -49,7 +49,7 @@ func TestExpeditionAggregate_CompleteExpedition_Success(t *testing.T) {
 
 func TestExpeditionAggregate_CompleteExpedition_Failure(t *testing.T) {
 	// given
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 
 	// when
 	events, err := agg.CompleteExpedition(1, "failure", "", "", time.Now().UTC())
@@ -69,7 +69,7 @@ func TestExpeditionAggregate_CompleteExpedition_Failure(t *testing.T) {
 
 func TestExpeditionAggregate_ShouldGommage(t *testing.T) {
 	// given: 3 consecutive failures (threshold)
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
 		agg.CompleteExpedition(i+1, "failure", "", "", now)
@@ -86,7 +86,7 @@ func TestExpeditionAggregate_ShouldGommage(t *testing.T) {
 
 func TestExpeditionAggregate_ShouldGommage_BelowThreshold(t *testing.T) {
 	// given: 2 consecutive failures (below threshold of 3)
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 2 {
 		agg.CompleteExpedition(i+1, "failure", "", "", now)
@@ -103,7 +103,7 @@ func TestExpeditionAggregate_ShouldGommage_BelowThreshold(t *testing.T) {
 
 func TestExpeditionAggregate_GommageEvent(t *testing.T) {
 	// given: consecutive failures at threshold
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
 		agg.CompleteExpedition(i+1, "failure", "", "", now)
@@ -116,14 +116,14 @@ func TestExpeditionAggregate_GommageEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ev.Type != paintress.EventGommageTriggered {
-		t.Errorf("expected type %s, got %s", paintress.EventGommageTriggered, ev.Type)
+	if ev.Type != domain.EventGommageTriggered {
+		t.Errorf("expected type %s, got %s", domain.EventGommageTriggered, ev.Type)
 	}
 }
 
 func TestExpeditionAggregate_SuccessResetsFailures(t *testing.T) {
 	// given: 2 consecutive failures then a success
-	agg := paintress.NewExpeditionAggregate()
+	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	agg.CompleteExpedition(1, "failure", "", "", now)
 	agg.CompleteExpedition(2, "failure", "", "", now)

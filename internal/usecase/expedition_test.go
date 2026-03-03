@@ -6,11 +6,12 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestRunExpeditions_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := paintress.RunExpeditionCommand{}
+	cmd := domain.RunExpeditionCommand{}
 
 	// when
 	exitCode, err := RunExpeditions(context.Background(), cmd, paintress.Config{}, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
@@ -26,7 +27,7 @@ func TestRunExpeditions_InvalidCommand(t *testing.T) {
 
 func TestArchivePrune_InvalidCommand(t *testing.T) {
 	// given: empty RepoPath
-	cmd := paintress.ArchivePruneCommand{}
+	cmd := domain.ArchivePruneCommand{}
 
 	// when
 	_, err := ArchivePrune(cmd)
@@ -39,7 +40,7 @@ func TestArchivePrune_InvalidCommand(t *testing.T) {
 
 func TestArchivePrune_InvalidDays(t *testing.T) {
 	// given: Days <= 0
-	cmd := paintress.ArchivePruneCommand{RepoPath: "/tmp", Days: 0}
+	cmd := domain.ArchivePruneCommand{RepoPath: "/tmp", Days: 0}
 
 	// when
 	_, err := ArchivePrune(cmd)

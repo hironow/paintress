@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -40,9 +41,9 @@ type Paintress struct {
 	pool        *WorktreePool // nil when --workers=0
 	notifier    paintress.Notifier
 	approver    paintress.Approver
-	outboxStore paintress.OutboxStore     // transactional outbox for D-Mail delivery
-	eventStore  paintress.EventStore      // append-only event log (fire-and-forget)
-	Dispatcher  paintress.EventDispatcher // policy engine (best-effort dispatch after emit)
+	outboxStore paintress.OutboxStore  // transactional outbox for D-Mail delivery
+	eventStore  domain.EventStore      // append-only event log (fire-and-forget)
+	Dispatcher  domain.EventDispatcher // policy engine (best-effort dispatch after emit)
 
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryMu      sync.Mutex
@@ -62,24 +63,24 @@ type Paintress struct {
 // emitEvent appends a single event to the event store. Errors are logged
 // but never propagated — the event log is observational, not critical.
 // After persistence, the event is dispatched to the PolicyEngine best-effort.
-func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
+func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 	// Record OTel metric for expedition completions (fire-and-forget, independent of event store)
-	if eventType == paintress.EventExpeditionCompleted {
-		if d, ok := data.(paintress.ExpeditionCompletedData); ok {
-			paintress.RecordExpedition(context.Background(), d.Status)
+	if eventType == domain.EventExpeditionCompleted {
+		if d, ok := data.(domain.ExpeditionCompletedData); ok {
+			domain.RecordExpedition(context.Background(), d.Status)
 		}
 	}
 	if p.eventStore == nil {
 		return
 	}
-	ev, err := paintress.NewEvent(eventType, data, time.Now())
+	ev, err := domain.NewEvent(eventType, data, time.Now())
 	if err != nil {
 		p.Logger.Debug("event emit marshal: %v", err)
 		return
 	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Debug("event emit append: %v", err)
-		paintress.RecordEventEmitError(context.Background(), string(eventType))
+		domain.RecordEventEmitError(context.Background(), string(eventType))
 	}
 	// Best-effort policy dispatch
 	if p.Dispatcher != nil {
@@ -89,7 +90,7 @@ func (p *Paintress) emitEvent(eventType paintress.EventType, data any) {
 	}
 }
 
-func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore paintress.EventStore) *Paintress {
+func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
 	if logger == nil {
 		logger = paintress.NewLogger(nil, false)
 	}
@@ -356,7 +357,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("party_info"), p.reserve.Status()))
 
 		model := p.reserve.ActiveModel()
-		p.emitEvent(paintress.EventExpeditionStarted, paintress.ExpeditionStartedData{
+		p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: exp, Worker: workerID, Model: model,
 		})
 		expCtx, expSpan := paintress.Tracer.Start(ctx, "expedition",
@@ -391,7 +392,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
 		for _, dm := range inboxDMails {
-			p.emitEvent(paintress.EventInboxReceived, paintress.InboxReceivedData{
+			p.emitEvent(domain.EventInboxReceived, domain.InboxReceivedData{
 				Name: dm.Name, Severity: dm.Severity,
 			})
 		}
@@ -456,7 +457,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 			}
 			p.gradient.Discharge()
-			p.emitEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+			p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 				Level: p.gradient.Level(), Operator: "discharge",
 			})
 
@@ -477,7 +478,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 			}
 			WriteJournal(p.config.Continent, errReport)
-			p.emitEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+			p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 				Expedition: exp, Status: "failed",
 			})
 			if midHighCount > 0 {
@@ -513,7 +514,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("%s", paintress.Msg("report_parse_fail"))
 				p.Logger.Warn("%s", fmt.Sprintf(paintress.Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
-				p.emitEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "decay",
 				})
 				p.writeFlag(flagDir, exp, "?", "parse_error", "?", midHighCount)
@@ -527,7 +528,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 					parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 				}
 				WriteJournal(p.config.Continent, parseErrReport)
-				p.emitEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 					Expedition: exp, Status: "parse_error",
 				})
 				p.consecutiveFailures.Add(1)
@@ -542,7 +543,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				)
 				p.handleSuccess(report)
 				p.gradient.Charge()
-				p.emitEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "charge",
 				})
 				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
@@ -565,7 +566,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 				p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
-				p.emitEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 					Expedition: exp, Status: "success",
 					IssueID: report.IssueID, BugsFound: fmt.Sprintf("%d", report.BugsFound),
 				})
@@ -584,24 +585,24 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			case paintress.StatusSkipped:
 				p.Logger.Warn("%s", fmt.Sprintf(paintress.Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
-				p.emitEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "decay",
 				})
 				p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
-				p.emitEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 					Expedition: exp, Status: "skipped", IssueID: report.IssueID,
 				})
 				p.totalSkipped.Add(1)
 			case paintress.StatusFailed:
 				p.Logger.Error("%s", fmt.Sprintf(paintress.Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
-				p.emitEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "discharge",
 				})
 				p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 				WriteJournal(p.config.Continent, report)
-				p.emitEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+				p.emitEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 					Expedition: exp, Status: "failed", IssueID: report.IssueID,
 				})
 				p.consecutiveFailures.Add(1)
@@ -621,7 +622,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			releaseWorkDir()
 			expSpan.End()
 			p.Logger.Error("%s", fmt.Sprintf(paintress.Msg("gommage"), maxConsecutiveFailures))
-			p.emitEvent(paintress.EventGommageTriggered, paintress.GommageTriggeredData{
+			p.emitEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
 				Expedition: exp, ConsecutiveFailures: maxConsecutiveFailures,
 			})
 			return errGommage
@@ -998,7 +999,7 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm paintress.DMail
 			return
 		}
 		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
-		p.emitEvent(paintress.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
+		p.emitEvent(domain.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
 		p.runFollowUp(ctx, []paintress.DMail{dm}, workDir, remaining)
 	case "escalate":
 		p.handleEscalation(dm)
@@ -1013,5 +1014,5 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm paintress.DMail
 // requires human attention.
 func (p *Paintress) handleEscalation(dm paintress.DMail) {
 	p.Logger.Warn("ESCALATION: %s requires human attention (issues: %v)", dm.Name, dm.Issues)
-	p.emitEvent(paintress.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues})
+	p.emitEvent(domain.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues})
 }

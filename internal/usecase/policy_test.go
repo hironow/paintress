@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestPolicyEngine_Dispatch_NoHandlers(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
-	ev, err := paintress.NewEvent(paintress.EventExpeditionStarted, paintress.ExpeditionStartedData{
+	ev, err := domain.NewEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 		Expedition: 1,
 		Worker:     0,
 		Model:      "claude-sonnet-4-6",
@@ -34,11 +34,11 @@ func TestPolicyEngine_RegisterAndFire(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(paintress.EventExpeditionCompleted, func(ctx context.Context, ev paintress.Event) error {
+	engine.Register(domain.EventExpeditionCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := paintress.NewEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 1,
 		Status:     "success",
 		IssueID:    "ISS-123",
@@ -64,12 +64,12 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 	engine := NewPolicyEngine(nil)
 	var count int
 	for range 3 {
-		engine.Register(paintress.EventGradientChanged, func(ctx context.Context, ev paintress.Event) error {
+		engine.Register(domain.EventGradientChanged, func(ctx context.Context, ev domain.Event) error {
 			count++
 			return nil
 		})
 	}
-	ev, err := paintress.NewEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
 		Level:    3,
 		Operator: "+1",
 	}, time.Now().UTC())
@@ -92,10 +92,10 @@ func TestPolicyEngine_MultipleHandlers(t *testing.T) {
 func TestPolicyEngine_HandlerError(t *testing.T) {
 	// given
 	engine := NewPolicyEngine(nil)
-	engine.Register(paintress.EventGommageTriggered, func(ctx context.Context, ev paintress.Event) error {
+	engine.Register(domain.EventGommageTriggered, func(ctx context.Context, ev domain.Event) error {
 		return fmt.Errorf("handler failed")
 	})
-	ev, err := paintress.NewEvent(paintress.EventGommageTriggered, paintress.GommageTriggeredData{
+	ev, err := domain.NewEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
 		Expedition:          5,
 		ConsecutiveFailures: 3,
 	}, time.Now().UTC())
@@ -116,11 +116,11 @@ func TestPolicyEngine_UnmatchedEventType(t *testing.T) {
 	// given: register for expedition.completed only
 	engine := NewPolicyEngine(nil)
 	var fired bool
-	engine.Register(paintress.EventExpeditionCompleted, func(ctx context.Context, ev paintress.Event) error {
+	engine.Register(domain.EventExpeditionCompleted, func(ctx context.Context, ev domain.Event) error {
 		fired = true
 		return nil
 	})
-	ev, err := paintress.NewEvent(paintress.EventDMailStaged, paintress.DMailStagedData{
+	ev, err := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{
 		Name: "test.dmail",
 	}, time.Now().UTC())
 	if err != nil {

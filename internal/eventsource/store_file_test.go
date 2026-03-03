@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
@@ -14,8 +14,8 @@ func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
 	dir := t.TempDir()
 	store := NewFileEventStore(dir)
 	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
-	ev, err := paintress.NewEvent(paintress.EventExpeditionStarted,
-		paintress.ExpeditionStartedData{Expedition: 1, Worker: 0, Model: "opus"}, now)
+	ev, err := domain.NewEvent(domain.EventExpeditionStarted,
+		domain.ExpeditionStartedData{Expedition: 1, Worker: 0, Model: "opus"}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,8 +33,8 @@ func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
 	if len(events) != 1 {
 		t.Fatalf("len = %d, want 1", len(events))
 	}
-	if events[0].Type != paintress.EventExpeditionStarted {
-		t.Errorf("Type = %q, want %q", events[0].Type, paintress.EventExpeditionStarted)
+	if events[0].Type != domain.EventExpeditionStarted {
+		t.Errorf("Type = %q, want %q", events[0].Type, domain.EventExpeditionStarted)
 	}
 }
 
@@ -62,10 +62,10 @@ func TestFileEventStore_DailyRotation(t *testing.T) {
 	day1 := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
 	day2 := time.Date(2026, 2, 28, 10, 0, 0, 0, time.UTC)
 
-	ev1, _ := paintress.NewEvent(paintress.EventExpeditionStarted,
-		paintress.ExpeditionStartedData{Expedition: 1}, day1)
-	ev2, _ := paintress.NewEvent(paintress.EventExpeditionCompleted,
-		paintress.ExpeditionCompletedData{Expedition: 1, Status: "success"}, day2)
+	ev1, _ := domain.NewEvent(domain.EventExpeditionStarted,
+		domain.ExpeditionStartedData{Expedition: 1}, day1)
+	ev2, _ := domain.NewEvent(domain.EventExpeditionCompleted,
+		domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}, day2)
 
 	// when
 	if err := store.Append(ev1, ev2); err != nil {
@@ -105,12 +105,12 @@ func TestFileEventStore_LoadSince(t *testing.T) {
 	t2 := time.Date(2026, 2, 27, 11, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
 
-	ev1, _ := paintress.NewEvent(paintress.EventExpeditionStarted,
-		paintress.ExpeditionStartedData{Expedition: 1}, t1)
-	ev2, _ := paintress.NewEvent(paintress.EventExpeditionCompleted,
-		paintress.ExpeditionCompletedData{Expedition: 1, Status: "success"}, t2)
-	ev3, _ := paintress.NewEvent(paintress.EventExpeditionStarted,
-		paintress.ExpeditionStartedData{Expedition: 2}, t3)
+	ev1, _ := domain.NewEvent(domain.EventExpeditionStarted,
+		domain.ExpeditionStartedData{Expedition: 1}, t1)
+	ev2, _ := domain.NewEvent(domain.EventExpeditionCompleted,
+		domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}, t2)
+	ev3, _ := domain.NewEvent(domain.EventExpeditionStarted,
+		domain.ExpeditionStartedData{Expedition: 2}, t3)
 
 	store.Append(ev1, ev2, ev3)
 
@@ -124,7 +124,7 @@ func TestFileEventStore_LoadSince(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("len = %d, want 2", len(events))
 	}
-	if events[0].Type != paintress.EventExpeditionCompleted {
+	if events[0].Type != domain.EventExpeditionCompleted {
 		t.Errorf("events[0].Type = %q, want expedition.completed", events[0].Type)
 	}
 }
@@ -133,7 +133,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	// given
 	dir := t.TempDir()
 	store := NewFileEventStore(dir)
-	invalid := paintress.Event{} // all fields empty
+	invalid := domain.Event{} // all fields empty
 
 	// when
 	err := store.Append(invalid)
@@ -150,10 +150,10 @@ func TestFileEventStore_StableOrderForSameTimestamp(t *testing.T) {
 	store := NewFileEventStore(dir)
 	now := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
 
-	ev1, _ := paintress.NewEvent(paintress.EventDMailStaged,
-		paintress.DMailStagedData{Name: "first"}, now)
-	ev2, _ := paintress.NewEvent(paintress.EventDMailFlushed,
-		paintress.DMailFlushedData{Count: 1}, now)
+	ev1, _ := domain.NewEvent(domain.EventDMailStaged,
+		domain.DMailStagedData{Name: "first"}, now)
+	ev2, _ := domain.NewEvent(domain.EventDMailFlushed,
+		domain.DMailFlushedData{Count: 1}, now)
 
 	store.Append(ev1, ev2)
 
@@ -167,10 +167,10 @@ func TestFileEventStore_StableOrderForSameTimestamp(t *testing.T) {
 	if len(events) != 2 {
 		t.Fatalf("len = %d, want 2", len(events))
 	}
-	if events[0].Type != paintress.EventDMailStaged {
+	if events[0].Type != domain.EventDMailStaged {
 		t.Errorf("first event Type = %q, want dmail.staged", events[0].Type)
 	}
-	if events[1].Type != paintress.EventDMailFlushed {
+	if events[1].Type != domain.EventDMailFlushed {
 		t.Errorf("second event Type = %q, want dmail.flushed", events[1].Type)
 	}
 }

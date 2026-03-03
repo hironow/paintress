@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestStatus_EmptyState(t *testing.T) {
@@ -90,25 +91,25 @@ func TestStatus_WithMailDirs(t *testing.T) {
 func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with expedition events
 	baseDir := t.TempDir()
-	eventsDir := paintress.EventsDir(baseDir)
+	eventsDir := domain.EventsDir(baseDir)
 	store := NewEventStore(eventsDir)
 
 	ts := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
-	events := []paintress.Event{
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+	events := []domain.Event{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 1, Status: "success", IssueID: "PROJ-1",
 		}, ts),
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 2, Status: "success", IssueID: "PROJ-2",
 		}, ts.Add(time.Minute)),
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 3, Status: "failed", IssueID: "PROJ-3",
 		}, ts.Add(2*time.Minute)),
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 4, Status: "skipped", IssueID: "PROJ-4",
 		}, ts.Add(3*time.Minute)),
-		makeStatusEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+		makeStatusEvent(domain.EventGradientChanged, domain.GradientChangedData{
 			Level: 3, Operator: "charge",
 		}, ts.Add(4*time.Minute)),
 	}
@@ -235,8 +236,8 @@ func TestStatusReport_FormatJSON(t *testing.T) {
 	}
 }
 
-func makeStatusEvent(eventType paintress.EventType, data any, ts time.Time) paintress.Event {
-	ev, err := paintress.NewEvent(eventType, data, ts)
+func makeStatusEvent(eventType domain.EventType, data any, ts time.Time) domain.Event {
+	ev, err := domain.NewEvent(eventType, data, ts)
 	if err != nil {
 		panic(err)
 	}
