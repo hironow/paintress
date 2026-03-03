@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // === Lumina: Parallel Journal Scan ===
@@ -98,7 +99,7 @@ func TestRace_Lumina_ConcurrentScan(t *testing.T) {
 // === DevServer: Start/Stop Race ===
 
 func TestRace_DevServer_ConcurrentStopCalls(t *testing.T) {
-	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), paintress.NewLogger(io.Discard, false))
+	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), domain.NewLogger(io.Discard, false))
 
 	// Multiple concurrent Stop calls should not panic
 	var wg sync.WaitGroup
@@ -113,7 +114,7 @@ func TestRace_DevServer_ConcurrentStopCalls(t *testing.T) {
 }
 
 func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
-	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), paintress.NewLogger(io.Discard, false))
+	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), domain.NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
 
@@ -139,14 +140,14 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 
 func TestRace_Expedition_ConcurrentReserveCheck(t *testing.T) {
 	dir := t.TempDir()
-	rp := paintress.NewReserveParty("opus", []string{"sonnet"}, paintress.NewLogger(io.Discard, false))
+	rp := domain.NewReserveParty("opus", []string{"sonnet"}, domain.NewLogger(io.Discard, false))
 	g := paintress.NewGradientGauge(5)
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  g,
 		Reserve:   rp,
 	}

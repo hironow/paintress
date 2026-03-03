@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -16,11 +15,11 @@ type PolicyHandler func(ctx context.Context, event domain.Event) error
 // This connects the POLICY registry (domain.Policies) to executable handlers.
 type PolicyEngine struct {
 	handlers map[domain.EventType][]PolicyHandler
-	logger   *paintress.Logger
+	logger   *domain.Logger
 }
 
 // NewPolicyEngine creates a PolicyEngine. Pass nil logger for silent operation.
-func NewPolicyEngine(logger *paintress.Logger) *PolicyEngine {
+func NewPolicyEngine(logger *domain.Logger) *PolicyEngine {
 	return &PolicyEngine{
 		handlers: make(map[domain.EventType][]PolicyHandler),
 		logger:   logger,

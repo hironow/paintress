@@ -1,10 +1,12 @@
-package paintress
+package domain
 
 import (
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	paintress "github.com/hironow/paintress"
 )
 
 // ReserveParty manages model fallback when the primary model hits rate limits.
@@ -113,7 +115,7 @@ func (rp *ReserveParty) onRateLimitDetected() {
 	if rp.active == rp.primary && len(rp.reserve) > 0 {
 		prev := rp.active
 		rp.active = rp.reserve[0]
-		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_activated"), prev, rp.active))
+		rp.logger.Warn("%s", fmt.Sprintf(paintress.Msg("reserve_activated"), prev, rp.active))
 	}
 }
 
@@ -126,7 +128,7 @@ func (rp *ReserveParty) TryRecoverPrimary() {
 	if rp.active != rp.primary && time.Now().After(rp.cooldownUntil) {
 		prev := rp.active
 		rp.active = rp.primary
-		rp.logger.OK("%s", fmt.Sprintf(Msg("primary_recovered"), prev, rp.active))
+		rp.logger.OK("%s", fmt.Sprintf(paintress.Msg("primary_recovered"), prev, rp.active))
 	}
 }
 
@@ -139,7 +141,7 @@ func (rp *ReserveParty) ForceReserve() {
 		prev := rp.active
 		rp.active = rp.reserve[0]
 		rp.cooldownUntil = time.Now().Add(30 * time.Minute)
-		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_forced"), prev, rp.active))
+		rp.logger.Warn("%s", fmt.Sprintf(paintress.Msg("reserve_forced"), prev, rp.active))
 	}
 }
 

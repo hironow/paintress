@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // TestHelperProcess is a test helper process used to mock exec.Command.
@@ -63,9 +64,9 @@ func newTestExpedition(t *testing.T, output string, exitCode int) *Expedition {
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", []string{"sonnet"}, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", []string{"sonnet"}, domain.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(output, exitCode),
 	}
 }
@@ -79,9 +80,9 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 		},
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -116,9 +117,9 @@ func TestExpedition_BuildPrompt_French(t *testing.T) {
 			BaseBranch: "main",
 			DevURL:     "http://localhost:3000",
 		},
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -150,9 +151,9 @@ func TestExpedition_BuildPrompt_ContainsGradient(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  g,
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -167,9 +168,9 @@ func TestExpedition_BuildPrompt_ContainsLuminas(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 		Luminas: []paintress.Lumina{
 			{Pattern: "[WARN] Failed 3 times: timeout", Source: "failure-pattern", Uses: 3},
 		},
@@ -187,9 +188,9 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -200,14 +201,14 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 
 func TestExpedition_BuildPrompt_ReserveInfo(t *testing.T) {
 	dir := t.TempDir()
-	rp := paintress.NewReserveParty("opus", []string{"sonnet"}, paintress.NewLogger(io.Discard, false))
+	rp := domain.NewReserveParty("opus", []string{"sonnet"}, domain.NewLogger(io.Discard, false))
 	rp.CheckOutput("rate limit") // Switch to reserve
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "develop", DevURL: "http://localhost:5173"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
 		Reserve:   rp,
 	}
@@ -230,9 +231,9 @@ func TestExpedition_BuildPrompt_OutputFormat(t *testing.T) {
 		Number:    3,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -260,9 +261,9 @@ func TestBuildPrompt_IncludesContextFiles(t *testing.T) {
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := exp.BuildPrompt()
@@ -284,9 +285,9 @@ func TestBuildPrompt_NoContextSection_WhenEmpty(t *testing.T) {
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := exp.BuildPrompt()
@@ -470,7 +471,7 @@ func TestNewPaintress_BasicConfig(t *testing.T) {
 		DevURL:         "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	if p.gradient == nil {
 		t.Error("gradient should be initialized")
 	}
@@ -494,7 +495,7 @@ func TestNewPaintress_MultiModelConfig(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -515,7 +516,7 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -543,7 +544,7 @@ echo "done"
 	os.WriteFile(script, []byte(scriptContent), 0755)
 
 	logPath := filepath.Join(logDir, "test-watcher.log")
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(logFile)
 	defer logFile.Close()
@@ -560,7 +561,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   logger,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, logger),
+		Reserve:  domain.NewReserveParty("opus", nil, logger),
 	}
 
 	ctx := context.Background()
@@ -605,7 +606,7 @@ echo "done"
 	os.WriteFile(script, []byte(scriptContent), 0755)
 
 	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(logFile)
 	defer logFile.Close()
@@ -623,7 +624,7 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   logger,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, logger),
+		Reserve:  domain.NewReserveParty("opus", nil, logger),
 	}
 
 	ctx := context.Background()
@@ -648,9 +649,9 @@ func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	for _, lang := range []string{"en", "ja", "fr"} {
@@ -676,9 +677,9 @@ func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: ""},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// Test all 3 languages
@@ -719,9 +720,9 @@ func TestBuildPrompt_WithLinearConfig(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -741,9 +742,9 @@ func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -768,9 +769,9 @@ func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// Must not panic — should gracefully omit Linear scope
@@ -839,9 +840,9 @@ __EXPEDITION_END__`
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(reportOutput, 0),
 	}
 
@@ -895,9 +896,9 @@ func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
 			TimeoutSec: 30,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
 	}
 
@@ -925,9 +926,9 @@ func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 		Number:    1,
 		Continent: dir,
 		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Logger:    domain.NewLogger(io.Discard, false),
 		Gradient:  paintress.NewGradientGauge(5),
-		Reserve:   paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:   domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -1064,10 +1065,10 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1125,10 +1126,10 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1194,10 +1195,10 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1267,10 +1268,10 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1375,10 +1376,10 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1448,10 +1449,10 @@ echo "done"
 			ClaudeCmd:  script,
 		},
 		LogDir:   logDir,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1554,10 +1555,10 @@ echo "done"
 			ClaudeCmd:  script1,
 		},
 		LogDir:   logDir1,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 	exp2 := &Expedition{
 		Number:    2,
@@ -1570,10 +1571,10 @@ echo "done"
 			ClaudeCmd:  script2,
 		},
 		LogDir:   logDir2,
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	// when — run both expeditions concurrently
@@ -1627,7 +1628,7 @@ func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 		NoDev:     true,
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 
 	if p.devServer != nil {
 		t.Error("devServer should be nil when NoDev=true")

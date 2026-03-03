@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
@@ -16,7 +17,7 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	p := &Paintress{
 		config:      paintress.Config{Continent: continent},
 		outboxStore: store,
-		Logger:      paintress.NewLogger(nil, false),
+		Logger:      domain.NewLogger(nil, false),
 	}
 
 	// when — stageEscalation calls SendDMail which does Stage + Flush internally
@@ -57,7 +58,7 @@ func TestStageEscalation_ArchiveAndOutbox(t *testing.T) {
 	p := &Paintress{
 		config:      paintress.Config{Continent: continent},
 		outboxStore: store,
-		Logger:      paintress.NewLogger(nil, false),
+		Logger:      domain.NewLogger(nil, false),
 	}
 
 	// when
@@ -86,7 +87,7 @@ func TestStageEscalation_Idempotent(t *testing.T) {
 	p := &Paintress{
 		config:      paintress.Config{Continent: continent},
 		outboxStore: store,
-		Logger:      paintress.NewLogger(nil, false),
+		Logger:      domain.NewLogger(nil, false),
 	}
 
 	// when — stage twice with same expedition (same D-Mail name)
@@ -105,7 +106,7 @@ func TestStageEscalation_NilOutboxStore(t *testing.T) {
 	// given — no outbox store configured
 	p := &Paintress{
 		config: paintress.Config{Continent: t.TempDir()},
-		Logger: paintress.NewLogger(nil, false),
+		Logger: domain.NewLogger(nil, false),
 	}
 
 	// when / then — should not panic

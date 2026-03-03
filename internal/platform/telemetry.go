@@ -1,4 +1,4 @@
-package paintress
+package platform
 
 import (
 	"go.opentelemetry.io/otel/metric"

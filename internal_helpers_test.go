@@ -1,6 +1,6 @@
 package paintress
 
-// containsStr is a test helper — checks substring presence without importing strings.
+// containsStr is a test helper -- checks substring presence without importing strings.
 // This duplicate exists for package paintress (internal) tests; the package
 // paintress_test version lives in helpers_test.go.
 func containsStr(s, sub string) bool {

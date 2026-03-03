@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -20,16 +22,16 @@ type DevServer struct {
 	url     string
 	dir     string
 	logPath string
-	logger  *paintress.Logger
+	logger  *domain.Logger
 
 	mu      sync.Mutex
 	process *exec.Cmd
 	running bool
 }
 
-func NewDevServer(cmd, url, dir, logPath string, logger *paintress.Logger) *DevServer {
+func NewDevServer(cmd, url, dir, logPath string, logger *domain.Logger) *DevServer {
 	if logger == nil {
-		logger = paintress.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 	return &DevServer{cmd: cmd, url: url, dir: dir, logPath: logPath, logger: logger}
 }
@@ -47,7 +49,7 @@ func (ds *DevServer) setRunning(v bool) {
 }
 
 func (ds *DevServer) Start(ctx context.Context) error {
-	ctx, span := paintress.Tracer.Start(ctx, "devserver.start",
+	ctx, span := platform.Tracer.Start(ctx, "devserver.start",
 		trace.WithAttributes(
 			attribute.String("cmd", ds.cmd),
 			attribute.String("url", ds.url),

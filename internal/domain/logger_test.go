@@ -1,4 +1,4 @@
-package paintress_test
+package domain_test
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestSetExtraWriter_DualWrite(t *testing.T) {
@@ -22,7 +22,7 @@ func TestSetExtraWriter_DualWrite(t *testing.T) {
 	}
 	defer f.Close()
 
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	logger.SetExtraWriter(f)
 
 	logger.Info("dual write test")
@@ -37,7 +37,7 @@ func TestSetExtraWriter_DualWrite(t *testing.T) {
 }
 
 func TestSetExtraWriter_NilSafe(t *testing.T) {
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	// Should not panic when called with nil multiple times
 	logger.SetExtraWriter(nil)
 	logger.SetExtraWriter(nil)
@@ -46,7 +46,7 @@ func TestSetExtraWriter_NilSafe(t *testing.T) {
 func TestLogFunctions_NoPanic(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(f)
 	defer f.Close()
@@ -63,7 +63,7 @@ func TestLogFunctions_NoPanic(t *testing.T) {
 func TestLogFunctions_WritesToFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(f)
 
@@ -84,7 +84,7 @@ func TestLogFunctions_WritesToFile(t *testing.T) {
 }
 
 func TestLogFunctions_WithoutLogFile(t *testing.T) {
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	// Should not panic even without log file
 	logger.Info("no file")
@@ -94,7 +94,7 @@ func TestLogFunctions_WithoutLogFile(t *testing.T) {
 
 func TestLogFunctions_WritesToWriter(t *testing.T) {
 	var buf bytes.Buffer
-	logger := paintress.NewLogger(&buf, false)
+	logger := domain.NewLogger(&buf, false)
 
 	logger.Info("writer test message")
 
@@ -113,7 +113,7 @@ func TestLogFunctions_DoesNotWriteToStdout(t *testing.T) {
 	}
 	os.Stdout = w
 
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	logger.Info("should not appear on stdout")
 
 	_ = w.Close()
@@ -130,7 +130,7 @@ func TestLogFunctions_DoesNotWriteToStdout(t *testing.T) {
 
 func TestLogFunctions_NoColorCodes(t *testing.T) {
 	var buf bytes.Buffer
-	logger := paintress.NewLogger(&buf, false)
+	logger := domain.NewLogger(&buf, false)
 
 	logger.Info("no color test")
 
@@ -148,7 +148,7 @@ func TestLogFunctions_QuietMode_SuppressesWriter(t *testing.T) {
 	path := filepath.Join(dir, "quiet.log")
 
 	// Quiet mode: pass io.Discard as out to suppress console output.
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(f)
 	defer f.Close()
@@ -166,7 +166,7 @@ func TestLogFunctions_QuietMode_SuppressesWriter(t *testing.T) {
 
 func TestLogger_Debug_Verbose(t *testing.T) {
 	var buf bytes.Buffer
-	logger := paintress.NewLogger(&buf, true)
+	logger := domain.NewLogger(&buf, true)
 
 	logger.Debug("debug message")
 
@@ -178,7 +178,7 @@ func TestLogger_Debug_Verbose(t *testing.T) {
 
 func TestLogger_Debug_NotVerbose(t *testing.T) {
 	var buf bytes.Buffer
-	logger := paintress.NewLogger(&buf, false)
+	logger := domain.NewLogger(&buf, false)
 
 	logger.Debug("debug message")
 
@@ -190,7 +190,7 @@ func TestLogger_Debug_NotVerbose(t *testing.T) {
 
 func TestLogger_Writer(t *testing.T) {
 	var buf bytes.Buffer
-	logger := paintress.NewLogger(&buf, false)
+	logger := domain.NewLogger(&buf, false)
 
 	if logger.Writer() != &buf {
 		t.Error("Writer() should return the configured writer")
@@ -202,7 +202,7 @@ func TestLogger_Writer(t *testing.T) {
 func TestLogFunctions_ConcurrentLogging(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "concurrent.log")
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	f, _ := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(f)
 	defer f.Close()
@@ -241,7 +241,7 @@ func TestLogFunctions_ReinitLogFile(t *testing.T) {
 	path1 := filepath.Join(dir, "log1.log")
 	path2 := filepath.Join(dir, "log2.log")
 
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 	f1, _ := os.OpenFile(path1, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	logger.SetExtraWriter(f1)
 	logger.Info("to first file")
@@ -260,7 +260,7 @@ func TestLogFunctions_ReinitLogFile(t *testing.T) {
 // --- from race_test.go ---
 
 func TestLogger_ConcurrentSetExtraWriterAndWrite(t *testing.T) {
-	logger := paintress.NewLogger(io.Discard, false)
+	logger := domain.NewLogger(io.Discard, false)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 20; i++ {

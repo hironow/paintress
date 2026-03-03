@@ -16,6 +16,7 @@ import (
 
 	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -32,12 +33,12 @@ var (
 type Paintress struct {
 	config      paintress.Config
 	logDir      string
-	Logger      *paintress.Logger
+	Logger      *domain.Logger
 	DataOut     io.Writer // stdout-equivalent for data output
 	StdinIn     io.Reader // stdin-equivalent for interactive input
 	devServer   *DevServer
 	gradient    *paintress.GradientGauge
-	reserve     *paintress.ReserveParty
+	reserve     *domain.ReserveParty
 	pool        *WorktreePool // nil when --workers=0
 	notifier    paintress.Notifier
 	approver    paintress.Approver
@@ -67,7 +68,7 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 	// Record OTel metric for expedition completions (fire-and-forget, independent of event store)
 	if eventType == domain.EventExpeditionCompleted {
 		if d, ok := data.(domain.ExpeditionCompletedData); ok {
-			domain.RecordExpedition(context.Background(), d.Status)
+			platform.RecordExpedition(context.Background(), d.Status)
 		}
 	}
 	if p.eventStore == nil {
@@ -80,7 +81,7 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Debug("event emit append: %v", err)
-		domain.RecordEventEmitError(context.Background(), string(eventType))
+		platform.RecordEventEmitError(context.Background(), string(eventType))
 	}
 	// Best-effort policy dispatch
 	if p.Dispatcher != nil {
@@ -90,9 +91,9 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 	}
 }
 
-func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
+func NewPaintress(cfg paintress.Config, logger *domain.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
 	if logger == nil {
-		logger = paintress.NewLogger(nil, false)
+		logger = domain.NewLogger(nil, false)
 	}
 	if dataOut == nil {
 		dataOut = io.Discard
@@ -156,7 +157,7 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 		DataOut:      dataOut,
 		StdinIn:      stdinIn,
 		gradient:     paintress.NewGradientGauge(gradientMax),
-		reserve:      paintress.NewReserveParty(primary, reserves, logger),
+		reserve:      domain.NewReserveParty(primary, reserves, logger),
 		notifier:     notifier,
 		approver:     approver,
 		eventStore:   eventStore,
@@ -177,7 +178,7 @@ func NewPaintress(cfg paintress.Config, logger *paintress.Logger, dataOut io.Wri
 }
 
 func (p *Paintress) Run(ctx context.Context) int {
-	ctx, rootSpan := paintress.Tracer.Start(ctx, "paintress.run",
+	ctx, rootSpan := platform.Tracer.Start(ctx, "paintress.run",
 		trace.WithAttributes(
 			attribute.String("continent", p.config.Continent),
 			attribute.Int("max_expeditions", p.config.MaxExpeditions),
@@ -360,7 +361,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: exp, Worker: workerID, Model: model,
 		})
-		expCtx, expSpan := paintress.Tracer.Start(ctx, "expedition",
+		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition",
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
 				attribute.Int("worker.id", workerID),
@@ -370,13 +371,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		var workDir string
 		if p.pool != nil {
-			_, acqSpan := paintress.Tracer.Start(expCtx, "worktree.acquire")
+			_, acqSpan := platform.Tracer.Start(expCtx, "worktree.acquire")
 			workDir = p.pool.Acquire()
 			acqSpan.End()
 		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
-				_, relSpan := paintress.Tracer.Start(expCtx, "worktree.release")
+				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release")
 				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
@@ -487,7 +488,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
 		} else {
-			_, parseSpan := paintress.Tracer.Start(expCtx, "report.parse")
+			_, parseSpan := platform.Tracer.Start(expCtx, "report.parse")
 			report, status := paintress.ParseReport(output, exp)
 			parseSpan.End()
 
@@ -646,7 +647,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 }
 
 func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.ExpeditionReport, budget time.Duration, workDir string) {
-	ctx, loopSpan := paintress.Tracer.Start(ctx, "review.loop",
+	ctx, loopSpan := platform.Tracer.Start(ctx, "review.loop",
 		trace.WithAttributes(
 			attribute.String("pr_url", report.PRUrl),
 			attribute.String("branch", report.Branch),
@@ -680,7 +681,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 
 		p.Logger.Info("%s", fmt.Sprintf(paintress.Msg("review_running"), cycle, maxReviewGateCycles))
 
-		_, revSpan := paintress.Tracer.Start(ctx, "review.command",
+		_, revSpan := platform.Tracer.Start(ctx, "review.command",
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
@@ -752,7 +753,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *paintress.Expedit
 		}
 
 		model := p.reserve.ActiveModel()
-		_, fixSpan := paintress.Tracer.Start(fixCtx, "reviewfix.claude",
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude",
 			trace.WithAttributes(
 				attribute.Int("cycle", cycle),
 				attribute.String("model", model),
@@ -813,7 +814,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []paintress.DMail, w
 	}
 
 	model := p.reserve.ActiveModel()
-	_, followUpSpan := paintress.Tracer.Start(ctx, "followup.claude",
+	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
 		trace.WithAttributes(
 			attribute.String("model", model),
 			attribute.Int("matched_dmails", len(dmails)),

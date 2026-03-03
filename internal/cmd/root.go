@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ func NewRootCommand() *cobra.Command {
 			if os.Getenv("PAINTRESS_QUIET") != "" {
 				out = io.Discard
 			}
-			logger := paintress.NewLogger(out, verbose)
+			logger := domain.NewLogger(out, verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("paintress", Version)
 			shutdownMeter = initMeter("paintress", Version)
@@ -83,11 +83,11 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-// loggerFrom extracts the *paintress.Logger from the cobra command context.
+// loggerFrom extracts the *domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
-func loggerFrom(cmd *cobra.Command) *paintress.Logger {
-	if l, ok := cmd.Context().Value(loggerKey).(*paintress.Logger); ok {
+func loggerFrom(cmd *cobra.Command) *domain.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(*domain.Logger); ok {
 		return l
 	}
-	return paintress.NewLogger(cmd.ErrOrStderr(), false)
+	return domain.NewLogger(cmd.ErrOrStderr(), false)
 }

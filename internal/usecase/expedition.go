@@ -12,7 +12,7 @@ import (
 
 // RunExpeditions validates the RunExpeditionCommand, then delegates to session.
 // Creates a PolicyEngine and injects it into the Paintress session.
-func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand, cfg paintress.Config, logger *paintress.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) (int, error) {
+func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand, cfg paintress.Config, logger *domain.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) (int, error) {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return 1, fmt.Errorf("command validation: %w", errs[0])
 	}

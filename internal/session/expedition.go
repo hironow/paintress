@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -24,14 +26,14 @@ type Expedition struct {
 	WorkDir   string // execution directory (worktree path or Continent)
 	Config    paintress.Config
 	LogDir    string
-	Logger    *paintress.Logger
+	Logger    *domain.Logger
 	DataOut   io.Writer          // stdout-equivalent for streaming Claude output
 	Notifier  paintress.Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
 	Luminas     []paintress.Lumina
 	Gradient    *paintress.GradientGauge
-	Reserve     *paintress.ReserveParty
+	Reserve     *domain.ReserveParty
 	InboxDMails []paintress.DMail // d-mails from inbox (for archiving after expedition)
 	inboxOnce   sync.Once
 
@@ -189,7 +191,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	model := e.Reserve.ActiveModel()
 
-	expCtx, invokeSpan := paintress.Tracer.Start(expCtx, "claude.invoke",
+	expCtx, invokeSpan := platform.Tracer.Start(expCtx, "claude.invoke",
 		trace.WithAttributes(
 			attribute.String("model", model),
 			attribute.Int("expedition.number", e.Number),

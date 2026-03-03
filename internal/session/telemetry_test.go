@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -26,12 +28,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	paintress.Tracer = tp.Tracer("paintress-test")
+	platform.Tracer = tp.Tracer("paintress-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
 		// Restore noop tracer so other tests are not affected
-		paintress.Tracer = prev.Tracer("paintress")
+		platform.Tracer = prev.Tracer("paintress")
 	})
 	return exp
 }
@@ -39,7 +41,7 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	_, span := paintress.Tracer.Start(context.Background(), "flushed-span")
+	_, span := platform.Tracer.Start(context.Background(), "flushed-span")
 	span.End()
 
 	spans := exp.GetSpans()
@@ -66,7 +68,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -101,7 +103,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, domain.NewLogger(io.Discard, false), io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -160,9 +162,9 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			Model:      "opus",
 		},
 		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
-		Logger:   paintress.NewLogger(io.Discard, false),
+		Logger:   domain.NewLogger(io.Discard, false),
 		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Reserve:  domain.NewReserveParty("opus", nil, domain.NewLogger(io.Discard, false)),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
