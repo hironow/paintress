@@ -60,7 +60,7 @@ func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -98,7 +98,7 @@ func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -156,7 +156,7 @@ func TestPaintressRun_DryRun_PreservesExistingJournals(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	// Verify original journals are untouched
@@ -294,7 +294,7 @@ func TestSwarmMode_DryRun_CreatesUniquePrompts(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -340,7 +340,7 @@ func TestSwarmMode_DryRun_SingleWorker(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -374,7 +374,7 @@ func TestSwarmMode_Gommage_StopsAllWorkers(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 1 {
@@ -407,7 +407,7 @@ func TestSwarmMode_MaxExpeditions_LessThan_Workers(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -446,7 +446,7 @@ func TestSwarmMode_ContextCancellation_GracefulShutdown(t *testing.T) {
 		cancel()
 	}()
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(ctx)
 
 	// Workers fail fast with /bin/false, but cooldown is 10s.
@@ -481,7 +481,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -531,7 +531,7 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(ctx)
 
 	// DeadlineExceeded should return non-zero (130), not 0
@@ -573,7 +573,7 @@ func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(ctx)
 
 	// Should be interrupted (130), NOT gommage (1)
@@ -601,7 +601,7 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -645,7 +645,7 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	// errComplete → exit code 0
@@ -679,7 +679,7 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 
 	// First run: 2 DryRun expeditions
 	code := p.Run(context.Background())
@@ -735,7 +735,7 @@ func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	// Journal entry should exist for expedition 1
@@ -762,7 +762,7 @@ func TestSwarmMode_FlagMonotonic_NoRegression(t *testing.T) {
 
 	// Directly test the monotonic guard via Paintress.writeFlag
 	cfg := domain.Config{Continent: dir, BaseBranch: "main", Model: "opus"}
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 
 	// Write flag for expedition 5
 	p.writeFlag(dir, 5, "ISS-5", "success", "10", 0)
@@ -794,7 +794,7 @@ func TestPaintressRun_NoDev_SkipsDevServer(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 
 	// devServer should be nil — no panic during Run
 	if p.devServer != nil {
@@ -914,7 +914,7 @@ echo '__EXPEDITION_END__'
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -988,7 +988,7 @@ echo '__EXPEDITION_END__'
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -1073,7 +1073,7 @@ echo '__EXPEDITION_END__'
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -1125,7 +1125,7 @@ echo '__EXPEDITION_COMPLETE__'
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {
@@ -1207,7 +1207,7 @@ echo '__EXPEDITION_END__'
 	}
 
 	var logBuf bytes.Buffer
-	p := NewPaintress(cfg, platform.NewLogger(&logBuf, false), &logBuf, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(&logBuf, false), &logBuf, io.Discard, nil, nil)
 	code := p.Run(context.Background())
 
 	if code != 0 {

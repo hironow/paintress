@@ -154,7 +154,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.RunExpeditionCommand{
 		RepoPath: continent,
-	}, cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
+	}, cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), eventStore)
 	if ucErr != nil {
 		return ucErr
 	}

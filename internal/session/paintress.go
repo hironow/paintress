@@ -35,6 +35,7 @@ type Paintress struct {
 	logDir      string
 	Logger      domain.Logger
 	DataOut     io.Writer // stdout-equivalent for data output
+	ErrOut      io.Writer // stderr-equivalent for UI chrome (banners, blank lines)
 	StdinIn     io.Reader // stdin-equivalent for interactive input
 	devServer   *DevServer
 	gradient    *domain.GradientGauge
@@ -61,10 +62,18 @@ type Paintress struct {
 	consecutiveFailures  atomic.Int64
 }
 
-// emitEvent appends a single event to the event store. Errors are logged
-// but never propagated — the event log is observational, not critical.
+// errWriter returns ErrOut or io.Discard if nil (nil-safe accessor for tests).
+func (p *Paintress) errWriter() io.Writer {
+	if p.ErrOut != nil {
+		return p.ErrOut
+	}
+	return io.Discard
+}
+
+// emitEvent appends a single event to the event store and returns any
+// persistence error. Callers decide whether the error is critical.
 // After persistence, the event is dispatched to the PolicyEngine best-effort.
-func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
+func (p *Paintress) emitEvent(eventType domain.EventType, data any) error {
 	// Record OTel metric for expedition completions (fire-and-forget, independent of event store)
 	if eventType == domain.EventExpeditionCompleted {
 		if d, ok := data.(domain.ExpeditionCompletedData); ok {
@@ -72,16 +81,17 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 		}
 	}
 	if p.eventStore == nil {
-		return
+		return nil
 	}
 	ev, err := domain.NewEvent(eventType, data, time.Now())
 	if err != nil {
 		p.Logger.Warn("event emit marshal: %v", err)
-		return
+		return fmt.Errorf("event emit marshal %s: %w", eventType, err)
 	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Warn("event emit append: %v", err)
 		platform.RecordEventEmitError(context.Background(), string(eventType))
+		return fmt.Errorf("event emit append %s: %w", eventType, err)
 	}
 	// Best-effort policy dispatch
 	if p.Dispatcher != nil {
@@ -89,6 +99,7 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) {
 			p.Logger.Debug("policy dispatch %s: %v", eventType, dispatchErr)
 		}
 	}
+	return nil
 }
 
 // emitExpeditionCompleted generates an expedition.completed event via the aggregate
@@ -104,16 +115,19 @@ func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound 
 		return
 	}
 	for _, ev := range events {
-		p.emitEvent(ev.Type, ev.Data)
+		_ = p.emitEvent(ev.Type, ev.Data)
 	}
 }
 
-func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
 	if dataOut == nil {
 		dataOut = io.Discard
+	}
+	if errOut == nil {
+		errOut = io.Discard
 	}
 	if stdinIn == nil {
 		stdinIn = strings.NewReader("")
@@ -153,7 +167,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, st
 	case cfg.ApproveCmd != "":
 		approver = NewCmdApprover(cfg.ApproveCmd)
 	default:
-		promptOut := logger.Writer()
+		promptOut := errOut
 		if promptOut == io.Discard || promptOut == dataOut {
 			promptOut = os.Stderr // nosemgrep: adr0002-no-os-stderr-in-internal — fallback for quiet-mode + interactive approval; cmd layer cannot predict this condition
 		}
@@ -172,6 +186,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, st
 		logDir:       logDir,
 		Logger:       logger,
 		DataOut:      dataOut,
+		ErrOut:       errOut,
 		StdinIn:      stdinIn,
 		gradient:     domain.NewGradientGauge(gradientMax),
 		reserve:      domain.NewReserveParty(primary, reserves, logger),
@@ -277,7 +292,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	if p.config.DryRun {
 		p.Logger.Warn("%s", domain.Msg("dry_run"))
 	}
-	fmt.Fprintln(p.Logger.Writer())
+	fmt.Fprintln(p.errWriter())
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===
 	p.totalAttempted.Store(0)
@@ -345,7 +360,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}
 	}
 
-	fmt.Fprintln(p.Logger.Writer())
+	fmt.Fprintln(p.errWriter())
 	p.printSummary()
 
 	switch {
@@ -380,7 +395,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("party_info"), p.reserve.Status()))
 
 		model := p.reserve.ActiveModel()
-		p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
+		_ = p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: exp, Worker: workerID, Model: model,
 		})
 		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition", // nosemgrep: adr0003-otel-span-without-defer-end — expSpan.End() called after expedition loop body
@@ -415,7 +430,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
 		for _, dm := range inboxDMails {
-			p.emitEvent(domain.EventInboxReceived, domain.InboxReceivedData{
+			_ = p.emitEvent(domain.EventInboxReceived, domain.InboxReceivedData{
 				Name: dm.Name, Severity: dm.Severity,
 			})
 		}
@@ -433,6 +448,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			LogDir:      p.logDir,
 			Logger:      p.Logger,
 			DataOut:     p.DataOut,
+			ErrOut:      p.ErrOut,
 			Luminas:     luminas,
 			Gradient:    p.gradient,
 			Reserve:     p.reserve,
@@ -480,7 +496,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				}
 			}
 			p.gradient.Discharge()
-			p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+			_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 				Level: p.gradient.Level(), Operator: "discharge",
 			})
 
@@ -535,7 +551,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("%s", domain.Msg("report_parse_fail"))
 				p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("output_check"), p.logDir, exp))
 				p.gradient.Decay()
-				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+				_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "decay",
 				})
 				p.writeFlag(flagDir, exp, "?", "parse_error", "?", midHighCount)
@@ -562,7 +578,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				)
 				p.handleSuccess(report)
 				p.gradient.Charge()
-				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+				_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "charge",
 				})
 				if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
@@ -601,7 +617,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			case domain.StatusSkipped:
 				p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))
 				p.gradient.Decay()
-				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+				_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "decay",
 				})
 				p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
@@ -611,7 +627,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			case domain.StatusFailed:
 				p.Logger.Error("%s", fmt.Sprintf(domain.Msg("issue_failed"), report.IssueID, report.Reason))
 				p.gradient.Discharge()
-				p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+				_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
 					Level: p.gradient.Level(), Operator: "discharge",
 				})
 				p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
@@ -634,7 +650,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			releaseWorkDir()
 			expSpan.End()
 			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
-			p.emitEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
+			_ = p.emitEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
 				Expedition: exp, ConsecutiveFailures: maxConsecutiveFailures,
 			})
 			return errGommage
@@ -889,7 +905,7 @@ func (p *Paintress) handleSuccess(report *domain.ExpeditionReport) {
 }
 
 func (p *Paintress) printBanner() {
-	w := p.Logger.Writer()
+	w := p.errWriter()
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
 	fmt.Fprintln(w, "║          The Paintress awakens               ║")
@@ -947,7 +963,7 @@ func (p *Paintress) printSummary() {
 		return
 	}
 
-	w := p.Logger.Writer()
+	w := p.errWriter()
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
 	fmt.Fprintln(w, "║          The Paintress rests                 ║")
@@ -1007,14 +1023,14 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 
 		if count > p.config.MaxRetries {
 			p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)
-			p.handleEscalation(dm)
+			_ = p.handleEscalation(dm)
 			return
 		}
 		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
-		p.emitEvent(domain.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
+		_ = p.emitEvent(domain.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
 		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 	case "escalate":
-		p.handleEscalation(dm)
+		_ = p.handleEscalation(dm)
 	case "resolve":
 		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
 	default:
@@ -1023,8 +1039,13 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 }
 
 // handleEscalation logs and emits an escalation event for a D-Mail that
-// requires human attention.
-func (p *Paintress) handleEscalation(dm domain.DMail) {
+// requires human attention. Returns an error if the escalation event
+// cannot be persisted — escalation events are critical and must be detectable.
+func (p *Paintress) handleEscalation(dm domain.DMail) error {
 	p.Logger.Warn("ESCALATION: %s requires human attention (issues: %v)", dm.Name, dm.Issues)
-	p.emitEvent(domain.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues})
+	if err := p.emitEvent(domain.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues}); err != nil {
+		p.Logger.Error("ESCALATION EVENT LOST: %s (issues: %v): %v", dm.Name, dm.Issues, err)
+		return fmt.Errorf("escalation event persistence: %w", err)
+	}
+	return nil
 }

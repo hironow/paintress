@@ -28,6 +28,7 @@ type Expedition struct {
 	LogDir    string
 	Logger    domain.Logger
 	DataOut   io.Writer       // stdout-equivalent for streaming Claude output
+	ErrOut    io.Writer       // stderr-equivalent for UI chrome output
 	Notifier  port.Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics
@@ -49,6 +50,14 @@ type Expedition struct {
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+}
+
+// errWriter returns ErrOut or io.Discard if nil (nil-safe accessor for tests).
+func (e *Expedition) errWriter() io.Writer {
+	if e.ErrOut != nil {
+		return e.ErrOut
+	}
+	return io.Discard
 }
 
 // containsIssue reports whether issues contains target (case-insensitive).
@@ -337,7 +346,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	err = cmd.Wait()
 	if e.Config.OutputFormat != "json" {
-		fmt.Fprintln(e.Logger.Writer())
+		fmt.Fprintln(e.errWriter())
 	}
 
 	if expCtx.Err() == context.DeadlineExceeded {
