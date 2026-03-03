@@ -6,26 +6,13 @@
 
 ## Repository Structure (ADR 0013/0014: 3-Layer Separation)
 
-Dependency direction: `internal/cmd` → `internal/session` → `internal/eventsource` → `paintress` (root)
+Dependency direction: `internal/cmd` → `internal/usecase` → `internal/session` → `internal/eventsource` → `internal/domain`
 
-### Root package `paintress` — types, constants, pure functions, go:embed
+### Root package — `doc.go` only (root-zero: all code moved to internal/)
 
-- `paintress.go` — RunSummary, PruneResult, DoctorCheck, JSON formatters
-- `expedition.go` — Expedition types, go:embed templates, pure prompt building
-- `dmail.go` — DMail types, ParseDMail, MarshalDMail, ValidateDMail (pure)
-- `config.go` — Config, ProjectConfig, LinearConfig, go:embed SkillsFS
-- `interfaces.go` — port interfaces (Approver, Notifier, GitExecutor) + default impls
-- `flag.go` — ExpeditionFlag type, FlagPath
-- `journal.go` — JournalEntry type
-- `lumina.go` — Lumina type, FormatLuminaForPrompt (pure)
-- `issues.go` — Issue type
-- `gradient.go` — GradientGauge type, pure methods
-- `reserve.go` — ReserveParty type, pure methods
-- `report.go` — Report types
-- `lang.go` — language constants
-- `logger.go` — structured logger (root infrastructure per S0005)
-- `telemetry.go` — Tracer (noop default, root infrastructure per S0005)
-- `event.go` — Event envelope, EventType constants, EventStore interface, ValidateEvent, NewEvent
+### `internal/domain/` — types, constants, pure functions, go:embed
+
+All former root package contents now reside here (types, interfaces, event/command/policy, go:embed templates, pure functions).
 
 ### `internal/eventsource/` — event store infrastructure
 

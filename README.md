@@ -373,21 +373,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- internal/eventsource/     Event store infrastructure (JSONL append-only)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI documentation generator
-+-- Root package (paintress)  Types, interfaces, pure functions, go:embed
-|   +-- paintress.go          RunSummary, PruneResult, DoctorCheck
-|   +-- expedition.go         Expedition types, go:embed templates
-|   +-- dmail.go              DMail types, ParseDMail, MarshalDMail, ValidateDMail
-|   +-- config.go             Config, ProjectConfig, LinearConfig, go:embed SkillsFS
-|   +-- interfaces.go         Port interfaces (Approver, Notifier, GitExecutor)
-|   +-- event.go              Event envelope, EventType constants
-|   +-- flag.go               ExpeditionFlag type
-|   +-- gradient.go           GradientGauge type
-|   +-- lumina.go             Lumina type, FormatLuminaForPrompt
-|   +-- reserve.go            ReserveParty type
-|   +-- report.go             Report types
-|   +-- journal.go            JournalEntry type
-|   +-- logger.go             Structured logger (noop default)
-|   +-- telemetry.go          OTel tracer (noop default)
++-- doc.go                    Package declaration (root-zero: all code in internal/)
 +-- templates/                AI prompt templates ({en,ja,fr})
 |   +-- skills/               D-Mail SKILL.md templates
 +-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
