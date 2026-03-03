@@ -487,7 +487,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.consecutiveFailures.Add(1)
 			p.totalFailed.Add(1)
 		} else {
-			_, parseSpan := platform.Tracer.Start(expCtx, "report.parse")
+			_, parseSpan := platform.Tracer.Start(expCtx, "report.parse") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 492
 			report, status := domain.ParseReport(output, exp)
 			parseSpan.End()
 
@@ -680,7 +680,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("review_running"), cycle, maxReviewGateCycles))
 
-		_, revSpan := platform.Tracer.Start(ctx, "review.command",
+		_, revSpan := platform.Tracer.Start(ctx, "review.command", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
@@ -752,7 +752,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 		}
 
 		model := p.reserve.ActiveModel()
-		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude",
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 777
 			trace.WithAttributes(
 				attribute.Int("cycle", cycle),
 				attribute.String("model", model),
@@ -988,7 +988,7 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 		sort.Strings(sorted)
 		retryKey := strings.Join(sorted, ",")
 
-		p.retryMu.Lock()
+		p.retryMu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- Lock/use/Unlock in 3 lines, defer unnecessary
 		p.retryTracker[retryKey]++
 		count := p.retryTracker[retryKey]
 		p.retryMu.Unlock()
