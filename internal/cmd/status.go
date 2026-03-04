@@ -11,7 +11,7 @@ import (
 // newStatusCommand creates the status subcommand that displays operational status.
 func newStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status [repo-path]",
+		Use:   "status [path]",
 		Short: "Show paintress operational status",
 		Long: `Display operational status including expedition history, success rate,
 gradient level, and pending d-mail counts.
