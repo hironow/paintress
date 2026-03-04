@@ -83,6 +83,19 @@ func SortByPriority(issues []Issue) {
 	})
 }
 
+// ContainsIssue reports whether issues contains target (case-insensitive).
+func ContainsIssue(issues []string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for _, id := range issues {
+		if strings.EqualFold(id, target) {
+			return true
+		}
+	}
+	return false
+}
+
 // FormatIssuesJSON returns issues as a JSON array string.
 func FormatIssuesJSON(issues []Issue) (string, error) {
 	data, err := json.Marshal(issues)

@@ -17,3 +17,18 @@ type ExpeditionFlag struct {
 func FlagPath(continent string) string {
 	return filepath.Join(continent, ".expedition", ".run", "flag.md")
 }
+
+// BestFlag returns the flag with the highest LastExpedition number.
+// If flags is empty, a zero-value ExpeditionFlag is returned.
+func BestFlag(flags []ExpeditionFlag) ExpeditionFlag {
+	if len(flags) == 0 {
+		return ExpeditionFlag{}
+	}
+	best := flags[0]
+	for _, f := range flags[1:] {
+		if f.LastExpedition > best.LastExpedition {
+			best = f
+		}
+	}
+	return best
+}

@@ -60,19 +60,6 @@ func (e *Expedition) errWriter() io.Writer {
 	return io.Discard
 }
 
-// containsIssue reports whether issues contains target (case-insensitive).
-func containsIssue(issues []string, target string) bool {
-	if target == "" {
-		return false
-	}
-	for _, id := range issues {
-		if strings.EqualFold(id, target) {
-			return true
-		}
-	}
-	return false
-}
-
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
 func (e *Expedition) setCurrentIssue(issue string) {
 	e.currentIssueMu.Lock()
@@ -295,7 +282,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			} else {
 				e.Logger.Info("Expedition #%d: d-mail received — %s (%s)", e.Number, dm.Name, dm.Kind)
 			}
-			if cur := e.getCurrentIssue(); cur != "" && containsIssue(dm.Issues, cur) {
+			if cur := e.getCurrentIssue(); cur != "" && domain.ContainsIssue(dm.Issues, cur) {
 				e.appendMidMatchedMail(dm)
 				e.Logger.Info("Expedition #%d: d-mail routed to current issue %s — %s", e.Number, cur, dm.Name)
 			}

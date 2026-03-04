@@ -8,9 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -48,8 +46,7 @@ type Paintress struct {
 	Dispatcher  port.EventDispatcher   // policy engine (best-effort dispatch after emit)
 
 	// Retry tracking: maps sorted issue keys to attempt count
-	retryMu      sync.Mutex
-	retryTracker map[string]int
+	retryTracker *domain.RetryTracker
 
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
@@ -193,7 +190,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		notifier:     notifier,
 		approver:     approver,
 		eventStore:   eventStore,
-		retryTracker: make(map[string]int),
+		retryTracker: domain.NewRetryTracker(),
 	}
 
 	if !cfg.NoDev {
@@ -700,7 +697,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				if report.Insight != "" {
 					report.Insight += " | "
 				}
-				report.Insight += "Review interrupted: " + summarizeReview(lastComments)
+				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
 			}
 			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), ctx.Err()))
 			return
@@ -712,7 +709,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		expandedCmd := ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
+		expandedCmd := domain.ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
 		result, err := RunReview(reviewCtx, expandedCmd, reviewDir)
 		reviewCancel()
 		if err != nil {
@@ -721,7 +718,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				if report.Insight != "" {
 					report.Insight += " | "
 				}
-				report.Insight += "Review interrupted: " + summarizeReview(lastComments)
+				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
 			}
 			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), err))
 			return
@@ -765,14 +762,14 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
+			report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
 			p.Logger.Warn("%s", domain.Msg("review_limit"))
 			return
 		}
 
 		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
 
-		prompt := BuildReviewFixPrompt(branch, result.Comments)
+		prompt := domain.BuildReviewFixPrompt(branch, result.Comments)
 
 		claudeCmd := p.config.ClaudeCmd
 		if claudeCmd == "" {
@@ -810,7 +807,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Reviewfix failed: " + summarizeReview(string(out))
+			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(string(out))
 			return
 		}
 	}
@@ -818,7 +815,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 	if report.Insight != "" {
 		report.Insight += " | "
 	}
-	report.Insight += "Review not fully resolved: " + summarizeReview(lastComments)
+	report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
 	p.Logger.Warn("%s", domain.Msg("review_limit"))
 }
 
@@ -916,21 +913,18 @@ func (p *Paintress) printBanner() {
 // reconcileFlags scans the continent's own flag.md and, when workers > 0,
 // all worktree flag.md files, returning the one with the highest LastExpedition.
 func reconcileFlags(continent string, workers int) domain.ExpeditionFlag {
-	best := ReadFlag(continent)
+	flags := []domain.ExpeditionFlag{ReadFlag(continent)}
 	if workers == 0 {
-		return best
+		return flags[0]
 	}
 	pattern := filepath.Join(continent, ".expedition", ".run", "worktrees", "*",
 		".expedition", ".run", "flag.md")
 	matches, _ := filepath.Glob(pattern)
 	for _, match := range matches {
 		base := filepath.Dir(filepath.Dir(filepath.Dir(match)))
-		f := ReadFlag(base)
-		if f.LastExpedition > best.LastExpedition {
-			best = f
-		}
+		flags = append(flags, ReadFlag(base))
 	}
-	return best
+	return domain.BestFlag(flags)
 }
 
 func (p *Paintress) writeFlag(dir string, expNum int, issueID, status, remaining string, midHighSeverity int) {
@@ -1011,15 +1005,8 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 			p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 			return
 		}
-		sorted := make([]string, len(dm.Issues))
-		copy(sorted, dm.Issues)
-		sort.Strings(sorted)
-		retryKey := strings.Join(sorted, ",")
-
-		p.retryMu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- Lock/use/Unlock in 3 lines, defer unnecessary
-		p.retryTracker[retryKey]++
-		count := p.retryTracker[retryKey]
-		p.retryMu.Unlock()
+		count := p.retryTracker.Track(dm.Issues)
+		retryKey := domain.RetryKey(dm.Issues)
 
 		if count > p.config.MaxRetries {
 			p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)

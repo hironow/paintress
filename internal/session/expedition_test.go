@@ -943,31 +943,31 @@ func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 }
 
 func TestContainsIssue_Match(t *testing.T) {
-	if !containsIssue([]string{"MY-42", "MY-43"}, "MY-42") {
+	if !domain.ContainsIssue([]string{"MY-42", "MY-43"}, "MY-42") {
 		t.Error("should match MY-42 in list")
 	}
 }
 
 func TestContainsIssue_NoMatch(t *testing.T) {
-	if containsIssue([]string{"MY-42", "MY-43"}, "MY-99") {
+	if domain.ContainsIssue([]string{"MY-42", "MY-43"}, "MY-99") {
 		t.Error("should not match MY-99")
 	}
 }
 
 func TestContainsIssue_EmptyList(t *testing.T) {
-	if containsIssue(nil, "MY-42") {
+	if domain.ContainsIssue(nil, "MY-42") {
 		t.Error("empty list should not match")
 	}
 }
 
 func TestContainsIssue_EmptyTarget(t *testing.T) {
-	if containsIssue([]string{"MY-42"}, "") {
+	if domain.ContainsIssue([]string{"MY-42"}, "") {
 		t.Error("empty target should not match")
 	}
 }
 
 func TestContainsIssue_CaseInsensitive(t *testing.T) {
-	if !containsIssue([]string{"my-42"}, "MY-42") {
+	if !domain.ContainsIssue([]string{"my-42"}, "MY-42") {
 		t.Error("should match case-insensitively")
 	}
 }
