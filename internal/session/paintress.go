@@ -102,18 +102,21 @@ func (p *Paintress) emitEvent(eventType domain.EventType, data any) error {
 // emitExpeditionCompleted generates an expedition.completed event via the aggregate
 // and persists it through emitEvent. OTel metric is recorded directly since
 // aggregate events use json.RawMessage (not the typed struct emitEvent expects).
-func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound string) {
+// Returns an error if event persistence fails — expedition completion is critical.
+func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound string) error {
 	platform.RecordExpedition(context.Background(), status)
 
 	agg := domain.NewExpeditionAggregate()
 	events, err := agg.CompleteExpedition(exp, status, issueID, bugsFound, time.Now())
 	if err != nil {
-		p.Logger.Warn("aggregate expedition: %v", err)
-		return
+		return fmt.Errorf("aggregate expedition: %w", err)
 	}
 	for _, ev := range events {
-		_ = p.emitEvent(ev.Type, ev.Data)
+		if err := p.emitEvent(ev.Type, ev.Data); err != nil {
+			return fmt.Errorf("emit expedition event %s: %w", ev.Type, err)
+		}
 	}
+	return nil
 }
 
 func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
@@ -495,9 +498,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			releaseWorkDir()
 			expSpan.End()
 			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
-			_ = p.emitEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
+			if err := p.emitEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
 				Expedition: exp, ConsecutiveFailures: maxConsecutiveFailures,
-			})
+			}); err != nil {
+				p.Logger.Error("gommage event lost: %v", err)
+			}
 			return errGommage
 		}
 
@@ -557,7 +562,9 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 		errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 	}
 	WriteJournal(p.config.Continent, errReport)
-	p.emitExpeditionCompleted(exp, "failed", "", "")
+	if err := p.emitExpeditionCompleted(exp, "failed", "", ""); err != nil {
+		p.Logger.Error("expedition completion event lost: %v", err)
+	}
 	if midHighCount > 0 {
 		p.Logger.Warn("Expedition #%d: %d HIGH severity D-Mail received mid-expedition", exp, midHighCount)
 	}
@@ -608,7 +615,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 		}
 		WriteJournal(p.config.Continent, parseErrReport)
-		p.emitExpeditionCompleted(exp, "parse_error", "", "")
+		if err := p.emitExpeditionCompleted(exp, "parse_error", "", ""); err != nil {
+			p.Logger.Error("expedition completion event lost: %v", err)
+		}
 		p.consecutiveFailures.Add(1)
 		p.totalFailed.Add(1)
 	case domain.StatusSuccess:
@@ -644,7 +653,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		p.emitExpeditionCompleted(exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound))
+		if err := p.emitExpeditionCompleted(exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound)); err != nil {
+			p.Logger.Error("expedition completion event lost: %v", err)
+		}
 		if dm := domain.NewReportDMail(report); dm.Name != "" {
 			if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
@@ -665,7 +676,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		})
 		p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		p.emitExpeditionCompleted(exp, "skipped", report.IssueID, "")
+		if err := p.emitExpeditionCompleted(exp, "skipped", report.IssueID, ""); err != nil {
+			p.Logger.Error("expedition completion event lost: %v", err)
+		}
 		p.totalSkipped.Add(1)
 	case domain.StatusFailed:
 		p.Logger.Error("%s", fmt.Sprintf(domain.Msg("issue_failed"), report.IssueID, report.Reason))
@@ -675,7 +688,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		})
 		p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		p.emitExpeditionCompleted(exp, "failed", report.IssueID, "")
+		if err := p.emitExpeditionCompleted(exp, "failed", report.IssueID, ""); err != nil {
+			p.Logger.Error("expedition completion event lost: %v", err)
+		}
 		p.consecutiveFailures.Add(1)
 		p.totalFailed.Add(1)
 	}
@@ -1026,14 +1041,18 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 
 		if count > p.config.MaxRetries {
 			p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)
-			_ = p.handleEscalation(dm)
+			if err := p.handleEscalation(dm); err != nil {
+				p.Logger.Error("escalation event lost: %v", err)
+			}
 			return
 		}
 		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
 		_ = p.emitEvent(domain.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
 		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 	case "escalate":
-		_ = p.handleEscalation(dm)
+		if err := p.handleEscalation(dm); err != nil {
+			p.Logger.Error("escalation event lost: %v", err)
+		}
 	case "resolve":
 		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
 	default:
