@@ -33,7 +33,7 @@ func NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir string) (*SQLiteOutboxSt
 			return nil, fmt.Errorf("outbox store: create dir %s: %w", dir, err)
 		}
 	}
-	db, err := sql.Open("sqlite", dbPath) // nosemgrep: d4-sql-open-without-defer-close — stored in struct, closed via Close()
+	db, err := sql.Open("sqlite", dbPath) // nosemgrep: d4-sql-open-without-defer-close -- stored in struct, closed via Close()
 	if err != nil {
 		return nil, fmt.Errorf("outbox store: open db: %w", err)
 	}
@@ -147,8 +147,9 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	}
 
 	if len(items) == 0 {
+		// Nothing to flush — rollback the empty transaction.
 		conn.ExecContext(ctx, "ROLLBACK") //nolint:errcheck
-		committed = true
+		committed = true                  // suppress deferred rollback
 		return 0, nil
 	}
 
@@ -156,6 +157,7 @@ func (s *SQLiteOutboxStore) Flush() (int, error) {
 	for _, it := range items {
 		archivePath := filepath.Join(s.archiveDir, it.name)
 		if writeErr := atomicWrite(archivePath, it.data); writeErr != nil {
+			// Per-item failure: increment retry_count and continue.
 			conn.ExecContext(ctx, //nolint:errcheck
 				`UPDATE staged SET retry_count = retry_count + 1 WHERE name = ?`, it.name)
 			continue
