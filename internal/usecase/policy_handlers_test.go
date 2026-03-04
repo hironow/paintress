@@ -21,6 +21,19 @@ type spyNotifier struct {
 	calls []notifyCall
 }
 
+type metricsCall struct {
+	eventType string
+	status    string
+}
+
+type spyPolicyMetrics struct {
+	calls []metricsCall
+}
+
+func (s *spyPolicyMetrics) RecordPolicyEvent(_ context.Context, eventType, status string) {
+	s.calls = append(s.calls, metricsCall{eventType: eventType, status: status})
+}
+
 func (s *spyNotifier) Notify(_ context.Context, title, message string) error {
 	s.calls = append(s.calls, notifyCall{title: title, message: message})
 	return nil
@@ -87,6 +100,117 @@ func TestPolicyHandler_ExpeditionCompleted_NotifiesSideEffect(t *testing.T) {
 	}
 	if !strings.Contains(call.message, "success") {
 		t.Errorf("expected message to contain status, got: %s", call.message)
+	}
+}
+
+func TestPolicyHandler_ExpeditionCompleted_RecordsMetrics(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyPolicyMetrics{}
+	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
+		Expedition: 42, Status: "success",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 RecordPolicyEvent call, got %d", len(spy.calls))
+	}
+	if spy.calls[0].eventType != "expedition.completed" {
+		t.Errorf("expected eventType 'expedition.completed', got: %s", spy.calls[0].eventType)
+	}
+	if spy.calls[0].status != "handled" {
+		t.Errorf("expected status 'handled', got: %s", spy.calls[0].status)
+	}
+}
+
+func TestPolicyHandler_InboxReceived_RecordsMetrics(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyPolicyMetrics{}
+	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventInboxReceived, map[string]string{
+		"source": "test",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 RecordPolicyEvent call, got %d", len(spy.calls))
+	}
+	if spy.calls[0].eventType != "inbox.received" {
+		t.Errorf("expected eventType 'inbox.received', got: %s", spy.calls[0].eventType)
+	}
+}
+
+func TestPolicyHandler_GradientChanged_RecordsMetrics(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyPolicyMetrics{}
+	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
+		Level: 3, Operator: "auto",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 RecordPolicyEvent call, got %d", len(spy.calls))
+	}
+	if spy.calls[0].eventType != "gradient.changed" {
+		t.Errorf("expected eventType 'gradient.changed', got: %s", spy.calls[0].eventType)
+	}
+}
+
+func TestPolicyHandler_DMailStaged_RecordsMetrics(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyPolicyMetrics{}
+	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, spy)
+
+	ev, err := domain.NewEvent(domain.EventDMailStaged, map[string]string{
+		"kind": "feedback",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 RecordPolicyEvent call, got %d", len(spy.calls))
+	}
+	if spy.calls[0].eventType != "dmail.staged" {
+		t.Errorf("expected eventType 'dmail.staged', got: %s", spy.calls[0].eventType)
 	}
 }
 

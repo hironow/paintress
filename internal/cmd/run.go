@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -154,7 +155,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.RunExpeditionCommand{
 		RepoPath: continent,
-	}, cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), eventStore)
+	}, cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), eventStore, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
 		return ucErr
 	}

@@ -26,21 +26,25 @@ func registerExpeditionPolicies(engine *PolicyEngine, logger domain.Logger, noti
 			fmt.Sprintf("Expedition #%d completed: %s", data.Expedition, data.Status)); err != nil {
 			logger.Debug("policy: notify error: %v", err)
 		}
+		metrics.RecordPolicyEvent(ctx, "expedition.completed", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventInboxReceived, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventInboxReceived, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: inbox received (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "inbox.received", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventGradientChanged, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventGradientChanged, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: gradient changed (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "gradient.changed", "handled")
 		return nil
 	})
 
-	engine.Register(domain.EventDMailStaged, func(_ context.Context, event domain.Event) error {
+	engine.Register(domain.EventDMailStaged, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail staged (type=%s)", event.Type)
+		metrics.RecordPolicyEvent(ctx, "dmail.staged", "handled")
 		return nil
 	})
 }
