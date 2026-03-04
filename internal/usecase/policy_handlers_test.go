@@ -31,7 +31,7 @@ func TestPolicyHandler_ExpeditionCompleted_InfoOutput(t *testing.T) {
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false)
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger, &port.NopNotifier{})
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 42, Status: "success",
@@ -62,7 +62,7 @@ func TestPolicyHandler_ExpeditionCompleted_NotifiesSideEffect(t *testing.T) {
 	logger := platform.NewLogger(&buf, false)
 	spy := &spyNotifier{}
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger, spy)
+	registerExpeditionPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 42, Status: "success",
@@ -95,7 +95,7 @@ func TestPolicyHandler_ExpeditionCompleted_DebugOnly_NoInfoOutput(t *testing.T) 
 	var buf bytes.Buffer
 	logger := platform.NewLogger(&buf, false) // verbose=false so Debug is suppressed
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger, &port.NopNotifier{})
+	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
 		Level: 3, Operator: "auto",

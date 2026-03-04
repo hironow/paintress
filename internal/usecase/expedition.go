@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/port"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -17,7 +18,7 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand, cfg do
 	}
 	engine := NewPolicyEngine(logger)
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
-	registerExpeditionPolicies(engine, logger, notifier)
+	registerExpeditionPolicies(engine, logger, notifier, &port.NopPolicyMetrics{})
 	p := session.NewPaintress(cfg, logger, dataOut, errOut, stdinIn, eventStore)
 	p.Dispatcher = engine
 	return p.Run(ctx), nil

@@ -12,7 +12,7 @@ import (
 
 // registerExpeditionPolicies registers POLICY handlers for expedition events.
 // See ADR S0014 (POLICY pattern) and S0018 (Event Storming alignment).
-func registerExpeditionPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier) {
+func registerExpeditionPolicies(engine *PolicyEngine, logger domain.Logger, notifier port.Notifier, metrics port.PolicyMetrics) {
 	engine.Register(domain.EventExpeditionCompleted, func(ctx context.Context, event domain.Event) error {
 		var data domain.ExpeditionCompletedData
 		if err := json.Unmarshal(event.Data, &data); err != nil {
