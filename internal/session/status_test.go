@@ -88,8 +88,8 @@ func TestStatus_WithMailDirs(t *testing.T) {
 func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with expedition events
 	baseDir := t.TempDir()
-	eventsDir := domain.EventsDir(baseDir)
-	store := NewEventStore(eventsDir)
+	stateDir := filepath.Join(baseDir, ".expedition")
+	store := NewEventStore(stateDir)
 
 	ts := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 

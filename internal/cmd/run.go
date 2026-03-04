@@ -124,8 +124,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
 	logger := loggerFrom(cmd)
-	eventsDir := domain.EventsDir(continent)
-	eventStore := usecase.NewEventStore(eventsDir)
+	stateDir := filepath.Join(continent, ".expedition")
+	eventStore := usecase.NewEventStore(stateDir)
 
 	if err := usecase.ValidateContinent(cfg.Continent); err != nil {
 		return err

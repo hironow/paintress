@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"encoding/json"
+	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
@@ -17,8 +18,8 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 // ComputeSuccessRate loads all events from the event store and computes
 // success rate metrics. Returns nil metrics when no events exist or loading fails.
 func ComputeSuccessRate(repoPath string) *domain.DoctorMetrics {
-	eventsDir := domain.EventsDir(repoPath)
-	store := session.NewEventStore(eventsDir)
+	stateDir := filepath.Join(repoPath, ".expedition")
+	store := session.NewEventStore(stateDir)
 	events, err := store.LoadAll()
 	if err != nil || len(events) == 0 {
 		return &domain.DoctorMetrics{SuccessRate: "no events"}

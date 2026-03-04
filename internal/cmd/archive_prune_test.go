@@ -9,20 +9,21 @@ import (
 	"time"
 )
 
-func TestArchivePruneCommand_RequiresRepoPath(t *testing.T) {
-	// given
+func TestArchivePruneCommand_NoArgs(t *testing.T) {
+	// given: no args → falls back to cwd (dry-run by default)
 	cmd := NewRootCommand()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"archive-prune"})
 
 	// when
 	err := cmd.Execute()
 
-	// then
-	if err == nil {
-		t.Fatal("expected error for missing repo-path, got nil")
+	// then: should succeed using cwd as repo path
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

@@ -11,19 +11,24 @@ import (
 )
 
 func TestStatusCommand_NoArgs(t *testing.T) {
-	// given
+	// given: no args → falls back to cwd
 	cmd := NewRootCommand()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"status"})
 
 	// when
 	err := cmd.Execute()
 
-	// then: should error — repo-path is required
-	if err == nil {
-		t.Fatal("expected error for no args, got nil")
+	// then: should succeed using cwd as repo path
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text := stdout.String()
+	if !strings.Contains(text, "paintress status:") {
+		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
 }
 

@@ -10,9 +10,9 @@ func PreflightCheck(binaries ...string) error {
 	return session.PreflightCheck(binaries...)
 }
 
-// NewEventStore creates an event store for the given events directory.
-func NewEventStore(eventsDir string) domain.EventStore {
-	return session.NewEventStore(eventsDir)
+// NewEventStore creates an event store for the given state directory.
+func NewEventStore(stateDir string) domain.EventStore {
+	return session.NewEventStore(stateDir)
 }
 
 // ValidateContinent ensures the .expedition directory structure exists.

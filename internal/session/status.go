@@ -2,6 +2,7 @@ package session
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
 )
@@ -20,8 +21,8 @@ func Status(baseDir string) domain.StatusReport {
 	report.ArchiveCount = countDirFiles(domain.ArchiveDir(baseDir))
 
 	// Load all events for expedition stats
-	eventsDir := domain.EventsDir(baseDir)
-	store := NewEventStore(eventsDir)
+	stateDir := filepath.Join(baseDir, ".expedition")
+	store := NewEventStore(stateDir)
 	allEvents, err := store.LoadAll()
 	if err != nil || len(allEvents) == 0 {
 		return report

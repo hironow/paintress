@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
@@ -33,8 +34,8 @@ func Rebuild(cmd domain.RebuildCommand, events domain.EventStore, projector doma
 // then replays events to regenerate projections.
 // This is the cmd-facing entry point that eliminates session imports from cmd.
 func RebuildFromDir(cmd domain.RebuildCommand, logger domain.Logger) error {
-	eventsDir := domain.EventsDir(cmd.RepoPath)
-	eventStore := session.NewEventStore(eventsDir)
+	stateDir := filepath.Join(cmd.RepoPath, ".expedition")
+	eventStore := session.NewEventStore(stateDir)
 	projector := session.NewProjectionApplier()
 
 	if err := Rebuild(cmd, eventStore, projector, logger); err != nil {

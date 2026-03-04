@@ -14,14 +14,17 @@ import (
 
 func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "archive-prune <repo-path>",
+		Use:   "archive-prune [repo-path]",
 		Short: "Prune old archived d-mails",
 		Long: `Prune archived d-mail files older than a specified number of days.
 
 By default runs in dry-run mode, listing candidates without deleting.
 Use --execute to perform actual deletion. The archive/ directory is
 git-tracked, so deletions should be reviewed and committed.`,
-		Example: `  # Dry run: list files older than 30 days
+		Example: `  # Dry run: list files older than 30 days (current directory)
+  paintress archive-prune
+
+  # Dry run: list files for a specific project
   paintress archive-prune /path/to/repo
 
   # Delete files older than 14 days
@@ -29,7 +32,7 @@ git-tracked, so deletions should be reviewed and committed.`,
 
   # JSON output for scripting
   paintress archive-prune -o json /path/to/repo`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
 			if days <= 0 {
@@ -53,9 +56,9 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	if execute && cmd.Flags().Changed("dry-run") {
 		return fmt.Errorf("--execute and --dry-run are mutually exclusive")
 	}
-	repoPath, err := filepath.Abs(args[0])
+	repoPath, err := resolveRepoPath(args)
 	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
+		return err
 	}
 	days, _ := cmd.Flags().GetInt("days")
 	outputFmt, _ := cmd.Flags().GetString("output")

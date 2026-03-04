@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
@@ -19,19 +18,19 @@ gradient level, and pending d-mail counts.
 
 Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.`,
-		Example: `  # Show status for a specific project
+		Example: `  # Show status for current directory
+  paintress status
+
+  # Show status for a specific project
   paintress status /path/to/repo
 
   # JSON output for scripting
   paintress status -o json /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("repo-path argument is required")
-			}
-			baseDir, err := filepath.Abs(args[0])
+			baseDir, err := resolveRepoPath(args)
 			if err != nil {
-				return fmt.Errorf("invalid path: %w", err)
+				return err
 			}
 
 			report := usecase.GetStatus(baseDir)
