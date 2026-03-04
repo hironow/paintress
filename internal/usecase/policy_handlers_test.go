@@ -214,15 +214,16 @@ func TestPolicyHandler_DMailStaged_RecordsMetrics(t *testing.T) {
 	}
 }
 
-func TestPolicyHandler_ExpeditionCompleted_DebugOnly_NoInfoOutput(t *testing.T) {
-	// given: Debug-only handler (gradient.changed) should NOT produce Info output
+func TestPolicyHandler_GradientChanged_NotifiesSideEffect(t *testing.T) {
+	// given
 	var buf bytes.Buffer
-	logger := platform.NewLogger(&buf, false) // verbose=false so Debug is suppressed
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyNotifier{}
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, &port.NopPolicyMetrics{})
+	registerExpeditionPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
-		Level: 3, Operator: "auto",
+		Level: 3, Operator: "charge",
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -231,9 +232,46 @@ func TestPolicyHandler_ExpeditionCompleted_DebugOnly_NoInfoOutput(t *testing.T) 
 	// when
 	engine.Dispatch(context.Background(), ev)
 
-	// then: no output (Debug suppressed when verbose=false)
-	output := buf.String()
-	if output != "" {
-		t.Errorf("expected no output for Debug-only handler with verbose=false, got: %s", output)
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 Notify call, got %d", len(spy.calls))
+	}
+	call := spy.calls[0]
+	if !strings.Contains(call.title, "Paintress") {
+		t.Errorf("expected title to contain 'Paintress', got: %s", call.title)
+	}
+	if !strings.Contains(call.message, "Gradient") {
+		t.Errorf("expected message to contain 'Gradient', got: %s", call.message)
+	}
+}
+
+func TestPolicyHandler_DMailStaged_NotifiesSideEffect(t *testing.T) {
+	// given
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	spy := &spyNotifier{}
+	engine := NewPolicyEngine(logger)
+	registerExpeditionPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
+
+	ev, err := domain.NewEvent(domain.EventDMailStaged, map[string]string{
+		"kind": "feedback",
+	}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// when
+	engine.Dispatch(context.Background(), ev)
+
+	// then
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 Notify call, got %d", len(spy.calls))
+	}
+	call := spy.calls[0]
+	if !strings.Contains(call.title, "Paintress") {
+		t.Errorf("expected title to contain 'Paintress', got: %s", call.title)
+	}
+	if !strings.Contains(call.message, "D-Mail staged") {
+		t.Errorf("expected message to contain 'D-Mail staged', got: %s", call.message)
 	}
 }

@@ -39,18 +39,26 @@ func registerExpeditionPolicies(engine *PolicyEngine, logger domain.Logger, noti
 		return nil
 	})
 
-	// POLICY CONTRACT: observation-only — debug log + metrics.
-	// Gradient changes are internal optimization decisions; no user action needed.
+	// POLICY: gradient.changed → notify + metrics.
 	engine.Register(domain.EventGradientChanged, func(ctx context.Context, event domain.Event) error {
-		logger.Debug("policy: gradient changed (type=%s)", event.Type)
+		logger.Info("policy: gradient changed (type=%s)", event.Type)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Paintress", "Gradient changed"); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
 		metrics.RecordPolicyEvent(ctx, "gradient.changed", "handled")
 		return nil
 	})
 
-	// POLICY CONTRACT: observation-only — debug log + metrics.
-	// D-Mail staging is an intermediate step before phonewave delivery.
+	// POLICY: dmail.staged → notify + metrics.
 	engine.Register(domain.EventDMailStaged, func(ctx context.Context, event domain.Event) error {
-		logger.Debug("policy: dmail staged (type=%s)", event.Type)
+		logger.Info("policy: dmail staged (type=%s)", event.Type)
+		notifyCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := notifier.Notify(notifyCtx, "Paintress", "D-Mail staged"); err != nil {
+			logger.Debug("policy: notify error: %v", err)
+		}
 		metrics.RecordPolicyEvent(ctx, "dmail.staged", "handled")
 		return nil
 	})
