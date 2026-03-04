@@ -45,3 +45,13 @@ type GitExecutor interface {
 	Git(ctx context.Context, dir string, args ...string) ([]byte, error)
 	Shell(ctx context.Context, dir string, command string) ([]byte, error)
 }
+
+// PolicyMetrics records policy handler execution metrics.
+type PolicyMetrics interface {
+	RecordPolicyEvent(ctx context.Context, eventType string, status string)
+}
+
+// NopPolicyMetrics is a no-op metrics recorder for tests and quiet mode.
+type NopPolicyMetrics struct{}
+
+func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
