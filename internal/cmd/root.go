@@ -38,6 +38,7 @@ func NewRootCommand() *cobra.Command {
 		// Silence usage on RunE errors (cobra prints usage by default on error)
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			applyOtelEnv(".expedition")
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			out := cmd.ErrOrStderr()
 			if os.Getenv("PAINTRESS_QUIET") != "" {
