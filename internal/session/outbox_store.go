@@ -213,10 +213,10 @@ func (s *SQLiteOutboxStore) Close() error {
 	return s.db.Close()
 }
 
-// NewOutboxStoreForContinent creates a SQLiteOutboxStore using conventional
+// NewOutboxStoreForDir creates a SQLiteOutboxStore using conventional
 // paths derived from the continent directory: DB at .expedition/.run/outbox.db,
 // targets at .expedition/archive/ and .expedition/outbox/.
-func NewOutboxStoreForContinent(continent string) (*SQLiteOutboxStore, error) {
+func NewOutboxStoreForDir(continent string) (*SQLiteOutboxStore, error) {
 	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
 	archiveDir := domain.ArchiveDir(continent)
 	outboxDir := domain.OutboxDir(continent)
@@ -230,7 +230,7 @@ func PruneFlushedOutbox(continent string) (int, error) {
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return 0, nil
 	}
-	store, err := NewOutboxStoreForContinent(continent)
+	store, err := NewOutboxStoreForDir(continent)
 	if err != nil {
 		return 0, fmt.Errorf("prune flushed outbox: open store: %w", err)
 	}

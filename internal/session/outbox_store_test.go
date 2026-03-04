@@ -13,7 +13,7 @@ import (
 
 func testOutboxStore(t *testing.T, continent string) *SQLiteOutboxStore {
 	t.Helper()
-	store, err := NewOutboxStoreForContinent(continent)
+	store, err := NewOutboxStoreForDir(continent)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}

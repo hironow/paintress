@@ -233,7 +233,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 
 	// Initialize transactional outbox store for D-Mail delivery.
-	outboxStore, err := NewOutboxStoreForContinent(p.config.Continent)
+	outboxStore, err := NewOutboxStoreForDir(p.config.Continent)
 	if err != nil {
 		p.Logger.Error("outbox store: %v", err)
 		rootSpan.End()
