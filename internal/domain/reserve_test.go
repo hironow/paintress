@@ -83,7 +83,7 @@ func TestReserve_TryRecoverPrimary_AfterCooldown(t *testing.T) {
 	rp.CheckOutput("rate limit")
 
 	// Manually set cooldown to past
-	rp.mu.Lock()
+	rp.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
 	rp.cooldownUntil = time.Now().Add(-1 * time.Minute)
 	rp.mu.Unlock()
 

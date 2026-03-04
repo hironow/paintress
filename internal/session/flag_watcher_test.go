@@ -23,7 +23,7 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 
 	ready := make(chan struct{}, 1)
 	go watchFlag(ctx, dir, func(issue, title string) {
-		mu.Lock()
+		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
 		gotIssue = issue
 		gotTitle = title
 		mu.Unlock()
@@ -97,7 +97,7 @@ func TestWatchFlag_DoesNotFireOnSameIssue(t *testing.T) {
 	defer cancel()
 
 	watchFlag(ctx, dir, func(issue, title string) {
-		mu.Lock()
+		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
 		callCount++
 		mu.Unlock()
 	}, nil)
@@ -124,7 +124,7 @@ func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 
 	ready := make(chan struct{}, 1)
 	go watchFlag(ctx, dir, func(issue, title string) {
-		mu.Lock()
+		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
 		issues = append(issues, issue)
 		count := len(issues)
 		mu.Unlock()

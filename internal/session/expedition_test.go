@@ -985,7 +985,7 @@ func TestMidMatchedDMails_Empty(t *testing.T) {
 
 func TestMidMatchedDMails_ReturnsCopy(t *testing.T) {
 	exp := &Expedition{}
-	exp.midMatchedMu.Lock()
+	exp.midMatchedMu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
 	exp.midMatchedMails = []domain.DMail{{Name: "spec-1", Kind: "specification"}}
 	exp.midMatchedMu.Unlock()
 
@@ -1305,7 +1305,7 @@ func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			exp.midMatchedMu.Lock()
+			exp.midMatchedMu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
 			exp.midMatchedMails = append(exp.midMatchedMails, domain.DMail{Name: fmt.Sprintf("dm-%d", n)})
 			exp.midMatchedMu.Unlock()
 		}(i)
