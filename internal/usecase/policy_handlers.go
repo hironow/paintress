@@ -30,18 +30,25 @@ func registerExpeditionPolicies(engine *PolicyEngine, logger domain.Logger, noti
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Inbox arrival is a high-frequency event; expedition.completed
+	// provides the user-facing summary notification.
 	engine.Register(domain.EventInboxReceived, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: inbox received (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "inbox.received", "handled")
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// Gradient changes are internal optimization decisions; no user action needed.
 	engine.Register(domain.EventGradientChanged, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: gradient changed (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "gradient.changed", "handled")
 		return nil
 	})
 
+	// POLICY CONTRACT: observation-only — debug log + metrics.
+	// D-Mail staging is an intermediate step before phonewave delivery.
 	engine.Register(domain.EventDMailStaged, func(ctx context.Context, event domain.Event) error {
 		logger.Debug("policy: dmail staged (type=%s)", event.Type)
 		metrics.RecordPolicyEvent(ctx, "dmail.staged", "handled")
