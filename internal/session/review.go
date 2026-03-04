@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const maxReviewGateCycles = 3
@@ -68,4 +71,215 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		Passed: true,
 		Output: output,
 	}, nil
+}
+
+func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.ExpeditionReport, budget time.Duration, workDir string) {
+	ctx, loopSpan := platform.Tracer.Start(ctx, "review.loop",
+		trace.WithAttributes(
+			attribute.String("pr_url", report.PRUrl),
+			attribute.String("branch", report.Branch),
+		),
+	)
+	defer loopSpan.End()
+
+	reviewDir := workDir
+	if reviewDir == "" {
+		reviewDir = p.config.Continent
+	}
+
+	var consumed time.Duration
+
+	reviewTimeout := max(
+		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewGateCycles),
+		minReviewTimeout,
+	)
+	var lastComments string
+	for cycle := 1; cycle <= maxReviewGateCycles; cycle++ {
+		if ctx.Err() != nil {
+			if lastComments != "" {
+				if report.Insight != "" {
+					report.Insight += " | "
+				}
+				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
+			}
+			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), ctx.Err()))
+			return
+		}
+
+		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("review_running"), cycle, maxReviewGateCycles))
+
+		_, revSpan := platform.Tracer.Start(ctx, "review.command", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+			trace.WithAttributes(attribute.Int("cycle", cycle)),
+		)
+		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
+		expandedCmd := domain.ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
+		result, err := RunReview(reviewCtx, expandedCmd, reviewDir)
+		reviewCancel()
+		if err != nil {
+			revSpan.End()
+			if lastComments != "" {
+				if report.Insight != "" {
+					report.Insight += " | "
+				}
+				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
+			}
+			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), err))
+			return
+		}
+
+		revSpan.SetAttributes(attribute.Bool("passed", result.Passed))
+		revSpan.End()
+
+		if result.Passed {
+			p.Logger.OK("%s", domain.Msg("review_passed"))
+			return
+		}
+
+		lastComments = result.Comments
+		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_comments"), cycle))
+
+		branch := strings.TrimSpace(report.Branch)
+		if branch == "" || strings.EqualFold(branch, "none") {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Reviewfix skipped: no valid branch"
+			return
+		}
+
+		gitCtx, gitCancel := context.WithTimeout(ctx, gitCmdTimeout)
+		gitCmd := exec.CommandContext(gitCtx, "git", "checkout", branch)
+		gitCmd.Dir = reviewDir
+		err = gitCmd.Run()
+		gitCancel()
+		if err != nil {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += fmt.Sprintf("Reviewfix skipped: checkout %s failed: %v", branch, err)
+			return
+		}
+
+		remaining := budget - consumed
+		if remaining <= 0 {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
+			p.Logger.Warn("%s", domain.Msg("review_limit"))
+			return
+		}
+
+		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
+
+		prompt := domain.BuildReviewFixPrompt(branch, result.Comments)
+
+		claudeCmd := p.config.ClaudeCmd
+		if claudeCmd == "" {
+			claudeCmd = domain.DefaultClaudeCmd
+		}
+
+		model := p.reserve.ActiveModel()
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 777 [permanent]
+			trace.WithAttributes(
+				attribute.Int("cycle", cycle),
+				attribute.String("model", model),
+			),
+		)
+
+		cmd := exec.CommandContext(fixCtx, claudeCmd,
+			"--model", model,
+			"--continue",
+			"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
+			"--dangerously-skip-permissions",
+			"--print",
+			"-p", prompt,
+		)
+		cmd.Dir = reviewDir
+		cmd.WaitDelay = 3 * time.Second
+
+		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("reviewfix_running"), model))
+		start := time.Now()
+		out, err := cmd.CombinedOutput()
+		consumed += time.Since(start)
+		fixSpan.End()
+		fixCancel()
+
+		if err != nil {
+			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("reviewfix_error"), err))
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(string(out))
+			return
+		}
+	}
+
+	if report.Insight != "" {
+		report.Insight += " | "
+	}
+	report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
+	p.Logger.Warn("%s", domain.Msg("review_limit"))
+}
+
+func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration) {
+	if len(dmails) == 0 {
+		return
+	}
+	if ctx.Err() != nil {
+		return
+	}
+	if remaining <= 0 {
+		p.Logger.Warn("Follow-up skipped: no remaining time budget")
+		return
+	}
+
+	prompt := domain.BuildFollowUpPrompt(dmails)
+	claudeCmd := p.config.ClaudeCmd
+	if claudeCmd == "" {
+		claudeCmd = domain.DefaultClaudeCmd
+	}
+
+	model := p.reserve.ActiveModel()
+	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
+		trace.WithAttributes(
+			attribute.String("model", model),
+			attribute.Int("matched_dmails", len(dmails)),
+		),
+	)
+	defer followUpSpan.End()
+
+	p.Logger.Info("Follow-up: delivering %d matched D-Mail(s) via --continue", len(dmails))
+
+	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	if remaining < timeout {
+		timeout = remaining
+	}
+	followCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(followCtx, claudeCmd,
+		"--model", model,
+		"--continue",
+		"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
+		"--dangerously-skip-permissions",
+		"--print",
+		"-p", prompt,
+	)
+	if workDir != "" {
+		cmd.Dir = workDir
+	} else {
+		cmd.Dir = p.config.Continent
+	}
+	cmd.WaitDelay = 3 * time.Second
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		p.Logger.Warn("Follow-up failed: %v", err)
+		followUpSpan.AddEvent("followup.error",
+			trace.WithAttributes(attribute.String("error", err.Error())),
+		)
+		return
+	}
+	p.Logger.OK("Follow-up completed (%d bytes output)", len(out))
 }
