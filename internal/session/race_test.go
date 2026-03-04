@@ -128,7 +128,7 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Access fields that are protected by mutex
-			ds.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock
+			ds.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 			_ = ds.running
 			ds.mu.Unlock()
 		}()

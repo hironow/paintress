@@ -122,7 +122,7 @@ func setupGitContainer(t *testing.T, ctx context.Context) testcontainers.Contain
 		Started: true,
 	}
 
-	ctr, err := testcontainers.GenericContainer(ctx, req) // nosemgrep: adr0007-testcontainers-generic-without-terminate -- CleanupContainer handles Terminate
+	ctr, err := testcontainers.GenericContainer(ctx, req) // nosemgrep: adr0007-testcontainers-generic-without-terminate -- CleanupContainer handles Terminate [permanent]
 	testcontainers.CleanupContainer(t, ctr)
 	if err != nil {
 		t.Fatalf("failed to start git container: %v", err)

@@ -166,7 +166,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	default:
 		promptOut := errOut
 		if promptOut == io.Discard || promptOut == dataOut {
-			promptOut = os.Stderr // nosemgrep: adr0002-no-os-stderr-in-internal — fallback for quiet-mode + interactive approval; cmd layer cannot predict this condition
+			promptOut = os.Stderr // nosemgrep: adr0002-no-os-stderr-in-internal — fallback for quiet-mode + interactive approval; cmd layer cannot predict this condition [permanent]
 		}
 		approver = NewStdinApprover(stdinIn, promptOut)
 	}
@@ -395,7 +395,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		_ = p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: exp, Worker: workerID, Model: model,
 		})
-		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition", // nosemgrep: adr0003-otel-span-without-defer-end — expSpan.End() called after expedition loop body
+		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition", // nosemgrep: adr0003-otel-span-without-defer-end — expSpan.End() called after expedition loop body [permanent]
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
 				attribute.Int("worker.id", workerID),
@@ -405,13 +405,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		var workDir string
 		if p.pool != nil {
-			_, acqSpan := platform.Tracer.Start(expCtx, "worktree.acquire") // nosemgrep: adr0003-otel-span-without-defer-end — acqSpan.End() called immediately after Acquire()
+			_, acqSpan := platform.Tracer.Start(expCtx, "worktree.acquire") // nosemgrep: adr0003-otel-span-without-defer-end — acqSpan.End() called immediately after Acquire() [permanent]
 			workDir = p.pool.Acquire()
 			acqSpan.End()
 		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
-				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release()
+				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release() [permanent]
 				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
@@ -569,7 +569,7 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 // status (complete/success/skipped/failed/parse-error), and updates counters.
 // Returns errComplete when all issues are done; nil otherwise.
 func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output string, expStart time.Time) error {
-	_, parseSpan := platform.Tracer.Start(expCtx, "report.parse") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called immediately after ParseReport
+	_, parseSpan := platform.Tracer.Start(expCtx, "report.parse") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called immediately after ParseReport [permanent]
 	report, status := domain.ParseReport(output, exp)
 	parseSpan.End()
 
@@ -721,7 +721,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("review_running"), cycle, maxReviewGateCycles))
 
-		_, revSpan := platform.Tracer.Start(ctx, "review.command", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch
+		_, revSpan := platform.Tracer.Start(ctx, "review.command", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
@@ -793,7 +793,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 		}
 
 		model := p.reserve.ActiveModel()
-		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 777
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 777 [permanent]
 			trace.WithAttributes(
 				attribute.Int("cycle", cycle),
 				attribute.String("model", model),

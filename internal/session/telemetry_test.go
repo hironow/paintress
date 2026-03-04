@@ -40,7 +40,7 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	_, span := platform.Tracer.Start(context.Background(), "flushed-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended
+	_, span := platform.Tracer.Start(context.Background(), "flushed-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended [permanent]
 	span.End()
 
 	spans := exp.GetSpans()
