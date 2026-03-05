@@ -45,6 +45,9 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 		path, err := exec.LookPath(cmd.name)
 		if err != nil {
+			if cmd.required {
+				check.Hint = fmt.Sprintf("install %s and ensure it is in PATH", cmd.name)
+			}
 			checks = append(checks, check)
 			continue
 		}
@@ -115,6 +118,7 @@ func checkContinent(continent string) domain.DoctorCheck {
 	info, err := os.Stat(expeditionDir)
 	if err != nil || !info.IsDir() {
 		check.Version = ".expedition/ not found"
+		check.Hint = `run "paintress init <repo-path>" to set up expedition`
 		return check
 	}
 
@@ -129,6 +133,7 @@ func checkContinent(continent string) domain.DoctorCheck {
 
 	if len(missing) > 0 {
 		check.Version = "missing: " + strings.Join(missing, ", ")
+		check.Hint = `run "paintress init <repo-path>" to recreate the expedition structure`
 		return check
 	}
 
@@ -152,6 +157,7 @@ func checkGitRepo(continent string) domain.DoctorCheck {
 	cancel()
 	if err != nil {
 		check.Version = "not a git repository"
+		check.Hint = `run "git init" or navigate to a git repository`
 		return check
 	}
 
@@ -174,6 +180,7 @@ func checkWritability(continent string) domain.DoctorCheck {
 	probe := filepath.Join(expeditionDir, ".doctor-probe")
 	if err := os.WriteFile(probe, []byte("probe"), 0644); err != nil {
 		check.Version = "not writable: " + err.Error()
+		check.Hint = "check file permissions on the .expedition/ directory"
 		return check
 	}
 	os.Remove(probe)
@@ -195,12 +202,14 @@ func checkConfig(continent string) domain.DoctorCheck {
 	configPath := domain.ProjectConfigPath(continent)
 	if _, err := os.Stat(configPath); err != nil {
 		check.Version = "config.yaml not found"
+		check.Hint = `run "paintress init <repo-path>" to create config`
 		return check
 	}
 
 	cfg, err := LoadProjectConfig(continent)
 	if err != nil {
 		check.Version = "load error: " + err.Error()
+		check.Hint = "check YAML syntax in .expedition/config.yaml"
 		return check
 	}
 
@@ -227,6 +236,7 @@ func checkSkills(continent string) domain.DoctorCheck {
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
 		check.Version = "skills/ not found"
+		check.Hint = `run "paintress init <repo-path>" to set up skills`
 		return check
 	}
 
@@ -248,11 +258,13 @@ func checkSkills(continent string) domain.DoctorCheck {
 
 	if found == 0 {
 		check.Version = "no SKILL.md files found"
+		check.Hint = `run "paintress init <repo-path>" to create skill files`
 		return check
 	}
 
 	if valid < found {
 		check.Version = fmt.Sprintf("%d/%d skills missing dmail-schema-version", found-valid, found)
+		check.Hint = `add "dmail-schema-version" to SKILL.md metadata`
 		return check
 	}
 
@@ -275,6 +287,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
 		check.Version = "events/ not found"
+		check.Hint = `run "paintress init <repo-path>" to create events directory`
 		return check
 	}
 
@@ -286,6 +299,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		f, err := os.Open(filepath.Join(eventsDir, entry.Name()))
 		if err != nil {
 			check.Version = "read error: " + err.Error()
+			check.Hint = "check file permissions on .expedition/events/"
 			return check
 		}
 		scanner := bufio.NewScanner(f)
@@ -297,6 +311,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 			if !json.Valid([]byte(line)) {
 				f.Close()
 				check.Version = fmt.Sprintf("corrupt JSON in %s", entry.Name())
+				check.Hint = "check event files for corruption in .expedition/events/"
 				return check
 			}
 			lines++
@@ -304,6 +319,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		f.Close()
 		if err := scanner.Err(); err != nil {
 			check.Version = "scan error: " + err.Error()
+			check.Hint = "check file permissions on .expedition/events/"
 			return check
 		}
 		files++
@@ -330,6 +346,7 @@ func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	}
 	if mcpErr != nil {
 		check.Version = "not authenticated: " + mcpErr.Error()
+		check.Hint = `run "claude login" to authenticate`
 		return check
 	}
 	check.OK = true
@@ -360,5 +377,6 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 		}
 	}
 	check.Version = "Linear MCP not found or not connected"
+	check.Hint = `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`
 	return check
 }

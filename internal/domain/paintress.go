@@ -65,6 +65,7 @@ type DoctorCheck struct {
 	Path     string `json:"path"`
 	Version  string `json:"version"`
 	OK       bool   `json:"ok"`
+	Hint     string `json:"hint,omitempty"`
 }
 
 // FormatDoctorJSON returns the checks as a JSON array string.

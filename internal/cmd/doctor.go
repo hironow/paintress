@@ -93,6 +93,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				allOK = false
 			}
 			fmt.Fprintf(w, "  %s  %-12s %s\n", marker, c.Name, label)
+			if c.Hint != "" {
+				fmt.Fprintf(w, "         %-12s hint: %s\n", "", c.Hint)
+			}
 		}
 	}
 
