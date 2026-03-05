@@ -9,7 +9,7 @@ import (
 )
 
 // NewEventStore creates an event store for the given state directory.
-// eventsource is the interface-adapter layer for event persistence (clean-architecture).
+// eventsource is the event persistence adapter (AWS Event Sourcing pattern).
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
 func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return eventsource.NewFileEventStore(filepath.Join(stateDir, "events"), logger)
