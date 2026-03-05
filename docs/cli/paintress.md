@@ -21,7 +21,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 * [paintress clean](paintress_clean.md)	 - Remove state directory (.expedition/)
 * [paintress doctor](paintress_doctor.md)	 - Check external command availability
 * [paintress init](paintress_init.md)	 - Initialize project configuration
-* [paintress issues](paintress_issues.md)	 - List Linear issues
+* [paintress issues](paintress_issues.md)	 - List Linear issues via Claude MCP
 * [paintress rebuild](paintress_rebuild.md)	 - Rebuild projections from event store
 * [paintress run](paintress_run.md)	 - Run the expedition loop
 * [paintress status](paintress_status.md)	 - Show paintress operational status
