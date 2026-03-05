@@ -21,7 +21,7 @@ func Status(baseDir string, logger domain.Logger) domain.StatusReport {
 	report.ArchiveCount = countDirFiles(domain.ArchiveDir(baseDir))
 
 	// Load all events for expedition stats
-	stateDir := filepath.Join(baseDir, ".expedition")
+	stateDir := filepath.Join(baseDir, domain.StateDir)
 	store := NewEventStore(stateDir, logger)
 	allEvents, err := store.LoadAll()
 	if err != nil || len(allEvents) == 0 {

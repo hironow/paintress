@@ -23,7 +23,7 @@ func newRebuildCommand() *cobra.Command {
 			}
 
 			logger := loggerFrom(cmd)
-			stateDir := filepath.Join(repoRoot, ".expedition")
+			stateDir := filepath.Join(repoRoot, domain.StateDir)
 			eventStore := session.NewEventStore(stateDir, logger)
 			projector := session.NewProjectionApplier()
 			if err := usecase.Rebuild(domain.RebuildCommand{RepoPath: repoRoot}, eventStore, projector, logger); err != nil {

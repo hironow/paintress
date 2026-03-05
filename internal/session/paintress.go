@@ -90,7 +90,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	if emitter == nil {
 		emitter = &port.NopExpeditionEventEmitter{}
 	}
-	logDir := filepath.Join(cfg.Continent, ".expedition", ".run", "logs")
+	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
 	// Reserve Party: parse model string for reserves
@@ -698,8 +698,8 @@ func reconcileFlags(continent string, workers int) domain.ExpeditionFlag {
 	if workers == 0 {
 		return flags[0]
 	}
-	pattern := filepath.Join(continent, ".expedition", ".run", "worktrees", "*",
-		".expedition", ".run", "flag.md")
+	pattern := filepath.Join(continent, domain.StateDir, ".run", "worktrees", "*",
+		domain.StateDir, ".run", "flag.md")
 	matches, _ := filepath.Glob(pattern)
 	for _, match := range matches {
 		base := filepath.Dir(filepath.Dir(filepath.Dir(match)))

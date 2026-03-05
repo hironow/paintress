@@ -12,7 +12,7 @@ import (
 // watchFlag watches flag.md for current_issue changes using filesystem
 // notifications and invokes onIssueChange when a new issue is detected.
 func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, title string), ready chan<- struct{}) {
-	runDir := filepath.Join(continent, ".expedition", ".run")
+	runDir := filepath.Join(continent, domain.StateDir, ".run")
 
 	if _, err := os.Stat(runDir); err != nil {
 		return

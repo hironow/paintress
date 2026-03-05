@@ -6,6 +6,9 @@ import (
 	"fmt"
 )
 
+// StateDir is the name of the paintress state directory.
+const StateDir = ".expedition"
+
 // RunSummary holds the results of a paintress loop run.
 type RunSummary struct {
 	Total           int64  `json:"total"`

@@ -63,7 +63,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	}
 	days, _ := cmd.Flags().GetInt("days")
 	outputFmt, _ := cmd.Flags().GetString("output")
-	stateDir := filepath.Join(repoPath, ".expedition")
+	stateDir := filepath.Join(repoPath, domain.StateDir)
 	archiveOps := session.NewArchiveOps()
 
 	// Collect archive candidates (dry-run to list only).

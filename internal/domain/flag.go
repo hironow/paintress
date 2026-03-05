@@ -15,7 +15,7 @@ type ExpeditionFlag struct {
 }
 
 func FlagPath(continent string) string {
-	return filepath.Join(continent, ".expedition", ".run", "flag.md")
+	return filepath.Join(continent, StateDir, ".run", "flag.md")
 }
 
 // BestFlag returns the flag with the highest LastExpedition number.

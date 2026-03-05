@@ -53,7 +53,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	var metrics *domain.DoctorMetrics
 	if len(args) > 0 {
-		stateDir := filepath.Join(args[0], ".expedition")
+		stateDir := filepath.Join(args[0], domain.StateDir)
 		eventStore := session.NewEventStore(stateDir, loggerFrom(cmd))
 		metrics = usecase.ComputeSuccessRate(eventStore)
 	}

@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -47,7 +48,7 @@ func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string,
 		git:        git,
 		baseBranch: baseBranch,
 		repoDir:    repoDir,
-		poolDir:    filepath.Join(repoDir, ".expedition", ".run", "worktrees"),
+		poolDir:    filepath.Join(repoDir, domain.StateDir, ".run", "worktrees"),
 		setupCmd:   setupCmd,
 		workers:    make(chan string, size),
 		size:       size,
@@ -100,7 +101,7 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	if _, err := wp.git.Git(ctx, path, "reset", "--hard", wp.baseBranch); err != nil {
 		return fmt.Errorf("reset: %w", err)
 	}
-	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", ".expedition"); err != nil {
+	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", domain.StateDir); err != nil {
 		return fmt.Errorf("clean: %w", err)
 	}
 	wp.workers <- path

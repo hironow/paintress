@@ -218,7 +218,7 @@ func (s *SQLiteOutboxStore) Close() error {
 // paths derived from the continent directory: DB at .expedition/.run/outbox.db,
 // targets at .expedition/archive/ and .expedition/outbox/.
 func NewOutboxStoreForDir(continent string) (*SQLiteOutboxStore, error) {
-	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
+	dbPath := filepath.Join(continent, domain.StateDir, ".run", "outbox.db")
 	archiveDir := domain.ArchiveDir(continent)
 	outboxDir := domain.OutboxDir(continent)
 	return NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
@@ -227,7 +227,7 @@ func NewOutboxStoreForDir(continent string) (*SQLiteOutboxStore, error) {
 // PruneFlushedOutbox opens the outbox DB, deletes flushed rows, runs
 // incremental vacuum, and closes the store. Returns 0 if the DB does not exist.
 func PruneFlushedOutbox(continent string) (int, error) {
-	dbPath := filepath.Join(continent, ".expedition", ".run", "outbox.db")
+	dbPath := filepath.Join(continent, domain.StateDir, ".run", "outbox.db")
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		return 0, nil
 	}

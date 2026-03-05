@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +20,7 @@ func newCleanCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			stateDir := filepath.Join(repoPath, ".expedition")
+			stateDir := filepath.Join(repoPath, domain.StateDir)
 
 			info, err := os.Stat(stateDir)
 			if err != nil || !info.IsDir() {

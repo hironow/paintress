@@ -114,10 +114,10 @@ func checkContinent(continent string) domain.DoctorCheck {
 		Required: false,
 	}
 
-	expeditionDir := filepath.Join(continent, ".expedition")
+	expeditionDir := filepath.Join(continent, domain.StateDir)
 	info, err := os.Stat(expeditionDir)
 	if err != nil || !info.IsDir() {
-		check.Version = ".expedition/ not found"
+		check.Version = domain.StateDir + "/ not found"
 		check.Hint = `run "paintress init <repo-path>" to set up expedition`
 		return check
 	}
@@ -176,7 +176,7 @@ func checkWritability(continent string) domain.DoctorCheck {
 		Required: false,
 	}
 
-	expeditionDir := filepath.Join(continent, ".expedition")
+	expeditionDir := filepath.Join(continent, domain.StateDir)
 	probe := filepath.Join(expeditionDir, ".doctor-probe")
 	if err := os.WriteFile(probe, []byte("probe"), 0644); err != nil {
 		check.Version = "not writable: " + err.Error()
@@ -232,7 +232,7 @@ func checkSkills(continent string) domain.DoctorCheck {
 		Required: false,
 	}
 
-	skillsDir := filepath.Join(continent, ".expedition", "skills")
+	skillsDir := filepath.Join(continent, domain.StateDir, "skills")
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
 		check.Version = "skills/ not found"
@@ -283,7 +283,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		Required: false,
 	}
 
-	eventsDir := filepath.Join(continent, ".expedition", "events")
+	eventsDir := filepath.Join(continent, domain.StateDir, "events")
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
 		check.Version = "events/ not found"

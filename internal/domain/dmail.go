@@ -81,17 +81,17 @@ func BuildFollowUpPrompt(dmails []DMail) string {
 
 // InboxDir returns the path to the d-mail inbox directory.
 func InboxDir(continent string) string {
-	return filepath.Join(continent, ".expedition", "inbox")
+	return filepath.Join(continent, StateDir, "inbox")
 }
 
 // OutboxDir returns the path to the d-mail outbox directory.
 func OutboxDir(continent string) string {
-	return filepath.Join(continent, ".expedition", "outbox")
+	return filepath.Join(continent, StateDir, "outbox")
 }
 
 // ArchiveDir returns the path to the d-mail archive directory.
 func ArchiveDir(continent string) string {
-	return filepath.Join(continent, ".expedition", "archive")
+	return filepath.Join(continent, StateDir, "archive")
 }
 
 // DMailSchemaVersion is the current D-Mail protocol schema version.

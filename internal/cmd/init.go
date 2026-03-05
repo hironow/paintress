@@ -56,7 +56,7 @@ flags for interactive prompts. This must be run once before
 				if otelErr != nil {
 					return otelErr
 				}
-				stateDir := filepath.Join(repoPath, ".expedition")
+				stateDir := filepath.Join(repoPath, domain.StateDir)
 				otelPath := filepath.Join(stateDir, ".otel.env")
 				if err := os.WriteFile(otelPath, []byte(content), 0o644); err != nil {
 					return fmt.Errorf("write .otel.env: %w", err)

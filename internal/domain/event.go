@@ -78,7 +78,7 @@ func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error)
 
 // EventsDir returns the path to the events directory under .expedition/.
 func EventsDir(continent string) string {
-	return filepath.Join(continent, ".expedition", "events")
+	return filepath.Join(continent, StateDir, "events")
 }
 
 // --- Event payload types ---

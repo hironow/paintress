@@ -3,7 +3,7 @@ package domain
 import "path/filepath"
 
 func JournalDir(continent string) string {
-	return filepath.Join(continent, ".expedition", "journal")
+	return filepath.Join(continent, StateDir, "journal")
 }
 
 // JournalEntry is a structured journal record.
