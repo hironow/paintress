@@ -507,3 +507,21 @@ rules:
     message: |
       domain 層で embed / text/template の import は禁止です。
       template 責務は platform 層に配置してください。
+
+  # --- Rule 22: No state dir literal in filepath.Join ---
+
+  - id: no-state-dir-literal-in-path-join
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: filepath.Join($X, ".expedition")
+      - pattern: filepath.Join($X, ".expedition", ...)
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/domain/**"
+    message: |
+      filepath.Join での state dir literal ".expedition" 直書きは禁止です。
+      domain.StateDir 定数を使用してください。
