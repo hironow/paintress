@@ -2,25 +2,15 @@ package usecase
 
 import (
 	"encoding/json"
-	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// RunDoctor checks all required external commands and returns the results.
-// claudeCmd is the configured Claude CLI command name (e.g. "claude", "cc-p").
-// continent is the optional .expedition/ root directory.
-func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
-	return session.RunDoctor(claudeCmd, continent)
-}
-
-// ComputeSuccessRate loads all events from the event store and computes
-// success rate metrics. Returns nil metrics when no events exist or loading fails.
-func ComputeSuccessRate(repoPath string) *domain.DoctorMetrics {
-	stateDir := filepath.Join(repoPath, ".expedition")
-	store := session.NewEventStore(stateDir)
-	events, err := store.LoadAll()
+// ComputeSuccessRate loads all events and computes success rate metrics.
+// Returns nil metrics when no events exist or loading fails.
+func ComputeSuccessRate(eventStore port.EventStore) *domain.DoctorMetrics {
+	events, err := eventStore.LoadAll()
 	if err != nil || len(events) == 0 {
 		return &domain.DoctorMetrics{SuccessRate: "no events"}
 	}

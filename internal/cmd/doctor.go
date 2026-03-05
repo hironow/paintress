@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +41,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		continent = args[0]
 	}
-	checks := usecase.RunDoctor(claudeCmd, continent)
+	checks := session.RunDoctor(claudeCmd, continent)
 
 	allRequired := true
 	for _, c := range checks {
@@ -51,7 +53,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	var metrics *domain.DoctorMetrics
 	if len(args) > 0 {
-		metrics = usecase.ComputeSuccessRate(args[0])
+		stateDir := filepath.Join(args[0], ".expedition")
+		eventStore := session.NewEventStore(stateDir, loggerFrom(cmd))
+		metrics = usecase.ComputeSuccessRate(eventStore)
 	}
 
 	if outputFmt == "json" {

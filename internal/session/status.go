@@ -9,7 +9,7 @@ import (
 
 // Status collects current operational status from the event store and filesystem.
 // baseDir is the repository root (the "continent" containing .expedition/).
-func Status(baseDir string) domain.StatusReport {
+func Status(baseDir string, logger domain.Logger) domain.StatusReport {
 	report := domain.StatusReport{
 		Continent: baseDir,
 	}
@@ -22,7 +22,7 @@ func Status(baseDir string) domain.StatusReport {
 
 	// Load all events for expedition stats
 	stateDir := filepath.Join(baseDir, ".expedition")
-	store := NewEventStore(stateDir)
+	store := NewEventStore(stateDir, logger)
 	allEvents, err := store.LoadAll()
 	if err != nil || len(allEvents) == 0 {
 		return report

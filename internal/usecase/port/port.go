@@ -77,3 +77,28 @@ type OutboxStore interface {
 	Flush() (int, error)
 	Close() error
 }
+
+// ArchiveOps handles archive pruning operations.
+type ArchiveOps interface {
+	ArchivePrune(repoPath string, days int, execute bool) (domain.PruneResult, error)
+	ListExpiredEventFiles(stateDir string, days int) ([]string, error)
+	PruneEventFiles(stateDir string, files []string) ([]string, error)
+	PruneFlushedOutbox(repoPath string) (int, error)
+}
+
+// ExpeditionRunner wraps the session-layer expedition orchestrator.
+type ExpeditionRunner interface {
+	SetDispatcher(dispatcher EventDispatcher)
+	Run(ctx context.Context) int
+}
+
+// ProjectOps handles project configuration and issue fetching.
+type ProjectOps interface {
+	LoadProjectConfig(absPath string) (*domain.ProjectConfig, error)
+	FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir string) ([]domain.Issue, error)
+}
+
+// DoctorOps runs diagnostic checks.
+type DoctorOps interface {
+	RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck
+}

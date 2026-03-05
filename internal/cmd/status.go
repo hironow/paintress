@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hironow/paintress/internal/usecase"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +33,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return err
 			}
 
-			report := usecase.GetStatus(baseDir)
+			report := session.Status(baseDir, loggerFrom(cmd))
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {

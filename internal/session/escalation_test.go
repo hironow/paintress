@@ -146,7 +146,7 @@ func TestHandleEscalation_SucceedsWithWorkingStore(t *testing.T) {
 	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
 		t.Fatalf("mkdir events: %v", err)
 	}
-	evStore := NewEventStore(eventsDir)
+	evStore := NewEventStore(eventsDir, &domain.NopLogger{})
 	p := &Paintress{
 		config:     domain.Config{Continent: continent},
 		Logger:     platform.NewLogger(nil, false),

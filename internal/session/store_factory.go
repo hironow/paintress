@@ -3,14 +3,15 @@ package session
 import (
 	"path/filepath"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/eventsource"
-	"github.com/hironow/paintress/internal/port"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // NewEventStore creates an event store for the given state directory.
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
-func NewEventStore(stateDir string) port.EventStore {
-	return eventsource.NewFileEventStore(filepath.Join(stateDir, "events"))
+func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
+	return eventsource.NewFileEventStore(filepath.Join(stateDir, "events"), logger)
 }
 
 // ListExpiredEventFiles returns .jsonl files older than the given days.

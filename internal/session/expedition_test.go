@@ -471,7 +471,7 @@ func TestNewPaintress_BasicConfig(t *testing.T) {
 		DevURL:         "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, domain.NewExpeditionAggregate())
 	if p.gradient == nil {
 		t.Error("gradient should be initialized")
 	}
@@ -495,7 +495,7 @@ func TestNewPaintress_MultiModelConfig(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, domain.NewExpeditionAggregate())
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -516,7 +516,7 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 		DevURL:    "http://localhost:3000",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, domain.NewExpeditionAggregate())
 	if p.reserve.ActiveModel() != "opus" {
 		t.Errorf("primary should be opus, got %q", p.reserve.ActiveModel())
 	}
@@ -1628,7 +1628,7 @@ func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 		NoDev:     true,
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, domain.NewExpeditionAggregate())
 
 	if p.devServer != nil {
 		t.Error("devServer should be nil when NoDev=true")

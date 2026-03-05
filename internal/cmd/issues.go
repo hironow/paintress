@@ -7,6 +7,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -59,7 +60,8 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	issues, err := usecase.FetchIssues(cmd.Context(), absPath, platform.DefaultClaudeCmd, stateFilter)
+	projectOps := session.NewProjectOps()
+	issues, err := usecase.FetchIssues(cmd.Context(), absPath, platform.DefaultClaudeCmd, stateFilter, projectOps)
 	if err != nil {
 		return err
 	}

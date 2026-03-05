@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// FetchIssues loads project config and fetches Linear issues via Claude MCP.
-func FetchIssues(ctx context.Context, absPath, claudeCmd string, stateFilter []string) ([]domain.Issue, error) {
-	cfg, err := session.LoadProjectConfig(absPath)
+// FetchIssues loads project config and fetches Linear issues via the project ops interface.
+func FetchIssues(ctx context.Context, absPath, claudeCmd string, stateFilter []string, ops port.ProjectOps) ([]domain.Issue, error) {
+	cfg, err := ops.LoadProjectConfig(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -25,7 +25,7 @@ func FetchIssues(ctx context.Context, absPath, claudeCmd string, stateFilter []s
 		return nil, fmt.Errorf("create work dir: %w", err)
 	}
 
-	issues, err := session.FetchIssuesViaMCP(ctx, claudeCmd, cfg.Tracker.Team, cfg.Tracker.Project, workDir)
+	issues, err := ops.FetchIssuesViaMCP(ctx, claudeCmd, cfg.Tracker.Team, cfg.Tracker.Project, workDir)
 	if err != nil {
 		return nil, err
 	}

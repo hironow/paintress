@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress/internal/port"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 func TestLocalNotifier_Darwin_CommandShape(t *testing.T) {

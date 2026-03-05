@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/platform"
-	"github.com/hironow/paintress/internal/port"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )

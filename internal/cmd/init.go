@@ -7,7 +7,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
-	"github.com/hironow/paintress/internal/usecase"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -36,11 +36,15 @@ flags for interactive prompts. This must be run once before
 
 			team, _ := cmd.Flags().GetString("team")
 			project, _ := cmd.Flags().GetString("project")
-			if err := usecase.InitProject(domain.InitCommand{
+			initCmd := domain.InitCommand{
 				RepoPath: repoPath,
 				Team:     team,
 				Project:  project,
-			}, cmd.ErrOrStderr()); err != nil {
+			}
+			if errs := initCmd.Validate(); len(errs) > 0 {
+				return fmt.Errorf("command validation: %w", errs[0])
+			}
+			if err := session.InitProject(repoPath, team, project, cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 

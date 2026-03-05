@@ -12,7 +12,7 @@ import (
 func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := NewFileEventStore(dir)
+	store := NewFileEventStore(dir, &domain.NopLogger{})
 	now := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
 	ev, err := domain.NewEvent(domain.EventExpeditionStarted,
 		domain.ExpeditionStartedData{Expedition: 1, Worker: 0, Model: "opus"}, now)
@@ -41,7 +41,7 @@ func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
 func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 	// given: directory does not exist
 	dir := filepath.Join(t.TempDir(), "nonexistent")
-	store := NewFileEventStore(dir)
+	store := NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
 	events, err := store.LoadAll()
@@ -58,7 +58,7 @@ func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 func TestFileEventStore_DailyRotation(t *testing.T) {
 	// given: events on two different days
 	dir := t.TempDir()
-	store := NewFileEventStore(dir)
+	store := NewFileEventStore(dir, &domain.NopLogger{})
 	day1 := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
 	day2 := time.Date(2026, 2, 28, 10, 0, 0, 0, time.UTC)
 
@@ -100,7 +100,7 @@ func TestFileEventStore_DailyRotation(t *testing.T) {
 func TestFileEventStore_LoadSince(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := NewFileEventStore(dir)
+	store := NewFileEventStore(dir, &domain.NopLogger{})
 	t1 := time.Date(2026, 2, 27, 10, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 2, 27, 11, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
@@ -132,7 +132,7 @@ func TestFileEventStore_LoadSince(t *testing.T) {
 func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	// given
 	dir := t.TempDir()
-	store := NewFileEventStore(dir)
+	store := NewFileEventStore(dir, &domain.NopLogger{})
 	invalid := domain.Event{} // all fields empty
 
 	// when
@@ -147,7 +147,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 func TestFileEventStore_StableOrderForSameTimestamp(t *testing.T) {
 	// given: two events with identical timestamps
 	dir := t.TempDir()
-	store := NewFileEventStore(dir)
+	store := NewFileEventStore(dir, &domain.NopLogger{})
 	now := time.Date(2026, 2, 27, 12, 0, 0, 0, time.UTC)
 
 	ev1, _ := domain.NewEvent(domain.EventDMailStaged,

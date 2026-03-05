@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/port"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // registerExpeditionPolicies registers POLICY handlers for expedition events.

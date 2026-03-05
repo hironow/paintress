@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/port"
+	"github.com/hironow/paintress/internal/usecase/port"
 
 	_ "modernc.org/sqlite"
 )

@@ -14,7 +14,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := Status(baseDir)
+	report := Status(baseDir, &domain.NopLogger{})
 
 	// then
 	if report.Expeditions != 0 {
@@ -74,7 +74,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := Status(baseDir)
+	report := Status(baseDir, &domain.NopLogger{})
 
 	// then
 	if report.InboxCount != 2 {
@@ -89,7 +89,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with expedition events
 	baseDir := t.TempDir()
 	stateDir := filepath.Join(baseDir, ".expedition")
-	store := NewEventStore(stateDir)
+	store := NewEventStore(stateDir, &domain.NopLogger{})
 
 	ts := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
@@ -116,7 +116,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 
 	// when
-	report := Status(baseDir)
+	report := Status(baseDir, &domain.NopLogger{})
 
 	// then
 	if report.Expeditions != 4 {

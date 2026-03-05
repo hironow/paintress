@@ -2,11 +2,9 @@ package usecase
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/port"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // Rebuild replays events to regenerate projection state.
@@ -28,24 +26,5 @@ func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain
 	}
 
 	logger.OK("rebuild complete")
-	return nil
-}
-
-// RebuildFromDir constructs event store and projection applier from a repo directory,
-// then replays events to regenerate projections.
-// This is the cmd-facing entry point that eliminates session imports from cmd.
-func RebuildFromDir(cmd domain.RebuildCommand, logger domain.Logger) error {
-	stateDir := filepath.Join(cmd.RepoPath, ".expedition")
-	eventStore := session.NewEventStore(stateDir)
-	projector := session.NewProjectionApplier()
-
-	if err := Rebuild(cmd, eventStore, projector, logger); err != nil {
-		return err
-	}
-
-	state := projector.State()
-	logger.OK("projections: %d expeditions (%d ok, %d failed, %d skipped), gradient=%d",
-		state.TotalExpeditions, state.Succeeded, state.Failed, state.Skipped, state.GradientLevel)
-
 	return nil
 }

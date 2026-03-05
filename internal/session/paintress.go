@@ -14,7 +14,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
-	"github.com/hironow/paintress/internal/port"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -107,7 +107,7 @@ func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound 
 	return nil
 }
 
-func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, eventStore port.EventStore) *Paintress {
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, eventStore port.EventStore, agg *domain.ExpeditionAggregate) *Paintress {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -170,7 +170,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	cfgCopy.MaxRetries = maxRetries
 
 	p := &Paintress{
-		Aggregate:    domain.NewExpeditionAggregate(),
+		Aggregate:    agg,
 		config:       cfgCopy,
 		logDir:       logDir,
 		Logger:       logger,
@@ -196,6 +196,11 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	}
 
 	return p
+}
+
+// SetDispatcher sets the event dispatcher (PolicyEngine) for the session.
+func (p *Paintress) SetDispatcher(d port.EventDispatcher) {
+	p.Dispatcher = d
 }
 
 func (p *Paintress) Run(ctx context.Context) int {

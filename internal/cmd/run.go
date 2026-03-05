@@ -9,6 +9,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -100,7 +101,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if !dryRun {
 		bins = append(bins, claudeCmd)
 	}
-	if err := usecase.PreflightCheck(bins...); err != nil {
+	if err := session.PreflightCheck(bins...); err != nil {
 		return err
 	}
 
@@ -126,9 +127,9 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	logger := loggerFrom(cmd)
 	stateDir := filepath.Join(continent, ".expedition")
-	eventStore := usecase.NewEventStore(stateDir)
+	eventStore := session.NewEventStore(stateDir, logger)
 
-	if err := usecase.ValidateContinent(cfg.Continent); err != nil {
+	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err
 	}
 
@@ -153,9 +154,12 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
+	notifier := session.BuildNotifier(cfg.NotifyCmd)
+	agg := domain.NewExpeditionAggregate()
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), eventStore, agg)
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.RunExpeditionCommand{
 		RepoPath: continent,
-	}, cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), eventStore, &platform.OTelPolicyMetrics{})
+	}, p, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
 		return ucErr
 	}

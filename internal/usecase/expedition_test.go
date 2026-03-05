@@ -2,11 +2,9 @@ package usecase
 
 import (
 	"context"
-	"io"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/platform"
 )
 
 func TestRunExpeditions_InvalidCommand(t *testing.T) {
@@ -14,7 +12,7 @@ func TestRunExpeditions_InvalidCommand(t *testing.T) {
 	cmd := domain.RunExpeditionCommand{}
 
 	// when
-	exitCode, err := RunExpeditions(context.Background(), cmd, domain.Config{}, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	exitCode, err := RunExpeditions(context.Background(), cmd, nil, &domain.NopLogger{}, nil, nil)
 
 	// then
 	if err == nil {
@@ -30,7 +28,7 @@ func TestArchivePrune_InvalidCommand(t *testing.T) {
 	cmd := domain.ArchivePruneCommand{}
 
 	// when
-	_, err := ArchivePrune(cmd)
+	_, err := ArchivePrune(cmd, nil)
 
 	// then
 	if err == nil {
@@ -43,7 +41,7 @@ func TestArchivePrune_InvalidDays(t *testing.T) {
 	cmd := domain.ArchivePruneCommand{RepoPath: "/tmp", Days: 0}
 
 	// when
-	_, err := ArchivePrune(cmd)
+	_, err := ArchivePrune(cmd, nil)
 
 	// then
 	if err == nil {
