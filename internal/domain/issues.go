@@ -7,9 +7,6 @@ import (
 	"strings"
 )
 
-// LinearAPIEndpoint is the default Linear GraphQL API URL.
-const LinearAPIEndpoint = "https://api.linear.app/graphql"
-
 // Issue represents a Linear issue for pipe-composable output.
 type Issue struct {
 	ID       string   `json:"id"`

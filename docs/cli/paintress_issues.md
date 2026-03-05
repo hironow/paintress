@@ -1,13 +1,12 @@
 ## paintress issues
 
-List Linear issues
+List Linear issues via Claude MCP
 
 ### Synopsis
 
-List Linear issues assigned to the configured team and project.
+Query Linear issues via Claude MCP tools for the configured team and project.
 
-Reads the Linear API key from the LINEAR_API_KEY environment variable
-and the team/project from .expedition/config.yaml. Supports filtering
+Reads the team/project from .expedition/config.yaml. Supports filtering
 by issue state (e.g. todo, in-progress). Hyphens in state names are
 converted to spaces automatically.
 

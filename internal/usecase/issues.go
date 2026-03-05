@@ -4,28 +4,28 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 )
 
-// FetchIssues loads project config and fetches Linear issues.
-// This orchestrates session.LoadProjectConfig + session.FetchIssues + filtering.
-func FetchIssues(ctx context.Context, absPath string, stateFilter []string) ([]domain.Issue, error) {
+// FetchIssues loads project config and fetches Linear issues via Claude MCP.
+func FetchIssues(ctx context.Context, absPath, claudeCmd string, stateFilter []string) ([]domain.Issue, error) {
 	cfg, err := session.LoadProjectConfig(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	if cfg.Linear.Team == "" {
+	if cfg.Tracker.Team == "" {
 		return nil, fmt.Errorf("linear.team not set in %s", domain.ProjectConfigPath(absPath))
 	}
 
-	apiKey := os.Getenv("LINEAR_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("LINEAR_API_KEY environment variable is required")
+	workDir := filepath.Join(absPath, ".expedition", ".run")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		return nil, fmt.Errorf("create work dir: %w", err)
 	}
 
-	issues, err := session.FetchIssues(ctx, domain.LinearAPIEndpoint, apiKey, cfg.Linear.Team, cfg.Linear.Project, stateFilter)
+	issues, err := session.FetchIssuesViaMCP(ctx, claudeCmd, cfg.Tracker.Team, cfg.Tracker.Project, workDir)
 	if err != nil {
 		return nil, err
 	}

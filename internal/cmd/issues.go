@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -13,11 +14,10 @@ import (
 func newIssuesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "issues <repo-path>",
-		Short: "List Linear issues",
-		Long: `List Linear issues assigned to the configured team and project.
+		Short: "List Linear issues via Claude MCP",
+		Long: `Query Linear issues via Claude MCP tools for the configured team and project.
 
-Reads the Linear API key from the LINEAR_API_KEY environment variable
-and the team/project from .expedition/config.yaml. Supports filtering
+Reads the team/project from .expedition/config.yaml. Supports filtering
 by issue state (e.g. todo, in-progress). Hyphens in state names are
 converted to spaces automatically.`,
 		Example: `  # List all issues
@@ -59,7 +59,7 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	issues, err := usecase.FetchIssues(cmd.Context(), absPath, stateFilter)
+	issues, err := usecase.FetchIssues(cmd.Context(), absPath, platform.DefaultClaudeCmd, stateFilter)
 	if err != nil {
 		return err
 	}

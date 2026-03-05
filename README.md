@@ -214,7 +214,7 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 | `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
 | `paintress doctor` | Check required external commands (git, claude, gh, docker) |
-| `paintress issues <repo-path>` | List Linear issues (`-o json` for JSON, `-s` to filter by state) |
+| `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
 | `paintress status [repo-path]` | Show paintress operational status |
 | `paintress clean <repo-path>` | Remove state directory (`.expedition/`) |
 | `paintress rebuild [repo-path]` | Rebuild projections from event store |
@@ -423,6 +423,15 @@ Install via Homebrew (`brew install hironow/tap/paintress` includes all binaries
 just build-all       # build all 4 binaries
 just install-all     # install all to /usr/local/bin
 ```
+
+## Documentation
+
+- [docs/](docs/README.md) — Full documentation index
+- [docs/expedition-directory.md](docs/expedition-directory.md) — `.expedition/` directory structure
+- [docs/policies.md](docs/policies.md) — Event → Policy mapping
+- [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/approval-contract.md](docs/approval-contract.md) — Three-way approval contract
+- [docs/adr/](docs/adr/README.md) — Architecture Decision Records
 
 ## Prerequisites
 
