@@ -11,12 +11,15 @@ Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.
 
 ```
-paintress status [repo-path] [flags]
+paintress status [path] [flags]
 ```
 
 ### Examples
 
 ```
+  # Show status for current directory
+  paintress status
+
   # Show status for a specific project
   paintress status /path/to/repo
 
@@ -40,4 +43,5 @@ paintress status [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+

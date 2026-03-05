@@ -27,9 +27,12 @@ paintress init <repo-path> [flags]
 ### Options
 
 ```
-  -h, --help             help for init
-      --project string   Linear project name
-      --team string      Linear team key (e.g. MY)
+  -h, --help                  help for init
+      --otel-backend string   OTel backend: jaeger, weave
+      --otel-entity string    Weave entity/team (required for weave)
+      --otel-project string   Weave project (required for weave)
+      --project string        Linear project name
+      --team string           Linear team key (e.g. MY)
 ```
 
 ### Options inherited from parent commands
@@ -42,4 +45,5 @@ paintress init <repo-path> [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+

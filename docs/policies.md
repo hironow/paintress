@@ -14,10 +14,10 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 | Policy Name | WHEN [EVENT] | THEN [COMMAND] | Side Effects |
 |---|---|---|---|
-| ExpeditionCompletedStageReport | expedition.completed | StageReport | Log (Info) + Desktop notification (5s timeout) |
-| InboxReceivedProcessFeedback | inbox.received | ProcessFeedback | Log (Debug) |
-| GradientChangedTriggerGommage | gradient.changed | TriggerGommage | Log (Debug) |
-| DMailStagedFlushOutbox | dmail.staged | FlushOutbox | Log (Debug) |
+| ExpeditionCompletedStageReport | expedition.completed | StageReport | Log (Info) + Desktop Notify + Metrics |
+| InboxReceivedProcessFeedback | inbox.received | ProcessFeedback | Log (Debug) + Metrics |
+| GradientChangedTriggerGommage | gradient.changed | TriggerGommage | Log (Info) + Desktop Notify + Metrics |
+| DMailStagedFlushOutbox | dmail.staged | FlushOutbox | Log (Info) + Desktop Notify + Metrics |
 
 ## Event Payload Format
 
@@ -35,5 +35,5 @@ No retry, no dead-letter queue, no error propagation to callers.
 
 ## Skeleton Handlers
 
-InboxReceivedProcessFeedback, GradientChangedTriggerGommage,
-and DMailStagedFlushOutbox are logging-only placeholders.
+InboxReceivedProcessFeedback is an observation-only placeholder
+(Debug log + Metrics, no notification).

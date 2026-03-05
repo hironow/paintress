@@ -5,6 +5,7 @@
 | Layer | Directory | Build Tag | Dependencies | CI |
 |-------|-----------|-----------|-------------|-----|
 | Unit | `internal/*/` | none | none | always |
+| Integration | `tests/integration/` | none | W&B API key | always |
 | Scenario | `tests/scenario/` | `scenario` | fake-claude, fake-gh, all 4 tool binaries | CI default (L1+L2) |
 | E2E | `tests/e2e/` | `e2e` | Docker, real services | manual / nightly |
 
@@ -45,7 +46,7 @@ Run: `just test-scenario` (L1+L2) or `just test-scenario-all`
 ## Running Tests
 
 ```bash
-# Unit tests (default CI)
+# Unit + integration tests (default CI)
 just test
 
 # Scenario tests (L1+L2, CI default)

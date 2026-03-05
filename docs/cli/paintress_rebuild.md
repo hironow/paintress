@@ -1,20 +1,19 @@
-## paintress clean
+## paintress rebuild
 
-Remove state directory (.expedition/)
+Rebuild projections from event store
 
 ### Synopsis
 
-Delete the .expedition/ directory to reset to a clean state. Use 'paintress init' to reinitialize.
+Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.
 
 ```
-paintress clean [path] [flags]
+paintress rebuild [repo-path] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for clean
-      --yes    Skip confirmation prompt
+  -h, --help   help for rebuild
 ```
 
 ### Options inherited from parent commands
