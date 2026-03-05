@@ -426,19 +426,12 @@ just install-all     # install all to /usr/local/bin
 
 ## What / Why / How
 
-| Aspect | Description |
-|--------|-------------|
-| **What** | Autonomous loop that sends AI agents to implement Linear issues until the backlog reaches zero |
-| **Why** | Automate the full issue lifecycle: implement, test, PR, review, fix — with no human intervention |
-| **How** | Fetch issue via Claude MCP → Claude Code implements in git branch → review gate → PR → next issue |
-| **Input** | Linear issues via Claude MCP tools, repository source code |
-| **Output** | Git branches, pull requests, D-Mail reports to downstream tools |
-| **Telemetry** | OTel spans: `paintress.run`, `expedition`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
-| **External Systems** | Linear (via Claude MCP), Claude Code subprocess, Git/GitHub, OTel exporter (Jaeger/Weave) |
+See [docs/conformance.md](docs/conformance.md) for the full conformance table (single source).
 
 ## Documentation
 
 - [docs/](docs/README.md) — Full documentation index
+- [docs/conformance.md](docs/conformance.md) — What/Why/How conformance table
 - [docs/expedition-directory.md](docs/expedition-directory.md) — `.expedition/` directory structure
 - [docs/policies.md](docs/policies.md) — Event → Policy mapping
 - [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
