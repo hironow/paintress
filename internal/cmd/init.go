@@ -8,6 +8,7 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -41,10 +42,8 @@ flags for interactive prompts. This must be run once before
 				Team:     team,
 				Project:  project,
 			}
-			if errs := initCmd.Validate(); len(errs) > 0 {
-				return fmt.Errorf("command validation: %w", errs[0])
-			}
-			if err := session.InitProject(repoPath, team, project, cmd.ErrOrStderr()); err != nil {
+			runner := &session.InitAdapter{Stderr: cmd.ErrOrStderr()}
+			if err := usecase.RunInit(initCmd, runner); err != nil {
 				return err
 			}
 
