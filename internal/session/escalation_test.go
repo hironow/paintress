@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
@@ -162,7 +163,7 @@ func TestHandleEscalation_SucceedsWithWorkingStore(t *testing.T) {
 	}
 }
 
-func TestEmitEvent_ReturnsErrorOnAppendFail(t *testing.T) {
+func TestEmit_ReturnsErrorOnAppendFail(t *testing.T) {
 	// given — event store that always fails
 	evStore := &failingEventStore{err: fmt.Errorf("readonly fs")}
 	p := &Paintress{
@@ -172,9 +173,13 @@ func TestEmitEvent_ReturnsErrorOnAppendFail(t *testing.T) {
 	}
 
 	// when
-	err := p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
 		Level: 5, Operator: "test",
-	})
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	err = p.emit(ev)
 
 	// then — error must be returned
 	if err == nil {
@@ -185,7 +190,7 @@ func TestEmitEvent_ReturnsErrorOnAppendFail(t *testing.T) {
 	}
 }
 
-func TestEmitEvent_NilEventStoreReturnsNil(t *testing.T) {
+func TestEmit_NilEventStoreReturnsNil(t *testing.T) {
 	// given — no event store
 	p := &Paintress{
 		config: domain.Config{Continent: t.TempDir()},
@@ -193,9 +198,13 @@ func TestEmitEvent_NilEventStoreReturnsNil(t *testing.T) {
 	}
 
 	// when
-	err := p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
+	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
 		Level: 5, Operator: "test",
-	})
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	err = p.emit(ev)
 
 	// then — nil event store is not an error
 	if err != nil {

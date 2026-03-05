@@ -130,3 +130,15 @@ type InboxReceivedData struct {
 	Name     string `json:"name"`
 	Severity string `json:"severity"`
 }
+
+// RetryAttemptedData is the payload for EventRetryAttempted.
+type RetryAttemptedData struct {
+	DMail   string `json:"dmail"`
+	Attempt int    `json:"attempt"`
+}
+
+// EscalatedData is the payload for EventEscalated.
+type EscalatedData struct {
+	DMail  string   `json:"dmail"`
+	Issues []string `json:"issues"`
+}

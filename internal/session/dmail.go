@@ -13,9 +13,22 @@ import (
 	"github.com/hironow/paintress/internal/port"
 )
 
+// emitDMailEvent appends a pre-built D-Mail event to the store and returns any
+// error. D-Mail events are part of the transactional outbox and must not be
+// silently dropped — event loss breaks event sourcing replay.
+func emitDMailEvent(store port.EventStore, ev domain.Event) error {
+	if store == nil {
+		return nil
+	}
+	if err := store.Append(ev); err != nil {
+		return fmt.Errorf("emit %s: append: %w", ev.Type, err)
+	}
+	return nil
+}
+
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStore) error {
+func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStore, agg *domain.ExpeditionAggregate) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = domain.DMailSchemaVersion
 	}
@@ -31,8 +44,10 @@ func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStor
 	if err := store.Stage(filename, data); err != nil {
 		return fmt.Errorf("dmail: stage: %w", err)
 	}
-	if err := emitDMailEvent(eventStore, domain.EventDMailStaged, domain.DMailStagedData{Name: d.Name}); err != nil {
-		return fmt.Errorf("dmail: event staged: %w", err)
+	if ev, err := agg.RecordDMailStaged(d.Name, time.Now()); err == nil {
+		if emitErr := emitDMailEvent(eventStore, ev); emitErr != nil {
+			return fmt.Errorf("dmail: event staged: %w", emitErr)
+		}
 	}
 	n, err := store.Flush()
 	if err != nil {
@@ -41,8 +56,10 @@ func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStor
 	if n == 0 {
 		return fmt.Errorf("dmail: flush: item not delivered (write failure, will retry)")
 	}
-	if err := emitDMailEvent(eventStore, domain.EventDMailFlushed, domain.DMailFlushedData{Count: n}); err != nil {
-		return fmt.Errorf("dmail: event flushed: %w", err)
+	if ev, err := agg.RecordDMailFlushed(n, time.Now()); err == nil {
+		if emitErr := emitDMailEvent(eventStore, ev); emitErr != nil {
+			return fmt.Errorf("dmail: event flushed: %w", emitErr)
+		}
 	}
 	return nil
 }
@@ -88,7 +105,7 @@ func ScanInbox(continent string) ([]domain.DMail, error) {
 
 // ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
 // Uses os.Rename for atomic move.
-func ArchiveInboxDMail(continent, name string, eventStore port.EventStore) error {
+func ArchiveInboxDMail(continent, name string, eventStore port.EventStore, agg *domain.ExpeditionAggregate) error {
 	filename := name + ".md"
 	src := filepath.Join(domain.InboxDir(continent), filename)
 	arcDir := domain.ArchiveDir(continent)
@@ -111,25 +128,11 @@ func ArchiveInboxDMail(continent, name string, eventStore port.EventStore) error
 		return fmt.Errorf("dmail: archive %s: %w", name, err)
 	}
 
-	if err := emitDMailEvent(eventStore, domain.EventDMailArchived, domain.DMailArchivedData{Name: name}); err != nil {
-		return fmt.Errorf("dmail: event archived: %w", err)
+	if ev, err := agg.RecordDMailArchived(name, time.Now()); err == nil {
+		if emitErr := emitDMailEvent(eventStore, ev); emitErr != nil {
+			return fmt.Errorf("dmail: event archived: %w", emitErr)
+		}
 	}
 	return nil
 }
 
-// emitDMailEvent appends a critical D-Mail event to the store and returns any
-// error. D-Mail events are part of the transactional outbox and must not be
-// silently dropped — event loss breaks event sourcing replay.
-func emitDMailEvent(store port.EventStore, eventType domain.EventType, data any) error {
-	if store == nil {
-		return nil
-	}
-	ev, err := domain.NewEvent(eventType, data, time.Now())
-	if err != nil {
-		return fmt.Errorf("emit %s: marshal: %w", eventType, err)
-	}
-	if err := store.Append(ev); err != nil {
-		return fmt.Errorf("emit %s: append: %w", eventType, err)
-	}
-	return nil
-}

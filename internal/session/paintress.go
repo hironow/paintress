@@ -29,6 +29,7 @@ var (
 )
 
 type Paintress struct {
+	Aggregate   *domain.ExpeditionAggregate // sole event factory for this session
 	config      domain.Config
 	logDir      string
 	Logger      domain.Logger
@@ -67,52 +68,39 @@ func (p *Paintress) errWriter() io.Writer {
 	return io.Discard
 }
 
-// emitEvent appends a single event to the event store and returns any
+// emit appends a pre-built event to the event store and returns any
 // persistence error. Callers decide whether the error is critical.
 // After persistence, the event is dispatched to the PolicyEngine best-effort.
-func (p *Paintress) emitEvent(eventType domain.EventType, data any) error {
-	// Record OTel metric for expedition completions (fire-and-forget, independent of event store)
-	if eventType == domain.EventExpeditionCompleted {
-		if d, ok := data.(domain.ExpeditionCompletedData); ok {
-			platform.RecordExpedition(context.Background(), d.Status)
-		}
-	}
+func (p *Paintress) emit(ev domain.Event) error {
 	if p.eventStore == nil {
 		return nil
 	}
-	ev, err := domain.NewEvent(eventType, data, time.Now())
-	if err != nil {
-		p.Logger.Warn("event emit marshal: %v", err)
-		return fmt.Errorf("event emit marshal %s: %w", eventType, err)
-	}
 	if err := p.eventStore.Append(ev); err != nil {
 		p.Logger.Warn("event emit append: %v", err)
-		platform.RecordEventEmitError(context.Background(), string(eventType))
-		return fmt.Errorf("event emit append %s: %w", eventType, err)
+		platform.RecordEventEmitError(context.Background(), string(ev.Type))
+		return fmt.Errorf("event emit append %s: %w", ev.Type, err)
 	}
 	// Best-effort policy dispatch
 	if p.Dispatcher != nil {
 		if dispatchErr := p.Dispatcher.Dispatch(context.Background(), ev); dispatchErr != nil {
-			p.Logger.Debug("policy dispatch %s: %v", eventType, dispatchErr)
+			p.Logger.Debug("policy dispatch %s: %v", ev.Type, dispatchErr)
 		}
 	}
 	return nil
 }
 
 // emitExpeditionCompleted generates an expedition.completed event via the aggregate
-// and persists it through emitEvent. OTel metric is recorded directly since
-// aggregate events use json.RawMessage (not the typed struct emitEvent expects).
+// and persists it through emit. OTel metric is recorded directly.
 // Returns an error if event persistence fails — expedition completion is critical.
 func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound string) error {
 	platform.RecordExpedition(context.Background(), status)
 
-	agg := domain.NewExpeditionAggregate()
-	events, err := agg.CompleteExpedition(exp, status, issueID, bugsFound, time.Now())
+	events, err := p.Aggregate.CompleteExpedition(exp, status, issueID, bugsFound, time.Now())
 	if err != nil {
 		return fmt.Errorf("aggregate expedition: %w", err)
 	}
 	for _, ev := range events {
-		if err := p.emitEvent(ev.Type, ev.Data); err != nil {
+		if err := p.emit(ev); err != nil {
 			return fmt.Errorf("emit expedition event %s: %w", ev.Type, err)
 		}
 	}
@@ -182,6 +170,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	cfgCopy.MaxRetries = maxRetries
 
 	p := &Paintress{
+		Aggregate:    domain.NewExpeditionAggregate(),
 		config:       cfgCopy,
 		logDir:       logDir,
 		Logger:       logger,
@@ -395,9 +384,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("party_info"), p.reserve.Status()))
 
 		model := p.reserve.ActiveModel()
-		_ = p.emitEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
-			Expedition: exp, Worker: workerID, Model: model,
-		})
+		if ev, err := p.Aggregate.StartExpedition(exp, workerID, model, time.Now()); err == nil {
+			_ = p.emit(ev)
+		}
 		expCtx, expSpan := platform.Tracer.Start(ctx, "expedition", // nosemgrep: adr0003-otel-span-without-defer-end — expSpan.End() called after expedition loop body [permanent]
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
@@ -430,9 +419,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
 		for _, dm := range inboxDMails {
-			_ = p.emitEvent(domain.EventInboxReceived, domain.InboxReceivedData{
-				Name: dm.Name, Severity: dm.Severity,
-			})
+			if ev, err := p.Aggregate.RecordInboxReceived(dm.Name, dm.Severity, time.Now()); err == nil {
+				_ = p.emit(ev)
+			}
 		}
 
 		flagDir := workDir
@@ -498,10 +487,10 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			releaseWorkDir()
 			expSpan.End()
 			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
-			if err := p.emitEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{
-				Expedition: exp, ConsecutiveFailures: maxConsecutiveFailures,
-			}); err != nil {
-				p.Logger.Error("gommage event lost: %v", err)
+			if ev, err := p.Aggregate.RecordGommage(exp, time.Now()); err == nil {
+				if emitErr := p.emit(ev); emitErr != nil {
+					p.Logger.Error("gommage event lost: %v", emitErr)
+				}
 			}
 			return errGommage
 		}
@@ -541,9 +530,9 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 		}
 	}
 	p.gradient.Discharge()
-	_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
-		Level: p.gradient.Level(), Operator: "discharge",
-	})
+	if ev, err := p.Aggregate.RecordGradientChange(p.gradient.Level(), "discharge", time.Now()); err == nil {
+		_ = p.emit(ev)
+	}
 
 	midHighNames := expedition.MidHighSeverityDMails()
 	midHighCount := len(midHighNames)
@@ -601,9 +590,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		p.Logger.Warn("%s", domain.Msg("report_parse_fail"))
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("output_check"), p.logDir, exp))
 		p.gradient.Decay()
-		_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
-			Level: p.gradient.Level(), Operator: "decay",
-		})
+		if ev, err := p.Aggregate.RecordGradientChange(p.gradient.Level(), "decay", time.Now()); err == nil {
+			_ = p.emit(ev)
+		}
 		p.writeFlag(flagDir, exp, "?", "parse_error", "?", midHighCount)
 		parseErrReport := &domain.ExpeditionReport{
 			Expedition: exp, IssueID: "?", IssueTitle: "?",
@@ -630,9 +619,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		)
 		p.handleSuccess(report)
 		p.gradient.Charge()
-		_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
-			Level: p.gradient.Level(), Operator: "charge",
-		})
+		if ev, err := p.Aggregate.RecordGradientChange(p.gradient.Level(), "charge", time.Now()); err == nil {
+			_ = p.emit(ev)
+		}
 		if matched := expedition.MidMatchedDMails(); len(matched) > 0 {
 			totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 			followUpBudget := totalTimeout - time.Since(expStart)
@@ -657,12 +646,12 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		if dm := domain.NewReportDMail(report); dm.Name != "" {
-			if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
+			if err := SendDMail(p.outboxStore, dm, p.eventStore, p.Aggregate); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
 			}
 		}
 		for _, dm := range expedition.InboxDMails {
-			if err := ArchiveInboxDMail(p.config.Continent, dm.Name, p.eventStore); err != nil {
+			if err := ArchiveInboxDMail(p.config.Continent, dm.Name, p.eventStore, p.Aggregate); err != nil {
 				p.Logger.Warn("dmail archive: %v", err)
 			}
 		}
@@ -671,9 +660,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))
 		p.gradient.Decay()
-		_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
-			Level: p.gradient.Level(), Operator: "decay",
-		})
+		if ev, err := p.Aggregate.RecordGradientChange(p.gradient.Level(), "decay", time.Now()); err == nil {
+			_ = p.emit(ev)
+		}
 		p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
 		if err := p.emitExpeditionCompleted(exp, "skipped", report.IssueID, ""); err != nil {
@@ -683,9 +672,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 	case domain.StatusFailed:
 		p.Logger.Error("%s", fmt.Sprintf(domain.Msg("issue_failed"), report.IssueID, report.Reason))
 		p.gradient.Discharge()
-		_ = p.emitEvent(domain.EventGradientChanged, domain.GradientChangedData{
-			Level: p.gradient.Level(), Operator: "discharge",
-		})
+		if ev, err := p.Aggregate.RecordGradientChange(p.gradient.Level(), "discharge", time.Now()); err == nil {
+			_ = p.emit(ev)
+		}
 		p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
 		if err := p.emitExpeditionCompleted(exp, "failed", report.IssueID, ""); err != nil {

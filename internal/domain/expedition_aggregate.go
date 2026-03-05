@@ -74,3 +74,42 @@ func (a *ExpeditionAggregate) RecordGradientChange(level int, operator string, n
 		Operator: operator,
 	}, now)
 }
+
+// RecordInboxReceived produces an inbox.received event.
+func (a *ExpeditionAggregate) RecordInboxReceived(name, severity string, now time.Time) (Event, error) {
+	return NewEvent(EventInboxReceived, InboxReceivedData{
+		Name:     name,
+		Severity: severity,
+	}, now)
+}
+
+// RecordRetryAttempted produces a retry.attempted event.
+func (a *ExpeditionAggregate) RecordRetryAttempted(dmailKey string, attempt int, now time.Time) (Event, error) {
+	return NewEvent(EventRetryAttempted, RetryAttemptedData{
+		DMail:   dmailKey,
+		Attempt: attempt,
+	}, now)
+}
+
+// RecordEscalated produces an escalated event.
+func (a *ExpeditionAggregate) RecordEscalated(dmailName string, issues []string, now time.Time) (Event, error) {
+	return NewEvent(EventEscalated, EscalatedData{
+		DMail:  dmailName,
+		Issues: issues,
+	}, now)
+}
+
+// RecordDMailStaged produces a dmail.staged event.
+func (a *ExpeditionAggregate) RecordDMailStaged(name string, now time.Time) (Event, error) {
+	return NewEvent(EventDMailStaged, DMailStagedData{Name: name}, now)
+}
+
+// RecordDMailFlushed produces a dmail.flushed event.
+func (a *ExpeditionAggregate) RecordDMailFlushed(count int, now time.Time) (Event, error) {
+	return NewEvent(EventDMailFlushed, DMailFlushedData{Count: count}, now)
+}
+
+// RecordDMailArchived produces a dmail.archived event.
+func (a *ExpeditionAggregate) RecordDMailArchived(name string, now time.Time) (Event, error) {
+	return NewEvent(EventDMailArchived, DMailArchivedData{Name: name}, now)
+}

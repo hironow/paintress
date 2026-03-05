@@ -16,7 +16,7 @@ func (p *Paintress) stageEscalation(expedition, failureCount int) {
 		return
 	}
 	dm := domain.NewEscalationDMail(expedition, failureCount)
-	if err := SendDMail(p.outboxStore, dm, p.eventStore); err != nil {
+	if err := SendDMail(p.outboxStore, dm, p.eventStore, p.Aggregate); err != nil {
 		p.Logger.Warn("escalation dmail: %v", err)
 	}
 }
@@ -42,7 +42,9 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 			return
 		}
 		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
-		_ = p.emitEvent(domain.EventRetryAttempted, map[string]any{"dmail": retryKey, "attempt": count})
+		if ev, err := p.Aggregate.RecordRetryAttempted(retryKey, count, time.Now()); err == nil {
+			_ = p.emit(ev)
+		}
 		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 	case "escalate":
 		if err := p.handleEscalation(dm); err != nil {
@@ -60,7 +62,12 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 // cannot be persisted — escalation events are critical and must be detectable.
 func (p *Paintress) handleEscalation(dm domain.DMail) error {
 	p.Logger.Warn("ESCALATION: %s requires human attention (issues: %v)", dm.Name, dm.Issues)
-	if err := p.emitEvent(domain.EventEscalated, map[string]any{"dmail": dm.Name, "issues": dm.Issues}); err != nil {
+	ev, err := p.Aggregate.RecordEscalated(dm.Name, dm.Issues, time.Now())
+	if err != nil {
+		p.Logger.Error("ESCALATION EVENT LOST: %s (issues: %v): marshal: %v", dm.Name, dm.Issues, err)
+		return fmt.Errorf("escalation event marshal: %w", err)
+	}
+	if err := p.emit(ev); err != nil {
 		p.Logger.Error("ESCALATION EVENT LOST: %s (issues: %v): %v", dm.Name, dm.Issues, err)
 		return fmt.Errorf("escalation event persistence: %w", err)
 	}
