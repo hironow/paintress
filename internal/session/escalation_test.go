@@ -116,13 +116,13 @@ func TestStageEscalation_NilOutboxStore(t *testing.T) {
 	p.stageEscalation(5, 3)
 }
 
-func TestHandleEscalation_ReturnsErrorOnEventStoreFail(t *testing.T) {
-	// given — event store that always fails
-	evStore := &failingEventStore{err: fmt.Errorf("disk full")}
+func TestHandleEscalation_ReturnsErrorOnEmitterFail(t *testing.T) {
+	// given — emitter that always fails
+	emitter := &failingEmitter{err: fmt.Errorf("disk full")}
 	p := &Paintress{
-		config:     domain.Config{Continent: t.TempDir()},
-		Logger:     platform.NewLogger(nil, false),
-		eventStore: evStore,
+		config:  domain.Config{Continent: t.TempDir()},
+		Logger:  platform.NewLogger(nil, false),
+		Emitter: emitter,
 	}
 	dm := domain.DMail{Name: "esc-fail", Issues: []string{"MY-99"}}
 
@@ -131,26 +131,20 @@ func TestHandleEscalation_ReturnsErrorOnEventStoreFail(t *testing.T) {
 
 	// then — error must be propagated (escalation events are critical)
 	if err == nil {
-		t.Fatal("expected error from failing event store, got nil")
+		t.Fatal("expected error from failing emitter, got nil")
 	}
 	if !strings.Contains(err.Error(), "disk full") {
 		t.Errorf("error should contain root cause, got: %s", err.Error())
 	}
 }
 
-func TestHandleEscalation_SucceedsWithWorkingStore(t *testing.T) {
-	// given — event store that works
-	continent := t.TempDir()
-	ensureExpeditionDirs(t, continent)
-	eventsDir := filepath.Join(continent, ".run", "events")
-	if err := os.MkdirAll(eventsDir, 0o755); err != nil {
-		t.Fatalf("mkdir events: %v", err)
-	}
-	evStore := NewEventStore(eventsDir, &domain.NopLogger{})
+func TestHandleEscalation_SucceedsWithWorkingEmitter(t *testing.T) {
+	// given — emitter that succeeds
+	emitter := &nopEmitter{}
 	p := &Paintress{
-		config:     domain.Config{Continent: continent},
-		Logger:     platform.NewLogger(nil, false),
-		eventStore: evStore,
+		config:  domain.Config{Continent: t.TempDir()},
+		Logger:  platform.NewLogger(nil, false),
+		Emitter: emitter,
 	}
 	dm := domain.DMail{Name: "esc-ok", Issues: []string{"MY-100"}}
 
@@ -163,51 +157,18 @@ func TestHandleEscalation_SucceedsWithWorkingStore(t *testing.T) {
 	}
 }
 
-func TestEmit_ReturnsErrorOnAppendFail(t *testing.T) {
-	// given — event store that always fails
-	evStore := &failingEventStore{err: fmt.Errorf("readonly fs")}
-	p := &Paintress{
-		config:     domain.Config{Continent: t.TempDir()},
-		Logger:     platform.NewLogger(nil, false),
-		eventStore: evStore,
-	}
+// nopEmitter is a no-op ExpeditionEventEmitter that always succeeds.
+type nopEmitter struct{}
 
-	// when
-	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
-		Level: 5, Operator: "test",
-	}, time.Now())
-	if err != nil {
-		t.Fatalf("unexpected marshal error: %v", err)
-	}
-	err = p.emit(ev)
-
-	// then — error must be returned
-	if err == nil {
-		t.Fatal("expected error from failing event store, got nil")
-	}
-	if !strings.Contains(err.Error(), "readonly fs") {
-		t.Errorf("error should contain root cause, got: %s", err.Error())
-	}
+func (n *nopEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error    { return nil }
+func (n *nopEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+	return nil
 }
-
-func TestEmit_NilEventStoreReturnsNil(t *testing.T) {
-	// given — no event store
-	p := &Paintress{
-		config: domain.Config{Continent: t.TempDir()},
-		Logger: platform.NewLogger(nil, false),
-	}
-
-	// when
-	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{
-		Level: 5, Operator: "test",
-	}, time.Now())
-	if err != nil {
-		t.Fatalf("unexpected marshal error: %v", err)
-	}
-	err = p.emit(ev)
-
-	// then — nil event store is not an error
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
+func (n *nopEmitter) EmitInboxReceived(_, _ string, _ time.Time) error             { return nil }
+func (n *nopEmitter) EmitGommage(_ int, _ time.Time) error                         { return nil }
+func (n *nopEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error        { return nil }
+func (n *nopEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error        { return nil }
+func (n *nopEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error        { return nil }
+func (n *nopEmitter) EmitDMailStaged(_ string, _ time.Time) error                  { return nil }
+func (n *nopEmitter) EmitDMailFlushed(_ int, _ time.Time) error                    { return nil }
+func (n *nopEmitter) EmitDMailArchived(_ string, _ time.Time) error                { return nil }

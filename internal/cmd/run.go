@@ -155,11 +155,10 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}()
 
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
-	agg := domain.NewExpeditionAggregate()
-	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), eventStore, agg)
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.RunExpeditionCommand{
 		RepoPath: continent,
-	}, p, logger, notifier, &platform.OTelPolicyMetrics{})
+	}, p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
 		return ucErr
 	}

@@ -12,7 +12,7 @@ func TestRunExpeditions_InvalidCommand(t *testing.T) {
 	cmd := domain.RunExpeditionCommand{}
 
 	// when
-	exitCode, err := RunExpeditions(context.Background(), cmd, nil, &domain.NopLogger{}, nil, nil)
+	exitCode, err := RunExpeditions(context.Background(), cmd, nil, nil, &domain.NopLogger{}, nil, nil)
 
 	// then
 	if err == nil {

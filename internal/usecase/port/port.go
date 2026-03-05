@@ -86,9 +86,46 @@ type ArchiveOps interface {
 	PruneFlushedOutbox(repoPath string) (int, error)
 }
 
+// ExpeditionEventEmitter wraps aggregate event production + persistence + dispatch
+// for expedition operations. Implemented in usecase layer, injected into session.
+// Dispatch is best-effort: errors are logged but not returned.
+type ExpeditionEventEmitter interface {
+	EmitStartExpedition(expedition, worker int, model string, now time.Time) error
+	EmitCompleteExpedition(expedition int, status, issueID, bugsFound string, now time.Time) error
+	EmitInboxReceived(name, severity string, now time.Time) error
+	EmitGommage(expedition int, now time.Time) error
+	EmitGradientChange(level int, operator string, now time.Time) error
+	EmitRetryAttempted(dmailKey string, attempt int, now time.Time) error
+	EmitEscalated(dmailName string, issues []string, now time.Time) error
+	EmitDMailStaged(name string, now time.Time) error
+	EmitDMailFlushed(count int, now time.Time) error
+	EmitDMailArchived(name string, now time.Time) error
+}
+
+// NopExpeditionEventEmitter is a no-op emitter for tests and when event
+// sourcing is not configured. All methods return nil.
+type NopExpeditionEventEmitter struct{}
+
+func (*NopExpeditionEventEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error {
+	return nil
+}
+func (*NopExpeditionEventEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+	return nil
+}
+func (*NopExpeditionEventEmitter) EmitInboxReceived(_, _ string, _ time.Time) error  { return nil }
+func (*NopExpeditionEventEmitter) EmitGommage(_ int, _ time.Time) error              { return nil }
+func (*NopExpeditionEventEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error {
+	return nil
+}
+func (*NopExpeditionEventEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return nil }
+func (*NopExpeditionEventEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return nil }
+func (*NopExpeditionEventEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
+func (*NopExpeditionEventEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
+func (*NopExpeditionEventEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }
+
 // ExpeditionRunner wraps the session-layer expedition orchestrator.
 type ExpeditionRunner interface {
-	SetDispatcher(dispatcher EventDispatcher)
+	SetEmitter(emitter ExpeditionEventEmitter)
 	Run(ctx context.Context) int
 }
 

@@ -13,22 +13,9 @@ import (
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// emitDMailEvent appends a pre-built D-Mail event to the store and returns any
-// error. D-Mail events are part of the transactional outbox and must not be
-// silently dropped — event loss breaks event sourcing replay.
-func emitDMailEvent(store port.EventStore, ev domain.Event) error {
-	if store == nil {
-		return nil
-	}
-	if err := store.Append(ev); err != nil {
-		return fmt.Errorf("emit %s: append: %w", ev.Type, err)
-	}
-	return nil
-}
-
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStore, agg *domain.ExpeditionAggregate) error {
+func SendDMail(store port.OutboxStore, d domain.DMail, emitter port.ExpeditionEventEmitter) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = domain.DMailSchemaVersion
 	}
@@ -44,8 +31,8 @@ func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStor
 	if err := store.Stage(filename, data); err != nil {
 		return fmt.Errorf("dmail: stage: %w", err)
 	}
-	if ev, err := agg.RecordDMailStaged(d.Name, time.Now()); err == nil {
-		if emitErr := emitDMailEvent(eventStore, ev); emitErr != nil {
+	if emitter != nil {
+		if emitErr := emitter.EmitDMailStaged(d.Name, time.Now()); emitErr != nil {
 			return fmt.Errorf("dmail: event staged: %w", emitErr)
 		}
 	}
@@ -56,8 +43,8 @@ func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStor
 	if n == 0 {
 		return fmt.Errorf("dmail: flush: item not delivered (write failure, will retry)")
 	}
-	if ev, err := agg.RecordDMailFlushed(n, time.Now()); err == nil {
-		if emitErr := emitDMailEvent(eventStore, ev); emitErr != nil {
+	if emitter != nil {
+		if emitErr := emitter.EmitDMailFlushed(n, time.Now()); emitErr != nil {
 			return fmt.Errorf("dmail: event flushed: %w", emitErr)
 		}
 	}
@@ -105,7 +92,7 @@ func ScanInbox(continent string) ([]domain.DMail, error) {
 
 // ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
 // Uses os.Rename for atomic move.
-func ArchiveInboxDMail(continent, name string, eventStore port.EventStore, agg *domain.ExpeditionAggregate) error {
+func ArchiveInboxDMail(continent, name string, emitter port.ExpeditionEventEmitter) error {
 	filename := name + ".md"
 	src := filepath.Join(domain.InboxDir(continent), filename)
 	arcDir := domain.ArchiveDir(continent)
@@ -128,8 +115,8 @@ func ArchiveInboxDMail(continent, name string, eventStore port.EventStore, agg *
 		return fmt.Errorf("dmail: archive %s: %w", name, err)
 	}
 
-	if ev, err := agg.RecordDMailArchived(name, time.Now()); err == nil {
-		if emitErr := emitDMailEvent(eventStore, ev); emitErr != nil {
+	if emitter != nil {
+		if emitErr := emitter.EmitDMailArchived(name, time.Now()); emitErr != nil {
 			return fmt.Errorf("dmail: event archived: %w", emitErr)
 		}
 	}
