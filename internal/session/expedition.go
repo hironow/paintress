@@ -190,9 +190,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	expCtx, invokeSpan := platform.Tracer.Start(expCtx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("model", model),
+				attribute.String("claude.model", model),
 				attribute.Int("expedition.number", e.Number),
-				attribute.Int("timeout_sec", e.Config.TimeoutSec),
+				attribute.Int("claude.timeout_sec", e.Config.TimeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
