@@ -1,7 +1,7 @@
 package usecase
 
 import (
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/port"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -11,7 +11,7 @@ func PreflightCheck(binaries ...string) error {
 }
 
 // NewEventStore creates an event store for the given state directory.
-func NewEventStore(stateDir string) domain.EventStore {
+func NewEventStore(stateDir string) port.EventStore {
 	return session.NewEventStore(stateDir)
 }
 

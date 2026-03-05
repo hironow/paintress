@@ -41,8 +41,8 @@ type Paintress struct {
 	pool        *WorktreePool // nil when --workers=0
 	notifier    port.Notifier
 	approver    port.Approver
-	outboxStore domain.OutboxStore     // transactional outbox for D-Mail delivery
-	eventStore  domain.EventStore      // append-only event log (fire-and-forget)
+	outboxStore port.OutboxStore       // transactional outbox for D-Mail delivery
+	eventStore  port.EventStore        // append-only event log (fire-and-forget)
 	Dispatcher  port.EventDispatcher   // policy engine (best-effort dispatch after emit)
 
 	// Retry tracking: maps sorted issue keys to attempt count
@@ -119,7 +119,7 @@ func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound 
 	return nil
 }
 
-func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, eventStore domain.EventStore) *Paintress {
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, eventStore port.EventStore) *Paintress {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}

@@ -3,6 +3,7 @@ package port
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 )
@@ -55,3 +56,24 @@ type PolicyMetrics interface {
 type NopPolicyMetrics struct{}
 
 func (*NopPolicyMetrics) RecordPolicyEvent(_ context.Context, _, _ string) {}
+
+// EventStore is the append-only event persistence interface.
+type EventStore interface {
+	// Append persists one or more events. Validation is performed before any writes.
+	Append(events ...domain.Event) error
+
+	// LoadAll returns all events in chronological order.
+	LoadAll() ([]domain.Event, error)
+
+	// LoadSince returns events with timestamps after the given time.
+	LoadSince(after time.Time) ([]domain.Event, error)
+}
+
+// OutboxStore is the transactional outbox interface for D-Mail delivery.
+// Stage writes to a write-ahead log (SQLite); Flush materialises staged
+// items to archive/ and outbox/ using atomic file writes.
+type OutboxStore interface {
+	Stage(name string, data []byte) error
+	Flush() (int, error)
+	Close() error
+}

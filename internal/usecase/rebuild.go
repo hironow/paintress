@@ -5,12 +5,13 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/port"
 	"github.com/hironow/paintress/internal/session"
 )
 
 // Rebuild replays events to regenerate projection state.
 // Validates the RebuildCommand and performs the rebuild.
-func Rebuild(cmd domain.RebuildCommand, events domain.EventStore, projector domain.EventApplier, logger domain.Logger) error {
+func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
 	if errs := cmd.Validate(); len(errs) > 0 {
 		return fmt.Errorf("command validation: %w", errs[0])
 	}

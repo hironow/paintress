@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/port"
 )
 
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store domain.OutboxStore, d domain.DMail, eventStore domain.EventStore) error {
+func SendDMail(store port.OutboxStore, d domain.DMail, eventStore port.EventStore) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = domain.DMailSchemaVersion
 	}
@@ -87,7 +88,7 @@ func ScanInbox(continent string) ([]domain.DMail, error) {
 
 // ArchiveInboxDMail moves a d-mail from inbox/ to archive/.
 // Uses os.Rename for atomic move.
-func ArchiveInboxDMail(continent, name string, eventStore domain.EventStore) error {
+func ArchiveInboxDMail(continent, name string, eventStore port.EventStore) error {
 	filename := name + ".md"
 	src := filepath.Join(domain.InboxDir(continent), filename)
 	arcDir := domain.ArchiveDir(continent)
@@ -119,7 +120,7 @@ func ArchiveInboxDMail(continent, name string, eventStore domain.EventStore) err
 // emitDMailEvent appends a critical D-Mail event to the store and returns any
 // error. D-Mail events are part of the transactional outbox and must not be
 // silently dropped — event loss breaks event sourcing replay.
-func emitDMailEvent(store domain.EventStore, eventType domain.EventType, data any) error {
+func emitDMailEvent(store port.EventStore, eventType domain.EventType, data any) error {
 	if store == nil {
 		return nil
 	}
