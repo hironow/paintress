@@ -9,24 +9,25 @@ import (
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // ValidateContinent ensures the .expedition directory structure exists.
 func ValidateContinent(continent string) error {
-	journalDir := filepath.Join(continent, ".expedition", "journal")
+	journalDir := filepath.Join(continent, domain.StateDir, "journal")
 	if err := os.MkdirAll(journalDir, 0755); err != nil {
 		return err
 	}
 
 	// Ensure .run/ directory exists for ephemeral files (flag.md, logs/, worktrees/)
-	runDir := filepath.Join(continent, ".expedition", ".run")
+	runDir := filepath.Join(continent, domain.StateDir, ".run")
 	if err := os.MkdirAll(runDir, 0755); err != nil {
 		return err
 	}
 
 	// Ensure d-mail directories exist (inbox, outbox, archive)
 	for _, sub := range []string{"inbox", "outbox", "archive"} {
-		d := filepath.Join(continent, ".expedition", sub)
+		d := filepath.Join(continent, domain.StateDir, sub)
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return err
 		}
@@ -35,7 +36,7 @@ func ValidateContinent(continent string) error {
 	// Ensure Agent Skills SKILL.md files exist for phonewave discovery
 	skillDirs := []string{"dmail-sendable", "dmail-readable"}
 	for _, dir := range skillDirs {
-		skillDir := filepath.Join(continent, ".expedition", "skills", dir)
+		skillDir := filepath.Join(continent, domain.StateDir, "skills", dir)
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
 			return err
 		}
@@ -44,7 +45,7 @@ func ValidateContinent(continent string) error {
 			if !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
-			content, err := fs.ReadFile(domain.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
+			content, err := fs.ReadFile(platform.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
 			if err != nil {
 				return fmt.Errorf("read embedded skill %s: %w", dir, err)
 			}
@@ -55,7 +56,7 @@ func ValidateContinent(continent string) error {
 	}
 
 	// Ensure .run/, inbox/, outbox/ are gitignored
-	gitignore := filepath.Join(continent, ".expedition", ".gitignore")
+	gitignore := filepath.Join(continent, domain.StateDir, ".gitignore")
 	content, err := os.ReadFile(gitignore)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {

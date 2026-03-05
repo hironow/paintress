@@ -1,12 +1,8 @@
 package domain
 
 import (
-	"embed"
 	"path/filepath"
 )
-
-//go:embed templates/skills/*/SKILL.md
-var SkillsFS embed.FS
 
 // Config holds the runtime configuration for a Paintress session.
 type Config struct {
@@ -44,5 +40,5 @@ type IssueTrackerConfig struct {
 
 // ProjectConfigPath returns the path to the project config file.
 func ProjectConfigPath(continent string) string {
-	return filepath.Join(continent, ".expedition", "config.yaml")
+	return filepath.Join(continent, StateDir, "config.yaml")
 }

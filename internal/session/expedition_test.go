@@ -1762,11 +1762,7 @@ func TestReadContextFiles_EmptyFileStillCreatesHeader(t *testing.T) {
 // --- MissionText tests (merged from mission_test.go) ---
 
 func TestMissionText_English(t *testing.T) {
-	orig := domain.Lang
-	defer func() { domain.Lang = orig }()
-	domain.Lang = "en"
-
-	text := domain.MissionText()
+	text := platform.MissionText("en")
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("English mission should contain 'Rules of Engagement'")
 	}
@@ -1785,11 +1781,7 @@ func TestMissionText_English(t *testing.T) {
 }
 
 func TestMissionText_Japanese(t *testing.T) {
-	orig := domain.Lang
-	defer func() { domain.Lang = orig }()
-	domain.Lang = "ja"
-
-	text := domain.MissionText()
+	text := platform.MissionText("ja")
 	if !containsStr(text, "行動規範") {
 		t.Error("Japanese mission should contain '行動規範'")
 	}
@@ -1802,11 +1794,7 @@ func TestMissionText_Japanese(t *testing.T) {
 }
 
 func TestMissionText_French(t *testing.T) {
-	orig := domain.Lang
-	defer func() { domain.Lang = orig }()
-	domain.Lang = "fr"
-
-	text := domain.MissionText()
+	text := platform.MissionText("fr")
 	if !containsStr(text, "engagement") {
 		t.Error("French mission should contain 'engagement'")
 	}
@@ -1816,11 +1804,7 @@ func TestMissionText_French(t *testing.T) {
 }
 
 func TestMissionText_FallbackToEnglish(t *testing.T) {
-	orig := domain.Lang
-	defer func() { domain.Lang = orig }()
-	domain.Lang = "de"
-
-	text := domain.MissionText()
+	text := platform.MissionText("de")
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("unsupported lang should fall back to English")
 	}

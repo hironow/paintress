@@ -127,22 +127,10 @@ func (e *Expedition) BuildPrompt() string {
 		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.Tracker.Team,
 		LinearProject:   projCfg.Tracker.Project,
-		MissionSection:  domain.MissionText(),
+		MissionSection:  platform.MissionText(domain.Lang),
 	}
 
-	tmplName := "expedition_en.md.tmpl"
-	switch domain.Lang {
-	case "ja":
-		tmplName = "expedition_ja.md.tmpl"
-	case "fr":
-		tmplName = "expedition_fr.md.tmpl"
-	}
-
-	var buf strings.Builder
-	if err := domain.ExpeditionTemplates.ExecuteTemplate(&buf, tmplName, data); err != nil {
-		panic(fmt.Sprintf("prompt template execution failed: %v", err))
-	}
-	return buf.String()
+	return platform.RenderExpeditionPrompt(domain.Lang, data)
 }
 
 func (e *Expedition) loadInboxSection() string {
@@ -220,7 +208,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 	cmd.Dir = workDir
 
-	if err := os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workDir, domain.StateDir, ".run"), 0755); err != nil {
 		return "", fmt.Errorf("create expedition run dir: %w", err)
 	}
 
