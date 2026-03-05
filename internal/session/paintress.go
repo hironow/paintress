@@ -284,9 +284,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("timeout_info"), p.config.TimeoutSec))
 	claudeCmd := p.config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = domain.DefaultClaudeCmd
+		claudeCmd = platform.DefaultClaudeCmd
 	}
-	if claudeCmd != domain.DefaultClaudeCmd {
+	if claudeCmd != platform.DefaultClaudeCmd {
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("claude_cmd_info"), claudeCmd))
 	}
 	if p.config.DryRun {

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +48,7 @@ flags for interactive prompts. This must be run once before
 			if otelBackend != "" {
 				otelEntity, _ := cmd.Flags().GetString("otel-entity")
 				otelProject, _ := cmd.Flags().GetString("otel-project")
-				content, otelErr := domain.OtelEnvContent(otelBackend, otelEntity, otelProject)
+				content, otelErr := platform.OtelEnvContent(otelBackend, otelEntity, otelProject)
 				if otelErr != nil {
 					return otelErr
 				}

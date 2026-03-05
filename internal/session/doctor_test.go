@@ -146,7 +146,7 @@ func TestRunDoctor_CheckConfig_ValidConfig(t *testing.T) {
 	// given — valid config.yaml
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
-	os.WriteFile(domain.ProjectConfigPath(dir), []byte("linear:\n  team: TEST\n"), 0644)
+	os.WriteFile(domain.ProjectConfigPath(dir), []byte("tracker:\n  team: TEST\n"), 0644)
 
 	// when
 	checks := RunDoctor("claude", dir)

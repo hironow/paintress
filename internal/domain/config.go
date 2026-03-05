@@ -8,9 +8,6 @@ import (
 //go:embed templates/skills/*/SKILL.md
 var SkillsFS embed.FS
 
-// DefaultClaudeCmd is the default CLI command name for Claude Code.
-const DefaultClaudeCmd = "claude"
-
 // Config holds the runtime configuration for a Paintress session.
 type Config struct {
 	Continent      string
@@ -36,11 +33,11 @@ type Config struct {
 
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 type ProjectConfig struct {
-	Linear LinearConfig `yaml:"linear"`
+	Tracker IssueTrackerConfig `yaml:"tracker"`
 }
 
-// LinearConfig holds Linear integration settings.
-type LinearConfig struct {
+// IssueTrackerConfig holds issue tracker integration settings.
+type IssueTrackerConfig struct {
 	Team    string `yaml:"team"`
 	Project string `yaml:"project,omitempty"`
 }

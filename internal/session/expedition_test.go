@@ -707,7 +707,7 @@ func TestBuildPrompt_WithLinearConfig(t *testing.T) {
 
 	// Write a config.yaml with Linear scope
 	cfg := &domain.ProjectConfig{
-		Linear: domain.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "ENG",
 			Project: "backend",
 		},
@@ -794,7 +794,7 @@ func TestLifecycle_Init_Then_Expedition(t *testing.T) {
 
 	// Phase 1: set up config as if `paintress init` was run
 	initCfg := &domain.ProjectConfig{
-		Linear: domain.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "MY",
 			Project: "paintress",
 		},
@@ -808,8 +808,8 @@ func TestLifecycle_Init_Then_Expedition(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
-	if cfg.Linear.Team != "MY" || cfg.Linear.Project != "paintress" {
-		t.Fatalf("unexpected config: team=%q project=%q", cfg.Linear.Team, cfg.Linear.Project)
+	if cfg.Tracker.Team != "MY" || cfg.Tracker.Project != "paintress" {
+		t.Fatalf("unexpected config: team=%q project=%q", cfg.Tracker.Team, cfg.Tracker.Project)
 	}
 
 	// Phase 2: run expedition with fake Claude (outputs a valid report)

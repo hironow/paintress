@@ -34,7 +34,7 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 		t.Fatalf("create expedition dir: %v", err)
 	}
 	cfgPath := domain.ProjectConfigPath(dir)
-	if err := os.WriteFile(cfgPath, []byte("linear:\n  team: MY\n"), 0644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte("tracker:\n  team: MY\n"), 0644); err != nil {
 		t.Fatalf("create config: %v", err)
 	}
 

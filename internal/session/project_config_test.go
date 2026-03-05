@@ -21,7 +21,7 @@ func TestSaveAndLoadProjectConfig(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	cfg := &domain.ProjectConfig{
-		Linear: domain.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    "MY",
 			Project: "paintress",
 		},
@@ -36,11 +36,11 @@ func TestSaveAndLoadProjectConfig(t *testing.T) {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
 
-	if loaded.Linear.Team != "MY" {
-		t.Errorf("Team = %q, want %q", loaded.Linear.Team, "MY")
+	if loaded.Tracker.Team != "MY" {
+		t.Errorf("Team = %q, want %q", loaded.Tracker.Team, "MY")
 	}
-	if loaded.Linear.Project != "paintress" {
-		t.Errorf("Project = %q, want %q", loaded.Linear.Project, "paintress")
+	if loaded.Tracker.Project != "paintress" {
+		t.Errorf("Project = %q, want %q", loaded.Tracker.Project, "paintress")
 	}
 }
 
@@ -49,7 +49,7 @@ func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
 	// .expedition/ does NOT exist — SaveProjectConfig should create it
 
 	cfg := &domain.ProjectConfig{
-		Linear: domain.LinearConfig{Team: "TEST"},
+		Tracker: domain.IssueTrackerConfig{Team: "TEST"},
 	}
 
 	if err := SaveProjectConfig(dir, cfg); err != nil {
@@ -61,8 +61,8 @@ func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
-	if loaded.Linear.Team != "TEST" {
-		t.Errorf("Team = %q, want %q", loaded.Linear.Team, "TEST")
+	if loaded.Tracker.Team != "TEST" {
+		t.Errorf("Team = %q, want %q", loaded.Tracker.Team, "TEST")
 	}
 }
 
@@ -73,7 +73,7 @@ func TestLoadProjectConfig_FileNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error for missing file, got: %v", err)
 	}
-	if cfg.Linear.Team != "" {
-		t.Errorf("Team = %q, want empty", cfg.Linear.Team)
+	if cfg.Tracker.Team != "" {
+		t.Errorf("Team = %q, want empty", cfg.Tracker.Team)
 	}
 }

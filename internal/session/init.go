@@ -25,7 +25,7 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 	}
 
 	cfg := &domain.ProjectConfig{
-		Linear: domain.LinearConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    team,
 			Project: project,
 		},

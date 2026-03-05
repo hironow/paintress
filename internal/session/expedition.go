@@ -125,8 +125,8 @@ func (e *Expedition) BuildPrompt() string {
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection(),
 		InboxSection:    e.loadInboxSection(),
-		LinearTeam:      projCfg.Linear.Team,
-		LinearProject:   projCfg.Linear.Project,
+		LinearTeam:      projCfg.Tracker.Team,
+		LinearProject:   projCfg.Tracker.Project,
 		MissionSection:  domain.MissionText(),
 	}
 
@@ -205,7 +205,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	claudeCmd := e.Config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = domain.DefaultClaudeCmd
+		claudeCmd = platform.DefaultClaudeCmd
 	}
 
 	cmd := newCmd(expCtx, claudeCmd,

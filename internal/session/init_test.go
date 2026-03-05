@@ -24,11 +24,11 @@ func TestInitProject_WritesConfig(t *testing.T) {
 	if loadErr != nil {
 		t.Fatalf("LoadProjectConfig: %v", loadErr)
 	}
-	if cfg.Linear.Team != "ENG" {
-		t.Errorf("Team = %q, want %q", cfg.Linear.Team, "ENG")
+	if cfg.Tracker.Team != "ENG" {
+		t.Errorf("Team = %q, want %q", cfg.Tracker.Team, "ENG")
 	}
-	if cfg.Linear.Project != "backend" {
-		t.Errorf("Project = %q, want %q", cfg.Linear.Project, "backend")
+	if cfg.Tracker.Project != "backend" {
+		t.Errorf("Project = %q, want %q", cfg.Tracker.Project, "backend")
 	}
 }
 
@@ -47,11 +47,11 @@ func TestInitProject_SkipOptionalProject(t *testing.T) {
 	if loadErr != nil {
 		t.Fatalf("LoadProjectConfig: %v", loadErr)
 	}
-	if cfg.Linear.Team != "MY" {
-		t.Errorf("Team = %q, want %q", cfg.Linear.Team, "MY")
+	if cfg.Tracker.Team != "MY" {
+		t.Errorf("Team = %q, want %q", cfg.Tracker.Team, "MY")
 	}
-	if cfg.Linear.Project != "" {
-		t.Errorf("Project = %q, want empty", cfg.Linear.Project)
+	if cfg.Tracker.Project != "" {
+		t.Errorf("Project = %q, want empty", cfg.Tracker.Project)
 	}
 }
 

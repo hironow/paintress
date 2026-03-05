@@ -64,7 +64,7 @@ max-expeditions is reached or the issue queue is empty.`,
 	cmd.Flags().IntP("timeout", "t", 1980, "Timeout per expedition in seconds (default: 33min)")
 	cmd.Flags().StringP("model", "m", "opus", "Model(s) comma-separated for reserve: opus,sonnet,haiku")
 	cmd.Flags().StringP("base-branch", "b", "main", "Base branch")
-	cmd.Flags().String("claude-cmd", domain.DefaultClaudeCmd, "Claude Code CLI command name")
+	cmd.Flags().String("claude-cmd", platform.DefaultClaudeCmd, "Claude Code CLI command name")
 	cmd.Flags().String("dev-cmd", "npm run dev", "Dev server command")
 	cmd.Flags().String("dev-dir", "", "Dev server working directory (defaults to repo path)")
 	cmd.Flags().String("dev-url", "http://localhost:3000", "Dev server URL")

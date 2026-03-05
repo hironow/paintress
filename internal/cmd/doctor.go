@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +34,7 @@ If repo-path is provided, also computes expedition success rate metrics.`,
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
-	claudeCmd := domain.DefaultClaudeCmd
+	claudeCmd := platform.DefaultClaudeCmd
 	var continent string
 	if len(args) > 0 {
 		continent = args[0]

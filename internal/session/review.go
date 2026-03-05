@@ -176,7 +176,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 		claudeCmd := p.config.ClaudeCmd
 		if claudeCmd == "" {
-			claudeCmd = domain.DefaultClaudeCmd
+			claudeCmd = platform.DefaultClaudeCmd
 		}
 
 		model := p.reserve.ActiveModel()
@@ -237,7 +237,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	prompt := domain.BuildFollowUpPrompt(dmails)
 	claudeCmd := p.config.ClaudeCmd
 	if claudeCmd == "" {
-		claudeCmd = domain.DefaultClaudeCmd
+		claudeCmd = platform.DefaultClaudeCmd
 	}
 
 	model := p.reserve.ActiveModel()
