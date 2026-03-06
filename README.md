@@ -375,7 +375,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI documentation generator
 +-- doc.go                    Package declaration (root-zero: all code in internal/)
-+-- templates/                AI prompt templates ({en,ja,fr})
++-- internal/platform/templates/  AI prompt templates ({en,ja,fr})
 |   +-- skills/               D-Mail SKILL.md templates
 +-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
 +-- tests/e2e/                Docker E2E tests (//go:build e2e)
