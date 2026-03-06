@@ -127,7 +127,7 @@ func badSessionNewEvent() {
 // --- Rule: session-no-direct-new-aggregate (pattern-regex) ---
 
 func badSessionNewAggregate() {
-	// ruleid: session-no-direct-new-aggregate
+	// ruleid: session-no-direct-new-aggregate, session-no-aggregate-type
 	_ = domain.NewReviewAggregate()
 }
 
@@ -242,8 +242,8 @@ var goodEmitter port.ExpeditionEventEmitter
 
 // --- Rule 20: session-no-aggregate-method-call ---
 
-// ruleid: session-no-aggregate-method-call
 func badAggCall(p struct{ Aggregate interface{ RecordStart() } }) {
+	// ruleid: session-no-aggregate-method-call
 	p.Aggregate.RecordStart()
 }
 
