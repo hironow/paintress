@@ -1,4 +1,5 @@
 package session
+// white-box-reason: SQLite internals: tests unexported db field for PRAGMA verification
 
 import (
 	"os"

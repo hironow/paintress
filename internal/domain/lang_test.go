@@ -1,4 +1,5 @@
 package domain
+// white-box-reason: internal state: tests unexported language global variable switching
 
 import (
 	"sync"

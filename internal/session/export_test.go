@@ -1,4 +1,5 @@
 package session
+// white-box-reason: bridge constructor: exposes unexported symbols for external test packages
 
 // export_test.go exposes unexported symbols for external tests (package session_test).
 // This is a standard Go pattern used by the stdlib (e.g., net/http/export_test.go).

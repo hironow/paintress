@@ -1,4 +1,5 @@
 package session
+// white-box-reason: session internals: tests unexported newTestPaintress helper and env isolation
 
 import (
 	"bytes"
