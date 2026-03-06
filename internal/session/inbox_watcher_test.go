@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestWatchInbox_DetectsNewDMail(t *testing.T) {
@@ -25,7 +26,7 @@ func TestWatchInbox_DetectsNewDMail(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		got = dm
 		mu.Unlock()
@@ -69,7 +70,7 @@ func TestWatchInbox_StopsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		watchInbox(ctx, dir, func(dm domain.DMail) {}, nil)
+		session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {}, nil)
 		close(done)
 	}()
 
@@ -94,7 +95,7 @@ func TestWatchInbox_IgnoresNonMdFiles(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		callCount++
 		mu.Unlock()
@@ -126,7 +127,6 @@ func TestWatchInbox_DetectsWriteToExistingFile(t *testing.T) {
 	os.MkdirAll(inboxDir, 0755)
 
 	// Pre-create an empty file BEFORE watcher starts.
-	// This means no Create event will fire — only Write events when content is added.
 	filePath := filepath.Join(inboxDir, "spec-overwrite-42.md")
 	os.WriteFile(filePath, []byte{}, 0644)
 
@@ -138,7 +138,7 @@ func TestWatchInbox_DetectsWriteToExistingFile(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		got = dm
 		mu.Unlock()
@@ -188,7 +188,7 @@ func TestWatchInbox_ScansExistingFilesOnStartup(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		got = dm
 		mu.Unlock()
@@ -230,7 +230,7 @@ func TestWatchInbox_IgnoresInvalidDMailFile(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		callCount++
 		mu.Unlock()
@@ -268,7 +268,7 @@ func TestWatchInbox_MultipleFilesInSequence(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		names = append(names, dm.Name)
 		mu.Unlock()
@@ -344,7 +344,7 @@ func TestWatchInbox_InitialScanSkipsInvalidFiles(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		names = append(names, dm.Name)
 		mu.Unlock()
@@ -388,7 +388,7 @@ func TestWatchInbox_NoDirNoPanic(t *testing.T) {
 	defer cancel()
 
 	// Should not panic — returns silently
-	watchInbox(ctx, dir, func(dm domain.DMail) {
+	session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		t.Error("callback should not fire when inbox dir does not exist")
 	}, nil)
 }
@@ -406,7 +406,7 @@ func TestWatchInbox_ParsesCorrectly(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		got = dm
 		mu.Unlock()
@@ -450,6 +450,16 @@ func TestWatchInbox_ParsesCorrectly(t *testing.T) {
 	}
 }
 
+// inboxCallbackNotifier calls fn on Notify for testing.
+type inboxCallbackNotifier struct {
+	fn func(title, msg string)
+}
+
+func (n *inboxCallbackNotifier) Notify(_ context.Context, title, msg string) error {
+	n.fn(title, msg)
+	return nil
+}
+
 func TestWatchInbox_HighSeverity_TriggersNotifier(t *testing.T) {
 	dir := t.TempDir()
 	inboxDir := filepath.Join(dir, ".expedition", "inbox")
@@ -457,7 +467,7 @@ func TestWatchInbox_HighSeverity_TriggersNotifier(t *testing.T) {
 
 	var notified bool
 	var notifiedMsg string
-	notifier := &callbackNotifier{
+	notifier := &inboxCallbackNotifier{
 		fn: func(title, msg string) {
 			notified = true
 			notifiedMsg = msg
@@ -472,7 +482,7 @@ func TestWatchInbox_HighSeverity_TriggersNotifier(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchInbox(ctx, dir, func(dm domain.DMail) {
+	go session.ExportWatchInbox(ctx, dir, func(dm domain.DMail) {
 		if seenFiles[dm.Name] {
 			return
 		}
@@ -508,14 +518,4 @@ func TestWatchInbox_HighSeverity_TriggersNotifier(t *testing.T) {
 	if !strings.Contains(notifiedMsg, "alert-mid-1") {
 		t.Errorf("notification message should contain d-mail name, got: %q", notifiedMsg)
 	}
-}
-
-// callbackNotifier calls fn on Notify for testing.
-type callbackNotifier struct {
-	fn func(title, msg string)
-}
-
-func (n *callbackNotifier) Notify(_ context.Context, title, msg string) error {
-	n.fn(title, msg)
-	return nil
 }

@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
@@ -22,7 +24,7 @@ func TestWatchFlag_DetectsCurrentIssue(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchFlag(ctx, dir, func(issue, title string) {
+	go session.ExportWatchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		gotIssue = issue
 		gotTitle = title
@@ -67,7 +69,7 @@ func TestWatchFlag_StopsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		watchFlag(ctx, dir, func(issue, title string) {}, nil)
+		session.ExportWatchFlag(ctx, dir, func(issue, title string) {}, nil)
 		close(done)
 	}()
 
@@ -96,7 +98,7 @@ func TestWatchFlag_DoesNotFireOnSameIssue(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	watchFlag(ctx, dir, func(issue, title string) {
+	session.ExportWatchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		callCount++
 		mu.Unlock()
@@ -123,7 +125,7 @@ func TestWatchFlag_DetectsIssueChange(t *testing.T) {
 	defer cancel()
 
 	ready := make(chan struct{}, 1)
-	go watchFlag(ctx, dir, func(issue, title string) {
+	go session.ExportWatchFlag(ctx, dir, func(issue, title string) {
 		mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 		issues = append(issues, issue)
 		count := len(issues)
@@ -188,7 +190,7 @@ func TestWatchFlag_NoFlagFile_NoPanic(t *testing.T) {
 	defer cancel()
 
 	// Should not panic — returns immediately because runDir doesn't exist
-	watchFlag(ctx, dir, func(issue, title string) {
+	session.ExportWatchFlag(ctx, dir, func(issue, title string) {
 		t.Error("callback should not fire when no flag file exists")
 	}, nil)
 }

@@ -1,26 +1,28 @@
-package session
+package session_test
 
 import (
 	"runtime"
 	"testing"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestShellName_ReturnsNonEmpty(t *testing.T) {
-	name := shellName()
+	name := session.ExportShellName()
 	if name == "" {
 		t.Error("shellName() returned empty string")
 	}
 }
 
 func TestShellFlag_ReturnsNonEmpty(t *testing.T) {
-	flag := shellFlag()
+	flag := session.ExportShellFlag()
 	if flag == "" {
 		t.Error("shellFlag() returned empty string")
 	}
 }
 
 func TestShellName_MatchesPlatform(t *testing.T) {
-	name := shellName()
+	name := session.ExportShellName()
 	switch runtime.GOOS {
 	case "windows":
 		if name != "cmd" {
@@ -34,7 +36,7 @@ func TestShellName_MatchesPlatform(t *testing.T) {
 }
 
 func TestShellFlag_MatchesPlatform(t *testing.T) {
-	flag := shellFlag()
+	flag := session.ExportShellFlag()
 	switch runtime.GOOS {
 	case "windows":
 		if flag != "/c" {
