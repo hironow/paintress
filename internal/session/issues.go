@@ -51,12 +51,16 @@ func FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir st
 
 	start := time.Now()
 	if err := cmd.Run(); err != nil {
-		span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
+		if platform.IsDetailDebug() {
+			span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
+		}
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.issues"))
 		return nil, fmt.Errorf("claude: %w", err)
 	}
-	span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
+	if platform.IsDetailDebug() {
+		span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
+	}
 
 	data, err := os.ReadFile(outputPath)
 	if err != nil {
