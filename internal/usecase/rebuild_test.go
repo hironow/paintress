@@ -1,4 +1,4 @@
-package usecase
+package usecase_test
 
 import (
 	"io"
@@ -8,6 +8,7 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 )
 
 func TestRebuild_EmptyEventStore(t *testing.T) {
@@ -19,7 +20,7 @@ func TestRebuild_EmptyEventStore(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	err := Rebuild(cmd, store, applier, logger)
+	err := usecase.Rebuild(cmd, store, applier, logger)
 
 	// then
 	if err != nil {
@@ -46,7 +47,7 @@ func TestRebuild_ReplaysEvents(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	err := Rebuild(cmd, store, applier, logger)
+	err := usecase.Rebuild(cmd, store, applier, logger)
 
 	// then
 	if err != nil {

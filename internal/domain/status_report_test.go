@@ -1,15 +1,17 @@
-package domain
+package domain_test
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestStatusReport_FormatText(t *testing.T) {
 	// given
-	report := StatusReport{
+	report := domain.StatusReport{
 		Continent:      "/path/to/repo",
 		Expeditions:    15,
 		Successes:      12,
@@ -52,7 +54,7 @@ func TestStatusReport_FormatText(t *testing.T) {
 
 func TestStatusReport_FormatText_NoEvents(t *testing.T) {
 	// given — zero-value report
-	report := StatusReport{}
+	report := domain.StatusReport{}
 
 	// when
 	text := report.FormatText()
@@ -65,7 +67,7 @@ func TestStatusReport_FormatText_NoEvents(t *testing.T) {
 
 func TestStatusReport_FormatJSON(t *testing.T) {
 	// given
-	report := StatusReport{
+	report := domain.StatusReport{
 		Continent:      "/path/to/repo",
 		Expeditions:    15,
 		Successes:      12,

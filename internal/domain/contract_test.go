@@ -1,12 +1,14 @@
 //go:build contract
 
-package domain
+package domain_test
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/domain"
 )
 
 const contractGoldenDir = "testdata/contract"
@@ -41,11 +43,11 @@ func readContractGolden(t *testing.T, name string) []byte {
 // TestContract_ParseDMail verifies that paintress's ParseDMail can
 // parse all cross-tool golden files. Paintress is Postel-liberal at
 // the parse level — unknown kinds and future schemas parse without error.
-func TestContract_ParseDMail(t *testing.T) {
+func TestContract_domain.ParseDMail(t *testing.T) {
 	for _, name := range contractGoldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
 			data := readContractGolden(t, name)
-			dm, err := ParseDMail(data)
+			dm, err := domain.ParseDMail(data)
 			if err != nil {
 				t.Fatalf("ParseDMail error: %v", err)
 			}
@@ -73,21 +75,21 @@ func TestContract_ParseDMail(t *testing.T) {
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	// future-schema.md has dmail-schema-version "2" — should be rejected
 	data := readContractGolden(t, "future-schema.md")
-	dm, err := ParseDMail(data)
+	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := ValidateDMail(dm); err == nil {
+	if err := domain.ValidateDMail(dm); err == nil {
 		t.Error("expected ValidateDMail to fail for schema version '2', but it passed")
 	}
 
 	// unknown-kind.md parses and validates (paintress doesn't enforce kind enum)
 	data = readContractGolden(t, "unknown-kind.md")
-	dm, err = ParseDMail(data)
+	dm, err = domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := ValidateDMail(dm); err != nil {
+	if err := domain.ValidateDMail(dm); err != nil {
 		t.Errorf("unexpected ValidateDMail error for unknown kind: %v", err)
 	}
 }
