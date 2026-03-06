@@ -11,12 +11,12 @@ import (
 // stageEscalation creates and stages a feedback D-Mail for escalation when
 // consecutive failures reach the threshold. Errors are logged but not
 // propagated — escalation is best-effort observability.
-func (p *Paintress) stageEscalation(expedition, failureCount int) {
+func (p *Paintress) stageEscalation(ctx context.Context, expedition, failureCount int) {
 	if p.outboxStore == nil {
 		return
 	}
 	dm := domain.NewEscalationDMail(expedition, failureCount)
-	if err := SendDMail(p.outboxStore, dm, p.Emitter); err != nil {
+	if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 		p.Logger.Warn("escalation dmail: %v", err)
 	}
 }

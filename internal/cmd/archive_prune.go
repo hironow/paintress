@@ -190,7 +190,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
-	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
+	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(cmd.Context(), repoPath); pruneErr == nil && pruned > 0 {
 		fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
 	}
 

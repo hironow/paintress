@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -15,7 +16,7 @@ import (
 
 // SendDMail writes a d-mail via the transactional outbox (Stage → Flush to
 // archive/ + outbox/). Archive-first ordering is guaranteed by the OutboxStore.
-func SendDMail(store port.OutboxStore, d domain.DMail, emitter port.ExpeditionEventEmitter) error {
+func SendDMail(ctx context.Context, store port.OutboxStore, d domain.DMail, emitter port.ExpeditionEventEmitter) error {
 	if d.SchemaVersion == "" {
 		d.SchemaVersion = domain.DMailSchemaVersion
 	}
@@ -28,7 +29,7 @@ func SendDMail(store port.OutboxStore, d domain.DMail, emitter port.ExpeditionEv
 	}
 
 	filename := d.Name + ".md"
-	if err := store.Stage(filename, data); err != nil {
+	if err := store.Stage(ctx, filename, data); err != nil {
 		return fmt.Errorf("dmail: stage: %w", err)
 	}
 	if emitter != nil {
@@ -36,7 +37,7 @@ func SendDMail(store port.OutboxStore, d domain.DMail, emitter port.ExpeditionEv
 			return fmt.Errorf("dmail: event staged: %w", emitErr)
 		}
 	}
-	n, err := store.Flush()
+	n, err := store.Flush(ctx)
 	if err != nil {
 		return fmt.Errorf("dmail: flush: %w", err)
 	}

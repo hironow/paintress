@@ -137,7 +137,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
-			p.stageEscalation(exp, maxConsecutiveFailures)
+			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
 			expSpan.AddEvent("gommage",
 				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
 			)
@@ -301,7 +301,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		if dm := domain.NewReportDMail(report); dm.Name != "" {
-			if err := SendDMail(p.outboxStore, dm, p.Emitter); err != nil {
+			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
 			}
 		}

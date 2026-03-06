@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	}
 
 	// when — stageEscalation calls SendDMail which does Stage + Flush internally
-	p.stageEscalation(5, 3)
+	p.stageEscalation(context.Background(), 5, 3)
 
 	// then — verify file exists in outbox (SendDMail already flushed)
 	outboxDir := domain.OutboxDir(continent)
@@ -65,7 +66,7 @@ func TestStageEscalation_ArchiveAndOutbox(t *testing.T) {
 	}
 
 	// when
-	p.stageEscalation(5, 3)
+	p.stageEscalation(context.Background(), 5, 3)
 
 	// then — both archive and outbox should have the file
 	archiveDir := domain.ArchiveDir(continent)
@@ -94,8 +95,8 @@ func TestStageEscalation_Idempotent(t *testing.T) {
 	}
 
 	// when — stage twice with same expedition (same D-Mail name)
-	p.stageEscalation(5, 3)
-	p.stageEscalation(5, 3)
+	p.stageEscalation(context.Background(), 5, 3)
+	p.stageEscalation(context.Background(), 5, 3)
 
 	// then — only one D-Mail in outbox (INSERT OR IGNORE + already flushed)
 	outboxDir := domain.OutboxDir(continent)
@@ -113,7 +114,7 @@ func TestStageEscalation_NilOutboxStore(t *testing.T) {
 	}
 
 	// when / then — should not panic
-	p.stageEscalation(5, 3)
+	p.stageEscalation(context.Background(), 5, 3)
 }
 
 func TestHandleEscalation_ReturnsErrorOnEmitterFail(t *testing.T) {

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -621,7 +622,7 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -670,7 +671,7 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -701,7 +702,7 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -991,7 +992,7 @@ func TestSendDMail_ArchiveDirFailure_NoOutbox(t *testing.T) {
 	dm := domain.DMail{Name: "fail-early", Kind: "report", Description: "Should fail at flush"}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := SendDMail(context.Background(), store, dm, nil)
 
 	// then — error at flush stage (atomicWrite to archive fails)
 	if err == nil {
@@ -1021,7 +1022,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -1250,7 +1251,7 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -1434,7 +1435,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	}
 
 	// Send report via outbox store (Stage → Flush)
-	if err := SendDMail(store, reportDMail,  nil); err != nil {
+	if err := SendDMail(context.Background(), store, reportDMail,  nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1564,7 +1565,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Reason:      "Initial setup complete",
 	}
 	reportDMail := domain.NewReportDMail(report)
-	if err := SendDMail(store, reportDMail,  nil); err != nil {
+	if err := SendDMail(context.Background(), store, reportDMail,  nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1606,7 +1607,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report1 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
 	})
-	if err := SendDMail(store, report1,  nil); err != nil {
+	if err := SendDMail(context.Background(), store, report1,  nil); err != nil {
 		t.Fatalf("Exp1 SendDMail: %v", err)
 	}
 	if err := ArchiveInboxDMail(continent, "spec-my-1",  nil); err != nil {
@@ -1638,7 +1639,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report2 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
 	})
-	if err := SendDMail(store, report2,  nil); err != nil {
+	if err := SendDMail(context.Background(), store, report2,  nil); err != nil {
 		t.Fatalf("Exp2 SendDMail: %v", err)
 	}
 	if err := ArchiveInboxDMail(continent, "feedback-d-001",  nil); err != nil {
@@ -1802,7 +1803,7 @@ func TestSendDMail_PropagatesEmitterError(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(outboxStore, dm, emitter)
+	err := SendDMail(context.Background(), outboxStore, dm, emitter)
 
 	// then — error from emitter must be propagated
 	if err == nil {

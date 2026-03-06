@@ -25,6 +25,6 @@ func (*archiveOps) PruneEventFiles(ctx context.Context, stateDir string, files [
 	return PruneEventFiles(ctx, stateDir, files)
 }
 
-func (*archiveOps) PruneFlushedOutbox(repoPath string) (int, error) {
-	return PruneFlushedOutbox(repoPath)
+func (*archiveOps) PruneFlushedOutbox(ctx context.Context, repoPath string) (int, error) {
+	return PruneFlushedOutbox(ctx, repoPath)
 }
