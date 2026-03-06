@@ -125,8 +125,8 @@ func (e *Expedition) BuildPrompt() string {
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection(),
 		InboxSection:    e.loadInboxSection(),
-		LinearTeam:      projCfg.Tracker.Team,
-		LinearProject:   projCfg.Tracker.Project,
+		LinearTeam:      projCfg.TrackerTeam(),
+		LinearProject:   projCfg.TrackerProject(),
 		MissionSection:  platform.MissionText(domain.Lang),
 	}
 

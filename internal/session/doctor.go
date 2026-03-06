@@ -215,8 +215,8 @@ func checkConfig(continent string) domain.DoctorCheck {
 
 	check.OK = true
 	check.Path = configPath
-	if cfg.Tracker.Team != "" {
-		check.Version = "team=" + cfg.Tracker.Team
+	if cfg.HasTrackerTeam() {
+		check.Version = "team=" + cfg.TrackerTeam()
 	} else {
 		check.Version = "loaded OK"
 	}

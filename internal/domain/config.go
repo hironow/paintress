@@ -38,6 +38,15 @@ type IssueTrackerConfig struct {
 	Project string `yaml:"project,omitempty"`
 }
 
+// TrackerTeam returns the issue tracker team name.
+func (c ProjectConfig) TrackerTeam() string { return c.Tracker.Team }
+
+// TrackerProject returns the issue tracker project name.
+func (c ProjectConfig) TrackerProject() string { return c.Tracker.Project }
+
+// HasTrackerTeam reports whether a tracker team is configured.
+func (c ProjectConfig) HasTrackerTeam() bool { return c.Tracker.Team != "" }
+
 // ProjectConfigPath returns the path to the project config file.
 func ProjectConfigPath(continent string) string {
 	return filepath.Join(continent, StateDir, "config.yaml")

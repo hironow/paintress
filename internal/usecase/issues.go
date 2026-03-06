@@ -15,12 +15,12 @@ func FetchIssues(ctx context.Context, absPath, claudeCmd string, stateFilter []s
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	if cfg.Tracker.Team == "" {
+	if !cfg.HasTrackerTeam() {
 		return nil, fmt.Errorf("linear.team not set in %s", domain.ProjectConfigPath(absPath))
 	}
 
 	workDir := filepath.Join(absPath, domain.StateDir, ".run")
-	issues, err := ops.FetchIssuesViaMCP(ctx, claudeCmd, cfg.Tracker.Team, cfg.Tracker.Project, workDir)
+	issues, err := ops.FetchIssuesViaMCP(ctx, claudeCmd, cfg.TrackerTeam(), cfg.TrackerProject(), workDir)
 	if err != nil {
 		return nil, err
 	}
