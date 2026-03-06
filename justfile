@@ -39,32 +39,36 @@ lint-md:
 
 # Build the binary with version info
 build:
-    go build -ldflags "{{LDFLAGS}}" -o {{TOOL}} ./cmd/{{TOOL}}/
+    @mkdir -p dist
+    go build -ldflags "{{LDFLAGS}}" -o dist/{{TOOL}} ./cmd/{{TOOL}}/
 
 # Build Telegram companion binary
 build-tg:
-    go build -o {{TOOL}}-tg ./cmd/{{TOOL}}-tg/
+    @mkdir -p dist
+    go build -o dist/{{TOOL}}-tg ./cmd/{{TOOL}}-tg/
 
 # Build Discord companion binary
 build-discord:
-    go build -o {{TOOL}}-discord ./cmd/{{TOOL}}-discord/
+    @mkdir -p dist
+    go build -o dist/{{TOOL}}-discord ./cmd/{{TOOL}}-discord/
 
 # Build Slack companion binary
 build-slack:
-    go build -o {{TOOL}}-slack ./cmd/{{TOOL}}-slack/
+    @mkdir -p dist
+    go build -o dist/{{TOOL}}-slack ./cmd/{{TOOL}}-slack/
 
 # Build all binaries (main + companions)
 build-all: build build-tg build-discord build-slack
 
 # Build and install to /usr/local/bin
 install: build
-    mv {{TOOL}} /usr/local/bin/
+    mv dist/{{TOOL}} /usr/local/bin/
 
 # Build and install companion binaries to /usr/local/bin
 install-companions: build-tg build-discord build-slack
-    mv {{TOOL}}-tg /usr/local/bin/
-    mv {{TOOL}}-discord /usr/local/bin/
-    mv {{TOOL}}-slack /usr/local/bin/
+    mv dist/{{TOOL}}-tg /usr/local/bin/
+    mv dist/{{TOOL}}-discord /usr/local/bin/
+    mv dist/{{TOOL}}-slack /usr/local/bin/
 
 # Install all binaries (main + companions)
 install-all: install install-companions
@@ -134,6 +138,7 @@ root-guard:
         ls *.go | grep -v '^doc\.go$' >&2; \
         exit 1; \
     fi
+    @bash scripts/check-root-layout.sh
 
 # Lint (fmt check + vet + markdown lint)
 lint: vet semgrep root-guard nosemgrep-audit lint-md
@@ -272,5 +277,6 @@ test-package-rationale-audit:
 
 # Clean build artifacts
 clean:
-    rm -f {{TOOL}} {{TOOL}}-tg {{TOOL}}-discord {{TOOL}}-slack coverage.out
+    rm -rf dist/ coverage.out
+    go clean
     go clean

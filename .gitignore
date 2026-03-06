@@ -1,8 +1,7 @@
 # OS
 .DS_Store
-# build files
-/paintress
-/docgen
+# build artifacts
+/dist/
 # test
 coverage.out
 # paintress runtime state on target repository
@@ -17,5 +16,5 @@ coverage.out
 docs/plans/
 # golang
 .gocache/
-# fake-claude binary (not source in testdata/)
-/fake-claude
+# firebase local debug log
+firebase-debug.log
