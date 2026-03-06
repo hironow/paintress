@@ -371,7 +371,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 |   +-- archive_prune.go      Archive file discovery/deletion
 |   +-- worktree.go           Git worktree operations
 |   +-- devserver.go          Dev server management
-+-- internal/eventsource/     Event store infrastructure (JSONL append-only)
++-- internal/eventsource/     Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI documentation generator
 +-- doc.go                    Package declaration (root-zero: all code in internal/)
