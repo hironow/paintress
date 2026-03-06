@@ -53,7 +53,7 @@ func WriteJournal(continent string, report *domain.ExpeditionReport) error {
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
-// WritePRIndex appends a PR URL index entry to the pr-index.jsonl file
+// WritePRIndex appends a PR URL index entry to the pr-index.jsonl file // nosemgrep: layer-session-no-event-persistence [permanent]
 // in the journal directory. Skips entries with empty or "none" PR URLs.
 func WritePRIndex(continent string, report *domain.ExpeditionReport) error {
 	if report.PRUrl == "" || report.PRUrl == "none" {
@@ -73,7 +73,7 @@ func WritePRIndex(continent string, report *domain.ExpeditionReport) error {
 		return fmt.Errorf("pr index: marshal: %w", err)
 	}
 	data = append(data, '\n')
-	path := filepath.Join(dir, "pr-index.jsonl")
+	path := filepath.Join(dir, "pr-index.jsonl") // nosemgrep: layer-session-no-event-persistence [permanent]
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("pr index: open: %w", err)

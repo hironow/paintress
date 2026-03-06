@@ -43,7 +43,7 @@ func readContractGolden(t *testing.T, name string) []byte {
 // TestContract_ParseDMail verifies that paintress's ParseDMail can
 // parse all cross-tool golden files. Paintress is Postel-liberal at
 // the parse level — unknown kinds and future schemas parse without error.
-func TestContract_domain.ParseDMail(t *testing.T) {
+func TestContract_ParseDMail(t *testing.T) {
 	for _, name := range contractGoldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
 			data := readContractGolden(t, name)
