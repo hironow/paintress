@@ -10,7 +10,7 @@ import (
 // ComputeSuccessRate loads all events and computes success rate metrics.
 // Returns nil metrics when no events exist or loading fails.
 func ComputeSuccessRate(eventStore port.EventStore) *domain.DoctorMetrics {
-	events, err := eventStore.LoadAll()
+	events, _, err := eventStore.LoadAll()
 	if err != nil || len(events) == 0 {
 		return &domain.DoctorMetrics{SuccessRate: "no events"}
 	}

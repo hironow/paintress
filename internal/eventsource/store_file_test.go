@@ -21,10 +21,10 @@ func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
 	}
 
 	// when
-	if err := store.Append(ev); err != nil {
+	if _, err := store.Append(ev); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 
 	// then
 	if err != nil {
@@ -44,7 +44,7 @@ func TestFileEventStore_LoadAll_EmptyDir(t *testing.T) {
 	store := NewFileEventStore(dir, &domain.NopLogger{})
 
 	// when
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 
 	// then
 	if err != nil {
@@ -68,7 +68,7 @@ func TestFileEventStore_DailyRotation(t *testing.T) {
 		domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}, day2)
 
 	// when
-	if err := store.Append(ev1, ev2); err != nil {
+	if _, err := store.Append(ev1, ev2); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 
@@ -85,7 +85,7 @@ func TestFileEventStore_DailyRotation(t *testing.T) {
 	}
 
 	// LoadAll returns both events in chronological order
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 	if err != nil {
 		t.Fatalf("LoadAll: %v", err)
 	}
@@ -112,10 +112,10 @@ func TestFileEventStore_LoadSince(t *testing.T) {
 	ev3, _ := domain.NewEvent(domain.EventExpeditionStarted,
 		domain.ExpeditionStartedData{Expedition: 2}, t3)
 
-	store.Append(ev1, ev2, ev3)
+	_, _ = store.Append(ev1, ev2, ev3)
 
 	// when: load events after t1
-	events, err := store.LoadSince(t1)
+	events, _, err := store.LoadSince(t1)
 
 	// then: only ev2 and ev3
 	if err != nil {
@@ -136,7 +136,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	invalid := domain.Event{} // all fields empty
 
 	// when
-	err := store.Append(invalid)
+	_, err := store.Append(invalid)
 
 	// then
 	if err == nil {
@@ -155,10 +155,10 @@ func TestFileEventStore_StableOrderForSameTimestamp(t *testing.T) {
 	ev2, _ := domain.NewEvent(domain.EventDMailFlushed,
 		domain.DMailFlushedData{Count: 1}, now)
 
-	store.Append(ev1, ev2)
+	_, _ = store.Append(ev1, ev2)
 
 	// when
-	events, err := store.LoadAll()
+	events, _, err := store.LoadAll()
 
 	// then: stable sort preserves insertion order
 	if err != nil {

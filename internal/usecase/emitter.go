@@ -37,7 +37,7 @@ func NewExpeditionEventEmitter(
 // emit persists events and dispatches (best-effort).
 func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
 	if e.store != nil {
-		if err := e.store.Append(events...); err != nil {
+		if _, err := e.store.Append(events...); err != nil {
 			return fmt.Errorf("append events: %w", err)
 		}
 	}

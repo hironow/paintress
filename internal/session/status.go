@@ -30,7 +30,7 @@ func Status(ctx context.Context, baseDir string, logger domain.Logger) domain.St
 
 	ctx, span := platform.Tracer.Start(ctx, "eventsource.load_all")
 	defer span.End()
-	allEvents, err := store.LoadAll()
+	allEvents, _, err := store.LoadAll()
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "eventsource.load_all"))

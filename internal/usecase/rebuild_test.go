@@ -69,8 +69,12 @@ type stubEventStore struct {
 	events []domain.Event
 }
 
-func (s *stubEventStore) Append(_ ...domain.Event) error       { return nil }
-func (s *stubEventStore) LoadAll() ([]domain.Event, error)     { return s.events, nil }
-func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, error) {
-	return s.events, nil
+func (s *stubEventStore) Append(_ ...domain.Event) (domain.AppendResult, error) {
+	return domain.AppendResult{}, nil
+}
+func (s *stubEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
+	return s.events, domain.LoadResult{}, nil
+}
+func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResult, error) {
+	return s.events, domain.LoadResult{}, nil
 }
