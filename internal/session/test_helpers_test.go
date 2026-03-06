@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // containsStr is a simple substring check without importing strings.
@@ -75,6 +78,53 @@ func setupTestRepo(t *testing.T) string {
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 	return dir
 }
+
+// ensureExpeditionDirs creates the standard expedition directory structure.
+func ensureExpeditionDirs(t *testing.T, continent string) {
+	t.Helper()
+	for _, dir := range []string{
+		domain.ArchiveDir(continent),
+		domain.OutboxDir(continent),
+		domain.InboxDir(continent),
+		filepath.Join(continent, ".expedition", ".run"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+}
+
+// testOutboxStore creates a test outbox store with automatic cleanup.
+func testOutboxStore(t *testing.T, continent string) *SQLiteOutboxStore {
+	t.Helper()
+	store, err := NewOutboxStoreForDir(continent)
+	if err != nil {
+		t.Fatalf("create outbox store: %v", err)
+	}
+	t.Cleanup(func() { store.Close() })
+	return store
+}
+
+// failingEmitter is a minimal ExpeditionEventEmitter that always returns an error.
+// Duplicated here for package session tests (also exists in dmail_test.go which is session_test).
+type failingEmitter struct {
+	err error
+}
+
+func (f *failingEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+	return f.err
+}
+func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error  { return f.err }
+func (f *failingEmitter) EmitGommage(_ int, _ time.Time) error              { return f.err }
+func (f *failingEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error {
+	return f.err
+}
+func (f *failingEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return f.err }
+func (f *failingEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return f.err }
+func (f *failingEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return f.err }
 
 // writeScript creates an executable shell script.
 func writeScript(t *testing.T, path string, content string) {

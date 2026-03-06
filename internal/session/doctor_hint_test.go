@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"fmt"
@@ -6,11 +6,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestCheckClaudeAuth_Failed_HasHint(t *testing.T) {
 	// given
-	check := checkClaudeAuth("", fmt.Errorf("exit status 1"))
+	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"))
 
 	// when/then
 	if check.OK {
@@ -29,7 +31,7 @@ func TestCheckLinearMCP_NotConnected_HasHint(t *testing.T) {
 	mcpOutput := "plugin:filesystem:filesystem: /path (stdio) - ok Connected\n"
 
 	// when
-	check := checkLinearMCP(mcpOutput, nil)
+	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if check.OK {
@@ -48,7 +50,7 @@ func TestCheckContinent_Missing_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	check := checkContinent(dir)
+	check := session.ExportCheckContinent(dir)
 
 	// then
 	if check.OK {
@@ -68,7 +70,7 @@ func TestCheckConfig_Missing_HasHint(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0o755)
 
 	// when
-	check := checkConfig(dir)
+	check := session.ExportCheckConfig(dir)
 
 	// then
 	if check.OK {
@@ -87,7 +89,7 @@ func TestCheckGitRepo_NotRepo_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	check := checkGitRepo(dir)
+	check := session.ExportCheckGitRepo(dir)
 
 	// then
 	if check.OK {
@@ -106,7 +108,7 @@ func TestCheckWritability_NotWritable_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	check := checkWritability(dir)
+	check := session.ExportCheckWritability(dir)
 
 	// then
 	if check.OK {
@@ -123,7 +125,7 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0o755)
 
 	// when
-	check := checkSkills(dir)
+	check := session.ExportCheckSkills(dir)
 
 	// then
 	if check.OK {
@@ -139,7 +141,7 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 
 func TestRunDoctor_BinaryNotFound_HasHint(t *testing.T) {
 	// given: use a nonexistent claude command
-	checks := RunDoctor("nonexistent-claude-xyz-99999", "")
+	checks := session.RunDoctor("nonexistent-claude-xyz-99999", "")
 
 	// then: the claude check should have a hint
 	for _, c := range checks {

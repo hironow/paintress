@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -10,11 +10,12 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
-func testOutboxStore(t *testing.T, continent string) *SQLiteOutboxStore {
+func testOutboxStore(t *testing.T, continent string) *session.SQLiteOutboxStore {
 	t.Helper()
-	store, err := NewOutboxStoreForDir(continent)
+	store, err := session.NewOutboxStoreForDir(continent)
 	if err != nil {
 		t.Fatalf("create outbox store: %v", err)
 	}
@@ -33,24 +34,6 @@ func ensureExpeditionDirs(t *testing.T, continent string) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("mkdir %s: %v", dir, err)
 		}
-	}
-}
-
-func TestSQLiteOutboxStore_PragmaSynchronousNormal(t *testing.T) {
-	// given
-	continent := t.TempDir()
-	ensureExpeditionDirs(t, continent)
-	store := testOutboxStore(t, continent)
-
-	// when: query PRAGMA on the store's own connection (package-internal access)
-	var synchronous string
-	if err := store.db.QueryRow("PRAGMA synchronous").Scan(&synchronous); err != nil {
-		t.Fatalf("query PRAGMA synchronous: %v", err)
-	}
-
-	// then: synchronous = 1 (NORMAL)
-	if synchronous != "1" {
-		t.Errorf("PRAGMA synchronous: got %q, want %q (NORMAL)", synchronous, "1")
 	}
 }
 
@@ -196,13 +179,13 @@ func TestSQLiteOutboxStore_ConcurrentStageAndFlush(t *testing.T) {
 	archiveDir := domain.ArchiveDir(continent)
 	outboxDir := domain.OutboxDir(continent)
 
-	storeA, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	storeA, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store A: %v", err)
 	}
 	defer storeA.Close()
 
-	storeB, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	storeB, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store B: %v", err)
 	}
@@ -307,7 +290,7 @@ func TestSQLiteOutboxStore_RetryCount_DeadLetterAfterMaxRetries(t *testing.T) {
 	archiveDir := domain.ArchiveDir(continent)
 	outboxDir := domain.OutboxDir(continent)
 
-	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store: %v", err)
 	}
@@ -348,7 +331,7 @@ func TestSQLiteOutboxStore_RetryCount_SuccessBeforeMaxRetries(t *testing.T) {
 	archiveDir := domain.ArchiveDir(continent)
 	outboxDir := domain.OutboxDir(continent)
 
-	store, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	store, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store: %v", err)
 	}
@@ -390,7 +373,7 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	archiveDir := domain.ArchiveDir(continent)
 	outboxDir := domain.OutboxDir(continent)
 
-	storeSetup, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	storeSetup, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create setup store: %v", err)
 	}
@@ -399,13 +382,13 @@ func TestSQLiteOutboxStore_ConcurrentFlushSameItem(t *testing.T) {
 	}
 	storeSetup.Close()
 
-	storeA, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	storeA, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store A: %v", err)
 	}
 	defer storeA.Close()
 
-	storeB, err := NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
+	storeB, err := session.NewSQLiteOutboxStore(dbPath, archiveDir, outboxDir)
 	if err != nil {
 		t.Fatalf("create store B: %v", err)
 	}

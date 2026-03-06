@@ -1809,3 +1809,15 @@ func TestMissionText_FallbackToEnglish(t *testing.T) {
 		t.Error("unsupported lang should fall back to English")
 	}
 }
+
+func TestExpedition_Run_ShortTimeout(t *testing.T) {
+	exp := newTestExpedition(t, "output", 0)
+	exp.Config.TimeoutSec = 1 // very short timeout
+
+	ctx := context.Background()
+	_, err := exp.Run(ctx)
+	// With 1-second timeout, process should complete fine (mock is fast)
+	if err != nil {
+		t.Logf("short timeout error (may be acceptable): %v", err)
+	}
+}

@@ -1,11 +1,14 @@
-package session
+package session_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
@@ -40,6 +43,8 @@ type stubEventStore struct {
 	loadResult   domain.LoadResult
 }
 
+var _ port.EventStore = (*stubEventStore)(nil)
+
 func (s *stubEventStore) Append(_ ...domain.Event) (domain.AppendResult, error) {
 	return s.appendResult, nil
 }
@@ -70,7 +75,7 @@ func TestSpanEventStore_BasicMode_OmitsDebugAttributes(t *testing.T) {
 		loadResult: domain.LoadResult{FileCount: 3, CorruptLineCount: 1},
 	}
 
-	store := NewSpanEventStore(inner)
+	store := session.NewSpanEventStore(inner)
 
 	// Exercise all three operations
 	evt, _ := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "test"}, time.Now())
@@ -138,7 +143,7 @@ func TestSpanEventStore_DebugMode_IncludesAllAttributes(t *testing.T) {
 		loadResult: domain.LoadResult{FileCount: 3, CorruptLineCount: 1},
 	}
 
-	store := NewSpanEventStore(inner)
+	store := session.NewSpanEventStore(inner)
 
 	evt, _ := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "test"}, time.Now())
 	store.Append(evt)  // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
@@ -196,7 +201,7 @@ func TestSpanEventStore_NoPIILeakage(t *testing.T) {
 		loadResult: domain.LoadResult{FileCount: 1, CorruptLineCount: 0},
 	}
 
-	store := NewSpanEventStore(inner)
+	store := session.NewSpanEventStore(inner)
 
 	evt, _ := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "secret-dmail"}, time.Now())
 	store.Append(evt)  // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
@@ -226,7 +231,7 @@ func TestSpanEventStore_NoPIILeakage(t *testing.T) {
 			if v == "" {
 				continue
 			}
-			if containsStr(v, "secret-dmail") {
+			if strings.Contains(v, "secret-dmail") {
 				t.Errorf("PII leak: span %q attribute %q contains event body data %q", s.Name, string(attr.Key), v)
 			}
 		}

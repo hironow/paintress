@@ -1,44 +1,46 @@
-package session
+package session_test
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestExtractValue_Normal(t *testing.T) {
-	v := extractValue("- **Status**: success")
+	v := session.ExportExtractValue("- **Status**: success")
 	if v != "success" {
 		t.Errorf("got %q, want 'success'", v)
 	}
 }
 
 func TestExtractValue_WithBoldMarkers(t *testing.T) {
-	v := extractValue("- **Status**: **failed**")
+	v := session.ExportExtractValue("- **Status**: **failed**")
 	if v != "failed" {
 		t.Errorf("got %q, want 'failed'", v)
 	}
 }
 
 func TestExtractValue_NoColon(t *testing.T) {
-	v := extractValue("no colon here")
+	v := session.ExportExtractValue("no colon here")
 	if v != "" {
 		t.Errorf("got %q, want empty", v)
 	}
 }
 
 func TestExtractValue_EmptyValue(t *testing.T) {
-	v := extractValue("- **Status**:")
+	v := session.ExportExtractValue("- **Status**:")
 	if v != "" {
 		t.Errorf("got %q, want empty", v)
 	}
 }
 
 func TestExtractValue_ValueWithColons(t *testing.T) {
-	v := extractValue("- **Reason**: test failed: assertion error: expected 5")
+	v := session.ExportExtractValue("- **Reason**: test failed: assertion error: expected 5")
 	// SplitN with 2 keeps everything after first ":"
 	if v != "test failed: assertion error: expected 5" {
 		t.Errorf("got %q", v)
@@ -47,7 +49,7 @@ func TestExtractValue_ValueWithColons(t *testing.T) {
 
 func TestFormatLuminaForPrompt_Empty(t *testing.T) {
 	result := domain.FormatLuminaForPrompt(nil)
-	if !containsStr(result, "No Lumina learned") {
+	if !strings.Contains(result, "No Lumina learned") {
 		t.Errorf("empty luminas should say no luminas: %q", result)
 	}
 }
@@ -59,16 +61,16 @@ func TestFormatLuminaForPrompt_WithLuminas(t *testing.T) {
 	}
 	result := domain.FormatLuminaForPrompt(luminas)
 
-	if !containsStr(result, "Defensive") {
+	if !strings.Contains(result, "Defensive") {
 		t.Errorf("should contain Defensive section header: %q", result)
 	}
-	if !containsStr(result, "Offensive") {
+	if !strings.Contains(result, "Offensive") {
 		t.Errorf("should contain Offensive section header: %q", result)
 	}
-	if !containsStr(result, "tests failing") {
+	if !strings.Contains(result, "tests failing") {
 		t.Errorf("should contain failure pattern: %q", result)
 	}
-	if !containsStr(result, "implement") {
+	if !strings.Contains(result, "implement") {
 		t.Errorf("should contain success pattern: %q", result)
 	}
 }
@@ -86,9 +88,9 @@ func TestScanJournalsForLumina_FailureThreshold(t *testing.T) {
 - **Mission**: implement
 `), 0644)
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "test failed") {
+		if strings.Contains(l.Pattern, "test failed") {
 			t.Error("single failure should not create lumina")
 		}
 	}
@@ -109,9 +111,9 @@ func TestScanJournalsForLumina_SuccessThreshold(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "verify") {
+		if strings.Contains(l.Pattern, "verify") {
 			t.Error("2 successes should not reach threshold of 3")
 		}
 	}
@@ -141,15 +143,15 @@ func TestScanJournalsForLumina_MixedStatuses(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	hasFailure := false
 	hasSuccess := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "lint error") {
+		if strings.Contains(l.Pattern, "lint error") {
 			hasFailure = true
 		}
-		if containsStr(l.Pattern, "implement") && containsStr(l.Pattern, "Proven approach") {
+		if strings.Contains(l.Pattern, "implement") && strings.Contains(l.Pattern, "Proven approach") {
 			hasSuccess = true
 		}
 	}
@@ -179,7 +181,7 @@ func TestScanJournalsForLumina_DifferentFailureReasons(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i+1)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 	if len(luminas) != 0 {
 		t.Errorf("different failure reasons should not create luminas, got %d", len(luminas))
 	}
@@ -202,11 +204,11 @@ func TestScanJournalsForLumina_InsightUsedForDefensive(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	hasInsight := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "Redis connection required") {
+		if strings.Contains(l.Pattern, "Redis connection required") {
 			hasInsight = true
 		}
 		// Should NOT contain the raw reason "test timeout" as the pattern
@@ -235,11 +237,11 @@ func TestScanJournalsForLumina_InsightUsedForOffensive(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	hasInsight := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "TDD cycle with bun test") {
+		if strings.Contains(l.Pattern, "TDD cycle with bun test") {
 			hasInsight = true
 		}
 		// Should NOT contain the raw mission type as the pattern
@@ -268,11 +270,11 @@ func TestScanJournalsForLumina_FallbackToReasonWhenNoInsight(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	hasReason := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "lint error") {
+		if strings.Contains(l.Pattern, "lint error") {
 			hasReason = true
 		}
 	}
@@ -296,11 +298,11 @@ func TestScanJournalsForLumina_FallbackToMissionWhenNoInsight(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	hasMission := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "implement") {
+		if strings.Contains(l.Pattern, "implement") {
 			hasMission = true
 		}
 	}
@@ -324,14 +326,14 @@ func TestScanJournalsForLumina_HighSeverityAlert(t *testing.T) {
 	os.WriteFile(filepath.Join(jDir, "001.md"), []byte(content), 0644)
 
 	// when
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	// then
 	hasAlert := false
 	for _, l := range luminas {
 		if l.Source == "high-severity-alert" {
 			hasAlert = true
-			if !containsStr(l.Pattern, "alert-critical, alert-deploy") {
+			if !strings.Contains(l.Pattern, "alert-critical, alert-deploy") {
 				t.Errorf("alert lumina should contain d-mail names, got: %q", l.Pattern)
 			}
 		}
@@ -356,7 +358,7 @@ func TestScanJournalsForLumina_NoHighSeverity(t *testing.T) {
 	os.WriteFile(filepath.Join(jDir, "001.md"), []byte(content), 0644)
 
 	// when
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 
 	// then
 	for _, l := range luminas {
@@ -377,13 +379,13 @@ func TestFormatLuminaForPrompt_WithAlert(t *testing.T) {
 	result := domain.FormatLuminaForPrompt(luminas)
 
 	// then
-	if !containsStr(result, "Alert") {
+	if !strings.Contains(result, "Alert") {
 		t.Errorf("should contain Alert section header, got: %q", result)
 	}
-	if !containsStr(result, "alert-critical") {
+	if !strings.Contains(result, "alert-critical") {
 		t.Errorf("should contain alert d-mail name, got: %q", result)
 	}
-	if !containsStr(result, "Defensive") {
+	if !strings.Contains(result, "Defensive") {
 		t.Errorf("should still contain Defensive section, got: %q", result)
 	}
 }
