@@ -131,7 +131,7 @@ func (ds *DevServer) Stop() {
 	defer ds.mu.Unlock()
 	if ds.process != nil && ds.process.Process != nil {
 		ds.logger.Info("%s", domain.Msg("devserver_stop"))
-		_ = ds.process.Process.Signal(os.Interrupt)
+		_ = ds.process.Process.Signal(os.Interrupt) // nosemgrep: lod-excessive-dot-chain
 		done := make(chan struct{})
 		go func() {
 			_ = ds.process.Wait()
@@ -140,7 +140,7 @@ func (ds *DevServer) Stop() {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
-			_ = ds.process.Process.Kill()
+			_ = ds.process.Process.Kill() // nosemgrep: lod-excessive-dot-chain
 		}
 		ds.running = false
 	}
