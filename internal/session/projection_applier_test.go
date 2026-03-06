@@ -1,15 +1,16 @@
-package session
+package session_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestProjectionApplier_Apply_UpdatesState(t *testing.T) {
 	// given
-	applier := NewProjectionApplier()
+	applier := session.NewProjectionApplier()
 	ev := makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 1, Status: "success", IssueID: "PROJ-1",
 	})
@@ -32,7 +33,7 @@ func TestProjectionApplier_Apply_UpdatesState(t *testing.T) {
 
 func TestProjectionApplier_Rebuild_ResetsAndReplays(t *testing.T) {
 	// given: applier with pre-existing state
-	applier := NewProjectionApplier()
+	applier := session.NewProjectionApplier()
 	applier.Apply(makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 1, Status: "failed",
 	}))
@@ -69,7 +70,7 @@ func TestProjectionApplier_Rebuild_ResetsAndReplays(t *testing.T) {
 
 func TestProjectionApplier_Rebuild_Empty(t *testing.T) {
 	// given
-	applier := NewProjectionApplier()
+	applier := session.NewProjectionApplier()
 	applier.Apply(makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 1, Status: "success",
 	}))
@@ -102,10 +103,10 @@ func TestProjectionApplier_ConsistentWithProjectState(t *testing.T) {
 	}
 
 	// when
-	applier := NewProjectionApplier()
+	applier := session.NewProjectionApplier()
 	applier.Rebuild(events)
 	applierState := applier.State()
-	directState := ProjectState(events)
+	directState := session.ProjectState(events)
 
 	// then: both should produce identical state
 	if applierState.TotalExpeditions != directState.TotalExpeditions {

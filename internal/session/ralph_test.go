@@ -1,12 +1,14 @@
-package session
+package session_test
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 // === Flag Tests ===
@@ -15,8 +17,8 @@ func TestReadWriteFlag(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 5, "AWE-42", "success", "3", 0)
-	f := ReadFlag(dir)
+	session.WriteFlag(dir, 5, "AWE-42", "success", "3", 0)
+	f := session.ReadFlag(dir)
 	if f.LastExpedition != 5 {
 		t.Errorf("LastExpedition = %d", f.LastExpedition)
 	}
@@ -36,7 +38,7 @@ func TestWriteJournal(t *testing.T) {
 		MissionType: "implement", Status: "success", Reason: "done",
 		PRUrl: "https://example.com/pr/1", BugIssues: "none",
 	}
-	if err := WriteJournal(dir, report); err != nil {
+	if err := session.WriteJournal(dir, report); err != nil {
 		t.Fatal(err)
 	}
 
@@ -45,7 +47,7 @@ func TestWriteJournal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !containsStr(string(content), "AWE-10") {
+	if !strings.Contains(string(content), "AWE-10") {
 		t.Error("missing issue ID")
 	}
 }
@@ -56,7 +58,7 @@ func TestLumina_ScanEmpty(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 	if len(luminas) != 0 {
 		t.Errorf("expected 0 luminas from empty journals, got %d", len(luminas))
 	}
@@ -78,10 +80,10 @@ func TestLumina_ScanWithFailures(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 	found := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "テストが3回") {
+		if strings.Contains(l.Pattern, "テストが3回") {
 			found = true
 		}
 	}
@@ -104,10 +106,10 @@ func TestLumina_ScanWithSuccesses(t *testing.T) {
 		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", i)), []byte(content), 0644)
 	}
 
-	luminas := ScanJournalsForLumina(dir)
+	luminas := session.ScanJournalsForLumina(dir)
 	found := false
 	for _, l := range luminas {
-		if containsStr(l.Pattern, "implement") && containsStr(l.Pattern, "Proven approach") {
+		if strings.Contains(l.Pattern, "implement") && strings.Contains(l.Pattern, "Proven approach") {
 			found = true
 		}
 	}

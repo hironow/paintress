@@ -1,10 +1,12 @@
-package session
+package session_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestArchivePrune_DryRun_ListsOldFiles(t *testing.T) {
@@ -20,7 +22,7 @@ func TestArchivePrune_DryRun_ListsOldFiles(t *testing.T) {
 	os.Chtimes(oldFile, time.Now().Add(-40*24*time.Hour), time.Now().Add(-40*24*time.Hour))
 
 	// when: dry-run with 30 days threshold
-	result, err := ArchivePrune(dir, 30, false)
+	result, err := session.ArchivePrune(dir, 30, false)
 
 	// then
 	if err != nil {
@@ -54,7 +56,7 @@ func TestArchivePrune_Execute_DeletesOldFiles(t *testing.T) {
 	os.Chtimes(old2, past, past)
 
 	// when: execute with 30 days threshold
-	result, err := ArchivePrune(dir, 30, true)
+	result, err := session.ArchivePrune(dir, 30, true)
 
 	// then
 	if err != nil {
@@ -84,7 +86,7 @@ func TestArchivePrune_NoArchiveDir_ReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result, err := ArchivePrune(dir, 30, false)
+	result, err := session.ArchivePrune(dir, 30, false)
 
 	// then
 	if err != nil {
@@ -110,7 +112,7 @@ func TestArchivePrune_IgnoresNonMdFiles(t *testing.T) {
 	os.Chtimes(oldMd, past, past)
 
 	// when
-	result, err := ArchivePrune(dir, 30, false)
+	result, err := session.ArchivePrune(dir, 30, false)
 
 	// then
 	if err != nil {
@@ -134,7 +136,7 @@ func TestArchivePrune_AllRecent_NoCandidates(t *testing.T) {
 	os.WriteFile(filepath.Join(archiveDir, "report-my-2.md"), []byte("new"), 0644)
 
 	// when
-	result, err := ArchivePrune(dir, 30, false)
+	result, err := session.ArchivePrune(dir, 30, false)
 
 	// then
 	if err != nil {
@@ -164,7 +166,7 @@ func TestArchivePrune_Execute_ReportsPartialFailure(t *testing.T) {
 	defer os.Chmod(archiveDir, 0755) // restore for cleanup
 
 	// when: execute
-	result, err := ArchivePrune(dir, 30, true)
+	result, err := session.ArchivePrune(dir, 30, true)
 
 	// then: no error from function, but Deleted < Candidates
 	if err != nil {
@@ -180,7 +182,7 @@ func TestArchivePrune_Execute_ReportsPartialFailure(t *testing.T) {
 
 func TestArchivePrune_NegativeDays_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	_, err := ArchivePrune(dir, -7, false)
+	_, err := session.ArchivePrune(dir, -7, false)
 	if err == nil {
 		t.Fatal("expected error for negative days, got nil")
 	}
@@ -188,7 +190,7 @@ func TestArchivePrune_NegativeDays_ReturnsError(t *testing.T) {
 
 func TestArchivePrune_ZeroDays_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
-	_, err := ArchivePrune(dir, 0, false)
+	_, err := session.ArchivePrune(dir, 0, false)
 	if err == nil {
 		t.Fatal("expected error for zero days, got nil")
 	}
@@ -205,7 +207,7 @@ func TestArchivePrune_CustomDays(t *testing.T) {
 	os.Chtimes(f, time.Now().Add(-10*24*time.Hour), time.Now().Add(-10*24*time.Hour))
 
 	// when: threshold is 7 days — file should be a candidate
-	result7, err := ArchivePrune(dir, 7, false)
+	result7, err := session.ArchivePrune(dir, 7, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -214,7 +216,7 @@ func TestArchivePrune_CustomDays(t *testing.T) {
 	}
 
 	// when: threshold is 15 days — file should NOT be a candidate
-	result15, err := ArchivePrune(dir, 15, false)
+	result15, err := session.ArchivePrune(dir, 15, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

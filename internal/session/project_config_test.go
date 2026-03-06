@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestProjectConfigPath(t *testing.T) {
@@ -27,11 +28,11 @@ func TestSaveAndLoadProjectConfig(t *testing.T) {
 		},
 	}
 
-	if err := SaveProjectConfig(dir, cfg); err != nil {
+	if err := session.SaveProjectConfig(dir, cfg); err != nil {
 		t.Fatalf("SaveProjectConfig: %v", err)
 	}
 
-	loaded, err := LoadProjectConfig(dir)
+	loaded, err := session.LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
@@ -52,12 +53,12 @@ func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
 		Tracker: domain.IssueTrackerConfig{Team: "TEST"},
 	}
 
-	if err := SaveProjectConfig(dir, cfg); err != nil {
+	if err := session.SaveProjectConfig(dir, cfg); err != nil {
 		t.Fatalf("SaveProjectConfig should create parent dir, got: %v", err)
 	}
 
 	// Verify file was written
-	loaded, err := LoadProjectConfig(dir)
+	loaded, err := session.LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("LoadProjectConfig: %v", err)
 	}
@@ -69,7 +70,7 @@ func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
 func TestLoadProjectConfig_FileNotFound(t *testing.T) {
 	dir := t.TempDir()
 
-	cfg, err := LoadProjectConfig(dir)
+	cfg, err := session.LoadProjectConfig(dir)
 	if err != nil {
 		t.Fatalf("expected no error for missing file, got: %v", err)
 	}

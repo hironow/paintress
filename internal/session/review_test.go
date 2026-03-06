@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 // === HasReviewComments ===
@@ -209,7 +210,7 @@ func TestRunReview_EmptyCommand(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result, err := RunReview(ctx, "", "/tmp")
+	result, err := session.RunReview(ctx, "", "/tmp")
 
 	// then
 	if err != nil {
@@ -225,7 +226,7 @@ func TestRunReview_WhitespaceOnlyCommand(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result, err := RunReview(ctx, "   ", "/tmp")
+	result, err := session.RunReview(ctx, "   ", "/tmp")
 
 	// then
 	if err != nil {
@@ -246,7 +247,7 @@ func TestRunReview_NonZeroExitWithComments(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Reset live URL'\nexit 1\n"), 0755)
 
 	// when
-	result, err := RunReview(ctx, scriptPath, dir)
+	result, err := session.RunReview(ctx, scriptPath, dir)
 
 	// then — should return review comments, NOT an error
 	if err != nil {
@@ -265,7 +266,7 @@ func TestRunReview_CommandNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	result, err := RunReview(ctx, "nonexistent-review-tool-xyz --check", t.TempDir())
+	result, err := session.RunReview(ctx, "nonexistent-review-tool-xyz --check", t.TempDir())
 
 	// then — exit code based: non-zero exit → ReviewResult with Passed=false
 	// (shell wraps the command, so "command not found" becomes exit 127 + stderr)
@@ -283,7 +284,7 @@ func TestRunReview_PassingReview(t *testing.T) {
 	dir := t.TempDir()
 
 	// when — echo outputs clean review text
-	result, err := RunReview(ctx, "echo I did not find any discrete actionable regressions", dir)
+	result, err := session.RunReview(ctx, "echo I did not find any discrete actionable regressions", dir)
 
 	// then
 	if err != nil {
@@ -303,7 +304,7 @@ func TestRunReview_FailingReview(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Reset live URL state'\nexit 1\n"), 0755)
 
 	// when
-	result, err := RunReview(ctx, scriptPath, dir)
+	result, err := session.RunReview(ctx, scriptPath, dir)
 
 	// then
 	if err != nil {
@@ -323,7 +324,7 @@ func TestRunReview_ExitZero_PassesEvenWithTagsInOutput(t *testing.T) {
 	dir := t.TempDir()
 
 	// when — echo exits 0
-	result, err := RunReview(ctx, "echo [P2] Reset live URL state", dir)
+	result, err := session.RunReview(ctx, "echo [P2] Reset live URL state", dir)
 
 	// then — exit 0 means pass, output content is irrelevant
 	if err != nil {
@@ -343,7 +344,7 @@ func TestRunReview_FindingsWithHTTP429MentionNotRateLimited(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Fix HTTP 429 error handling in API client'\nexit 1\n"), 0755)
 
 	// when
-	result, err := RunReview(ctx, scriptPath, dir)
+	result, err := session.RunReview(ctx, scriptPath, dir)
 
 	// then — should return review comments, NOT treat as rate-limited
 	if err != nil {
@@ -366,7 +367,7 @@ func TestRunReview_RateLimitInOutput(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'rate limit exceeded'\nexit 1\n"), 0755)
 
 	// when
-	_, err := RunReview(ctx, scriptPath, dir)
+	_, err := session.RunReview(ctx, scriptPath, dir)
 
 	// then — rate limit on non-zero exit is a service error
 	if err == nil {
@@ -383,7 +384,7 @@ func TestRunReview_RateLimitExitZero_Passes(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	result, err := RunReview(ctx, "echo rate limit exceeded", dir)
+	result, err := session.RunReview(ctx, "echo rate limit exceeded", dir)
 
 	// then — exit 0 means pass
 	if err != nil {
@@ -403,7 +404,7 @@ func TestRunReview_CommentsTakePrecedenceOverRateLimit(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho '[P2] Fix pagination; rate limit exceeded during analysis'\nexit 1\n"), 0755)
 
 	// when — rate limit text is present, but so are actual review comments
-	_, err := RunReview(ctx, scriptPath, dir)
+	_, err := session.RunReview(ctx, scriptPath, dir)
 
 	// then — rate limit detection catches "rate limit" substring, so this is
 	// treated as a service error. The trade-off: false positives are rare because
@@ -423,7 +424,7 @@ func TestRunReview_RespectsWorkingDirectory(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'clean review'\n"), 0755)
 
 	// when — run script by name only, relying on cmd.Dir
-	result, err := RunReview(ctx, "./review.sh", dir)
+	result, err := session.RunReview(ctx, "./review.sh", dir)
 
 	// then
 	if err != nil {
@@ -440,7 +441,7 @@ func TestRunReview_EmptyOutput_Passes(t *testing.T) {
 	dir := t.TempDir()
 
 	// when — command exits 0 with no output
-	result, err := RunReview(ctx, "true", dir)
+	result, err := session.RunReview(ctx, "true", dir)
 
 	// then
 	if err != nil {
@@ -457,7 +458,7 @@ func TestRunReview_ContextCanceled(t *testing.T) {
 	cancel() // cancel immediately
 
 	// when
-	_, err := RunReview(ctx, "sleep 10", t.TempDir())
+	_, err := session.RunReview(ctx, "sleep 10", t.TempDir())
 
 	// then
 	if err == nil {
@@ -475,7 +476,7 @@ func TestRunReview_CallerTimeoutPreventsHang(t *testing.T) {
 
 	// when — run a command that would hang for 999s
 	start := time.Now()
-	_, err := RunReview(ctx, "sleep 999", t.TempDir())
+	_, err := session.RunReview(ctx, "sleep 999", t.TempDir())
 	elapsed := time.Since(start)
 
 	// then — should timeout around 2s, not hang
@@ -498,7 +499,7 @@ func TestRunReview_ExitCodeNonZero_ReturnsComments(t *testing.T) {
 	os.WriteFile(scriptPath, []byte("#!/bin/bash\necho 'style: variable name too short'\nexit 1\n"), 0755)
 
 	// when
-	result, err := RunReview(ctx, scriptPath, dir)
+	result, err := session.RunReview(ctx, scriptPath, dir)
 
 	// then — non-zero exit means comments found (not an error)
 	if err != nil {

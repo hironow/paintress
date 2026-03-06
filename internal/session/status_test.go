@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestStatus_EmptyState(t *testing.T) {
@@ -15,7 +16,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := Status(context.Background(), baseDir, &domain.NopLogger{})
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.Expeditions != 0 {
@@ -75,7 +76,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := Status(context.Background(), baseDir, &domain.NopLogger{})
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.InboxCount != 2 {
@@ -90,7 +91,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with expedition events
 	baseDir := t.TempDir()
 	stateDir := filepath.Join(baseDir, ".expedition")
-	store := NewEventStore(stateDir, &domain.NopLogger{})
+	store := session.NewEventStore(stateDir, &domain.NopLogger{})
 
 	ts := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
@@ -117,7 +118,7 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 
 	// when
-	report := Status(context.Background(), baseDir, &domain.NopLogger{})
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.Expeditions != 4 {

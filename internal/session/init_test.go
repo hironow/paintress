@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"io"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestInitProject_WritesConfig(t *testing.T) {
@@ -14,13 +15,13 @@ func TestInitProject_WritesConfig(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	err := InitProject(dir, "ENG", "backend", io.Discard)
+	err := session.InitProject(dir, "ENG", "backend", io.Discard)
 
 	// then
 	if err != nil {
 		t.Fatalf("InitProject: %v", err)
 	}
-	cfg, loadErr := LoadProjectConfig(dir)
+	cfg, loadErr := session.LoadProjectConfig(dir)
 	if loadErr != nil {
 		t.Fatalf("LoadProjectConfig: %v", loadErr)
 	}
@@ -37,13 +38,13 @@ func TestInitProject_SkipOptionalProject(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	err := InitProject(dir, "MY", "", io.Discard)
+	err := session.InitProject(dir, "MY", "", io.Discard)
 
 	// then
 	if err != nil {
 		t.Fatalf("InitProject: %v", err)
 	}
-	cfg, loadErr := LoadProjectConfig(dir)
+	cfg, loadErr := session.LoadProjectConfig(dir)
 	if loadErr != nil {
 		t.Fatalf("LoadProjectConfig: %v", loadErr)
 	}
@@ -60,7 +61,7 @@ func TestInitProject_CreatesExpeditionDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	err := InitProject(dir, "MY", "", io.Discard)
+	err := session.InitProject(dir, "MY", "", io.Discard)
 
 	// then
 	if err != nil {
@@ -81,7 +82,7 @@ func TestInitProject_ConfigFileExists(t *testing.T) {
 	dir := t.TempDir()
 
 	// when — first init succeeds
-	err := InitProject(dir, "MY", "", io.Discard)
+	err := session.InitProject(dir, "MY", "", io.Discard)
 	if err != nil {
 		t.Fatalf("first InitProject: %v", err)
 	}

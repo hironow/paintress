@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"os"
@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestJournalDir(t *testing.T) {
@@ -31,7 +32,7 @@ func TestWriteJournal_CreatesDirectoryIfMissing(t *testing.T) {
 		PRUrl:       "https://example.com/pr/1",
 		BugIssues:   "none",
 	}
-	if err := WriteJournal(dir, report); err != nil {
+	if err := session.WriteJournal(dir, report); err != nil {
 		t.Fatal(err)
 	}
 
@@ -58,7 +59,7 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 		Insight:     "Tailwind config uses content paths with glob patterns",
 	}
 
-	if err := WriteJournal(dir, report); err != nil {
+	if err := session.WriteJournal(dir, report); err != nil {
 		t.Fatal(err)
 	}
 
@@ -81,7 +82,7 @@ func TestWriteJournal_ContentFormat(t *testing.T) {
 		"Insight**: Tailwind config uses content paths with glob patterns",
 	}
 	for _, c := range checks {
-		if !containsStr(s, c) {
+		if !strings.Contains(s, c) {
 			t.Errorf("journal missing %q", c)
 		}
 	}
@@ -104,7 +105,7 @@ func TestWriteJournal_IncludesFailureType(t *testing.T) {
 		Insight:     "External service was down",
 	}
 
-	WriteJournal(dir, report)
+	session.WriteJournal(dir, report)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "001.md"))
 	if err != nil {
@@ -131,7 +132,7 @@ func TestWriteJournal_EmptyInsightField(t *testing.T) {
 		Insight:     "",
 	}
 
-	WriteJournal(dir, report)
+	session.WriteJournal(dir, report)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "002.md"))
 	if err != nil {
@@ -158,7 +159,7 @@ func TestWriteJournal_InsightNotSetDefaultsToEmptyLine(t *testing.T) {
 		// Insight intentionally not set
 	}
 
-	WriteJournal(dir, report)
+	session.WriteJournal(dir, report)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "003.md"))
 	if err != nil {
@@ -186,7 +187,7 @@ func TestWriteJournal_FilenamePadding(t *testing.T) {
 			Expedition: tt.expedition, IssueID: "X", Status: "success",
 			PRUrl: "none", BugIssues: "none",
 		}
-		WriteJournal(dir, report)
+		session.WriteJournal(dir, report)
 
 		path := filepath.Join(dir, ".expedition", "journal", tt.filename)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -199,7 +200,7 @@ func TestListJournalFiles_Empty(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	files, err := ListJournalFiles(dir)
+	files, err := session.ListJournalFiles(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +218,7 @@ func TestListJournalFiles_SkipsZeroFile(t *testing.T) {
 	os.WriteFile(filepath.Join(jDir, "000.md"), []byte("skip me"), 0644)
 	os.WriteFile(filepath.Join(jDir, "001.md"), []byte("include me"), 0644)
 
-	files, err := ListJournalFiles(dir)
+	files, err := session.ListJournalFiles(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +236,7 @@ func TestListJournalFiles_Sorted(t *testing.T) {
 	os.WriteFile(filepath.Join(jDir, "001.md"), []byte("first"), 0644)
 	os.WriteFile(filepath.Join(jDir, "002.md"), []byte("second"), 0644)
 
-	files, err := ListJournalFiles(dir)
+	files, err := session.ListJournalFiles(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +260,7 @@ func TestListJournalFiles_SkipsNonMdFiles(t *testing.T) {
 	os.WriteFile(filepath.Join(jDir, "notes.txt"), []byte("not a journal"), 0644)
 	os.WriteFile(filepath.Join(jDir, "data.json"), []byte("{}"), 0644)
 
-	files, err := ListJournalFiles(dir)
+	files, err := session.ListJournalFiles(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +285,7 @@ func TestWriteJournal_HighSeverityDMailField(t *testing.T) {
 		HighSeverityDMails: "alert-critical, alert-deploy",
 	}
 
-	WriteJournal(dir, report)
+	session.WriteJournal(dir, report)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "001.md"))
 	if err != nil {
@@ -311,7 +312,7 @@ func TestWriteJournal_HighSeverityDMailEmpty(t *testing.T) {
 		BugIssues:   "none",
 	}
 
-	WriteJournal(dir, report)
+	session.WriteJournal(dir, report)
 
 	content, err := os.ReadFile(filepath.Join(dir, ".expedition", "journal", "002.md"))
 	if err != nil {
@@ -324,7 +325,7 @@ func TestWriteJournal_HighSeverityDMailEmpty(t *testing.T) {
 
 func TestListJournalFiles_NoDirectory(t *testing.T) {
 	dir := t.TempDir()
-	_, err := ListJournalFiles(dir)
+	_, err := session.ListJournalFiles(dir)
 	if err == nil {
 		t.Error("expected error when journal dir doesn't exist")
 	}
@@ -340,7 +341,7 @@ func TestWritePRIndex_AppendsEntry(t *testing.T) {
 	}
 
 	// when
-	if err := WritePRIndex(continent, report); err != nil {
+	if err := session.WritePRIndex(continent, report); err != nil {
 		t.Fatalf("WritePRIndex: %v", err)
 	}
 
@@ -366,7 +367,7 @@ func TestWritePRIndex_SkipsNone(t *testing.T) {
 		IssueID:    "AWE-42",
 		PRUrl:      "none",
 	}
-	if err := WritePRIndex(continent, report); err != nil {
+	if err := session.WritePRIndex(continent, report); err != nil {
 		t.Fatalf("WritePRIndex: %v", err)
 	}
 	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl")
@@ -383,7 +384,7 @@ func TestWritePRIndex_AppendsMultiple(t *testing.T) {
 			IssueID:    "AWE-" + string(rune('0'+i)),
 			PRUrl:      "https://github.com/org/repo/pull/" + string(rune('0'+i)),
 		}
-		if err := WritePRIndex(continent, report); err != nil {
+		if err := session.WritePRIndex(continent, report); err != nil {
 			t.Fatalf("WritePRIndex #%d: %v", i, err)
 		}
 	}

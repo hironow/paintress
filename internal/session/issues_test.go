@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestFetchIssuesViaMCP_ParsesOutput(t *testing.T) {
@@ -41,7 +42,7 @@ JSONEOF
 	}
 
 	// when
-	issues, err := FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	issues, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
 
 	// then
 	if err != nil {
@@ -82,7 +83,7 @@ echo "[]" > "$output_path"
 	os.WriteFile(fakeScript, []byte(script), 0755)
 
 	// when
-	issues, err := FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	issues, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
 
 	// then
 	if err != nil {
@@ -100,7 +101,7 @@ func TestFetchIssuesViaMCP_ClaudeFailure(t *testing.T) {
 	os.WriteFile(fakeScript, []byte("#!/bin/bash\nexit 1\n"), 0755)
 
 	// when
-	_, err := FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	_, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
 
 	// then
 	if err == nil {
@@ -126,7 +127,7 @@ echo "{invalid json" > "$output_path"
 	os.WriteFile(fakeScript, []byte(script), 0755)
 
 	// when
-	_, err := FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	_, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
 
 	// then
 	if err == nil {
