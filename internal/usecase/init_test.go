@@ -26,7 +26,8 @@ func (s *stubInitRunner) InitProject(repoPath, team, project string) error {
 
 func TestRunInit_ValidCommand(t *testing.T) {
 	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{RepoPath: "/tmp/repo", Team: "MY", Project: "Hades"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp, domain.NewTeam("MY"), domain.NewProject("Hades"))
 
 	err := usecase.RunInit(cmd, runner)
 
@@ -47,23 +48,10 @@ func TestRunInit_ValidCommand(t *testing.T) {
 	}
 }
 
-func TestRunInit_EmptyRepoPath(t *testing.T) {
-	runner := &stubInitRunner{}
-	cmd := domain.InitCommand{RepoPath: ""}
-
-	err := usecase.RunInit(cmd, runner)
-
-	if err == nil {
-		t.Fatal("expected error for empty RepoPath")
-	}
-	if runner.called {
-		t.Fatal("expected InitProject not to be called")
-	}
-}
-
 func TestRunInit_RunnerError(t *testing.T) {
 	runner := &stubInitRunner{err: fmt.Errorf("continent invalid")}
-	cmd := domain.InitCommand{RepoPath: "/tmp/repo"}
+	rp, _ := domain.NewRepoPath("/tmp/repo")
+	cmd := domain.NewInitCommand(rp, domain.NewTeam(""), domain.NewProject(""))
 
 	err := usecase.RunInit(cmd, runner)
 

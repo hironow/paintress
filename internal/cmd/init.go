@@ -37,11 +37,11 @@ flags for interactive prompts. This must be run once before
 
 			team, _ := cmd.Flags().GetString("team")
 			project, _ := cmd.Flags().GetString("project")
-			initCmd := domain.InitCommand{
-				RepoPath: repoPath,
-				Team:     team,
-				Project:  project,
+			rp, err := domain.NewRepoPath(repoPath)
+			if err != nil {
+				return err
 			}
+			initCmd := domain.NewInitCommand(rp, domain.NewTeam(team), domain.NewProject(project))
 			runner := &session.InitAdapter{Stderr: cmd.ErrOrStderr()}
 			if err := usecase.RunInit(initCmd, runner); err != nil {
 				return err
