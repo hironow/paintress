@@ -218,6 +218,8 @@ rules:
     severity: ERROR
     pattern: $CMD.Execute()
     paths:
+      include:
+        - "/internal/cmd/**"
       exclude:
         - "*_test.go"
 
