@@ -1,4 +1,5 @@
 package eventsource
+
 // white-box-reason: eventsource internals: tests unexported FileEventStore implementation
 
 import (

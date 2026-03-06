@@ -123,8 +123,8 @@ func TestExpeditionAggregate_GommageEvent(t *testing.T) {
 
 func TestExpeditionAggregate_StatusVocabulary(t *testing.T) {
 	tests := []struct {
-		name             string
-		status           string
+		name              string
+		status            string
 		wantFailuresDelta int // 0 = no change, 1 = increment
 	}{
 		{"success resets failures", "success", 0},

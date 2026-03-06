@@ -863,7 +863,7 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// when
-	err = session.ArchiveInboxDMail(context.Background(), continent, "move-me",  nil)
+	err = session.ArchiveInboxDMail(context.Background(), continent, "move-me", nil)
 
 	// then
 	if err != nil {
@@ -898,7 +898,7 @@ func TestArchiveInboxDMail_SourceNotFound_NotInArchive(t *testing.T) {
 	os.MkdirAll(domain.InboxDir(continent), 0755)
 
 	// when
-	err := session.ArchiveInboxDMail(context.Background(), continent, "nonexistent",  nil)
+	err := session.ArchiveInboxDMail(context.Background(), continent, "nonexistent", nil)
 
 	// then — error: source missing and not in archive means wrong name
 	if err == nil {
@@ -920,7 +920,7 @@ func TestArchiveInboxDMail_SourceNotFound_AlreadyInArchive(t *testing.T) {
 	os.WriteFile(filepath.Join(arcDir, "already-moved.md"), data, 0644)
 
 	// when
-	err := session.ArchiveInboxDMail(context.Background(), continent, "already-moved",  nil)
+	err := session.ArchiveInboxDMail(context.Background(), continent, "already-moved", nil)
 
 	// then — idempotent: dst exists proves another worker archived it
 	if err != nil {
@@ -942,7 +942,7 @@ func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
 	errs := make(chan error, 2)
 	for range 2 {
 		go func() {
-			errs <- session.ArchiveInboxDMail(context.Background(), continent, "race-me",  nil)
+			errs <- session.ArchiveInboxDMail(context.Background(), continent, "race-me", nil)
 		}()
 	}
 
@@ -965,7 +965,7 @@ func TestArchiveInboxDMail_CreatesArchiveDir(t *testing.T) {
 	os.WriteFile(filepath.Join(inboxDir, "auto-dir.md"), data, 0644)
 
 	// when
-	err := session.ArchiveInboxDMail(context.Background(), continent, "auto-dir",  nil)
+	err := session.ArchiveInboxDMail(context.Background(), continent, "auto-dir", nil)
 
 	// then
 	if err != nil {
@@ -1436,7 +1436,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	}
 
 	// Send report via outbox store (Stage → Flush)
-	if err := session.SendDMail(context.Background(), store, reportDMail,  nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1459,7 +1459,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	// ── Phase 5: Archive inbox d-mails (post-expedition) ──
 
 	for _, dm := range scanned {
-		if err := session.ArchiveInboxDMail(context.Background(), continent, dm.Name,  nil); err != nil {
+		if err := session.ArchiveInboxDMail(context.Background(), continent, dm.Name, nil); err != nil {
 			t.Fatalf("session.ArchiveInboxDMail(%s): %v", dm.Name, err)
 		}
 	}
@@ -1566,7 +1566,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Reason:      "Initial setup complete",
 	}
 	reportDMail := domain.NewReportDMail(report)
-	if err := session.SendDMail(context.Background(), store, reportDMail,  nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1608,10 +1608,10 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report1 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
 	})
-	if err := session.SendDMail(context.Background(), store, report1,  nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, report1, nil); err != nil {
 		t.Fatalf("Exp1 SendDMail: %v", err)
 	}
-	if err := session.ArchiveInboxDMail(context.Background(), continent, "spec-my-1",  nil); err != nil {
+	if err := session.ArchiveInboxDMail(context.Background(), continent, "spec-my-1", nil); err != nil {
 		t.Fatalf("Exp1 ArchiveInboxDMail: %v", err)
 	}
 
@@ -1640,10 +1640,10 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	report2 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
 	})
-	if err := session.SendDMail(context.Background(), store, report2,  nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, report2, nil); err != nil {
 		t.Fatalf("Exp2 SendDMail: %v", err)
 	}
-	if err := session.ArchiveInboxDMail(context.Background(), continent, "feedback-d-001",  nil); err != nil {
+	if err := session.ArchiveInboxDMail(context.Background(), continent, "feedback-d-001", nil); err != nil {
 		t.Fatalf("Exp2 ArchiveInboxDMail: %v", err)
 	}
 
@@ -1779,8 +1779,8 @@ func (f *failingEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) er
 func (f *failingEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
 	return f.err
 }
-func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error  { return f.err }
-func (f *failingEmitter) EmitGommage(_ int, _ time.Time) error              { return f.err }
+func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitGommage(_ int, _ time.Time) error             { return f.err }
 func (f *failingEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error {
 	return f.err
 }

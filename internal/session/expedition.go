@@ -27,8 +27,8 @@ type Expedition struct {
 	Config    domain.Config
 	LogDir    string
 	Logger    domain.Logger
-	DataOut   io.Writer       // stdout-equivalent for streaming Claude output
-	ErrOut    io.Writer       // stderr-equivalent for UI chrome output
+	DataOut   io.Writer     // stdout-equivalent for streaming Claude output
+	ErrOut    io.Writer     // stderr-equivalent for UI chrome output
 	Notifier  port.Notifier // for mid-expedition HIGH severity notifications
 
 	// Game mechanics

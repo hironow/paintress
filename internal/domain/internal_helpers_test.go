@@ -1,4 +1,5 @@
 package domain
+
 // white-box-reason: internal helpers: tests unexported utility functions (containsStr)
 
 // containsStr is a test helper — checks substring presence without importing strings.

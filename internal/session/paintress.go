@@ -330,5 +330,3 @@ func (p *Paintress) Run(ctx context.Context) int {
 		return 0
 	}
 }
-
-

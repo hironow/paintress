@@ -117,8 +117,8 @@ func (*NopExpeditionEventEmitter) EmitStartExpedition(_, _ int, _ string, _ time
 func (*NopExpeditionEventEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
 	return nil
 }
-func (*NopExpeditionEventEmitter) EmitInboxReceived(_, _ string, _ time.Time) error  { return nil }
-func (*NopExpeditionEventEmitter) EmitGommage(_ int, _ time.Time) error              { return nil }
+func (*NopExpeditionEventEmitter) EmitInboxReceived(_, _ string, _ time.Time) error { return nil }
+func (*NopExpeditionEventEmitter) EmitGommage(_ int, _ time.Time) error             { return nil }
 func (*NopExpeditionEventEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error {
 	return nil
 }

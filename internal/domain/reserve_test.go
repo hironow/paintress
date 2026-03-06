@@ -1,4 +1,5 @@
 package domain
+
 // white-box-reason: internal helpers: tests unexported reservation construction and helpers
 
 import (

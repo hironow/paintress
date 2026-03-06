@@ -1,4 +1,5 @@
 package session
+
 // white-box-reason: session internals: tests unexported escalation workflow state mutation
 
 import (
@@ -162,15 +163,15 @@ func TestHandleEscalation_SucceedsWithWorkingEmitter(t *testing.T) {
 // nopEmitter is a no-op ExpeditionEventEmitter that always succeeds.
 type nopEmitter struct{}
 
-func (n *nopEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error    { return nil }
+func (n *nopEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error { return nil }
 func (n *nopEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
 	return nil
 }
-func (n *nopEmitter) EmitInboxReceived(_, _ string, _ time.Time) error             { return nil }
-func (n *nopEmitter) EmitGommage(_ int, _ time.Time) error                         { return nil }
-func (n *nopEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error        { return nil }
-func (n *nopEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error        { return nil }
-func (n *nopEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error        { return nil }
-func (n *nopEmitter) EmitDMailStaged(_ string, _ time.Time) error                  { return nil }
-func (n *nopEmitter) EmitDMailFlushed(_ int, _ time.Time) error                    { return nil }
-func (n *nopEmitter) EmitDMailArchived(_ string, _ time.Time) error                { return nil }
+func (n *nopEmitter) EmitInboxReceived(_, _ string, _ time.Time) error      { return nil }
+func (n *nopEmitter) EmitGommage(_ int, _ time.Time) error                  { return nil }
+func (n *nopEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error { return nil }
+func (n *nopEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return nil }
+func (n *nopEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return nil }
+func (n *nopEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
+func (n *nopEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
+func (n *nopEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }

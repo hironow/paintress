@@ -1,4 +1,5 @@
 package usecase
+
 // white-box-reason: usecase internals: tests unexported expedition adapter construction
 
 // Validation tests for RunExpeditionCommand and ArchivePruneCommand have been

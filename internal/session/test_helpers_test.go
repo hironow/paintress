@@ -1,4 +1,5 @@
 package session
+
 // white-box-reason: test infrastructure: shared helpers constructing unexported types for sibling tests
 
 import (
@@ -116,8 +117,8 @@ func (f *failingEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) er
 func (f *failingEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
 	return f.err
 }
-func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error  { return f.err }
-func (f *failingEmitter) EmitGommage(_ int, _ time.Time) error              { return f.err }
+func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitGommage(_ int, _ time.Time) error             { return f.err }
 func (f *failingEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error {
 	return f.err
 }

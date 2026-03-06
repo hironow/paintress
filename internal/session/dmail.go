@@ -174,4 +174,3 @@ func ArchiveInboxDMail(ctx context.Context, continent, name string, emitter port
 	span.SetAttributes(attribute.Int("dmail.archive.count", 1))
 	return nil
 }
-
