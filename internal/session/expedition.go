@@ -138,7 +138,7 @@ func (e *Expedition) loadInboxSection() string {
 		if len(e.InboxDMails) > 0 {
 			return // already loaded externally (e.g., by HIGH severity gate)
 		}
-		dmails, err := ScanInbox(e.Continent)
+		dmails, err := ScanInbox(context.Background(), e.Continent)
 		if err != nil {
 			e.Logger.Warn("inbox scan failed: %v", err)
 			return

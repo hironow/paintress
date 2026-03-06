@@ -267,7 +267,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 
 	// Pre-flight HIGH severity gate (once, before workers start).
-	preflightInbox, scanErr := ScanInbox(p.config.Continent)
+	preflightInbox, scanErr := ScanInbox(ctx, p.config.Continent)
 	if scanErr != nil {
 		p.Logger.Error("inbox scan failed (fail-closed): %v", scanErr)
 		return 1

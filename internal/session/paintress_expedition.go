@@ -71,7 +71,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
-		inboxDMails, scanErr := ScanInbox(p.config.Continent)
+		inboxDMails, scanErr := ScanInbox(expCtx, p.config.Continent)
 		if scanErr != nil {
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
@@ -306,7 +306,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			}
 		}
 		for _, dm := range expedition.InboxDMails {
-			if err := ArchiveInboxDMail(p.config.Continent, dm.Name, p.Emitter); err != nil {
+			if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
 				p.Logger.Warn("dmail archive: %v", err)
 			}
 		}
