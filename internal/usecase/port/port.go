@@ -86,8 +86,8 @@ type OutboxStore interface {
 // ArchiveOps handles archive pruning operations.
 type ArchiveOps interface {
 	ArchivePrune(repoPath string, days int, execute bool) (domain.PruneResult, error)
-	ListExpiredEventFiles(stateDir string, days int) ([]string, error)
-	PruneEventFiles(stateDir string, files []string) ([]string, error)
+	ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error)
+	PruneEventFiles(ctx context.Context, stateDir string, files []string) ([]string, error)
 	PruneFlushedOutbox(repoPath string) (int, error)
 }
 

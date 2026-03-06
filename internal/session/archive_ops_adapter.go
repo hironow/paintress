@@ -1,6 +1,10 @@
 package session
 
-import "github.com/hironow/paintress/internal/domain"
+import (
+	"context"
+
+	"github.com/hironow/paintress/internal/domain"
+)
 
 type archiveOps struct{}
 
@@ -13,12 +17,12 @@ func (*archiveOps) ArchivePrune(repoPath string, days int, execute bool) (domain
 	return ArchivePrune(repoPath, days, execute)
 }
 
-func (*archiveOps) ListExpiredEventFiles(stateDir string, days int) ([]string, error) {
-	return ListExpiredEventFiles(stateDir, days)
+func (*archiveOps) ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error) {
+	return ListExpiredEventFiles(ctx, stateDir, days)
 }
 
-func (*archiveOps) PruneEventFiles(stateDir string, files []string) ([]string, error) {
-	return PruneEventFiles(stateDir, files)
+func (*archiveOps) PruneEventFiles(ctx context.Context, stateDir string, files []string) ([]string, error) {
+	return PruneEventFiles(ctx, stateDir, files)
 }
 
 func (*archiveOps) PruneFlushedOutbox(repoPath string) (int, error) {

@@ -1,50 +1,5 @@
 package usecase
 
-import (
-	"context"
-	"testing"
-
-	"github.com/hironow/paintress/internal/domain"
-)
-
-func TestRunExpeditions_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := domain.RunExpeditionCommand{}
-
-	// when
-	exitCode, err := RunExpeditions(context.Background(), cmd, nil, nil, &domain.NopLogger{}, nil, nil)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for empty RepoPath")
-	}
-	if exitCode != 1 {
-		t.Errorf("expected exit code 1, got %d", exitCode)
-	}
-}
-
-func TestArchivePrune_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := domain.ArchivePruneCommand{}
-
-	// when
-	_, err := ArchivePrune(cmd, nil)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for empty RepoPath")
-	}
-}
-
-func TestArchivePrune_InvalidDays(t *testing.T) {
-	// given: Days <= 0
-	cmd := domain.ArchivePruneCommand{RepoPath: "/tmp", Days: 0}
-
-	// when
-	_, err := ArchivePrune(cmd, nil)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for non-positive Days")
-	}
-}
+// Validation tests for RunExpeditionCommand and ArchivePruneCommand have been
+// moved to domain/primitives_test.go (parse-don't-validate). The usecase layer
+// no longer calls Validate() — commands are always-valid by construction.

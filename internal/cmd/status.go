@@ -33,7 +33,7 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return err
 			}
 
-			report := session.Status(baseDir, loggerFrom(cmd))
+			report := session.Status(cmd.Context(), baseDir, loggerFrom(cmd))
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {

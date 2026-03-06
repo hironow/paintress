@@ -10,23 +10,10 @@ import (
 	"github.com/hironow/paintress/internal/session"
 )
 
-func TestRebuild_InvalidCommand(t *testing.T) {
-	// given: empty RepoPath
-	cmd := domain.RebuildCommand{}
-	logger := platform.NewLogger(io.Discard, false)
-
-	// when
-	err := Rebuild(cmd, nil, nil, logger)
-
-	// then
-	if err == nil {
-		t.Fatal("expected validation error for empty RepoPath")
-	}
-}
-
 func TestRebuild_EmptyEventStore(t *testing.T) {
 	// given
-	cmd := domain.RebuildCommand{RepoPath: "/tmp/nonexistent"}
+	rp, _ := domain.NewRepoPath("/tmp/nonexistent")
+	cmd := domain.NewRebuildCommand(rp)
 	store := &stubEventStore{events: nil}
 	applier := session.NewProjectionApplier()
 	logger := platform.NewLogger(io.Discard, false)
@@ -45,7 +32,8 @@ func TestRebuild_EmptyEventStore(t *testing.T) {
 
 func TestRebuild_ReplaysEvents(t *testing.T) {
 	// given
-	cmd := domain.RebuildCommand{RepoPath: "/tmp/test"}
+	rp, _ := domain.NewRepoPath("/tmp/test")
+	cmd := domain.NewRebuildCommand(rp)
 	now := time.Now()
 	ev1, _ := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 		Expedition: 1, Status: "success",

@@ -36,8 +36,8 @@ git-tracked, so deletions should be reviewed and committed.`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
-			if days <= 0 {
-				return fmt.Errorf("--days must be positive, got %d", days)
+			if _, err := domain.NewDays(days); err != nil {
+				return fmt.Errorf("--days: %w", err)
 			}
 			return nil
 		},
@@ -66,18 +66,22 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	stateDir := filepath.Join(repoPath, domain.StateDir)
 	archiveOps := session.NewArchiveOps()
 
+	rp, rpErr := domain.NewRepoPath(repoPath)
+	if rpErr != nil {
+		return rpErr
+	}
+	d, dErr := domain.NewDays(days)
+	if dErr != nil {
+		return dErr
+	}
 	// Collect archive candidates (dry-run to list only).
-	archiveResult, err := usecase.ArchivePrune(domain.ArchivePruneCommand{
-		RepoPath: repoPath,
-		Days:     days,
-		Execute:  false,
-	}, archiveOps)
+	archiveResult, err := usecase.ArchivePrune(domain.NewArchivePruneCommand(rp, d, false), archiveOps)
 	if err != nil {
 		return err
 	}
 
 	// Collect event file candidates.
-	eventFiles, eventErr := archiveOps.ListExpiredEventFiles(stateDir, days)
+	eventFiles, eventErr := archiveOps.ListExpiredEventFiles(cmd.Context(), stateDir, days)
 	if eventErr != nil {
 		return fmt.Errorf("failed to list expired events: %w", eventErr)
 	}
@@ -109,7 +113,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 			out.Deleted = execResult.Deleted
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := archiveOps.PruneEventFiles(stateDir, eventFiles)
+				deleted, delErr := archiveOps.PruneEventFiles(cmd.Context(), stateDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}
@@ -178,7 +182,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 
 	// Execute: event file deletion
 	if len(eventFiles) > 0 {
-		deleted, delErr := archiveOps.PruneEventFiles(stateDir, eventFiles)
+		deleted, delErr := archiveOps.PruneEventFiles(cmd.Context(), stateDir, eventFiles)
 		if delErr != nil {
 			return fmt.Errorf("event prune failed: %w", delErr)
 		}
