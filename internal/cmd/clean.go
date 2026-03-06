@@ -5,18 +5,22 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/spf13/cobra"
 )
 
 func newCleanCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "clean <repo-path>",
+		Use:   "clean [path]",
 		Short: "Remove state directory (.expedition/)",
 		Long:  "Delete the .expedition/ directory to reset to a clean state. Use 'paintress init' to reinitialize.",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoPath := args[0]
-			stateDir := filepath.Join(repoPath, ".expedition")
+			repoPath, err := resolveRepoPath(args)
+			if err != nil {
+				return err
+			}
+			stateDir := filepath.Join(repoPath, domain.StateDir)
 
 			info, err := os.Stat(stateDir)
 			if err != nil || !info.IsDir() {

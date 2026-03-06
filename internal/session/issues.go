@@ -6,153 +6,76 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"strings"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
-	"github.com/hironow/paintress"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
-// FetchIssues queries Linear GraphQL API and returns issues for the given team.
-// endpoint can be overridden for testing; pass paintress.LinearAPIEndpoint for production.
-// When stateFilter is non-empty, completed/canceled issues are included in the
-// GraphQL query so that local filtering can match them.
-func FetchIssues(ctx context.Context, endpoint, apiKey, teamKey, project string, stateFilter []string) ([]paintress.Issue, error) {
-	if apiKey == "" {
-		return nil, fmt.Errorf("LINEAR_API_KEY is required")
-	}
+// FetchIssuesViaMCP invokes Claude CLI with Linear MCP tools to fetch issues.
+// Claude writes the result as a JSON array to a temp file in workDir.
+func FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir string) ([]domain.Issue, error) {
+	ctx, span := platform.Tracer.Start(ctx, "paintress.issues")
+	defer span.End()
 
-	query := `query($filter: IssueFilter, $first: Int, $after: String) {
-		issues(filter: $filter, first: $first, after: $after) {
-			nodes {
-				identifier
-				title
-				priority
-				state { name }
-				labels { nodes { name } }
-			}
-			pageInfo {
-				hasNextPage
-				endCursor
-			}
-		}
-	}`
+	outputPath := filepath.Join(workDir, fmt.Sprintf("issues-%d.json", time.Now().UnixNano()))
 
-	filter := map[string]any{
-		"team": map[string]any{"key": map[string]any{"eq": teamKey}},
-	}
-	if len(stateFilter) == 0 {
-		filter["state"] = map[string]any{
-			"type": map[string]any{"nin": []string{"completed", "canceled"}},
-		}
-	}
+	var projectClause string
 	if project != "" {
-		filter["project"] = map[string]any{
-			"name": map[string]any{"eq": project},
-		}
+		projectClause = fmt.Sprintf(" for project %q", project)
+	}
+	prompt := fmt.Sprintf(
+		"Use mcp__linear__list_issues to list ALL issues for team %q%s. "+
+			"Paginate until no more results. "+
+			"Write the result as a JSON array to %s "+
+			"Each element must have fields: id (the issue identifier like TEAM-123), title, priority (number), status (state name), labels (array of label names).",
+		team, projectClause, outputPath,
+	)
+
+	args := []string{
+		"--print",
+		"--dangerously-skip-permissions",
+		"--allowedTools", "mcp__linear__list_issues,Write",
+		"-p", prompt,
 	}
 
-	var allIssues []paintress.Issue
-	var cursor string
+	cmd := exec.CommandContext(ctx, claudeCmd, args...)
+	var stderr bytes.Buffer
+	cmd.Stdout = io.Discard
+	cmd.Stderr = &stderr
 
-	for {
-		vars := map[string]any{
-			"filter": filter,
-			"first":  250,
+	start := time.Now()
+	if err := cmd.Run(); err != nil {
+		if platform.IsDetailDebug() {
+			span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
 		}
-		if cursor != "" {
-			vars["after"] = cursor
-		}
-
-		reqBody, err := json.Marshal(map[string]any{
-			"query":     query,
-			"variables": vars,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("marshal request: %w", err)
-		}
-
-		req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewReader(reqBody))
-		if err != nil {
-			return nil, fmt.Errorf("create request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-
-		client := &http.Client{Timeout: 30 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("request: %w", err)
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("read response: %w", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("Linear API error (%d): %s", resp.StatusCode, string(body))
-		}
-
-		var gqlResp struct {
-			Data struct {
-				Issues struct {
-					Nodes []struct {
-						Identifier string `json:"identifier"`
-						Title      string `json:"title"`
-						Priority   int    `json:"priority"`
-						State      struct {
-							Name string `json:"name"`
-						} `json:"state"`
-						Labels struct {
-							Nodes []struct {
-								Name string `json:"name"`
-							} `json:"nodes"`
-						} `json:"labels"`
-					} `json:"nodes"`
-					PageInfo struct {
-						HasNextPage bool   `json:"hasNextPage"`
-						EndCursor   string `json:"endCursor"`
-					} `json:"pageInfo"`
-				} `json:"issues"`
-			} `json:"data"`
-			Errors []struct {
-				Message string `json:"message"`
-			} `json:"errors"`
-		}
-
-		if err := json.Unmarshal(body, &gqlResp); err != nil {
-			return nil, fmt.Errorf("parse response: %w", err)
-		}
-
-		if len(gqlResp.Errors) > 0 {
-			msgs := make([]string, 0, len(gqlResp.Errors))
-			for _, e := range gqlResp.Errors {
-				msgs = append(msgs, e.Message)
-			}
-			return nil, fmt.Errorf("GraphQL errors: %s", strings.Join(msgs, "; "))
-		}
-
-		for _, node := range gqlResp.Data.Issues.Nodes {
-			labels := make([]string, 0, len(node.Labels.Nodes))
-			for _, l := range node.Labels.Nodes {
-				labels = append(labels, l.Name)
-			}
-			allIssues = append(allIssues, paintress.Issue{
-				ID:       node.Identifier,
-				Title:    node.Title,
-				Priority: node.Priority,
-				Status:   node.State.Name,
-				Labels:   labels,
-			})
-		}
-
-		if !gqlResp.Data.Issues.PageInfo.HasNextPage {
-			break
-		}
-		cursor = gqlResp.Data.Issues.PageInfo.EndCursor
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "paintress.issues"))
+		return nil, fmt.Errorf("claude: %w", err)
+	}
+	if platform.IsDetailDebug() {
+		span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
 	}
 
-	return allIssues, nil
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "paintress.issues"))
+		return nil, fmt.Errorf("read issues output: %w", err)
+	}
+
+	var issues []domain.Issue
+	if err := json.Unmarshal(data, &issues); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "paintress.issues"))
+		return nil, fmt.Errorf("parse issues output: %w", err)
+	}
+
+	span.SetAttributes(attribute.Int("issues.fetch.count", len(issues)))
+	return issues, nil
 }

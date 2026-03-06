@@ -8,12 +8,12 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // WriteJournal writes an expedition report to the journal directory.
-func WriteJournal(continent string, report *paintress.ExpeditionReport) error {
-	dir := paintress.JournalDir(continent)
+func WriteJournal(continent string, report *domain.ExpeditionReport) error {
+	dir := domain.JournalDir(continent)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -53,17 +53,17 @@ func WriteJournal(continent string, report *paintress.ExpeditionReport) error {
 	return os.WriteFile(path, []byte(content), 0644)
 }
 
-// WritePRIndex appends a PR URL index entry to the pr-index.jsonl file
+// WritePRIndex appends a PR URL index entry to the pr-index.jsonl file // nosemgrep: layer-session-no-event-persistence [permanent]
 // in the journal directory. Skips entries with empty or "none" PR URLs.
-func WritePRIndex(continent string, report *paintress.ExpeditionReport) error {
+func WritePRIndex(continent string, report *domain.ExpeditionReport) error {
 	if report.PRUrl == "" || report.PRUrl == "none" {
 		return nil
 	}
-	dir := paintress.JournalDir(continent)
+	dir := domain.JournalDir(continent)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	entry := paintress.PRIndexEntry{
+	entry := domain.PRIndexEntry{
 		Expedition: report.Expedition,
 		IssueID:    report.IssueID,
 		PRUrl:      report.PRUrl,
@@ -73,7 +73,7 @@ func WritePRIndex(continent string, report *paintress.ExpeditionReport) error {
 		return fmt.Errorf("pr index: marshal: %w", err)
 	}
 	data = append(data, '\n')
-	path := filepath.Join(dir, "pr-index.jsonl")
+	path := filepath.Join(dir, "pr-index.jsonl") // nosemgrep: layer-session-no-event-persistence [permanent]
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("pr index: open: %w", err)
@@ -85,7 +85,7 @@ func WritePRIndex(continent string, report *paintress.ExpeditionReport) error {
 
 // ListJournalFiles returns journal file paths sorted by name (ascending).
 func ListJournalFiles(continent string) ([]string, error) {
-	dir := paintress.JournalDir(continent)
+	dir := domain.JournalDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err

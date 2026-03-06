@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+
 import (
 	"bytes"
 	"os"
@@ -38,7 +40,7 @@ func TestCleanCmd_DeletesExpeditionDir(t *testing.T) {
 		t.Fatalf("create expedition dir: %v", err)
 	}
 	cfgPath := filepath.Join(expDir, "config.yaml")
-	if err := os.WriteFile(cfgPath, []byte("linear:\n  team: MY\n"), 0644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte("tracker:\n  team: MY\n"), 0644); err != nil {
 		t.Fatalf("create config: %v", err)
 	}
 

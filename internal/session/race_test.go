@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: concurrency internals: tests race conditions on unexported shared state
+
 import (
 	"fmt"
 	"io"
@@ -8,7 +10,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // === Lumina: Parallel Journal Scan ===
@@ -77,7 +80,7 @@ func TestRace_Lumina_ConcurrentScan(t *testing.T) {
 
 	// Multiple goroutines call ScanJournalsForLumina concurrently on same dir
 	var wg sync.WaitGroup
-	results := make([][]paintress.Lumina, 10)
+	results := make([][]domain.Lumina, 10)
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(idx int) {
@@ -98,7 +101,7 @@ func TestRace_Lumina_ConcurrentScan(t *testing.T) {
 // === DevServer: Start/Stop Race ===
 
 func TestRace_DevServer_ConcurrentStopCalls(t *testing.T) {
-	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), paintress.NewLogger(io.Discard, false))
+	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), platform.NewLogger(io.Discard, false))
 
 	// Multiple concurrent Stop calls should not panic
 	var wg sync.WaitGroup
@@ -113,7 +116,7 @@ func TestRace_DevServer_ConcurrentStopCalls(t *testing.T) {
 }
 
 func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
-	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), paintress.NewLogger(io.Discard, false))
+	ds := NewDevServer("echo hello", "http://localhost:19999", t.TempDir(), filepath.Join(t.TempDir(), "dev.log"), platform.NewLogger(io.Discard, false))
 
 	var wg sync.WaitGroup
 
@@ -127,7 +130,7 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Access fields that are protected by mutex
-			ds.mu.Lock()
+			ds.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 			_ = ds.running
 			ds.mu.Unlock()
 		}()
@@ -139,14 +142,14 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 
 func TestRace_Expedition_ConcurrentReserveCheck(t *testing.T) {
 	dir := t.TempDir()
-	rp := paintress.NewReserveParty("opus", []string{"sonnet"}, paintress.NewLogger(io.Discard, false))
-	g := paintress.NewGradientGauge(5)
+	rp := domain.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false))
+	g := domain.NewGradientGauge(5)
 
 	e := &Expedition{
 		Number:    1,
 		Continent: dir,
-		Config:    paintress.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    paintress.NewLogger(io.Discard, false),
+		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
+		Logger:    platform.NewLogger(io.Discard, false),
 		Gradient:  g,
 		Reserve:   rp,
 	}

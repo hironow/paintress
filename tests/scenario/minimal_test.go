@@ -19,8 +19,9 @@ import (
 //  6. all outboxes empty at the end
 //
 // Route exercised:
-//   .expedition/inbox -> paintress -> .expedition/outbox -> phonewave -> .gate/inbox
-//   .gate/inbox -> amadeus -> .gate/outbox -> phonewave -> .expedition/inbox + .siren/inbox
+//
+//	.expedition/inbox -> paintress -> .expedition/outbox -> phonewave -> .gate/inbox
+//	.gate/inbox -> amadeus -> .gate/outbox -> phonewave -> .expedition/inbox + .siren/inbox
 func TestScenario_L1_Minimal(t *testing.T) {
 	if testing.Short() {
 		t.Skip("scenario tests are not short")

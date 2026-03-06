@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+
 import (
 	"context"
 	"testing"
@@ -8,7 +10,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // setupTestTracer installs an InMemoryExporter with a synchronous span processor
@@ -20,12 +22,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := paintress.Tracer
-	paintress.Tracer = tp.Tracer("paintress-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("paintress-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		paintress.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 	return exp
 }
@@ -36,7 +38,7 @@ func TestInitTracer_NoopWhenEndpointUnset(t *testing.T) {
 	shutdown := initTracer("test-svc", "0.0.1")
 	defer shutdown(context.Background())
 
-	_, span := paintress.Tracer.Start(context.Background(), "test-span")
+	_, span := platform.Tracer.Start(context.Background(), "test-span")
 	defer span.End()
 
 	if span.IsRecording() {
@@ -54,15 +56,15 @@ func TestMultiExporter_BothReceive(t *testing.T) {
 	)
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	oldTracer := paintress.Tracer
-	paintress.Tracer = tp.Tracer("paintress-test")
+	oldTracer := platform.Tracer
+	platform.Tracer = tp.Tracer("paintress-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
-		paintress.Tracer = oldTracer
+		platform.Tracer = oldTracer
 	})
 
-	_, span := paintress.Tracer.Start(context.Background(), "multi-span")
+	_, span := platform.Tracer.Start(context.Background(), "multi-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended [permanent]
 	span.End()
 
 	if len(exp1.GetSpans()) == 0 {

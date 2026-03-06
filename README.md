@@ -214,7 +214,10 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 | `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
 | `paintress doctor` | Check required external commands (git, claude, gh, docker) |
-| `paintress issues <repo-path>` | List Linear issues (`-o json` for JSON, `-s` to filter by state) |
+| `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
+| `paintress status [repo-path]` | Show paintress operational status |
+| `paintress clean <repo-path>` | Remove state directory (`.expedition/`) |
+| `paintress rebuild [repo-path]` | Rebuild projections from event store |
 | `paintress archive-prune <repo-path>` | Prune old archived d-mails (`-d 14` for days, `-x` to execute) |
 | `paintress version` | Show version, commit, date, and Go version (`-j` for JSON) |
 | `paintress update` | Self-update to the latest GitHub release (`-C` to check only) |
@@ -368,24 +371,10 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 |   +-- archive_prune.go      Archive file discovery/deletion
 |   +-- worktree.go           Git worktree operations
 |   +-- devserver.go          Dev server management
-+-- internal/eventsource/     Event store infrastructure (JSONL append-only)
++-- internal/eventsource/     Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
 +-- internal/domain/          Pure domain functions
 +-- internal/tools/docgen/    CLI documentation generator
-+-- Root package (paintress)  Types, interfaces, pure functions, go:embed
-|   +-- paintress.go          RunSummary, PruneResult, DoctorCheck
-|   +-- expedition.go         Expedition types, go:embed templates
-|   +-- dmail.go              DMail types, ParseDMail, MarshalDMail, ValidateDMail
-|   +-- config.go             Config, ProjectConfig, LinearConfig, go:embed SkillsFS
-|   +-- interfaces.go         Port interfaces (Approver, Notifier, GitExecutor)
-|   +-- event.go              Event envelope, EventType constants
-|   +-- flag.go               ExpeditionFlag type
-|   +-- gradient.go           GradientGauge type
-|   +-- lumina.go             Lumina type, FormatLuminaForPrompt
-|   +-- reserve.go            ReserveParty type
-|   +-- report.go             Report types
-|   +-- journal.go            JournalEntry type
-|   +-- logger.go             Structured logger (noop default)
-|   +-- telemetry.go          OTel tracer (noop default)
++-- doc.go                    Package declaration (root-zero: all code in internal/)
 +-- templates/                AI prompt templates ({en,ja,fr})
 |   +-- skills/               D-Mail SKILL.md templates
 +-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
@@ -434,6 +423,20 @@ Install via Homebrew (`brew install hironow/tap/paintress` includes all binaries
 just build-all       # build all 4 binaries
 just install-all     # install all to /usr/local/bin
 ```
+
+## What / Why / How
+
+See [docs/conformance.md](docs/conformance.md) for the full conformance table (single source).
+
+## Documentation
+
+- [docs/](docs/README.md) — Full documentation index
+- [docs/conformance.md](docs/conformance.md) — What/Why/How conformance table
+- [docs/expedition-directory.md](docs/expedition-directory.md) — `.expedition/` directory structure
+- [docs/policies.md](docs/policies.md) — Event → Policy mapping
+- [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
+- [docs/approval-contract.md](docs/approval-contract.md) — Three-way approval contract
+- [docs/adr/](docs/adr/README.md) — Architecture Decision Records
 
 ## Prerequisites
 

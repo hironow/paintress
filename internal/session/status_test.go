@@ -1,14 +1,14 @@
-package session
+package session_test
 
 import (
-	"encoding/json"
+	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestStatus_EmptyState(t *testing.T) {
@@ -16,7 +16,7 @@ func TestStatus_EmptyState(t *testing.T) {
 	baseDir := t.TempDir()
 
 	// when
-	report := Status(baseDir)
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.Expeditions != 0 {
@@ -51,8 +51,8 @@ func TestStatus_EmptyState(t *testing.T) {
 func TestStatus_WithMailDirs(t *testing.T) {
 	// given — create inbox and archive with files
 	baseDir := t.TempDir()
-	inboxDir := paintress.InboxDir(baseDir)
-	archiveDir := paintress.ArchiveDir(baseDir)
+	inboxDir := domain.InboxDir(baseDir)
+	archiveDir := domain.ArchiveDir(baseDir)
 
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestStatus_WithMailDirs(t *testing.T) {
 	}
 
 	// when
-	report := Status(baseDir)
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.InboxCount != 2 {
@@ -90,35 +90,35 @@ func TestStatus_WithMailDirs(t *testing.T) {
 func TestStatus_WithEvents(t *testing.T) {
 	// given — create event store with expedition events
 	baseDir := t.TempDir()
-	eventsDir := paintress.EventsDir(baseDir)
-	store := NewEventStore(eventsDir)
+	stateDir := filepath.Join(baseDir, ".expedition")
+	store := session.NewEventStore(stateDir, &domain.NopLogger{})
 
 	ts := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
 
-	events := []paintress.Event{
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+	events := []domain.Event{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 1, Status: "success", IssueID: "PROJ-1",
 		}, ts),
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 2, Status: "success", IssueID: "PROJ-2",
 		}, ts.Add(time.Minute)),
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 3, Status: "failed", IssueID: "PROJ-3",
 		}, ts.Add(2*time.Minute)),
-		makeStatusEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeStatusEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 4, Status: "skipped", IssueID: "PROJ-4",
 		}, ts.Add(3*time.Minute)),
-		makeStatusEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+		makeStatusEvent(domain.EventGradientChanged, domain.GradientChangedData{
 			Level: 3, Operator: "charge",
 		}, ts.Add(4*time.Minute)),
 	}
 
-	if err := store.Append(events...); err != nil {
+	if _, err := store.Append(events...); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	report := Status(baseDir)
+	report := session.Status(context.Background(), baseDir, &domain.NopLogger{})
 
 	// then
 	if report.Expeditions != 4 {
@@ -143,100 +143,8 @@ func TestStatus_WithEvents(t *testing.T) {
 	}
 }
 
-func TestStatusReport_FormatText(t *testing.T) {
-	// given
-	report := StatusReport{
-		Continent:      "/path/to/repo",
-		Expeditions:    15,
-		Successes:      12,
-		Failures:       2,
-		SuccessRate:    0.857,
-		GradientLevel:  3,
-		InboxCount:     1,
-		ArchiveCount:   10,
-		LastExpedition: time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
-	}
-
-	// when
-	text := report.FormatText()
-
-	// then — verify key lines are present
-	expected := []string{
-		"paintress status:",
-		"Continent:",
-		"/path/to/repo",
-		"Expeditions:",
-		"15",
-		"12 success",
-		"2 failed",
-		"Success rate:",
-		"85.7%",
-		"Gradient:",
-		"level 3",
-		"Inbox:",
-		"1 pending",
-		"Archive:",
-		"10 processed",
-		"Last expedition:",
-	}
-	for _, s := range expected {
-		if !strings.Contains(text, s) {
-			t.Errorf("expected output to contain %q, got:\n%s", s, text)
-		}
-	}
-}
-
-func TestStatusReport_FormatText_NoEvents(t *testing.T) {
-	// given — zero-value report
-	report := StatusReport{}
-
-	// when
-	text := report.FormatText()
-
-	// then
-	if !strings.Contains(text, "no expeditions yet") {
-		t.Errorf("expected 'no expeditions yet' for zero time, got:\n%s", text)
-	}
-}
-
-func TestStatusReport_FormatJSON(t *testing.T) {
-	// given
-	report := StatusReport{
-		Continent:      "/path/to/repo",
-		Expeditions:    15,
-		Successes:      12,
-		Failures:       2,
-		SuccessRate:    0.857,
-		GradientLevel:  3,
-		InboxCount:     1,
-		ArchiveCount:   10,
-		LastExpedition: time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC),
-	}
-
-	// when
-	data := report.FormatJSON()
-
-	// then — verify it's valid JSON with expected fields
-	var parsed map[string]any
-	if err := json.Unmarshal([]byte(data), &parsed); err != nil {
-		t.Fatalf("invalid JSON: %v\n%s", err, data)
-	}
-	if parsed["expeditions"] != float64(15) {
-		t.Errorf("expected expeditions=15, got %v", parsed["expeditions"])
-	}
-	if parsed["successes"] != float64(12) {
-		t.Errorf("expected successes=12, got %v", parsed["successes"])
-	}
-	if parsed["inbox_count"] != float64(1) {
-		t.Errorf("expected inbox_count=1, got %v", parsed["inbox_count"])
-	}
-	if parsed["continent"] != "/path/to/repo" {
-		t.Errorf("expected continent=/path/to/repo, got %v", parsed["continent"])
-	}
-}
-
-func makeStatusEvent(eventType paintress.EventType, data any, ts time.Time) paintress.Event {
-	ev, err := paintress.NewEvent(eventType, data, ts)
+func makeStatusEvent(eventType domain.EventType, data any, ts time.Time) domain.Event {
+	ev, err := domain.NewEvent(eventType, data, ts)
 	if err != nil {
 		panic(err)
 	}

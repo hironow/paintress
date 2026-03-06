@@ -7,7 +7,8 @@ import (
 	"os/signal"
 	"path/filepath"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
@@ -52,7 +53,7 @@ max-expeditions is reached or the issue queue is empty.`,
 			// Set language global
 			lang, _ := cmd.Flags().GetString("lang")
 			if lang == "ja" || lang == "en" || lang == "fr" {
-				paintress.Lang = lang
+				domain.Lang = lang
 			}
 
 			return nil
@@ -64,7 +65,7 @@ max-expeditions is reached or the issue queue is empty.`,
 	cmd.Flags().IntP("timeout", "t", 1980, "Timeout per expedition in seconds (default: 33min)")
 	cmd.Flags().StringP("model", "m", "opus", "Model(s) comma-separated for reserve: opus,sonnet,haiku")
 	cmd.Flags().StringP("base-branch", "b", "main", "Base branch")
-	cmd.Flags().String("claude-cmd", paintress.DefaultClaudeCmd, "Claude Code CLI command name")
+	cmd.Flags().String("claude-cmd", platform.DefaultClaudeCmd, "Claude Code CLI command name")
 	cmd.Flags().String("dev-cmd", "npm run dev", "Dev server command")
 	cmd.Flags().String("dev-dir", "", "Dev server working directory (defaults to repo path)")
 	cmd.Flags().String("dev-url", "http://localhost:3000", "Dev server URL")
@@ -88,7 +89,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	// Pre-flight check: ensure init has been run
-	cfgPath := paintress.ProjectConfigPath(continent)
+	cfgPath := domain.ProjectConfigPath(continent)
 	if _, statErr := os.Stat(cfgPath); statErr != nil {
 		return fmt.Errorf("not initialized — run 'paintress init %s' first", continent)
 	}
@@ -104,7 +105,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	cfg := paintress.Config{}
+	cfg := domain.Config{}
 	cfg.Continent = continent
 	cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
 	cfg.TimeoutSec, _ = cmd.Flags().GetInt("timeout")
@@ -125,8 +126,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 
 	logger := loggerFrom(cmd)
-	eventsDir := paintress.EventsDir(continent)
-	eventStore := session.NewEventStore(eventsDir)
+	stateDir := filepath.Join(continent, domain.StateDir)
+	eventStore := session.NewEventStore(stateDir, logger)
 
 	if err := session.ValidateContinent(cfg.Continent); err != nil {
 		return err
@@ -147,15 +148,19 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	go func() {
 		select {
 		case sig := <-sigCh:
-			logger.Warn("%s", fmt.Sprintf(paintress.Msg("signal_received"), sig))
+			logger.Warn("%s", fmt.Sprintf(domain.Msg("signal_received"), sig))
 			cancel()
 		case <-ctx.Done():
 		}
 	}()
 
-	exitCode, ucErr := usecase.RunExpeditions(ctx, paintress.RunExpeditionCommand{
-		RepoPath: continent,
-	}, cfg, logger, cmd.OutOrStdout(), cmd.InOrStdin(), eventStore)
+	notifier := session.BuildNotifier(cfg.NotifyCmd)
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
+	rp, rpErr := domain.NewRepoPath(continent)
+	if rpErr != nil {
+		return rpErr
+	}
+	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
 		return ucErr
 	}

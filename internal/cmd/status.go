@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
@@ -12,29 +11,29 @@ import (
 // newStatusCommand creates the status subcommand that displays operational status.
 func newStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status [repo-path]",
+		Use:   "status [path]",
 		Short: "Show paintress operational status",
 		Long: `Display operational status including expedition history, success rate,
 gradient level, and pending d-mail counts.
 
-Output goes to stderr (human-readable) by default.
+Output goes to stdout by default (human-readable text).
 Use -o json for machine-readable JSON output to stdout.`,
-		Example: `  # Show status for a specific project
+		Example: `  # Show status for current directory
+  paintress status
+
+  # Show status for a specific project
   paintress status /path/to/repo
 
   # JSON output for scripting
   paintress status -o json /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("repo-path argument is required")
-			}
-			baseDir, err := filepath.Abs(args[0])
+			baseDir, err := resolveRepoPath(args)
 			if err != nil {
-				return fmt.Errorf("invalid path: %w", err)
+				return err
 			}
 
-			report := session.Status(baseDir)
+			report := session.Status(cmd.Context(), baseDir, loggerFrom(cmd))
 
 			outputFmt, _ := cmd.Flags().GetString("output")
 			if outputFmt == "json" {
@@ -46,8 +45,8 @@ Use -o json for machine-readable JSON output to stdout.`,
 				return nil
 			}
 
-			// Text output to stderr (human-readable metadata)
-			fmt.Fprint(cmd.ErrOrStderr(), report.FormatText())
+			// Text output to stdout (human-readable, per S0027)
+			fmt.Fprint(cmd.OutOrStdout(), report.FormatText())
 			return nil
 		},
 	}

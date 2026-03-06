@@ -5,7 +5,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // InitProject creates .expedition/config.yaml using the provided values
@@ -24,8 +24,8 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 		return fmt.Errorf("continent validation: %w", err)
 	}
 
-	cfg := &paintress.ProjectConfig{
-		Linear: paintress.LinearConfig{
+	cfg := &domain.ProjectConfig{
+		Tracker: domain.IssueTrackerConfig{
 			Team:    team,
 			Project: project,
 		},
@@ -35,7 +35,7 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Fprintf(w, "\nConfig saved to %s\n", paintress.ProjectConfigPath(absPath))
+	fmt.Fprintf(w, "\nConfig saved to %s\n", domain.ProjectConfigPath(absPath))
 	if team != "" {
 		fmt.Fprintf(w, "  Linear team:    %s\n", team)
 	}

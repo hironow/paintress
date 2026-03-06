@@ -1,11 +1,13 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"path/filepath"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +36,7 @@ If repo-path is provided, also computes expedition success rate metrics.`,
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
-	claudeCmd := paintress.DefaultClaudeCmd
+	claudeCmd := platform.DefaultClaudeCmd
 	var continent string
 	if len(args) > 0 {
 		continent = args[0]
@@ -49,45 +51,19 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	var metrics *paintress.DoctorMetrics
+	var metrics *domain.DoctorMetrics
 	if len(args) > 0 {
-		repoPath := args[0]
-		eventsDir := paintress.EventsDir(repoPath)
-		store := session.NewEventStore(eventsDir)
-		events, err := store.LoadAll()
-		if err == nil && len(events) > 0 {
-			rate := paintress.SuccessRate(events)
-			var success, total int
-			for _, ev := range events {
-				if ev.Type != paintress.EventExpeditionCompleted {
-					continue
-				}
-				var data paintress.ExpeditionCompletedData
-				if json.Unmarshal(ev.Data, &data) != nil {
-					continue
-				}
-				if data.Status == "skipped" {
-					continue
-				}
-				total++
-				if data.Status == "success" {
-					success++
-				}
-			}
-			metrics = &paintress.DoctorMetrics{
-				SuccessRate: paintress.FormatSuccessRate(rate, success, total),
-			}
-		} else {
-			metrics = &paintress.DoctorMetrics{SuccessRate: "no events"}
-		}
+		stateDir := filepath.Join(args[0], domain.StateDir)
+		eventStore := session.NewEventStore(stateDir, loggerFrom(cmd))
+		metrics = usecase.ComputeSuccessRate(eventStore)
 	}
 
 	if outputFmt == "json" {
-		output := paintress.DoctorOutput{
+		output := domain.DoctorOutput{
 			Checks:  checks,
 			Metrics: metrics,
 		}
-		out, err := paintress.FormatDoctorOutputJSON(output)
+		out, err := domain.FormatDoctorOutputJSON(output)
 		if err != nil {
 			return err
 		}
@@ -122,6 +98,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				allOK = false
 			}
 			fmt.Fprintf(w, "  %s  %-12s %s\n", marker, c.Name, label)
+			if c.Hint != "" {
+				fmt.Fprintf(w, "         %-12s hint: %s\n", "", c.Hint)
+			}
 		}
 	}
 

@@ -1,5 +1,7 @@
 package session
 
+// white-box-reason: session internals: tests unexported localGitExecutor for worktree operations
+
 import (
 	"context"
 	"fmt"
@@ -9,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"github.com/testcontainers/testcontainers-go"
 	tcexec "github.com/testcontainers/testcontainers-go/exec"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -122,7 +124,7 @@ func setupGitContainer(t *testing.T, ctx context.Context) testcontainers.Contain
 		Started: true,
 	}
 
-	ctr, err := testcontainers.GenericContainer(ctx, req)
+	ctr, err := testcontainers.GenericContainer(ctx, req) // nosemgrep: adr0007-testcontainers-generic-without-terminate -- CleanupContainer handles Terminate [permanent]
 	testcontainers.CleanupContainer(t, ctr)
 	if err != nil {
 		t.Fatalf("failed to start git container: %v", err)
@@ -198,8 +200,8 @@ func TestContainerGitExecutor_Shell_EchoCommand(t *testing.T) {
 	}
 }
 
-// Verify that containerGitExecutor satisfies the paintress.GitExecutor interface at compile time.
-var _ paintress.GitExecutor = (*containerGitExecutor)(nil)
+// Verify that containerGitExecutor satisfies the port.GitExecutor interface at compile time.
+var _ port.GitExecutor = (*containerGitExecutor)(nil)
 
 func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
 	if testing.Short() {

@@ -6,13 +6,15 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Compile-time check that localGitExecutor implements paintress.GitExecutor.
-var _ paintress.GitExecutor = (*localGitExecutor)(nil)
+// Compile-time check that localGitExecutor implements port.GitExecutor.
+var _ port.GitExecutor = (*localGitExecutor)(nil)
 
 // localGitExecutor runs git commands on the host filesystem.
 type localGitExecutor struct{}
@@ -31,7 +33,7 @@ func (e *localGitExecutor) Shell(ctx context.Context, dir string, command string
 
 // WorktreePool manages a pool of git worktrees for parallel expedition workers.
 type WorktreePool struct {
-	git        paintress.GitExecutor
+	git        port.GitExecutor
 	baseBranch string
 	repoDir    string      // original repository
 	poolDir    string      // .expedition/worktrees/
@@ -41,12 +43,12 @@ type WorktreePool struct {
 }
 
 // NewWorktreePool creates a new WorktreePool with the given configuration.
-func NewWorktreePool(git paintress.GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool {
+func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool {
 	return &WorktreePool{
 		git:        git,
 		baseBranch: baseBranch,
 		repoDir:    repoDir,
-		poolDir:    filepath.Join(repoDir, ".expedition", ".run", "worktrees"),
+		poolDir:    filepath.Join(repoDir, domain.StateDir, ".run", "worktrees"),
 		setupCmd:   setupCmd,
 		workers:    make(chan string, size),
 		size:       size,
@@ -55,7 +57,7 @@ func NewWorktreePool(git paintress.GitExecutor, repoDir, baseBranch, setupCmd st
 
 // Init prunes stale worktree references and creates fresh worktrees for each worker.
 func (wp *WorktreePool) Init(ctx context.Context) error {
-	ctx, span := paintress.Tracer.Start(ctx, "worktree_pool.init",
+	ctx, span := platform.Tracer.Start(ctx, "worktree_pool.init",
 		trace.WithAttributes(attribute.Int("pool.size", wp.size)),
 	)
 	defer span.End()
@@ -99,7 +101,7 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	if _, err := wp.git.Git(ctx, path, "reset", "--hard", wp.baseBranch); err != nil {
 		return fmt.Errorf("reset: %w", err)
 	}
-	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", ".expedition"); err != nil {
+	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", domain.StateDir); err != nil {
 		return fmt.Errorf("clean: %w", err)
 	}
 	wp.workers <- path

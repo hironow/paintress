@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"fmt"
@@ -8,12 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestRunDoctor_GitFound(t *testing.T) {
 	// given/when
-	checks := RunDoctor("claude", "")
+	checks := session.RunDoctor("claude", "")
 	var gitCheck *struct {
 		Name    string
 		OK      bool
@@ -49,7 +50,7 @@ func TestRunDoctor_GitFound(t *testing.T) {
 
 func TestRunDoctor_DockerIsOptional(t *testing.T) {
 	// given/when
-	checks := RunDoctor("claude", "")
+	checks := session.RunDoctor("claude", "")
 
 	// then
 	for i := range checks {
@@ -65,7 +66,7 @@ func TestRunDoctor_DockerIsOptional(t *testing.T) {
 
 func TestRunDoctor_MissingCommand(t *testing.T) {
 	// given/when
-	checks := RunDoctor("nonexistent-paintress-cmd-12345", "")
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", "")
 
 	// then
 	for i := range checks {
@@ -90,7 +91,7 @@ func TestRunDoctor_CheckContinent_ValidStructure(t *testing.T) {
 	}
 
 	// when
-	checks := RunDoctor("claude", dir)
+	checks := session.RunDoctor("claude", dir)
 
 	// then — continent check should be OK
 	for _, c := range checks {
@@ -112,7 +113,7 @@ func TestRunDoctor_CheckContinent_MissingDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	checks := RunDoctor("claude", dir)
+	checks := session.RunDoctor("claude", dir)
 
 	// then — continent check should be NOT OK but NOT required (warning)
 	for _, c := range checks {
@@ -132,7 +133,7 @@ func TestRunDoctor_CheckContinent_MissingDir(t *testing.T) {
 func TestRunDoctor_CheckContinent_Empty_Skipped(t *testing.T) {
 	// given — no continent path provided
 	// when
-	checks := RunDoctor("claude", "")
+	checks := session.RunDoctor("claude", "")
 
 	// then — no continent check should appear
 	for _, c := range checks {
@@ -146,10 +147,10 @@ func TestRunDoctor_CheckConfig_ValidConfig(t *testing.T) {
 	// given — valid config.yaml
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
-	os.WriteFile(paintress.ProjectConfigPath(dir), []byte("linear:\n  team: TEST\n"), 0644)
+	os.WriteFile(domain.ProjectConfigPath(dir), []byte("tracker:\n  team: TEST\n"), 0644)
 
 	// when
-	checks := RunDoctor("claude", dir)
+	checks := session.RunDoctor("claude", dir)
 
 	// then — config check should be OK
 	for _, c := range checks {
@@ -172,7 +173,7 @@ func TestRunDoctor_CheckConfig_MissingConfig(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	// when
-	checks := RunDoctor("claude", dir)
+	checks := session.RunDoctor("claude", dir)
 
 	// then — config check should NOT be OK but NOT required (warning)
 	for _, c := range checks {
@@ -200,7 +201,7 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 	}
 
 	// when
-	check := checkGitRepo(dir)
+	check := session.ExportCheckGitRepo(dir)
 
 	// then
 	if !check.OK {
@@ -219,7 +220,7 @@ func TestCheckGitRepo_NotRepo(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	check := checkGitRepo(dir)
+	check := session.ExportCheckGitRepo(dir)
 
 	// then
 	if check.OK {
@@ -236,7 +237,7 @@ func TestCheckWritability_OK(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	// when
-	check := checkWritability(dir)
+	check := session.ExportCheckWritability(dir)
 
 	// then
 	if !check.OK {
@@ -258,7 +259,7 @@ func TestCheckWritability_ReadOnly(t *testing.T) {
 	t.Cleanup(func() { os.Chmod(expDir, 0755) })
 
 	// when
-	check := checkWritability(dir)
+	check := session.ExportCheckWritability(dir)
 
 	// then
 	if check.OK {
@@ -277,7 +278,7 @@ func TestCheckSkills_Valid(t *testing.T) {
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: test\nmetadata:\n  dmail-schema-version: \"1\"\n---\n"), 0644)
 
 	// when
-	check := checkSkills(dir)
+	check := session.ExportCheckSkills(dir)
 
 	// then
 	if !check.OK {
@@ -297,7 +298,7 @@ func TestCheckSkills_MissingFile(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	// when
-	check := checkSkills(dir)
+	check := session.ExportCheckSkills(dir)
 
 	// then
 	if check.OK {
@@ -313,7 +314,7 @@ func TestCheckSkills_MissingVersion(t *testing.T) {
 	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: bad\n---\n"), 0644)
 
 	// when
-	check := checkSkills(dir)
+	check := session.ExportCheckSkills(dir)
 
 	// then
 	if check.OK {
@@ -330,7 +331,7 @@ func TestCheckEventStore_Valid(t *testing.T) {
 		[]byte("{\"type\":\"expedition.completed\",\"timestamp\":\"2026-03-02T00:00:00Z\"}\n"), 0644)
 
 	// when
-	check := checkEventStore(dir)
+	check := session.ExportCheckEventStore(dir)
 
 	// then
 	if !check.OK {
@@ -352,7 +353,7 @@ func TestCheckEventStore_Corrupt(t *testing.T) {
 	os.WriteFile(filepath.Join(eventsDir, "bad.jsonl"), []byte("not json\n"), 0644)
 
 	// when
-	check := checkEventStore(dir)
+	check := session.ExportCheckEventStore(dir)
 
 	// then
 	if check.OK {
@@ -366,7 +367,7 @@ func TestCheckEventStore_NoDir(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	// when
-	check := checkEventStore(dir)
+	check := session.ExportCheckEventStore(dir)
 
 	// then
 	if check.OK {
@@ -379,7 +380,7 @@ func TestCheckClaudeAuth_Authenticated(t *testing.T) {
 	mcpOutput := "plugin:filesystem:filesystem: /path (stdio) - ✓ Connected\n"
 
 	// when
-	check := checkClaudeAuth(mcpOutput, nil)
+	check := session.ExportCheckClaudeAuth(mcpOutput, nil)
 
 	// then
 	if !check.OK {
@@ -398,7 +399,7 @@ func TestCheckClaudeAuth_Failed(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	check := checkClaudeAuth("", mcpErr)
+	check := session.ExportCheckClaudeAuth("", mcpErr)
 
 	// then
 	if check.OK {
@@ -414,7 +415,7 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✓ Connected\n"
 
 	// when
-	check := checkLinearMCP(mcpOutput, nil)
+	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if !check.OK {
@@ -433,7 +434,7 @@ func TestCheckLinearMCP_NotFound(t *testing.T) {
 	mcpOutput := "plugin:filesystem:filesystem: /path (stdio) - ✓ Connected\n"
 
 	// when
-	check := checkLinearMCP(mcpOutput, nil)
+	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if check.OK {
@@ -446,7 +447,7 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	mcpOutput := "plugin:linear:linear: https://mcp.linear.app/mcp (HTTP) - ✗ Disconnected\n"
 
 	// when
-	check := checkLinearMCP(mcpOutput, nil)
+	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
 	if check.OK {
@@ -459,7 +460,7 @@ func TestCheckLinearMCP_MCPListFailed(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	check := checkLinearMCP("", mcpErr)
+	check := session.ExportCheckLinearMCP("", mcpErr)
 
 	// then
 	if check.OK {
@@ -478,7 +479,7 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	}
 
 	// when
-	checks := RunDoctor("nonexistent-claude-xyz-12345", dir)
+	checks := session.RunDoctor("nonexistent-claude-xyz-12345", dir)
 
 	// then — claude-auth and linear-mcp should exist with skip message
 	var authFound, mcpFound bool
@@ -513,7 +514,7 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
 	// given — no continent path
 	// when
-	checks := RunDoctor("claude", "")
+	checks := session.RunDoctor("claude", "")
 
 	// then — MCP checks should not appear
 	for _, c := range checks {

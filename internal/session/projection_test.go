@@ -1,32 +1,31 @@
-package session
+package session_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
-func makeProjectionEvent(t EventType, data any) paintress.Event {
-	ev, err := paintress.NewEvent(t, data, time.Now())
+func makeProjectionEvent(eventType domain.EventType, data any) domain.Event {
+	ev, err := domain.NewEvent(eventType, data, time.Now())
 	if err != nil {
 		panic(err)
 	}
 	return ev
 }
 
-func makeProjectionEventAt(t EventType, data any, ts time.Time) paintress.Event {
-	ev, err := paintress.NewEvent(t, data, ts)
+func makeProjectionEventAt(eventType domain.EventType, data any, ts time.Time) domain.Event {
+	ev, err := domain.NewEvent(eventType, data, ts)
 	if err != nil {
 		panic(err)
 	}
 	return ev
 }
-
-type EventType = paintress.EventType
 
 func TestProjectState_Empty(t *testing.T) {
-	state := ProjectState(nil)
+	state := session.ProjectState(nil)
 
 	if state.TotalExpeditions != 0 {
 		t.Errorf("TotalExpeditions = %d, want 0", state.TotalExpeditions)
@@ -37,22 +36,22 @@ func TestProjectState_Empty(t *testing.T) {
 }
 
 func TestProjectState_ExpeditionCompleted(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventExpeditionStarted, paintress.ExpeditionStartedData{
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: 1, Worker: 0, Model: "sonnet",
 		}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 1, Status: "success",
 		}),
-		makeProjectionEvent(paintress.EventExpeditionStarted, paintress.ExpeditionStartedData{
+		makeProjectionEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{
 			Expedition: 2, Worker: 0, Model: "sonnet",
 		}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 2, Status: "failed",
 		}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.TotalExpeditions != 2 {
 		t.Errorf("TotalExpeditions = %d, want 2", state.TotalExpeditions)
@@ -72,13 +71,13 @@ func TestProjectState_ExpeditionCompleted(t *testing.T) {
 }
 
 func TestProjectState_SkippedExpedition(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 1, Status: "skipped",
 		}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.Skipped != 1 {
 		t.Errorf("Skipped = %d, want 1", state.Skipped)
@@ -89,16 +88,16 @@ func TestProjectState_SkippedExpedition(t *testing.T) {
 }
 
 func TestProjectState_GradientChanged(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventGradientChanged, domain.GradientChangedData{
 			Level: 3, Operator: "auto",
 		}),
-		makeProjectionEvent(paintress.EventGradientChanged, paintress.GradientChangedData{
+		makeProjectionEvent(domain.EventGradientChanged, domain.GradientChangedData{
 			Level: 5, Operator: "manual",
 		}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.GradientLevel != 5 {
 		t.Errorf("GradientLevel = %d, want 5", state.GradientLevel)
@@ -106,13 +105,13 @@ func TestProjectState_GradientChanged(t *testing.T) {
 }
 
 func TestProjectState_DMailCounts(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventDMailStaged, paintress.DMailStagedData{Name: "spec-1"}),
-		makeProjectionEvent(paintress.EventDMailStaged, paintress.DMailStagedData{Name: "spec-2"}),
-		makeProjectionEvent(paintress.EventInboxReceived, paintress.InboxReceivedData{Name: "report-1", Severity: "info"}),
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "spec-1"}),
+		makeProjectionEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "spec-2"}),
+		makeProjectionEvent(domain.EventInboxReceived, domain.InboxReceivedData{Name: "report-1", Severity: "info"}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.DMailsStaged != 2 {
 		t.Errorf("DMailsStaged = %d, want 2", state.DMailsStaged)
@@ -123,18 +122,18 @@ func TestProjectState_DMailCounts(t *testing.T) {
 }
 
 func TestProjectState_FullReplay(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventExpeditionStarted, paintress.ExpeditionStartedData{Expedition: 1}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 1, Status: "success"}),
-		makeProjectionEvent(paintress.EventDMailStaged, paintress.DMailStagedData{Name: "spec-1"}),
-		makeProjectionEvent(paintress.EventDMailFlushed, paintress.DMailFlushedData{Count: 1}),
-		makeProjectionEvent(paintress.EventGradientChanged, paintress.GradientChangedData{Level: 2}),
-		makeProjectionEvent(paintress.EventExpeditionStarted, paintress.ExpeditionStartedData{Expedition: 2}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 2, Status: "success"}),
-		makeProjectionEvent(paintress.EventInboxReceived, paintress.InboxReceivedData{Name: "report-1"}),
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{Expedition: 1}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}),
+		makeProjectionEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "spec-1"}),
+		makeProjectionEvent(domain.EventDMailFlushed, domain.DMailFlushedData{Count: 1}),
+		makeProjectionEvent(domain.EventGradientChanged, domain.GradientChangedData{Level: 2}),
+		makeProjectionEvent(domain.EventExpeditionStarted, domain.ExpeditionStartedData{Expedition: 2}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 2, Status: "success"}),
+		makeProjectionEvent(domain.EventInboxReceived, domain.InboxReceivedData{Name: "report-1"}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.TotalExpeditions != 2 {
 		t.Errorf("TotalExpeditions = %d, want 2", state.TotalExpeditions)
@@ -160,16 +159,16 @@ func TestProjectState_LastExpeditionAt(t *testing.T) {
 	ts1 := time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC)
 	ts2 := time.Date(2026, 3, 1, 11, 30, 0, 0, time.UTC)
 
-	events := []paintress.Event{
-		makeProjectionEventAt(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+	events := []domain.Event{
+		makeProjectionEventAt(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 1, Status: "success",
 		}, ts1),
-		makeProjectionEventAt(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeProjectionEventAt(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 2, Status: "failed",
 		}, ts2),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if !state.LastExpeditionAt.Equal(ts2) {
 		t.Errorf("LastExpeditionAt = %v, want %v", state.LastExpeditionAt, ts2)
@@ -177,14 +176,14 @@ func TestProjectState_LastExpeditionAt(t *testing.T) {
 }
 
 func TestProjectState_ErrorRate(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 1, Status: "success"}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 2, Status: "failed"}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 3, Status: "success"}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 4, Status: "failed"}),
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 2, Status: "failed"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 3, Status: "success"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 4, Status: "failed"}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	got := state.ErrorRate()
 	want := 0.5 // 2 failed out of 4
@@ -194,7 +193,7 @@ func TestProjectState_ErrorRate(t *testing.T) {
 }
 
 func TestProjectState_ErrorRate_Empty(t *testing.T) {
-	state := ProjectState(nil)
+	state := session.ProjectState(nil)
 
 	got := state.ErrorRate()
 	if got != 0.0 {
@@ -203,12 +202,12 @@ func TestProjectState_ErrorRate_Empty(t *testing.T) {
 }
 
 func TestProjectState_GommageCount(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventGommageTriggered, paintress.GommageTriggeredData{Expedition: 1, ConsecutiveFailures: 3}),
-		makeProjectionEvent(paintress.EventGommageTriggered, paintress.GommageTriggeredData{Expedition: 5, ConsecutiveFailures: 3}),
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{Expedition: 1, ConsecutiveFailures: 3}),
+		makeProjectionEvent(domain.EventGommageTriggered, domain.GommageTriggeredData{Expedition: 5, ConsecutiveFailures: 3}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.GommageCount != 2 {
 		t.Errorf("GommageCount = %d, want 2", state.GommageCount)
@@ -216,14 +215,14 @@ func TestProjectState_GommageCount(t *testing.T) {
 }
 
 func TestProjectState_ConsecutiveFailures(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 1, Status: "failed"}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 2, Status: "failed"}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 3, Status: "success"}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 4, Status: "failed"}),
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 1, Status: "failed"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 2, Status: "failed"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 3, Status: "success"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 4, Status: "failed"}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.ConsecutiveFailures != 1 {
 		t.Errorf("ConsecutiveFailures = %d, want 1 (reset by success at expedition 3)", state.ConsecutiveFailures)
@@ -231,16 +230,16 @@ func TestProjectState_ConsecutiveFailures(t *testing.T) {
 }
 
 func TestProjectState_LastIssueID(t *testing.T) {
-	events := []paintress.Event{
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+	events := []domain.Event{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 1, Status: "success", IssueID: "PROJ-123",
 		}),
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
 			Expedition: 2, Status: "success", IssueID: "PROJ-456",
 		}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.LastIssueID != "PROJ-456" {
 		t.Errorf("LastIssueID = %q, want %q", state.LastIssueID, "PROJ-456")
@@ -248,12 +247,12 @@ func TestProjectState_LastIssueID(t *testing.T) {
 }
 
 func TestProjectState_IgnoresUnknownEvents(t *testing.T) {
-	events := []paintress.Event{
+	events := []domain.Event{
 		{ID: "x", Type: "unknown.event", Timestamp: time.Now(), Data: []byte(`{}`)},
-		makeProjectionEvent(paintress.EventExpeditionCompleted, paintress.ExpeditionCompletedData{Expedition: 1, Status: "success"}),
+		makeProjectionEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}),
 	}
 
-	state := ProjectState(events)
+	state := session.ProjectState(events)
 
 	if state.TotalExpeditions != 1 {
 		t.Errorf("TotalExpeditions = %d, want 1", state.TotalExpeditions)

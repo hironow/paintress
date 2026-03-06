@@ -1,7 +1,7 @@
 # 0014. Event Sourcing for Expedition Lifecycle
 
 **Date:** 2026-02-27
-**Status:** Accepted — supersedes 0013 (event sourcing exclusion)
+**Status:** Superseded by [0015](0015-event-sourcing-with-projections.md)
 
 ## Context
 

@@ -1,15 +1,16 @@
-package session
+package session_test
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestParseKV_Normal(t *testing.T) {
-	k, v, ok := parseKV("last_expedition: 5")
+	k, v, ok := session.ExportParseKV("last_expedition: 5")
 	if !ok {
 		t.Fatal("expected ok")
 	}
@@ -19,28 +20,28 @@ func TestParseKV_Normal(t *testing.T) {
 }
 
 func TestParseKV_Comment(t *testing.T) {
-	_, _, ok := parseKV("# this is a comment")
+	_, _, ok := session.ExportParseKV("# this is a comment")
 	if ok {
 		t.Error("comments should return false")
 	}
 }
 
 func TestParseKV_Empty(t *testing.T) {
-	_, _, ok := parseKV("")
+	_, _, ok := session.ExportParseKV("")
 	if ok {
 		t.Error("empty line should return false")
 	}
 }
 
 func TestParseKV_NoColon(t *testing.T) {
-	_, _, ok := parseKV("no colon here")
+	_, _, ok := session.ExportParseKV("no colon here")
 	if ok {
 		t.Error("line without colon should return false")
 	}
 }
 
 func TestParseKV_ValueWithColon(t *testing.T) {
-	k, v, ok := parseKV("last_updated: 2024-01-01 12:00:00")
+	k, v, ok := session.ExportParseKV("last_updated: 2024-01-01 12:00:00")
 	if !ok {
 		t.Fatal("expected ok")
 	}
@@ -53,7 +54,7 @@ func TestParseKV_ValueWithColon(t *testing.T) {
 }
 
 func TestParseKV_WhitespaceOnly(t *testing.T) {
-	_, _, ok := parseKV("   ")
+	_, _, ok := session.ExportParseKV("   ")
 	if ok {
 		t.Error("whitespace-only line should return false")
 	}
@@ -61,7 +62,7 @@ func TestParseKV_WhitespaceOnly(t *testing.T) {
 
 func TestReadFlag_NonexistentFile(t *testing.T) {
 	dir := t.TempDir()
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	if f.Remaining != "?" {
 		t.Errorf("default Remaining should be '?', got %q", f.Remaining)
 	}
@@ -71,7 +72,7 @@ func TestReadFlag_NonexistentFile(t *testing.T) {
 }
 
 func TestFlagPath(t *testing.T) {
-	p := paintress.FlagPath("/some/repo")
+	p := domain.FlagPath("/some/repo")
 	want := filepath.Join("/some/repo", ".expedition", ".run", "flag.md")
 	if p != want {
 		t.Errorf("FlagPath = %q, want %q", p, want)
@@ -82,8 +83,8 @@ func TestWriteFlag_AllFields(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 10, "AWE-99", "success", "0", 0)
-	f := ReadFlag(dir)
+	session.WriteFlag(dir, 10, "AWE-99", "success", "0", 0)
+	f := session.ReadFlag(dir)
 
 	if f.LastExpedition != 10 {
 		t.Errorf("LastExpedition = %d, want 10", f.LastExpedition)
@@ -106,10 +107,10 @@ func TestWriteFlag_Overwrite(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 1, "AWE-1", "success", "10", 0)
-	WriteFlag(dir, 2, "AWE-2", "failed", "9", 0)
+	session.WriteFlag(dir, 1, "AWE-1", "success", "10", 0)
+	session.WriteFlag(dir, 2, "AWE-2", "failed", "9", 0)
 
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	if f.LastExpedition != 2 {
 		t.Errorf("should reflect latest write, got %d", f.LastExpedition)
 	}
@@ -128,7 +129,7 @@ remaining_issues: 10 (approx): 3 left
 `
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	if f.LastExpedition != 7 {
 		t.Errorf("LastExpedition = %d, want 7", f.LastExpedition)
 	}
@@ -142,9 +143,9 @@ func TestWriteFlag_IssueIDWithNewline_IsSanitized(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	issueID := "AWE-1\nAWE-2"
-	WriteFlag(dir, 1, issueID, "success", "5", 0)
+	session.WriteFlag(dir, 1, issueID, "success", "5", 0)
 
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	if f.LastIssue != "AWE-1 AWE-2" {
 		t.Errorf("LastIssue = %q, want %q", f.LastIssue, "AWE-1 AWE-2")
 	}
@@ -154,8 +155,8 @@ func TestWriteFlag_SanitizesStatusAndRemaining(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
-	WriteFlag(dir, 1, "AWE-1", "success\nextra", "5\r\nmore", 0)
-	f := ReadFlag(dir)
+	session.WriteFlag(dir, 1, "AWE-1", "success\nextra", "5\r\nmore", 0)
+	f := session.ReadFlag(dir)
 
 	if f.LastStatus != "success extra" {
 		t.Errorf("LastStatus = %q, want %q", f.LastStatus, "success extra")
@@ -176,7 +177,7 @@ current_title: flag.md watcher
 `
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	if f.CurrentIssue != "MY-239" {
 		t.Errorf("CurrentIssue = %q, want %q", f.CurrentIssue, "MY-239")
 	}
@@ -195,7 +196,7 @@ remaining_issues: 5
 `
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	if f.CurrentIssue != "" {
 		t.Errorf("CurrentIssue should default to empty, got %q", f.CurrentIssue)
 	}
@@ -214,7 +215,7 @@ remaining_issues: 1
 `
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 	// fmt.Sscanf should leave LastExpedition at zero on parse failure.
 	if f.LastExpedition != 0 {
 		t.Errorf("LastExpedition = %d, want 0 on parse failure", f.LastExpedition)
@@ -225,7 +226,7 @@ remaining_issues: 1
 `
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
-	f = ReadFlag(dir)
+	f = session.ReadFlag(dir)
 	// Negative values are currently accepted by fmt.Sscanf.
 	if f.LastExpedition != -5 {
 		t.Errorf("LastExpedition = %d, want -5 for negative values", f.LastExpedition)
@@ -237,8 +238,8 @@ func TestWriteFlag_MidHighSeverity(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// given — write flag with mid-high severity count
-	WriteFlag(dir, 5, "MY-42", "success", "3", 2)
-	f := ReadFlag(dir)
+	session.WriteFlag(dir, 5, "MY-42", "success", "3", 2)
+	f := session.ReadFlag(dir)
 
 	// then — mid_high_severity should be recorded
 	if f.MidHighSeverity != 2 {
@@ -255,8 +256,8 @@ func TestWriteFlag_MidHighSeverityZero(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
 
 	// given — write flag with zero mid-high severity
-	WriteFlag(dir, 3, "MY-10", "failed", "5", 0)
-	f := ReadFlag(dir)
+	session.WriteFlag(dir, 3, "MY-10", "failed", "5", 0)
+	f := session.ReadFlag(dir)
 
 	// then — mid_high_severity should be 0 (not omitted)
 	if f.MidHighSeverity != 0 {
@@ -279,7 +280,7 @@ mid_high_severity: 3
 	os.WriteFile(filepath.Join(runDir, "flag.md"), []byte(content), 0644)
 
 	// when
-	f := ReadFlag(dir)
+	f := session.ReadFlag(dir)
 
 	// then
 	if f.MidHighSeverity != 3 {
@@ -295,20 +296,20 @@ func TestReconcileFlags_FindsMaxAcrossWorktrees(t *testing.T) {
 
 	// Continent's own flag.md
 	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
-	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
+	session.WriteFlag(continent, 5, "MY-10", "success", "5", 0)
 
 	// worker-001 flag.md — the highest
 	w1 := filepath.Join(continent, ".expedition", ".run", "worktrees", "worker-001")
 	os.MkdirAll(filepath.Join(w1, ".expedition", ".run"), 0755)
-	WriteFlag(w1, 7, "MY-20", "success", "3", 1)
+	session.WriteFlag(w1, 7, "MY-20", "success", "3", 1)
 
 	// worker-002 flag.md — lower than both
 	w2 := filepath.Join(continent, ".expedition", ".run", "worktrees", "worker-002")
 	os.MkdirAll(filepath.Join(w2, ".expedition", ".run"), 0755)
-	WriteFlag(w2, 3, "MY-5", "failed", "7", 0)
+	session.WriteFlag(w2, 3, "MY-5", "failed", "7", 0)
 
 	// when
-	best := reconcileFlags(continent, 2)
+	best := session.ExportReconcileFlags(continent, 2)
 
 	// then — should return worker-001's flag (exp 7)
 	if best.LastExpedition != 7 {
@@ -326,10 +327,10 @@ func TestReconcileFlags_NoWorktrees(t *testing.T) {
 	// given — only continent flag.md, no worktrees
 	continent := t.TempDir()
 	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
-	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
+	session.WriteFlag(continent, 5, "MY-10", "success", "5", 0)
 
 	// when
-	best := reconcileFlags(continent, 2)
+	best := session.ExportReconcileFlags(continent, 2)
 
 	// then — should return continent's flag
 	if best.LastExpedition != 5 {
@@ -345,7 +346,7 @@ func TestReconcileFlags_NoFlagFiles(t *testing.T) {
 	continent := t.TempDir()
 
 	// when
-	best := reconcileFlags(continent, 2)
+	best := session.ExportReconcileFlags(continent, 2)
 
 	// then — zero-value defaults
 	if best.LastExpedition != 0 {
@@ -360,14 +361,14 @@ func TestReconcileFlags_Workers0_IgnoresWorktreeFlags(t *testing.T) {
 	// given — continent flag (exp 5), stale worktree flag (exp 99)
 	continent := t.TempDir()
 	os.MkdirAll(filepath.Join(continent, ".expedition", ".run"), 0755)
-	WriteFlag(continent, 5, "MY-10", "success", "5", 0)
+	session.WriteFlag(continent, 5, "MY-10", "success", "5", 0)
 
 	w1 := filepath.Join(continent, ".expedition", ".run", "worktrees", "worker-001")
 	os.MkdirAll(filepath.Join(w1, ".expedition", ".run"), 0755)
-	WriteFlag(w1, 99, "STALE-1", "success", "0", 0)
+	session.WriteFlag(w1, 99, "STALE-1", "success", "0", 0)
 
 	// when — workers=0 means no pool init, stale worktree flags are ignored
-	best := reconcileFlags(continent, 0)
+	best := session.ExportReconcileFlags(continent, 0)
 
 	// then — only continent flag is considered
 	if best.LastExpedition != 5 {

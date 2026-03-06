@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/spf13/cobra"
 )
 
@@ -37,12 +40,13 @@ func NewRootCommand() *cobra.Command {
 		// Silence usage on RunE errors (cobra prints usage by default on error)
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			applyOtelEnv(domain.StateDir)
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			out := cmd.ErrOrStderr()
 			if os.Getenv("PAINTRESS_QUIET") != "" {
 				out = io.Discard
 			}
-			logger := paintress.NewLogger(out, verbose)
+			logger := platform.NewLogger(out, verbose)
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("paintress", Version)
 			shutdownMeter = initMeter("paintress", Version)
@@ -76,6 +80,7 @@ func NewRootCommand() *cobra.Command {
 		newIssuesCommand(),
 		newArchivePruneCommand(),
 		newCleanCommand(),
+		newRebuildCommand(),
 		newVersionCommand(),
 		newUpdateCommand(),
 	)
@@ -83,11 +88,31 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-// loggerFrom extracts the *paintress.Logger from the cobra command context.
+// resolveRepoPath returns the absolute path from the first arg or cwd.
+// Validates that the path exists and is a directory.
+func resolveRepoPath(args []string) (string, error) {
+	if len(args) > 0 {
+		abs, err := filepath.Abs(args[0])
+		if err != nil {
+			return "", fmt.Errorf("resolve path: %w", err)
+		}
+		info, err := os.Stat(abs)
+		if err != nil {
+			return "", fmt.Errorf("path not found: %w", err)
+		}
+		if !info.IsDir() {
+			return "", fmt.Errorf("not a directory: %s", abs)
+		}
+		return abs, nil
+	}
+	return os.Getwd()
+}
+
+// loggerFrom extracts the domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
-func loggerFrom(cmd *cobra.Command) *paintress.Logger {
-	if l, ok := cmd.Context().Value(loggerKey).(*paintress.Logger); ok {
+func loggerFrom(cmd *cobra.Command) domain.Logger {
+	if l, ok := cmd.Context().Value(loggerKey).(domain.Logger); ok {
 		return l
 	}
-	return paintress.NewLogger(cmd.ErrOrStderr(), false)
+	return platform.NewLogger(cmd.ErrOrStderr(), false)
 }

@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // watchFlag watches flag.md for current_issue changes using filesystem
 // notifications and invokes onIssueChange when a new issue is detected.
 func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, title string), ready chan<- struct{}) {
-	runDir := filepath.Join(continent, ".expedition", ".run")
+	runDir := filepath.Join(continent, domain.StateDir, ".run")
 
 	if _, err := os.Stat(runDir); err != nil {
 		return
@@ -41,7 +41,7 @@ func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, 
 		onIssueChange(flag.CurrentIssue, flag.CurrentTitle)
 	}
 
-	flagName := filepath.Base(paintress.FlagPath(continent))
+	flagName := filepath.Base(domain.FlagPath(continent))
 	for {
 		select {
 		case <-ctx.Done():

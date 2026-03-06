@@ -1,14 +1,16 @@
 package session
 
+// white-box-reason: session internals: tests unexported DevServer struct state inspection
+
 import (
 	"io"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 func TestNewDevServer(t *testing.T) {
-	ds := NewDevServer("npm run dev", "http://localhost:3000", "/some/dir", "/tmp/dev.log", paintress.NewLogger(io.Discard, false))
+	ds := NewDevServer("npm run dev", "http://localhost:3000", "/some/dir", "/tmp/dev.log", platform.NewLogger(io.Discard, false))
 
 	if ds.cmd != "npm run dev" {
 		t.Errorf("cmd = %q", ds.cmd)
@@ -28,7 +30,7 @@ func TestNewDevServer(t *testing.T) {
 }
 
 func TestDevServer_StopWhenNotRunning(t *testing.T) {
-	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null", paintress.NewLogger(io.Discard, false))
+	ds := NewDevServer("echo", "http://localhost:3000", t.TempDir(), "/dev/null", platform.NewLogger(io.Discard, false))
 	// Stop on a non-running server should not panic
 	ds.Stop()
 }

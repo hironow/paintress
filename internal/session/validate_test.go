@@ -1,17 +1,19 @@
-package session
+package session_test
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestValidateContinent_ExistingDir(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
 }
@@ -19,7 +21,7 @@ func TestValidateContinent_ExistingDir(t *testing.T) {
 func TestValidateContinent_CreatesExpeditionDir(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("should create .expedition dir, got error: %v", err)
 	}
 
@@ -37,7 +39,7 @@ func TestValidateContinent_CreatesExpeditionDir(t *testing.T) {
 func TestValidateContinent_CreatesGitignore(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -46,7 +48,7 @@ func TestValidateContinent_CreatesGitignore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("should create .gitignore: %v", err)
 	}
-	if !containsStr(string(content), ".run/") {
+	if !strings.Contains(string(content), ".run/") {
 		t.Error(".gitignore should contain .run/")
 	}
 }
@@ -60,7 +62,7 @@ func TestValidateContinent_AppendsRunToExistingGitignore(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".logs/\nworktrees/\n"), 0644)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -68,7 +70,7 @@ func TestValidateContinent_AppendsRunToExistingGitignore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .gitignore: %v", err)
 	}
-	if !containsStr(string(content), ".run/") {
+	if !strings.Contains(string(content), ".run/") {
 		t.Errorf(".gitignore should contain .run/ after upgrade, got: %q", string(content))
 	}
 }
@@ -82,7 +84,7 @@ func TestValidateContinent_AppendsRunWithMissingTrailingNewline(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte("worktrees/"), 0644)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -115,7 +117,7 @@ func TestValidateContinent_DoesNotDuplicateRunInGitignore(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".run/\n"), 0644)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -148,12 +150,12 @@ func TestValidateContinent_PreservesGitignoreOnReadError(t *testing.T) {
 	defer os.Chmod(gitignore, 0644) // restore for cleanup
 
 	// ValidateContinent should return an error, not silently overwrite
-	err := ValidateContinent(dir)
+	err := session.ValidateContinent(dir)
 	if err == nil {
 		// If no error, the file must not have been overwritten
 		os.Chmod(gitignore, 0644)
 		content, _ := os.ReadFile(gitignore)
-		if !containsStr(string(content), ".logs/") {
+		if !strings.Contains(string(content), ".logs/") {
 			t.Error("existing .gitignore content was overwritten on read error")
 		}
 	}
@@ -172,7 +174,7 @@ func TestValidateContinent_WriteStringErrorsPropagate(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte("worktrees/"), 0644)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -186,7 +188,7 @@ func TestValidateContinent_WriteStringErrorsPropagate(t *testing.T) {
 func TestValidateContinent_CreatesDMailDirs(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -201,7 +203,7 @@ func TestValidateContinent_CreatesDMailDirs(t *testing.T) {
 func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -219,7 +221,7 @@ func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
 func TestValidateContinent_ArchiveIsNotGitignored(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -241,7 +243,7 @@ func TestValidateContinent_AppendsInboxOutboxToExistingGitignore(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".run/\n"), 0644)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -265,7 +267,7 @@ func TestValidateContinent_DoesNotDuplicateInboxOutboxInGitignore(t *testing.T) 
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n"), 0644)
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -284,7 +286,7 @@ func TestValidateContinent_DoesNotDuplicateInboxOutboxInGitignore(t *testing.T) 
 func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -317,7 +319,7 @@ func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
 
@@ -329,7 +331,7 @@ func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 	}
 
 	// Second call should not error and should not overwrite
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
 
@@ -347,7 +349,7 @@ func TestValidateContinent_SkillStatErrorPropagates(t *testing.T) {
 	dir := t.TempDir()
 
 	// First call creates the skill directory and file
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
 
@@ -357,7 +359,7 @@ func TestValidateContinent_SkillStatErrorPropagates(t *testing.T) {
 	defer os.Chmod(skillDir, 0755)
 
 	// ValidateContinent should propagate the stat error, not silently skip
-	err := ValidateContinent(dir)
+	err := session.ValidateContinent(dir)
 	if err == nil {
 		t.Error("expected error when skill directory is unreadable, got nil")
 	}
@@ -367,10 +369,10 @@ func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 
 	// Call twice — should not error on second call
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	if err := ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
 }

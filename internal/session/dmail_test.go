@@ -1,6 +1,7 @@
-package session
+package session_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,7 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestParseDMail_ValidFrontmatter(t *testing.T) {
@@ -31,7 +33,7 @@ metadata:
 `)
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
@@ -76,7 +78,7 @@ description: "Minimal report"
 `)
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
@@ -114,7 +116,7 @@ name: [invalid yaml
 `)
 
 	// when
-	_, err := paintress.ParseDMail(input)
+	_, err := domain.ParseDMail(input)
 
 	// then
 	if err == nil {
@@ -130,7 +132,7 @@ description: "This has no frontmatter delimiters"
 `)
 
 	// when
-	_, err := paintress.ParseDMail(input)
+	_, err := domain.ParseDMail(input)
 
 	// then
 	if err == nil {
@@ -147,7 +149,7 @@ description: "Missing closing delimiter"
 `)
 
 	// when
-	_, err := paintress.ParseDMail(input)
+	_, err := domain.ParseDMail(input)
 
 	// then
 	if err == nil {
@@ -157,7 +159,7 @@ description: "Missing closing delimiter"
 
 func TestDMailMarshal_RoundTrip(t *testing.T) {
 	// given — DMail with all fields populated
-	original := paintress.DMail{
+	original := domain.DMail{
 		Name:        "spec-my-42",
 		Kind:        "specification",
 		Description: "Issue MY-42 is ready for implementation",
@@ -173,7 +175,7 @@ func TestDMailMarshal_RoundTrip(t *testing.T) {
 		t.Fatalf("Marshal error: %v", err)
 	}
 
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
@@ -214,7 +216,7 @@ func TestDMailMarshal_RoundTrip(t *testing.T) {
 
 func TestDMailMarshal_EmptyBody(t *testing.T) {
 	// given — DMail with no body
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "report-my-10",
 		Kind:        "report",
 		Description: "Empty body report",
@@ -233,7 +235,7 @@ func TestDMailMarshal_EmptyBody(t *testing.T) {
 	}
 
 	// round-trip should produce empty body
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
@@ -246,10 +248,10 @@ func TestDMailMarshal_EmptyBody(t *testing.T) {
 
 func TestFormatDMailForPrompt_EmptySlice(t *testing.T) {
 	// given
-	var dmails []paintress.DMail
+	var dmails []domain.DMail
 
 	// when
-	result := paintress.FormatDMailForPrompt(dmails)
+	result := domain.FormatDMailForPrompt(dmails)
 
 	// then
 	if result != "" {
@@ -259,7 +261,7 @@ func TestFormatDMailForPrompt_EmptySlice(t *testing.T) {
 
 func TestFormatDMailForPrompt_SingleDMail(t *testing.T) {
 	// given
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{
 			Name:        "spec-my-42",
 			Kind:        "specification",
@@ -270,7 +272,7 @@ func TestFormatDMailForPrompt_SingleDMail(t *testing.T) {
 	}
 
 	// when
-	result := paintress.FormatDMailForPrompt(dmails)
+	result := domain.FormatDMailForPrompt(dmails)
 
 	// then
 	if !strings.Contains(result, "spec-my-42") {
@@ -289,13 +291,13 @@ func TestFormatDMailForPrompt_SingleDMail(t *testing.T) {
 
 func TestFormatDMailForPrompt_MultipleDMails(t *testing.T) {
 	// given
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{Name: "spec-my-10", Kind: "specification", Description: "First"},
 		{Name: "feedback-d-071", Kind: "feedback", Description: "Second", Severity: "medium"},
 	}
 
 	// when
-	result := paintress.FormatDMailForPrompt(dmails)
+	result := domain.FormatDMailForPrompt(dmails)
 
 	// then
 	if !strings.Contains(result, "spec-my-10") {
@@ -311,12 +313,12 @@ func TestFormatDMailForPrompt_MultipleDMails(t *testing.T) {
 
 func TestFormatDMailForPrompt_BodylessDMail(t *testing.T) {
 	// given — d-mail with no body (frontmatter only)
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{Name: "report-my-99", Kind: "report", Description: "Minimal report"},
 	}
 
 	// when
-	result := paintress.FormatDMailForPrompt(dmails)
+	result := domain.FormatDMailForPrompt(dmails)
 
 	// then — should still contain name and description
 	if !strings.Contains(result, "report-my-99") {
@@ -331,7 +333,7 @@ func TestFormatDMailForPrompt_BodylessDMail(t *testing.T) {
 
 func TestNewReportDMail_BasicFields(t *testing.T) {
 	// given
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  3,
 		IssueID:     "MY-42",
 		IssueTitle:  "Add rate limiting",
@@ -342,7 +344,7 @@ func TestNewReportDMail_BasicFields(t *testing.T) {
 	}
 
 	// when
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// then
 	if dm.Kind != "report" {
@@ -364,7 +366,7 @@ func TestNewReportDMail_BasicFields(t *testing.T) {
 
 func TestNewReportDMail_NameNormalization(t *testing.T) {
 	// given — issue ID with uppercase
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		IssueID:     "MY-100",
 		IssueTitle:  "Some issue",
 		MissionType: "fix",
@@ -372,7 +374,7 @@ func TestNewReportDMail_NameNormalization(t *testing.T) {
 	}
 
 	// when
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// then — name should be lowercase
 	if dm.Name != "report-my-100" {
@@ -387,7 +389,7 @@ func TestInboxDir(t *testing.T) {
 	continent := "/tmp/myrepo"
 
 	// when
-	got := paintress.InboxDir(continent)
+	got := domain.InboxDir(continent)
 
 	// then
 	want := filepath.Join("/tmp/myrepo", ".expedition", "inbox")
@@ -401,7 +403,7 @@ func TestOutboxDir(t *testing.T) {
 	continent := "/tmp/myrepo"
 
 	// when
-	got := paintress.OutboxDir(continent)
+	got := domain.OutboxDir(continent)
 
 	// then
 	want := filepath.Join("/tmp/myrepo", ".expedition", "outbox")
@@ -415,7 +417,7 @@ func TestArchiveDir(t *testing.T) {
 	continent := "/tmp/myrepo"
 
 	// when
-	got := paintress.ArchiveDir(continent)
+	got := domain.ArchiveDir(continent)
 
 	// then
 	want := filepath.Join("/tmp/myrepo", ".expedition", "archive")
@@ -442,7 +444,7 @@ More content after horizontal rule.
 `)
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
@@ -464,7 +466,7 @@ func TestParseDMail_NoTrailingNewlineAfterClosing(t *testing.T) {
 	input := []byte("---\nname: eof-test\nkind: report\ndescription: no trailing newline\n---")
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
@@ -492,7 +494,7 @@ issues:
 `)
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
@@ -514,7 +516,7 @@ func TestParseDMail_EmptyFrontmatter(t *testing.T) {
 	input := []byte("---\n\n---\n")
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
@@ -533,14 +535,14 @@ func TestParseDMail_EmptyFrontmatter(t *testing.T) {
 func TestScanInbox_ErrorOnMalformedFile(t *testing.T) {
 	// given — inbox contains a .md file with invalid frontmatter
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(inboxDir, "bad.md"), []byte("no frontmatter here"), 0644)
 
 	// when
-	_, err := ScanInbox(continent)
+	_, err := session.ScanInbox(context.Background(), continent)
 
 	// then — error should propagate (not silently skip)
 	if err == nil {
@@ -554,15 +556,15 @@ func TestScanInbox_ErrorOnMalformedFile(t *testing.T) {
 func TestScanInbox_SkipsSubdirectories(t *testing.T) {
 	// given — inbox contains a subdirectory and one valid file
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	os.MkdirAll(filepath.Join(inboxDir, "subdir"), 0755)
 
-	dm := paintress.DMail{Name: "valid-file", Kind: "report", Description: "Should be found"}
+	dm := domain.DMail{Name: "valid-file", Kind: "report", Description: "Should be found"}
 	data, _ := dm.Marshal()
 	os.WriteFile(filepath.Join(inboxDir, "valid-file.md"), data, 0644)
 
 	// when
-	results, err := ScanInbox(continent)
+	results, err := session.ScanInbox(context.Background(), continent)
 
 	// then
 	if err != nil {
@@ -579,17 +581,17 @@ func TestScanInbox_SkipsSubdirectories(t *testing.T) {
 func TestScanInbox_SortedByFilename(t *testing.T) {
 	// given — three files that sort alphabetically: a, b, c
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	os.MkdirAll(inboxDir, 0755)
 
 	for _, name := range []string{"charlie", "alpha", "bravo"} {
-		dm := paintress.DMail{Name: name, Kind: "report", Description: name}
+		dm := domain.DMail{Name: name, Kind: "report", Description: name}
 		data, _ := dm.Marshal()
 		os.WriteFile(filepath.Join(inboxDir, name+".md"), data, 0644)
 	}
 
 	// when
-	results, err := ScanInbox(continent)
+	results, err := session.ScanInbox(context.Background(), continent)
 
 	// then — sorted by filename (alpha.md < bravo.md < charlie.md)
 	if err != nil {
@@ -613,7 +615,7 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "spec-my-42",
 		Kind:        "specification",
 		Description: "Test sending d-mail",
@@ -621,15 +623,15 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := session.SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
 		t.Fatalf("SendDMail error: %v", err)
 	}
 
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "spec-my-42.md")
-	archivePath := filepath.Join(paintress.ArchiveDir(continent), "spec-my-42.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "spec-my-42.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "spec-my-42.md")
 
 	outboxData, err := os.ReadFile(outboxPath)
 	if err != nil {
@@ -646,7 +648,7 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	}
 
 	// Verify the content is a valid d-mail
-	parsed, err := paintress.ParseDMail(outboxData)
+	parsed, err := domain.ParseDMail(outboxData)
 	if err != nil {
 		t.Fatalf("ParseDMail on outbox file: %v", err)
 	}
@@ -663,14 +665,14 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "report-create-dirs",
 		Kind:        "report",
 		Description: "Dirs should be auto-created",
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := session.SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -678,8 +680,8 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	}
 
 	// Both files must exist
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "report-create-dirs.md")
-	archivePath := filepath.Join(paintress.ArchiveDir(continent), "report-create-dirs.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "report-create-dirs.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "report-create-dirs.md")
 
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("outbox file not found: %v", err)
@@ -694,14 +696,14 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "report-order-test",
 		Kind:        "report",
 		Description: "Verify both archive and outbox are written",
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := session.SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -709,11 +711,11 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 	}
 
 	// Both files must exist after Flush
-	archivePath := filepath.Join(paintress.ArchiveDir(continent), "report-order-test.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "report-order-test.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file should exist: %v", err)
 	}
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "report-order-test.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "report-order-test.md")
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("outbox file should exist: %v", err)
 	}
@@ -724,13 +726,13 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 func TestScanInbox_ReadsAllMdFiles(t *testing.T) {
 	// given — two d-mails in inbox
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	dm1 := paintress.DMail{Name: "alpha", Kind: "report", Description: "First"}
-	dm2 := paintress.DMail{Name: "beta", Kind: "specification", Description: "Second", Body: "Details\n"}
+	dm1 := domain.DMail{Name: "alpha", Kind: "report", Description: "First"}
+	dm2 := domain.DMail{Name: "beta", Kind: "specification", Description: "Second", Body: "Details\n"}
 
 	data1, err := dm1.Marshal()
 	if err != nil {
@@ -748,7 +750,7 @@ func TestScanInbox_ReadsAllMdFiles(t *testing.T) {
 	}
 
 	// when
-	results, err := ScanInbox(continent)
+	results, err := session.ScanInbox(context.Background(), continent)
 
 	// then
 	if err != nil {
@@ -772,13 +774,13 @@ func TestScanInbox_ReadsAllMdFiles(t *testing.T) {
 func TestScanInbox_EmptyDir(t *testing.T) {
 	// given — empty inbox directory
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
 	// when
-	results, err := ScanInbox(continent)
+	results, err := session.ScanInbox(context.Background(), continent)
 
 	// then
 	if err != nil {
@@ -792,12 +794,12 @@ func TestScanInbox_EmptyDir(t *testing.T) {
 func TestScanInbox_SkipsNonMd(t *testing.T) {
 	// given — one .md and one .txt in inbox
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	dm := paintress.DMail{Name: "valid", Kind: "report", Description: "Valid d-mail"}
+	dm := domain.DMail{Name: "valid", Kind: "report", Description: "Valid d-mail"}
 	data, err := dm.Marshal()
 	if err != nil {
 		t.Fatalf("setup: Marshal: %v", err)
@@ -810,7 +812,7 @@ func TestScanInbox_SkipsNonMd(t *testing.T) {
 	}
 
 	// when
-	results, err := ScanInbox(continent)
+	results, err := session.ScanInbox(context.Background(), continent)
 
 	// then
 	if err != nil {
@@ -829,7 +831,7 @@ func TestScanInbox_NonexistentDir(t *testing.T) {
 	continent := t.TempDir()
 
 	// when
-	results, err := ScanInbox(continent)
+	results, err := session.ScanInbox(context.Background(), continent)
 
 	// then — returns empty slice, not error
 	if err != nil {
@@ -845,12 +847,12 @@ func TestScanInbox_NonexistentDir(t *testing.T) {
 func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	// given — a d-mail sitting in inbox
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	if err := os.MkdirAll(inboxDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	dm := paintress.DMail{Name: "move-me", Kind: "report", Description: "To be archived"}
+	dm := domain.DMail{Name: "move-me", Kind: "report", Description: "To be archived"}
 	data, err := dm.Marshal()
 	if err != nil {
 		t.Fatalf("setup: Marshal: %v", err)
@@ -861,7 +863,7 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// when
-	err = ArchiveInboxDMail(continent, "move-me", nil)
+	err = session.ArchiveInboxDMail(context.Background(), continent, "move-me", nil)
 
 	// then
 	if err != nil {
@@ -874,14 +876,14 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// Present in archive
-	archivePath := filepath.Join(paintress.ArchiveDir(continent), "move-me.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "move-me.md")
 	archiveData, err := os.ReadFile(archivePath)
 	if err != nil {
 		t.Fatalf("archive file not found: %v", err)
 	}
 
 	// Content is preserved
-	parsed, err := paintress.ParseDMail(archiveData)
+	parsed, err := domain.ParseDMail(archiveData)
 	if err != nil {
 		t.Fatalf("ParseDMail on archived file: %v", err)
 	}
@@ -893,10 +895,10 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 func TestArchiveInboxDMail_SourceNotFound_NotInArchive(t *testing.T) {
 	// given — no file in inbox AND no file in archive (wrong name)
 	continent := t.TempDir()
-	os.MkdirAll(paintress.InboxDir(continent), 0755)
+	os.MkdirAll(domain.InboxDir(continent), 0755)
 
 	// when
-	err := ArchiveInboxDMail(continent, "nonexistent", nil)
+	err := session.ArchiveInboxDMail(context.Background(), continent, "nonexistent", nil)
 
 	// then — error: source missing and not in archive means wrong name
 	if err == nil {
@@ -910,15 +912,15 @@ func TestArchiveInboxDMail_SourceNotFound_NotInArchive(t *testing.T) {
 func TestArchiveInboxDMail_SourceNotFound_AlreadyInArchive(t *testing.T) {
 	// given — file already in archive (previously archived by another worker)
 	continent := t.TempDir()
-	os.MkdirAll(paintress.InboxDir(continent), 0755)
-	arcDir := paintress.ArchiveDir(continent)
+	os.MkdirAll(domain.InboxDir(continent), 0755)
+	arcDir := domain.ArchiveDir(continent)
 	os.MkdirAll(arcDir, 0755)
-	dm := paintress.DMail{Name: "already-moved", Kind: "report", Description: "already archived"}
+	dm := domain.DMail{Name: "already-moved", Kind: "report", Description: "already archived"}
 	data, _ := dm.Marshal()
 	os.WriteFile(filepath.Join(arcDir, "already-moved.md"), data, 0644)
 
 	// when
-	err := ArchiveInboxDMail(continent, "already-moved", nil)
+	err := session.ArchiveInboxDMail(context.Background(), continent, "already-moved", nil)
 
 	// then — idempotent: dst exists proves another worker archived it
 	if err != nil {
@@ -929,10 +931,10 @@ func TestArchiveInboxDMail_SourceNotFound_AlreadyInArchive(t *testing.T) {
 func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
 	// given — one file in inbox, two goroutines try to archive it
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	os.MkdirAll(inboxDir, 0755)
 
-	dm := paintress.DMail{Name: "race-me", Kind: "report", Description: "concurrent test"}
+	dm := domain.DMail{Name: "race-me", Kind: "report", Description: "concurrent test"}
 	data, _ := dm.Marshal()
 	os.WriteFile(filepath.Join(inboxDir, "race-me.md"), data, 0644)
 
@@ -940,7 +942,7 @@ func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
 	errs := make(chan error, 2)
 	for range 2 {
 		go func() {
-			errs <- ArchiveInboxDMail(continent, "race-me", nil)
+			errs <- session.ArchiveInboxDMail(context.Background(), continent, "race-me", nil)
 		}()
 	}
 
@@ -955,21 +957,21 @@ func TestArchiveInboxDMail_ConcurrentIdempotent(t *testing.T) {
 func TestArchiveInboxDMail_CreatesArchiveDir(t *testing.T) {
 	// given — archive/ does not exist yet
 	continent := t.TempDir()
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 	os.MkdirAll(inboxDir, 0755)
 
-	dm := paintress.DMail{Name: "auto-dir", Kind: "report", Description: "Archive dir auto-created"}
+	dm := domain.DMail{Name: "auto-dir", Kind: "report", Description: "Archive dir auto-created"}
 	data, _ := dm.Marshal()
 	os.WriteFile(filepath.Join(inboxDir, "auto-dir.md"), data, 0644)
 
 	// when
-	err := ArchiveInboxDMail(continent, "auto-dir", nil)
+	err := session.ArchiveInboxDMail(context.Background(), continent, "auto-dir", nil)
 
 	// then
 	if err != nil {
 		t.Fatalf("ArchiveInboxDMail error: %v", err)
 	}
-	archivePath := filepath.Join(paintress.ArchiveDir(continent), "auto-dir.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "auto-dir.md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file not found after auto-dir creation: %v", err)
 	}
@@ -984,14 +986,14 @@ func TestSendDMail_ArchiveDirFailure_NoOutbox(t *testing.T) {
 	store := testOutboxStore(t, continent)
 
 	// Make archive dir unwritable after store creation
-	archiveDir := paintress.ArchiveDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
 	os.Chmod(archiveDir, 0555)
 	t.Cleanup(func() { os.Chmod(archiveDir, 0755) })
 
-	dm := paintress.DMail{Name: "fail-early", Kind: "report", Description: "Should fail at flush"}
+	dm := domain.DMail{Name: "fail-early", Kind: "report", Description: "Should fail at flush"}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := session.SendDMail(context.Background(), store, dm, nil)
 
 	// then — error at flush stage (atomicWrite to archive fails)
 	if err == nil {
@@ -999,7 +1001,7 @@ func TestSendDMail_ArchiveDirFailure_NoOutbox(t *testing.T) {
 	}
 
 	// Outbox file must NOT exist (flush failed)
-	outboxPath := filepath.Join(paintress.OutboxDir(continent), "fail-early.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "fail-early.md")
 	if _, statErr := os.Stat(outboxPath); statErr == nil {
 		t.Error("outbox file should not exist when flush failed")
 	}
@@ -1010,7 +1012,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "full-content",
 		Kind:        "feedback",
 		Description: "Complete content verification",
@@ -1021,7 +1023,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := session.SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -1029,12 +1031,12 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	}
 
 	// Verify both locations are parseable and match
-	for _, dir := range []string{paintress.ArchiveDir(continent), paintress.OutboxDir(continent)} {
+	for _, dir := range []string{domain.ArchiveDir(continent), domain.OutboxDir(continent)} {
 		data, err := os.ReadFile(filepath.Join(dir, "full-content.md"))
 		if err != nil {
 			t.Fatalf("read %s: %v", dir, err)
 		}
-		parsed, err := paintress.ParseDMail(data)
+		parsed, err := domain.ParseDMail(data)
 		if err != nil {
 			t.Fatalf("parse %s: %v", dir, err)
 		}
@@ -1063,7 +1065,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 
 func TestNewReportDMail_NoPRUrl(t *testing.T) {
 	// given — report with empty PRUrl
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "MY-50",
 		IssueTitle:  "CLI tool",
@@ -1074,7 +1076,7 @@ func TestNewReportDMail_NoPRUrl(t *testing.T) {
 	}
 
 	// when
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// then — body should not contain PR line
 	if strings.Contains(dm.Body, "**PR:**") {
@@ -1084,7 +1086,7 @@ func TestNewReportDMail_NoPRUrl(t *testing.T) {
 
 func TestNewReportDMail_PRUrlNone(t *testing.T) {
 	// given — report with PRUrl = "none"
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  2,
 		IssueID:     "MY-51",
 		IssueTitle:  "Verify styling",
@@ -1094,7 +1096,7 @@ func TestNewReportDMail_PRUrlNone(t *testing.T) {
 	}
 
 	// when
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// then — "none" is also excluded
 	if strings.Contains(dm.Body, "**PR:**") {
@@ -1104,7 +1106,7 @@ func TestNewReportDMail_PRUrlNone(t *testing.T) {
 
 func TestNewReportDMail_NoReason(t *testing.T) {
 	// given — report with empty Reason
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  3,
 		IssueID:     "MY-52",
 		IssueTitle:  "Fix bug",
@@ -1114,7 +1116,7 @@ func TestNewReportDMail_NoReason(t *testing.T) {
 	}
 
 	// when
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// then — body should not contain Summary section
 	if strings.Contains(dm.Body, "## Summary") {
@@ -1124,7 +1126,7 @@ func TestNewReportDMail_NoReason(t *testing.T) {
 
 func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 	// given — create a report d-mail and marshal it
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  5,
 		IssueID:     "MY-77",
 		IssueTitle:  "Add caching",
@@ -1134,14 +1136,14 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 		Reason:      "Added Redis caching layer",
 	}
 
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// when — marshal then parse
 	data, err := dm.Marshal()
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
@@ -1162,8 +1164,8 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 	if !strings.Contains(parsed.Body, "Added Redis caching layer") {
 		t.Errorf("Body should contain reason after roundtrip")
 	}
-	if parsed.SchemaVersion != paintress.DMailSchemaVersion {
-		t.Errorf("SchemaVersion = %q, want %q after roundtrip", parsed.SchemaVersion, paintress.DMailSchemaVersion)
+	if parsed.SchemaVersion != domain.DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q after roundtrip", parsed.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
@@ -1182,24 +1184,24 @@ Body content.
 `)
 
 	// when
-	dm, err := paintress.ParseDMail(input)
+	dm, err := domain.ParseDMail(input)
 
 	// then
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if dm.SchemaVersion != paintress.DMailSchemaVersion {
-		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, paintress.DMailSchemaVersion)
+	if dm.SchemaVersion != domain.DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
 func TestDMailMarshal_SchemaVersionRoundTrip(t *testing.T) {
 	// given — DMail with SchemaVersion set
-	original := paintress.DMail{
+	original := domain.DMail{
 		Name:          "schema-v1",
 		Kind:          "report",
 		Description:   "Round-trip schema version",
-		SchemaVersion: paintress.DMailSchemaVersion,
+		SchemaVersion: domain.DMailSchemaVersion,
 		Body:          "Content.\n",
 	}
 
@@ -1208,20 +1210,20 @@ func TestDMailMarshal_SchemaVersionRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
 
 	// then
-	if parsed.SchemaVersion != paintress.DMailSchemaVersion {
-		t.Errorf("SchemaVersion = %q, want %q", parsed.SchemaVersion, paintress.DMailSchemaVersion)
+	if parsed.SchemaVersion != domain.DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", parsed.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
 func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
 	// given
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "MY-99",
 		IssueTitle:  "Test issue",
@@ -1230,11 +1232,11 @@ func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	dm := paintress.NewReportDMail(report)
+	dm := domain.NewReportDMail(report)
 
 	// then
-	if dm.SchemaVersion != paintress.DMailSchemaVersion {
-		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, paintress.DMailSchemaVersion)
+	if dm.SchemaVersion != domain.DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q", dm.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
@@ -1243,14 +1245,14 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "no-version",
 		Kind:        "report",
 		Description: "Missing schema version should be stamped",
 	}
 
 	// when
-	err := SendDMail(store, dm, nil)
+	err := session.SendDMail(context.Background(), store, dm, nil)
 
 	// then
 	if err != nil {
@@ -1258,16 +1260,16 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 	}
 
 	// Read back and verify version was stamped
-	data, err := os.ReadFile(filepath.Join(paintress.OutboxDir(continent), "no-version.md"))
+	data, err := os.ReadFile(filepath.Join(domain.OutboxDir(continent), "no-version.md"))
 	if err != nil {
 		t.Fatalf("read outbox: %v", err)
 	}
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("parse outbox: %v", err)
 	}
-	if parsed.SchemaVersion != paintress.DMailSchemaVersion {
-		t.Errorf("SchemaVersion = %q, want %q (should be stamped by SendDMail)", parsed.SchemaVersion, paintress.DMailSchemaVersion)
+	if parsed.SchemaVersion != domain.DMailSchemaVersion {
+		t.Errorf("SchemaVersion = %q, want %q (should be stamped by SendDMail)", parsed.SchemaVersion, domain.DMailSchemaVersion)
 	}
 }
 
@@ -1275,7 +1277,7 @@ func TestSendDMail_StampsSchemaVersion(t *testing.T) {
 
 func TestDMailMarshal_BodyWithoutTrailingNewline(t *testing.T) {
 	// given — body with no trailing newline
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "no-trailing-nl",
 		Kind:        "report",
 		Description: "Body without trailing newline",
@@ -1295,7 +1297,7 @@ func TestDMailMarshal_BodyWithoutTrailingNewline(t *testing.T) {
 	}
 
 	// round-trip should have trailing newline in body
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
@@ -1306,7 +1308,7 @@ func TestDMailMarshal_BodyWithoutTrailingNewline(t *testing.T) {
 
 func TestDMailMarshal_UnicodeContent(t *testing.T) {
 	// given — d-mail with Japanese content
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "unicode-test",
 		Kind:        "specification",
 		Description: "日本語の説明文",
@@ -1318,7 +1320,7 @@ func TestDMailMarshal_UnicodeContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Marshal error: %v", err)
 	}
-	parsed, err := paintress.ParseDMail(data)
+	parsed, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
@@ -1343,13 +1345,13 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	inboxDir := paintress.InboxDir(continent)
-	outboxDir := paintress.OutboxDir(continent)
-	archiveDir := paintress.ArchiveDir(continent)
+	inboxDir := domain.InboxDir(continent)
+	outboxDir := domain.OutboxDir(continent)
+	archiveDir := domain.ArchiveDir(continent)
 
 	// ── Phase 1: External tool writes specification and feedback to inbox ──
 
-	spec := paintress.DMail{
+	spec := domain.DMail{
 		Name:        "spec-my-42",
 		Kind:        "specification",
 		Description: "Implement rate limiting for API",
@@ -1357,7 +1359,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		Severity:    "medium",
 		Body:        "# Definition of Done\n\n- Token bucket algorithm\n- Per-key rate limiting\n",
 	}
-	feedback := paintress.DMail{
+	feedback := domain.DMail{
 		Name:        "feedback-d-071",
 		Kind:        "feedback",
 		Description: "Architecture drift in auth module",
@@ -1365,7 +1367,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		Body:        "## Findings\n\nSession handling does not match design doc.\n",
 	}
 
-	for _, dm := range []paintress.DMail{spec, feedback} {
+	for _, dm := range []domain.DMail{spec, feedback} {
 		data, err := dm.Marshal()
 		if err != nil {
 			t.Fatalf("setup: Marshal %s: %v", dm.Name, err)
@@ -1377,7 +1379,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// ── Phase 2: Paintress scans inbox (expedition startup) ──
 
-	scanned, err := ScanInbox(continent)
+	scanned, err := session.ScanInbox(context.Background(), continent)
 	if err != nil {
 		t.Fatalf("ScanInbox: %v", err)
 	}
@@ -1394,7 +1396,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// ── Phase 3: Format for prompt injection ──
 
-	promptSection := paintress.FormatDMailForPrompt(scanned)
+	promptSection := domain.FormatDMailForPrompt(scanned)
 	if promptSection == "" {
 		t.Fatal("FormatDMailForPrompt returned empty string")
 	}
@@ -1415,7 +1417,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// ── Phase 4: Expedition succeeds — create and send report ──
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  7,
 		IssueID:     "MY-42",
 		IssueTitle:  "Add rate limiting",
@@ -1424,7 +1426,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		Status:      "success",
 		Reason:      "Implemented token bucket with Redis backend",
 	}
-	reportDMail := paintress.NewReportDMail(report)
+	reportDMail := domain.NewReportDMail(report)
 
 	if reportDMail.Name != "report-my-42" {
 		t.Errorf("report Name = %q, want report-my-42", reportDMail.Name)
@@ -1434,7 +1436,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	}
 
 	// Send report via outbox store (Stage → Flush)
-	if err := SendDMail(store, reportDMail, nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
@@ -1445,7 +1447,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("report not found in %s: %v", dir, err)
 		}
-		parsed, err := paintress.ParseDMail(data)
+		parsed, err := domain.ParseDMail(data)
 		if err != nil {
 			t.Fatalf("report in %s not parseable: %v", dir, err)
 		}
@@ -1457,8 +1459,8 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	// ── Phase 5: Archive inbox d-mails (post-expedition) ──
 
 	for _, dm := range scanned {
-		if err := ArchiveInboxDMail(continent, dm.Name, nil); err != nil {
-			t.Fatalf("ArchiveInboxDMail(%s): %v", dm.Name, err)
+		if err := session.ArchiveInboxDMail(context.Background(), continent, dm.Name, nil); err != nil {
+			t.Fatalf("session.ArchiveInboxDMail(%s): %v", dm.Name, err)
 		}
 	}
 
@@ -1519,7 +1521,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 			t.Errorf("read archived %s: %v", entry.Name(), err)
 			continue
 		}
-		parsed, err := paintress.ParseDMail(data)
+		parsed, err := domain.ParseDMail(data)
 		if err != nil {
 			t.Errorf("parse archived %s: %v", entry.Name(), err)
 			continue
@@ -1538,7 +1540,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 
 	// ── Phase 1: Inbox dir is empty ──
 
-	scanned, err := ScanInbox(continent)
+	scanned, err := session.ScanInbox(context.Background(), continent)
 	if err != nil {
 		t.Fatalf("ScanInbox: %v", err)
 	}
@@ -1548,14 +1550,14 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 
 	// ── Phase 2: Empty prompt section ──
 
-	promptSection := paintress.FormatDMailForPrompt(scanned)
+	promptSection := domain.FormatDMailForPrompt(scanned)
 	if promptSection != "" {
 		t.Errorf("expected empty prompt section, got %q", promptSection)
 	}
 
 	// ── Phase 3: Expedition sends report even with no inbox ──
 
-	report := &paintress.ExpeditionReport{
+	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "MY-10",
 		IssueTitle:  "Setup project",
@@ -1563,13 +1565,13 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Status:      "success",
 		Reason:      "Initial setup complete",
 	}
-	reportDMail := paintress.NewReportDMail(report)
-	if err := SendDMail(store, reportDMail, nil); err != nil {
+	reportDMail := domain.NewReportDMail(report)
+	if err := session.SendDMail(context.Background(), store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
 
 	// outbox and archive should each have the report
-	for _, dirFn := range []func(string) string{paintress.OutboxDir, paintress.ArchiveDir} {
+	for _, dirFn := range []func(string) string{domain.OutboxDir, domain.ArchiveDir} {
 		path := filepath.Join(dirFn(continent), "report-my-10.md")
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("report not found at %s: %v", path, err)
@@ -1586,15 +1588,15 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
-	inboxDir := paintress.InboxDir(continent)
+	inboxDir := domain.InboxDir(continent)
 
 	// ── Expedition 1: spec in inbox ──
 
-	spec := paintress.DMail{Name: "spec-my-1", Kind: "specification", Description: "First task"}
+	spec := domain.DMail{Name: "spec-my-1", Kind: "specification", Description: "First task"}
 	data, _ := spec.Marshal()
 	os.WriteFile(filepath.Join(inboxDir, "spec-my-1.md"), data, 0644)
 
-	scanned1, err := ScanInbox(continent)
+	scanned1, err := session.ScanInbox(context.Background(), continent)
 	if err != nil {
 		t.Fatalf("Exp1 ScanInbox: %v", err)
 	}
@@ -1603,13 +1605,13 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	}
 
 	// Success → send report + archive inbox
-	report1 := paintress.NewReportDMail(&paintress.ExpeditionReport{
+	report1 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
 	})
-	if err := SendDMail(store, report1, nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, report1, nil); err != nil {
 		t.Fatalf("Exp1 SendDMail: %v", err)
 	}
-	if err := ArchiveInboxDMail(continent, "spec-my-1", nil); err != nil {
+	if err := session.ArchiveInboxDMail(context.Background(), continent, "spec-my-1", nil); err != nil {
 		t.Fatalf("Exp1 ArchiveInboxDMail: %v", err)
 	}
 
@@ -1621,13 +1623,13 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	// ── Between expeditions: new feedback arrives ──
 
-	fb := paintress.DMail{Name: "feedback-d-001", Kind: "feedback", Description: "Review feedback", Severity: "medium"}
+	fb := domain.DMail{Name: "feedback-d-001", Kind: "feedback", Description: "Review feedback", Severity: "medium"}
 	data, _ = fb.Marshal()
 	os.WriteFile(filepath.Join(inboxDir, "feedback-d-001.md"), data, 0644)
 
 	// ── Expedition 2: feedback in inbox ──
 
-	scanned2, err := ScanInbox(continent)
+	scanned2, err := session.ScanInbox(context.Background(), continent)
 	if err != nil {
 		t.Fatalf("Exp2 ScanInbox: %v", err)
 	}
@@ -1635,13 +1637,13 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 		t.Fatalf("Exp2: unexpected scan result: %v", scanned2)
 	}
 
-	report2 := paintress.NewReportDMail(&paintress.ExpeditionReport{
+	report2 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
 	})
-	if err := SendDMail(store, report2, nil); err != nil {
+	if err := session.SendDMail(context.Background(), store, report2, nil); err != nil {
 		t.Fatalf("Exp2 SendDMail: %v", err)
 	}
-	if err := ArchiveInboxDMail(continent, "feedback-d-001", nil); err != nil {
+	if err := session.ArchiveInboxDMail(context.Background(), continent, "feedback-d-001", nil); err != nil {
 		t.Fatalf("Exp2 ArchiveInboxDMail: %v", err)
 	}
 
@@ -1654,13 +1656,13 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	}
 
 	// outbox: 2 reports
-	outboxEntries, _ := os.ReadDir(paintress.OutboxDir(continent))
+	outboxEntries, _ := os.ReadDir(domain.OutboxDir(continent))
 	if len(outboxEntries) != 2 {
 		t.Errorf("final: outbox should have 2 reports, got %d", len(outboxEntries))
 	}
 
 	// archive: 4 files (spec + report1 + feedback + report2)
-	archiveEntries, _ := os.ReadDir(paintress.ArchiveDir(continent))
+	archiveEntries, _ := os.ReadDir(domain.ArchiveDir(continent))
 	if len(archiveEntries) != 4 {
 		names := make([]string, len(archiveEntries))
 		for i, e := range archiveEntries {
@@ -1673,11 +1675,11 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 // === BuildFollowUpPrompt Tests ===
 
 func TestBuildFollowUpPrompt_SingleDMail(t *testing.T) {
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting spec", Issues: []string{"MY-42"}, Body: "# DoD\n- Token bucket\n"},
 	}
 
-	prompt := paintress.BuildFollowUpPrompt(dmails)
+	prompt := domain.BuildFollowUpPrompt(dmails)
 
 	if !strings.Contains(prompt, "spec-my-42") {
 		t.Error("prompt should contain d-mail name")
@@ -1691,12 +1693,12 @@ func TestBuildFollowUpPrompt_SingleDMail(t *testing.T) {
 }
 
 func TestBuildFollowUpPrompt_MultipleDMails(t *testing.T) {
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting"},
 		{Name: "feedback-d-001", Kind: "feedback", Description: "Review feedback", Severity: "medium"},
 	}
 
-	prompt := paintress.BuildFollowUpPrompt(dmails)
+	prompt := domain.BuildFollowUpPrompt(dmails)
 
 	if !strings.Contains(prompt, "spec-my-42") {
 		t.Error("prompt should contain first d-mail")
@@ -1707,7 +1709,7 @@ func TestBuildFollowUpPrompt_MultipleDMails(t *testing.T) {
 }
 
 func TestBuildFollowUpPrompt_EmptySlice(t *testing.T) {
-	prompt := paintress.BuildFollowUpPrompt(nil)
+	prompt := domain.BuildFollowUpPrompt(nil)
 	if prompt != "" {
 		t.Errorf("empty input should return empty string, got %q", prompt)
 	}
@@ -1715,13 +1717,13 @@ func TestBuildFollowUpPrompt_EmptySlice(t *testing.T) {
 
 func TestFilterHighSeverity_NoHighSeverity(t *testing.T) {
 	// given
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{Name: "report-1", Kind: "report", Severity: ""},
 		{Name: "spec-2", Kind: "specification", Severity: "low"},
 	}
 
 	// when
-	high := paintress.FilterHighSeverity(dmails)
+	high := domain.FilterHighSeverity(dmails)
 
 	// then
 	if len(high) != 0 {
@@ -1731,7 +1733,7 @@ func TestFilterHighSeverity_NoHighSeverity(t *testing.T) {
 
 func TestFilterHighSeverity_MixedSeverity(t *testing.T) {
 	// given
-	dmails := []paintress.DMail{
+	dmails := []domain.DMail{
 		{Name: "report-1", Kind: "report", Severity: ""},
 		{Name: "alert-1", Kind: "alert", Severity: "high"},
 		{Name: "spec-1", Kind: "specification", Severity: "low"},
@@ -1739,7 +1741,7 @@ func TestFilterHighSeverity_MixedSeverity(t *testing.T) {
 	}
 
 	// when
-	high := paintress.FilterHighSeverity(dmails)
+	high := domain.FilterHighSeverity(dmails)
 
 	// then
 	if len(high) != 2 {
@@ -1752,10 +1754,10 @@ func TestFilterHighSeverity_MixedSeverity(t *testing.T) {
 
 func TestFilterHighSeverity_EmptySlice(t *testing.T) {
 	// given
-	var dmails []paintress.DMail
+	var dmails []domain.DMail
 
 	// when
-	high := paintress.FilterHighSeverity(dmails)
+	high := domain.FilterHighSeverity(dmails)
 
 	// then
 	if len(high) != 0 {
@@ -1763,57 +1765,64 @@ func TestFilterHighSeverity_EmptySlice(t *testing.T) {
 	}
 }
 
-// === Event Store Error Propagation Tests ===
+// === Emitter Error Propagation Tests ===
 //
 // D-Mail events (dmail.staged, dmail.flushed, dmail.archived) are critical
 // domain events in the event sourcing model. Errors must not be silently dropped.
 
-// failingEventStore is a minimal EventStore that always fails on Append.
-type failingEventStore struct {
+// failingEmitter is a minimal ExpeditionEventEmitter that always returns an error.
+type failingEmitter struct {
 	err error
 }
 
-func (f *failingEventStore) Append(_ ...paintress.Event) error { return f.err }
-func (f *failingEventStore) LoadAll() ([]paintress.Event, error) {
-	return nil, nil
+func (f *failingEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+	return f.err
 }
-func (f *failingEventStore) LoadSince(_ time.Time) ([]paintress.Event, error) {
-	return nil, nil
+func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitGommage(_ int, _ time.Time) error             { return f.err }
+func (f *failingEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error {
+	return f.err
 }
+func (f *failingEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return f.err }
+func (f *failingEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return f.err }
+func (f *failingEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return f.err }
 
-func TestSendDMail_PropagatesEventStoreError(t *testing.T) {
-	// given — an outbox store that works, but an event store that fails
+func TestSendDMail_PropagatesEmitterError(t *testing.T) {
+	// given — an outbox store that works, but an emitter that fails
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
 	outboxStore := testOutboxStore(t, continent)
-	evStore := &failingEventStore{err: fmt.Errorf("disk full")}
+	emitter := &failingEmitter{err: fmt.Errorf("disk full")}
 
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "report-es-fail",
 		Kind:        "report",
-		Description: "Test that event store errors propagate",
+		Description: "Test that emitter errors propagate",
 	}
 
 	// when
-	err := SendDMail(outboxStore, dm, evStore)
+	err := session.SendDMail(context.Background(), outboxStore, dm, emitter)
 
-	// then — error from event store must be propagated
+	// then — error from emitter must be propagated
 	if err == nil {
-		t.Fatal("expected error from failing event store, got nil")
+		t.Fatal("expected error from failing emitter, got nil")
 	}
 	if !strings.Contains(err.Error(), "disk full") {
 		t.Errorf("error should contain root cause, got: %s", err.Error())
 	}
 }
 
-func TestArchiveInboxDMail_PropagatesEventStoreError(t *testing.T) {
-	// given — a d-mail in inbox, and an event store that fails
+func TestArchiveInboxDMail_PropagatesEmitterError(t *testing.T) {
+	// given — a d-mail in inbox, and an emitter that fails
 	continent := t.TempDir()
 	ensureExpeditionDirs(t, continent)
-	evStore := &failingEventStore{err: fmt.Errorf("readonly fs")}
+	emitter := &failingEmitter{err: fmt.Errorf("readonly fs")}
 
 	// Write a d-mail file into inbox for archiving
-	dm := paintress.DMail{
+	dm := domain.DMail{
 		Name:        "spec-es-fail",
 		Kind:        "specification",
 		Description: "Test archive event propagation",
@@ -1822,16 +1831,16 @@ func TestArchiveInboxDMail_PropagatesEventStoreError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(paintress.InboxDir(continent), "spec-es-fail.md"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(domain.InboxDir(continent), "spec-es-fail.md"), data, 0644); err != nil {
 		t.Fatalf("write inbox: %v", err)
 	}
 
 	// when
-	err = ArchiveInboxDMail(continent, "spec-es-fail", evStore)
+	err = session.ArchiveInboxDMail(context.Background(), continent, "spec-es-fail", emitter)
 
-	// then — error from event store must be propagated
+	// then — error from emitter must be propagated
 	if err == nil {
-		t.Fatal("expected error from failing event store, got nil")
+		t.Fatal("expected error from failing emitter, got nil")
 	}
 	if !strings.Contains(err.Error(), "readonly fs") {
 		t.Errorf("error should contain root cause, got: %s", err.Error())

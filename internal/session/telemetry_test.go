@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"context"
@@ -11,7 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/session"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -26,12 +28,12 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
 	prev := otel.GetTracerProvider()
 	otel.SetTracerProvider(tp)
-	paintress.Tracer = tp.Tracer("paintress-test")
+	platform.Tracer = tp.Tracer("paintress-test")
 	t.Cleanup(func() {
 		tp.Shutdown(context.Background())
 		otel.SetTracerProvider(prev)
 		// Restore noop tracer so other tests are not affected
-		paintress.Tracer = prev.Tracer("paintress")
+		platform.Tracer = prev.Tracer("paintress")
 	})
 	return exp
 }
@@ -39,7 +41,7 @@ func setupTestTracer(t *testing.T) *tracetest.InMemoryExporter {
 func TestInitTracer_ShutdownFlushesSpans(t *testing.T) {
 	exp := setupTestTracer(t)
 
-	_, span := paintress.Tracer.Start(context.Background(), "flushed-span")
+	_, span := platform.Tracer.Start(context.Background(), "flushed-span") // nosemgrep: adr0003-otel-span-without-defer-end -- test span, immediately ended [permanent]
 	span.End()
 
 	spans := exp.GetSpans()
@@ -57,7 +59,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 1,
 		TimeoutSec:     30,
@@ -66,7 +68,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := session.NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -92,7 +94,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
 
-	cfg := paintress.Config{
+	cfg := domain.Config{
 		Continent:      dir,
 		MaxExpeditions: 1,
 		TimeoutSec:     30,
@@ -101,7 +103,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := NewPaintress(cfg, paintress.NewLogger(io.Discard, false), io.Discard, nil, nil)
+	p := session.NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -149,10 +151,10 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 
-	e := &Expedition{
+	e := &session.Expedition{
 		Number:    1,
 		Continent: dir,
-		Config: paintress.Config{
+		Config: domain.Config{
 			Continent:  dir,
 			TimeoutSec: 1, // 1 second timeout
 			ClaudeCmd:  sleepScript,
@@ -160,9 +162,9 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			Model:      "opus",
 		},
 		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
-		Logger:   paintress.NewLogger(io.Discard, false),
-		Gradient: paintress.NewGradientGauge(5),
-		Reserve:  paintress.NewReserveParty("opus", nil, paintress.NewLogger(io.Discard, false)),
+		Logger:   platform.NewLogger(io.Discard, false),
+		Gradient: domain.NewGradientGauge(5),
+		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -208,6 +210,20 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			}
 			if !modelFound {
 				t.Error("missing gen_ai.request.model attribute on claude.invoke span")
+			}
+
+			// Cross-tool conformance: claude.model and claude.timeout_sec must be present
+			conformanceAttrs := []string{"claude.model", "claude.timeout_sec"}
+			for _, key := range conformanceAttrs {
+				var attrFound bool
+				for _, attr := range s.Attributes {
+					if string(attr.Key) == key {
+						attrFound = true
+					}
+				}
+				if !attrFound {
+					t.Errorf("missing cross-tool conformance attribute %q on claude.invoke span", key)
+				}
 			}
 		}
 	}

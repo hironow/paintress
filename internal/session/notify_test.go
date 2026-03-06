@@ -1,12 +1,14 @@
 package session
 
+// white-box-reason: session internals: tests unexported LocalNotifier makeCmd injection
+
 import (
 	"context"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 func TestLocalNotifier_Darwin_CommandShape(t *testing.T) {
@@ -118,7 +120,7 @@ func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	err := n.Notify(context.Background(), "Title", "Message")
 
 	// then: returns ErrUnsupportedOS, does not panic or invoke command
-	if err != paintress.ErrUnsupportedOS {
+	if err != port.ErrUnsupportedOS {
 		t.Errorf("err = %v, want ErrUnsupportedOS", err)
 	}
 }
@@ -263,7 +265,7 @@ func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 
 func TestNopNotifier_NoError(t *testing.T) {
 	// given
-	n := &paintress.NopNotifier{}
+	n := &port.NopNotifier{}
 
 	// when
 	err := n.Notify(context.Background(), "Any", "Thing")

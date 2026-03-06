@@ -5,27 +5,42 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/fsnotify/fsnotify"
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // watchInbox watches the inbox/ directory for new or updated D-Mail files.
-func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintress.DMail), ready chan<- struct{}) {
-	inboxDir := paintress.InboxDir(continent)
+func watchInbox(ctx context.Context, continent string, onNewDMail func(dm domain.DMail), ready chan<- struct{}) {
+	_, span := platform.Tracer.Start(ctx, "paintress.inbox")
+	defer span.End()
+
+	inboxDir := domain.InboxDir(continent)
 
 	if _, err := os.Stat(inboxDir); err != nil {
+		span.SetAttributes(attribute.Int("inbox.watch.event.count", 0))
 		return
 	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "paintress.inbox"))
+		span.SetAttributes(attribute.Int("inbox.watch.event.count", 0))
 		return
 	}
 	defer watcher.Close()
 
 	if err := watcher.Add(inboxDir); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "paintress.inbox"))
+		span.SetAttributes(attribute.Int("inbox.watch.event.count", 0))
 		return
 	}
+
+	eventCount := 0
 
 	// Initial scan: catch files that already exist before the event loop starts.
 	entries, _ := os.ReadDir(inboxDir)
@@ -37,11 +52,12 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintr
 		if err != nil {
 			continue
 		}
-		dm, err := paintress.ParseDMail(data)
+		dm, err := domain.ParseDMail(data)
 		if err != nil {
 			continue
 		}
 		onNewDMail(dm)
+		eventCount++
 	}
 
 	if ready != nil {
@@ -51,9 +67,11 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintr
 	for {
 		select {
 		case <-ctx.Done():
+			span.SetAttributes(attribute.Int("inbox.watch.event.count", eventCount))
 			return
 		case event, ok := <-watcher.Events:
 			if !ok {
+				span.SetAttributes(attribute.Int("inbox.watch.event.count", eventCount))
 				return
 			}
 			if filepath.Ext(event.Name) != ".md" {
@@ -66,13 +84,15 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm paintr
 			if err != nil {
 				continue
 			}
-			dm, err := paintress.ParseDMail(data)
+			dm, err := domain.ParseDMail(data)
 			if err != nil {
 				continue
 			}
 			onNewDMail(dm)
+			eventCount++
 		case _, ok := <-watcher.Errors:
 			if !ok {
+				span.SetAttributes(attribute.Int("inbox.watch.event.count", eventCount))
 				return
 			}
 		}

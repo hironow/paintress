@@ -9,27 +9,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // ArchivePrune scans .expedition/archive/ for .md files older than the given
 // number of days. When execute is false (dry-run), it only lists candidates.
 // When execute is true, it deletes them and reports how many were removed.
-func ArchivePrune(continent string, days int, execute bool) (paintress.PruneResult, error) {
+func ArchivePrune(continent string, days int, execute bool) (domain.PruneResult, error) {
 	if days <= 0 {
-		return paintress.PruneResult{}, fmt.Errorf("days must be positive, got %d", days)
+		return domain.PruneResult{}, fmt.Errorf("days must be positive, got %d", days)
 	}
-	dir := paintress.ArchiveDir(continent)
+	dir := domain.ArchiveDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return paintress.PruneResult{}, nil
+			return domain.PruneResult{}, nil
 		}
-		return paintress.PruneResult{}, err
+		return domain.PruneResult{}, err
 	}
 
 	threshold := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
-	var result paintress.PruneResult
+	var result domain.PruneResult
 
 	for _, e := range entries {
 		if e.IsDir() {

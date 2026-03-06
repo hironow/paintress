@@ -32,7 +32,7 @@ dmail-schema-version: "1"
 | `kind` | string | Yes | Message type: `report`, `specification`, `feedback` |
 | `description` | string | Yes | Human-readable summary |
 | `issues` | string[] | No | Related Linear issue IDs |
-| `severity` | string | No | `HIGH` triggers the approval gate |
+| `severity` | string | No | `high` triggers the approval gate |
 | `action` | string | No | Requested action (e.g., `implement`, `review`, `fix`) |
 | `priority` | int | No | Priority level (0 = unset, higher = more urgent) |
 | `dmail-schema-version` | string | No | Protocol version (currently `"1"`) |
@@ -92,7 +92,7 @@ Bump `DMailSchemaVersion` when the frontmatter format changes.
 
 D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logged, but NOT archived. They remain in inbox/ for the next expedition's `ScanInbox`.
 
-- **HIGH severity**: Triggers desktop notification via `Notifier` (no approval gate mid-expedition). Counted in `totalMidHighSeverity` and recorded in journal/flag.
+- **`high` severity**: Triggers desktop notification via `Notifier` (no approval gate mid-expedition). Counted in `totalMidHighSeverity` and recorded in journal/flag.
 - **Issue-matched**: If the d-mail's `issues` field matches the expedition's `current_issue`, it is collected for a `--continue` follow-up turn after the expedition completes.
 
 ## Function Map
@@ -101,16 +101,16 @@ D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logg
 |----------|------|---------|
 | `ParseDMail` | `dmail.go` | Parse bytes into DMail struct |
 | `DMail.Marshal` | `dmail.go` | Serialize DMail to wire format |
-| `SendDMail` | `dmail.go` | Write to archive/ then outbox/ |
-| `ScanInbox` | `dmail.go` | Read all .md files from inbox/ |
-| `ArchiveInboxDMail` | `dmail.go` | Move inbox/ file to archive/ (idempotent if already archived) |
 | `FormatDMailForPrompt` | `dmail.go` | Format d-mails for prompt injection |
 | `NewReportDMail` | `dmail.go` | Create report d-mail from ExpeditionReport |
-| `FilterHighSeverity` | `gate.go` | Filter d-mails with severity=HIGH |
+| `FilterHighSeverity` | `dmail.go` | Filter d-mails with severity=high |
+| `SendDMail` | `internal/session/dmail.go` | Write to archive/ then outbox/ |
+| `ScanInbox` | `internal/session/dmail.go` | Read all .md files from inbox/ |
+| `ArchiveInboxDMail` | `internal/session/dmail.go` | Move inbox/ file to archive/ (idempotent if already archived) |
 
 ## HIGH Severity Gate
 
-When inbox contains HIGH severity d-mails, paintress runs a pre-flight gate:
+When inbox contains `high` severity d-mails, paintress runs a pre-flight gate:
 
 1. `Notifier.Notify()` — Desktop notification (fire-and-forget)
 2. `Approver.RequestApproval()` — Blocking approval request

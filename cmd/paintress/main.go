@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/hironow/paintress"
 	"github.com/hironow/paintress/internal/cmd"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 func main() {
@@ -35,6 +35,6 @@ func main() {
 		if errors.As(err, &exitErr) {
 			os.Exit(exitErr.Code)
 		}
-		os.Exit(paintress.ExitCode(err))
+		os.Exit(domain.ExitCode(err))
 	}
 }

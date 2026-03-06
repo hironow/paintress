@@ -1,16 +1,12 @@
 package usecase
 
 import (
-	"fmt"
-
-	"github.com/hironow/paintress"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// ArchivePrune validates the ArchivePruneCommand, then delegates to session.ArchivePrune.
-func ArchivePrune(cmd paintress.ArchivePruneCommand) (paintress.PruneResult, error) {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return paintress.PruneResult{}, fmt.Errorf("command validation: %w", errs[0])
-	}
-	return session.ArchivePrune(cmd.RepoPath, cmd.Days, cmd.Execute)
+// ArchivePrune delegates to the archive ops interface.
+// The ArchivePruneCommand is already valid by construction (parse-don't-validate).
+func ArchivePrune(cmd domain.ArchivePruneCommand, ops port.ArchiveOps) (domain.PruneResult, error) {
+	return ops.ArchivePrune(cmd.RepoPath().String(), cmd.Days().Int(), cmd.Execute())
 }

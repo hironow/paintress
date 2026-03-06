@@ -1,24 +1,31 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
 
 func newArchivePruneCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "archive-prune <repo-path>",
+		Use:   "archive-prune [path]",
 		Short: "Prune old archived d-mails",
 		Long: `Prune archived d-mail files older than a specified number of days.
 
 By default runs in dry-run mode, listing candidates without deleting.
 Use --execute to perform actual deletion. The archive/ directory is
 git-tracked, so deletions should be reviewed and committed.`,
-		Example: `  # Dry run: list files older than 30 days
+		Example: `  # Dry run: list files older than 30 days (current directory)
+  paintress archive-prune
+
+  # Dry run: list files for a specific project
   paintress archive-prune /path/to/repo
 
   # Delete files older than 14 days
@@ -26,41 +33,55 @@ git-tracked, so deletions should be reviewed and committed.`,
 
   # JSON output for scripting
   paintress archive-prune -o json /path/to/repo`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
-			if days <= 0 {
-				return fmt.Errorf("--days must be positive, got %d", days)
+			if _, err := domain.NewDays(days); err != nil {
+				return fmt.Errorf("--days: %w", err)
 			}
 			return nil
 		},
 		RunE: runArchivePrune,
 	}
 
-	cmd.Flags().IntP("days", "d", 30, "Number of days threshold")
-	cmd.Flags().BoolP("execute", "x", false, "Execute deletion (dry-run by default)")
+	cmd.Flags().IntP("days", "d", 30, "Retention days")
+	cmd.Flags().BoolP("execute", "x", false, "Execute pruning (default: dry-run)")
+	cmd.Flags().BoolP("dry-run", "n", false, "Dry-run mode (default behavior, explicit for scripting)")
+	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }
 
 func runArchivePrune(cmd *cobra.Command, args []string) error {
-	repoPath, err := filepath.Abs(args[0])
+	execute, _ := cmd.Flags().GetBool("execute")
+	if execute && cmd.Flags().Changed("dry-run") {
+		return fmt.Errorf("--execute and --dry-run are mutually exclusive")
+	}
+	repoPath, err := resolveRepoPath(args)
 	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
+		return err
 	}
 	days, _ := cmd.Flags().GetInt("days")
-	execute, _ := cmd.Flags().GetBool("execute")
 	outputFmt, _ := cmd.Flags().GetString("output")
-	stateDir := filepath.Join(repoPath, ".expedition")
+	stateDir := filepath.Join(repoPath, domain.StateDir)
+	archiveOps := session.NewArchiveOps()
 
+	rp, rpErr := domain.NewRepoPath(repoPath)
+	if rpErr != nil {
+		return rpErr
+	}
+	d, dErr := domain.NewDays(days)
+	if dErr != nil {
+		return dErr
+	}
 	// Collect archive candidates (dry-run to list only).
-	archiveResult, err := session.ArchivePrune(repoPath, days, false)
+	archiveResult, err := usecase.ArchivePrune(domain.NewArchivePruneCommand(rp, d, false), archiveOps)
 	if err != nil {
 		return err
 	}
 
 	// Collect event file candidates.
-	eventFiles, eventErr := session.ListExpiredEventFiles(stateDir, days)
+	eventFiles, eventErr := archiveOps.ListExpiredEventFiles(cmd.Context(), stateDir, days)
 	if eventErr != nil {
 		return fmt.Errorf("failed to list expired events: %w", eventErr)
 	}
@@ -85,14 +106,14 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 			EventFiles:      eventFiles,
 		}
 		if execute {
-			execResult, execErr := session.ArchivePrune(repoPath, days, true)
+			execResult, execErr := archiveOps.ArchivePrune(repoPath, days, true)
 			if execErr != nil {
 				return execErr
 			}
 			out.Deleted = execResult.Deleted
 
 			if len(eventFiles) > 0 {
-				deleted, delErr := session.PruneEventFiles(stateDir, eventFiles)
+				deleted, delErr := archiveOps.PruneEventFiles(cmd.Context(), stateDir, eventFiles)
 				if delErr != nil {
 					return fmt.Errorf("event prune failed: %w", delErr)
 				}
@@ -132,9 +153,27 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	yes, _ := cmd.Flags().GetBool("yes")
+	if !yes {
+		fmt.Fprintf(ew, "\nDelete these %d file(s)? [y/N] ", totalCandidates)
+		scanner := bufio.NewScanner(cmd.InOrStdin())
+		if !scanner.Scan() {
+			if scanErr := scanner.Err(); scanErr != nil {
+				return fmt.Errorf("read confirmation: %w", scanErr)
+			}
+			fmt.Fprintln(ew, "Cancelled.")
+			return nil
+		}
+		answer := strings.TrimSpace(scanner.Text())
+		if answer != "y" && answer != "Y" {
+			fmt.Fprintln(ew, "Cancelled.")
+			return nil
+		}
+	}
+
 	// Execute: archive deletion
 	if len(archiveResult.Candidates) > 0 {
-		execResult, execErr := session.ArchivePrune(repoPath, days, true)
+		execResult, execErr := archiveOps.ArchivePrune(repoPath, days, true)
 		if execErr != nil {
 			return execErr
 		}
@@ -143,7 +182,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 
 	// Execute: event file deletion
 	if len(eventFiles) > 0 {
-		deleted, delErr := session.PruneEventFiles(stateDir, eventFiles)
+		deleted, delErr := archiveOps.PruneEventFiles(cmd.Context(), stateDir, eventFiles)
 		if delErr != nil {
 			return fmt.Errorf("event prune failed: %w", delErr)
 		}
@@ -151,7 +190,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prune flushed outbox DB rows + incremental vacuum.
-	if pruned, pruneErr := session.PruneFlushedOutbox(repoPath); pruneErr == nil && pruned > 0 {
+	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(cmd.Context(), repoPath); pruneErr == nil && pruned > 0 {
 		fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
 	}
 

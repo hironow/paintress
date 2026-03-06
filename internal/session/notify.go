@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // cmdRunner abstracts exec.Cmd.Run for testing.
@@ -56,7 +56,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 	case "windows":
 		script := fmt.Sprintf(
 			`Add-Type -AssemblyName System.Windows.Forms; `+
-				`$n = New-Object System.Windows.Forms.NotifyIcon; `+
+				`$n = New-Object System.Windows.Forms.NotifyIcon; `+ // nosemgrep: lod-excessive-dot-chain [permanent]
 				`$n.Icon = [System.Drawing.SystemIcons]::Information; `+
 				`$n.BalloonTipTitle = '%s'; `+
 				`$n.BalloonTipText = '%s'; `+
@@ -66,7 +66,7 @@ func (n *LocalNotifier) Notify(ctx context.Context, title, message string) error
 		)
 		return mk(ctx, "powershell", "-NoProfile", "-Command", script).Run()
 	default:
-		return paintress.ErrUnsupportedOS
+		return port.ErrUnsupportedOS
 	}
 }
 
@@ -104,4 +104,13 @@ func (n *CmdNotifier) Notify(ctx context.Context, title, message string) error {
 	expanded := strings.ReplaceAll(n.cmdTemplate, "{title}", ShellQuote(title))
 	expanded = strings.ReplaceAll(expanded, "{message}", ShellQuote(message))
 	return n.factory()(ctx, shellName(), shellFlag(), expanded).Run()
+}
+
+// BuildNotifier creates the appropriate Notifier based on config.
+// If NotifyCmd is set, uses CmdNotifier. Otherwise uses LocalNotifier (OS-native).
+func BuildNotifier(notifyCmd string) port.Notifier {
+	if notifyCmd != "" {
+		return NewCmdNotifier(notifyCmd)
+	}
+	return &LocalNotifier{}
 }

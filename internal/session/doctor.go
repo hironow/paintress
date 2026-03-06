@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hironow/paintress"
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // makeMCPListCmd creates the exec.Cmd for `claude mcp list`.
@@ -25,7 +25,7 @@ var makeMCPListCmd = func(ctx context.Context, claudeCmd string) *exec.Cmd {
 // continent is the optional .expedition/ root directory. When non-empty,
 // additional checks for .expedition/ structure and config.yaml are included
 // as warnings (not required).
-func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
+func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 	commands := []struct {
 		name     string
 		required bool
@@ -36,15 +36,18 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 		{"docker", false},
 	}
 
-	checks := make([]paintress.DoctorCheck, 0, len(commands)+8)
+	checks := make([]domain.DoctorCheck, 0, len(commands)+8)
 	for _, cmd := range commands {
-		check := paintress.DoctorCheck{
+		check := domain.DoctorCheck{
 			Name:     cmd.name,
 			Required: cmd.required,
 		}
 
 		path, err := exec.LookPath(cmd.name)
 		if err != nil {
+			if cmd.required {
+				check.Hint = fmt.Sprintf("install %s and ensure it is in PATH", cmd.name)
+			}
 			checks = append(checks, check)
 			continue
 		}
@@ -81,11 +84,11 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 			}
 		}
 		if !claudeOK {
-			checks = append(checks, paintress.DoctorCheck{
+			checks = append(checks, domain.DoctorCheck{
 				Name: "claude-auth", Required: false,
 				Version: "skipped (claude not available)",
 			})
-			checks = append(checks, paintress.DoctorCheck{
+			checks = append(checks, domain.DoctorCheck{
 				Name: "linear-mcp", Required: false,
 				Version: "skipped (claude not available)",
 			})
@@ -105,16 +108,17 @@ func RunDoctor(claudeCmd string, continent string) []paintress.DoctorCheck {
 
 // checkContinent verifies the .expedition/ directory structure exists.
 // Returns a Warning-level check (Required=false).
-func checkContinent(continent string) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkContinent(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "continent",
 		Required: false,
 	}
 
-	expeditionDir := filepath.Join(continent, ".expedition")
+	expeditionDir := filepath.Join(continent, domain.StateDir)
 	info, err := os.Stat(expeditionDir)
 	if err != nil || !info.IsDir() {
-		check.Version = ".expedition/ not found"
+		check.Version = domain.StateDir + "/ not found"
+		check.Hint = `run "paintress init <repo-path>" to set up expedition`
 		return check
 	}
 
@@ -129,6 +133,7 @@ func checkContinent(continent string) paintress.DoctorCheck {
 
 	if len(missing) > 0 {
 		check.Version = "missing: " + strings.Join(missing, ", ")
+		check.Hint = `run "paintress init <repo-path>" to recreate the expedition structure`
 		return check
 	}
 
@@ -140,8 +145,8 @@ func checkContinent(continent string) paintress.DoctorCheck {
 
 // checkGitRepo verifies that the continent directory is inside a git repository.
 // Returns a Warning-level check (Required=false).
-func checkGitRepo(continent string) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkGitRepo(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "git-repo",
 		Required: false,
 	}
@@ -152,6 +157,7 @@ func checkGitRepo(continent string) paintress.DoctorCheck {
 	cancel()
 	if err != nil {
 		check.Version = "not a git repository"
+		check.Hint = `run "git init" or navigate to a git repository`
 		return check
 	}
 
@@ -164,16 +170,17 @@ func checkGitRepo(continent string) paintress.DoctorCheck {
 // checkWritability verifies that the .expedition/ directory is writable.
 // Creates and removes a probe file to test write access.
 // Returns a Warning-level check (Required=false).
-func checkWritability(continent string) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkWritability(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "writable",
 		Required: false,
 	}
 
-	expeditionDir := filepath.Join(continent, ".expedition")
+	expeditionDir := filepath.Join(continent, domain.StateDir)
 	probe := filepath.Join(expeditionDir, ".doctor-probe")
 	if err := os.WriteFile(probe, []byte("probe"), 0644); err != nil {
 		check.Version = "not writable: " + err.Error()
+		check.Hint = "check file permissions on the .expedition/ directory"
 		return check
 	}
 	os.Remove(probe)
@@ -186,28 +193,30 @@ func checkWritability(continent string) paintress.DoctorCheck {
 
 // checkConfig verifies that config.yaml exists and can be loaded.
 // Returns a Warning-level check (Required=false).
-func checkConfig(continent string) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkConfig(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "config",
 		Required: false,
 	}
 
-	configPath := paintress.ProjectConfigPath(continent)
+	configPath := domain.ProjectConfigPath(continent)
 	if _, err := os.Stat(configPath); err != nil {
 		check.Version = "config.yaml not found"
+		check.Hint = `run "paintress init <repo-path>" to create config`
 		return check
 	}
 
 	cfg, err := LoadProjectConfig(continent)
 	if err != nil {
 		check.Version = "load error: " + err.Error()
+		check.Hint = "check YAML syntax in .expedition/config.yaml"
 		return check
 	}
 
 	check.OK = true
 	check.Path = configPath
-	if cfg.Linear.Team != "" {
-		check.Version = "team=" + cfg.Linear.Team
+	if cfg.HasTrackerTeam() {
+		check.Version = "team=" + cfg.TrackerTeam()
 	} else {
 		check.Version = "loaded OK"
 	}
@@ -217,16 +226,17 @@ func checkConfig(continent string) paintress.DoctorCheck {
 // checkSkills verifies that SKILL.md files exist and contain dmail-schema-version.
 // Searches .expedition/skills/*/SKILL.md for valid skill definitions.
 // Returns a Warning-level check (Required=false).
-func checkSkills(continent string) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkSkills(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "skills",
 		Required: false,
 	}
 
-	skillsDir := filepath.Join(continent, ".expedition", "skills")
+	skillsDir := filepath.Join(continent, domain.StateDir, "skills")
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
 		check.Version = "skills/ not found"
+		check.Hint = `run "paintress init <repo-path>" to set up skills`
 		return check
 	}
 
@@ -248,11 +258,13 @@ func checkSkills(continent string) paintress.DoctorCheck {
 
 	if found == 0 {
 		check.Version = "no SKILL.md files found"
+		check.Hint = `run "paintress init <repo-path>" to create skill files`
 		return check
 	}
 
 	if valid < found {
 		check.Version = fmt.Sprintf("%d/%d skills missing dmail-schema-version", found-valid, found)
+		check.Hint = `add "dmail-schema-version" to SKILL.md metadata`
 		return check
 	}
 
@@ -263,29 +275,31 @@ func checkSkills(continent string) paintress.DoctorCheck {
 }
 
 // checkEventStore verifies that event JSONL files are parseable.
-// Scans .expedition/events/*.jsonl and validates each line is valid JSON.
+// Scans .expedition/events/*.jsonl and validates each line is valid JSON. // nosemgrep: layer-session-no-event-persistence [permanent]
 // Returns a Warning-level check (Required=false).
-func checkEventStore(continent string) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkEventStore(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "events",
 		Required: false,
 	}
 
-	eventsDir := filepath.Join(continent, ".expedition", "events")
+	eventsDir := filepath.Join(continent, domain.StateDir, "events")
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
 		check.Version = "events/ not found"
+		check.Hint = `run "paintress init <repo-path>" to create events directory`
 		return check
 	}
 
 	var files, lines int
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") { // nosemgrep: layer-session-no-event-persistence [permanent]
 			continue
 		}
 		f, err := os.Open(filepath.Join(eventsDir, entry.Name()))
 		if err != nil {
 			check.Version = "read error: " + err.Error()
+			check.Hint = "check file permissions on .expedition/events/"
 			return check
 		}
 		scanner := bufio.NewScanner(f)
@@ -297,6 +311,7 @@ func checkEventStore(continent string) paintress.DoctorCheck {
 			if !json.Valid([]byte(line)) {
 				f.Close()
 				check.Version = fmt.Sprintf("corrupt JSON in %s", entry.Name())
+				check.Hint = "check event files for corruption in .expedition/events/"
 				return check
 			}
 			lines++
@@ -304,13 +319,14 @@ func checkEventStore(continent string) paintress.DoctorCheck {
 		f.Close()
 		if err := scanner.Err(); err != nil {
 			check.Version = "scan error: " + err.Error()
+			check.Hint = "check file permissions on .expedition/events/"
 			return check
 		}
 		files++
 	}
 
 	if files == 0 {
-		check.Version = "no .jsonl files found"
+		check.Version = "no .jsonl files found" // nosemgrep: layer-session-no-event-persistence [permanent]
 		return check
 	}
 
@@ -323,13 +339,14 @@ func checkEventStore(continent string) paintress.DoctorCheck {
 // checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
-func checkClaudeAuth(mcpOutput string, mcpErr error) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "claude-auth",
 		Required: false,
 	}
 	if mcpErr != nil {
 		check.Version = "not authenticated: " + mcpErr.Error()
+		check.Hint = `run "claude login" to authenticate`
 		return check
 	}
 	check.OK = true
@@ -340,8 +357,8 @@ func checkClaudeAuth(mcpOutput string, mcpErr error) paintress.DoctorCheck {
 // checkLinearMCP parses `claude mcp list` output for Linear MCP connection.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
-func checkLinearMCP(mcpOutput string, mcpErr error) paintress.DoctorCheck {
-	check := paintress.DoctorCheck{
+func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
+	check := domain.DoctorCheck{
 		Name:     "linear-mcp",
 		Required: false,
 	}
@@ -360,5 +377,6 @@ func checkLinearMCP(mcpOutput string, mcpErr error) paintress.DoctorCheck {
 		}
 	}
 	check.Version = "Linear MCP not found or not connected"
+	check.Hint = `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`
 	return check
 }

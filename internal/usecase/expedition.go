@@ -2,22 +2,25 @@ package usecase
 
 import (
 	"context"
-	"fmt"
-	"io"
 
-	"github.com/hironow/paintress"
-	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// RunExpeditions validates the RunExpeditionCommand, then delegates to session.
-// Creates a PolicyEngine and injects it into the Paintress session.
-func RunExpeditions(ctx context.Context, cmd paintress.RunExpeditionCommand, cfg paintress.Config, logger *paintress.Logger, dataOut io.Writer, stdinIn io.Reader, eventStore paintress.EventStore) (int, error) {
-	if errs := cmd.Validate(); len(errs) > 0 {
-		return 1, fmt.Errorf("command validation: %w", errs[0])
-	}
+// RunExpeditions delegates to the expedition runner.
+// Creates aggregate + EventEmitter with PolicyEngine as dispatcher, injects via SetEmitter.
+// The RunExpeditionCommand is already valid by construction (parse-don't-validate).
+func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
+	runner port.ExpeditionRunner, eventStore port.EventStore, logger domain.Logger,
+	notifier port.Notifier, metrics port.PolicyMetrics) (int, error) {
 	engine := NewPolicyEngine(logger)
-	registerExpeditionPolicies(engine, logger)
-	p := session.NewPaintress(cfg, logger, dataOut, stdinIn, eventStore)
-	p.Dispatcher = engine
-	return p.Run(ctx), nil
+	if metrics == nil {
+		metrics = &port.NopPolicyMetrics{}
+	}
+	registerExpeditionPolicies(engine, logger, notifier, metrics)
+
+	agg := domain.NewExpeditionAggregate()
+	emitter := NewExpeditionEventEmitter(agg, eventStore, engine, logger)
+	runner.SetEmitter(emitter)
+	return runner.Run(ctx), nil
 }

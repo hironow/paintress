@@ -7,6 +7,11 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const maxReviewGateCycles = 3
@@ -47,7 +52,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			// Rate limit on non-zero exit is a service error, not review comments.
-			if isRateLimited(output) {
+			if domain.IsRateLimited(output) {
 				return nil, fmt.Errorf("review service rate/quota limited")
 			}
 			// Non-zero exit → review found comments.
@@ -58,7 +63,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 			}, nil
 		}
 		// Non-exit errors (failed to start, etc.)
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, summarizeReview(output))
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, domain.SummarizeReview(output))
 	}
 
 	// Exit 0 → pass, regardless of output content.
@@ -68,67 +73,213 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 	}, nil
 }
 
-func hasReviewComments(output string) bool {
-	indicators := []string{"[P0]", "[P1]", "[P2]", "[P3]", "[P4]"}
-	for _, tag := range indicators {
-		if strings.Contains(output, tag) {
-			return true
+func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.ExpeditionReport, budget time.Duration, workDir string) {
+	ctx, loopSpan := platform.Tracer.Start(ctx, "review.loop",
+		trace.WithAttributes(
+			attribute.String("pr_url", report.PRUrl),
+			attribute.String("branch", report.Branch),
+		),
+	)
+	defer loopSpan.End()
+
+	reviewDir := workDir
+	if reviewDir == "" {
+		reviewDir = p.config.Continent
+	}
+
+	var consumed time.Duration
+
+	reviewTimeout := max(
+		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewGateCycles),
+		minReviewTimeout,
+	)
+	var lastComments string
+	for cycle := 1; cycle <= maxReviewGateCycles; cycle++ {
+		if ctx.Err() != nil {
+			if lastComments != "" {
+				if report.Insight != "" {
+					report.Insight += " | "
+				}
+				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
+			}
+			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), ctx.Err()))
+			return
+		}
+
+		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("review_running"), cycle, maxReviewGateCycles))
+
+		_, revSpan := platform.Tracer.Start(ctx, "review.command", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called per branch [permanent]
+			trace.WithAttributes(attribute.Int("cycle", cycle)),
+		)
+		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
+		expandedCmd := domain.ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
+		result, err := RunReview(reviewCtx, expandedCmd, reviewDir)
+		reviewCancel()
+		if err != nil {
+			revSpan.End()
+			if lastComments != "" {
+				if report.Insight != "" {
+					report.Insight += " | "
+				}
+				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
+			}
+			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), err))
+			return
+		}
+
+		revSpan.SetAttributes(attribute.Bool("passed", result.Passed))
+		revSpan.End()
+
+		if result.Passed {
+			p.Logger.OK("%s", domain.Msg("review_passed"))
+			return
+		}
+
+		lastComments = result.Comments
+		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_comments"), cycle))
+
+		branch := strings.TrimSpace(report.Branch)
+		if branch == "" || strings.EqualFold(branch, "none") {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Reviewfix skipped: no valid branch"
+			return
+		}
+
+		gitCtx, gitCancel := context.WithTimeout(ctx, gitCmdTimeout)
+		gitCmd := exec.CommandContext(gitCtx, "git", "checkout", branch)
+		gitCmd.Dir = reviewDir
+		err = gitCmd.Run()
+		gitCancel()
+		if err != nil {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += fmt.Sprintf("Reviewfix skipped: checkout %s failed: %v", branch, err)
+			return
+		}
+
+		remaining := budget - consumed
+		if remaining <= 0 {
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
+			p.Logger.Warn("%s", domain.Msg("review_limit"))
+			return
+		}
+
+		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
+
+		prompt := domain.BuildReviewFixPrompt(branch, result.Comments)
+
+		claudeCmd := p.config.ClaudeCmd
+		if claudeCmd == "" {
+			claudeCmd = platform.DefaultClaudeCmd
+		}
+
+		model := p.reserve.ActiveModel()
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 777 [permanent]
+			trace.WithAttributes(
+				attribute.Int("cycle", cycle),
+				attribute.String("model", model),
+			),
+		)
+
+		cmd := exec.CommandContext(fixCtx, claudeCmd,
+			"--model", model,
+			"--continue",
+			"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
+			"--dangerously-skip-permissions",
+			"--print",
+			"-p", prompt,
+		)
+		cmd.Dir = reviewDir
+		cmd.WaitDelay = 3 * time.Second
+
+		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("reviewfix_running"), model))
+		start := time.Now()
+		out, err := cmd.CombinedOutput()
+		consumed += time.Since(start)
+		fixSpan.End()
+		fixCancel()
+
+		if err != nil {
+			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("reviewfix_error"), err))
+			if report.Insight != "" {
+				report.Insight += " | "
+			}
+			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(string(out))
+			return
 		}
 	}
-	if strings.Contains(output, "Review comment") {
-		return true
+
+	if report.Insight != "" {
+		report.Insight += " | "
 	}
-	return false
+	report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
+	p.Logger.Warn("%s", domain.Msg("review_limit"))
 }
 
-func isRateLimited(output string) bool {
-	lower := strings.ToLower(output)
-	signals := []string{
-		"rate limit",
-		"rate_limit",
-		"quota exceeded",
-		"quota limit",
-		"too many requests",
-		"usage limit",
+func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration) {
+	if len(dmails) == 0 {
+		return
 	}
-	for _, s := range signals {
-		if strings.Contains(lower, s) {
-			return true
-		}
+	if ctx.Err() != nil {
+		return
 	}
-	return false
-}
-
-// ExpandReviewCmd replaces placeholders in the review command string.
-// Supported placeholders:
-//
-//	{file}   → review working directory
-//	{branch} → current git branch name
-func ExpandReviewCmd(cmd, dir, branch string) string {
-	cmd = strings.ReplaceAll(cmd, "{file}", dir)
-	cmd = strings.ReplaceAll(cmd, "{branch}", branch)
-	return cmd
-}
-
-// BuildReviewFixPrompt creates a focused prompt for fixing review comments.
-func BuildReviewFixPrompt(branch string, comments string) string {
-	return fmt.Sprintf(`You are on branch %s with an open PR. A code review found the following issues:
-
-%s
-
-Fix all review comments above. Commit and push your changes. Do not create a new branch or PR.
-Keep fixes focused — only address the review comments, do not refactor unrelated code.
-If a review comment is unclear or you cannot resolve it after a reasonable attempt, skip it and move on to the next.
-Do not change the Linear issue status — it stays in its current state until the next Expedition.`, branch, comments)
-}
-
-// summarizeReview normalizes multi-line review output and truncates.
-func summarizeReview(comments string) string {
-	normalized := strings.Join(strings.Fields(comments), " ")
-	const maxLen = 500
-	runes := []rune(normalized)
-	if len(runes) <= maxLen {
-		return normalized
+	if remaining <= 0 {
+		p.Logger.Warn("Follow-up skipped: no remaining time budget")
+		return
 	}
-	return string(runes[:maxLen]) + "...(truncated)"
+
+	prompt := domain.BuildFollowUpPrompt(dmails)
+	claudeCmd := p.config.ClaudeCmd
+	if claudeCmd == "" {
+		claudeCmd = platform.DefaultClaudeCmd
+	}
+
+	model := p.reserve.ActiveModel()
+	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
+		trace.WithAttributes(
+			attribute.String("model", model),
+			attribute.Int("matched_dmails", len(dmails)),
+		),
+	)
+	defer followUpSpan.End()
+
+	p.Logger.Info("Follow-up: delivering %d matched D-Mail(s) via --continue", len(dmails))
+
+	timeout := time.Duration(p.config.TimeoutSec) * time.Second
+	if remaining < timeout {
+		timeout = remaining
+	}
+	followCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(followCtx, claudeCmd,
+		"--model", model,
+		"--continue",
+		"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
+		"--dangerously-skip-permissions",
+		"--print",
+		"-p", prompt,
+	)
+	if workDir != "" {
+		cmd.Dir = workDir
+	} else {
+		cmd.Dir = p.config.Continent
+	}
+	cmd.WaitDelay = 3 * time.Second
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		p.Logger.Warn("Follow-up failed: %v", err)
+		followUpSpan.AddEvent("followup.error",
+			trace.WithAttributes(attribute.String("error", err.Error())),
+		)
+		return
+	}
+	p.Logger.OK("Follow-up completed (%d bytes output)", len(out))
 }

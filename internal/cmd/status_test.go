@@ -1,5 +1,7 @@
 package cmd
 
+// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+
 import (
 	"bytes"
 	"encoding/json"
@@ -11,19 +13,24 @@ import (
 )
 
 func TestStatusCommand_NoArgs(t *testing.T) {
-	// given
+	// given: no args → falls back to cwd
 	cmd := NewRootCommand()
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.SetOut(stdout)
+	cmd.SetErr(stderr)
 	cmd.SetArgs([]string{"status"})
 
 	// when
 	err := cmd.Execute()
 
-	// then: should error — repo-path is required
-	if err == nil {
-		t.Fatal("expected error for no args, got nil")
+	// then: should succeed using cwd as repo path
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	text := stdout.String()
+	if !strings.Contains(text, "paintress status:") {
+		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
 }
 
@@ -61,14 +68,14 @@ func TestStatusCommand_TextOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Text goes to stderr
-	text := stderr.String()
+	// Text goes to stdout (per S0027)
+	text := stdout.String()
 	if !strings.Contains(text, "paintress status:") {
-		t.Errorf("expected stderr to contain 'paintress status:', got:\n%s", text)
+		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
-	// stdout should be empty for text mode
-	if stdout.Len() != 0 {
-		t.Errorf("expected empty stdout for text mode, got:\n%s", stdout.String())
+	// stderr should be empty for text mode
+	if stderr.Len() != 0 {
+		t.Errorf("expected empty stderr for text mode, got:\n%s", stderr.String())
 	}
 }
 
