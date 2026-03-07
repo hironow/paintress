@@ -344,24 +344,9 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 # View traces at http://localhost:16686
 ```
 
-## Project Layout
+## Development
 
-```
-cmd/paintress/          CLI entry point
-cmd/paintress-{tg,discord,slack}/  Companion binaries (notify/approve)
-internal/
-  cmd/                  Cobra commands (run, init, doctor, issues, etc.)
-  usecase/              Business logic (PolicyEngine + handlers)
-  session/              I/O orchestration (expedition, worktree, review)
-  eventsource/          Event persistence (JSONL append-only)
-  domain/               Pure domain types
-  platform/             Platform adapters (OTel, templates, logger)
-docs/                   Documentation, ADRs, CLI reference
-tests/                  Scenario (L1-L4) and Docker E2E tests
-.semgrep/               Layer enforcement rules
-```
-
-For detailed structure, see [docs/conformance.md](docs/conformance.md).
+All code lives in `internal/` (Go convention). See [docs/conformance.md](docs/conformance.md) for layer architecture and directory responsibilities. Run `just --list` for available tasks.
 
 ## Companion Binaries
 
@@ -390,14 +375,7 @@ paintress-slack doctor
 
 All companions follow the [approval contract](docs/approval-contract.md): exit 0 = approved, exit non-zero = denied.
 
-Build from source:
-
-```bash
-just build-all       # build all 4 binaries
-just install-all     # install all to /usr/local/bin
-```
-
-Homebrew installation (`brew install hironow/tap/paintress`) is WIP — the tap may not be published yet.
+Build from source: `just install-all` (installs all 4 binaries to `/usr/local/bin`). Homebrew (`brew install hironow/tap/paintress`) is WIP.
 
 ## What / Why / How
 
