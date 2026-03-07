@@ -231,8 +231,8 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 | `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
 | `paintress status [repo-path]` | Show paintress operational status |
 | `paintress clean <repo-path>` | Remove state directory (`.expedition/`) |
-| `paintress rebuild [repo-path]` | Rebuild projections from event store |
-| `paintress archive-prune <repo-path>` | Prune old archived d-mails (`-d 14` for days, `-x` to execute) |
+| `paintress rebuild <repo-path>` | Rebuild projections from event store |
+| `paintress archive-prune [repo-path]` | Prune old archived d-mails (`-d 14` for days, `-x` to execute) |
 | `paintress version` | Show version, commit, date, and Go version (`-j` for JSON) |
 | `paintress update` | Self-update to the latest GitHub release (`-C` to check only) |
 
