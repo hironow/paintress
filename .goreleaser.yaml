@@ -7,12 +7,18 @@ before:
     - go mod tidy
     - go test ./... -count=1 -short
 
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
 builds:
   - id: paintress
     main: ./cmd/paintress/
     binary: paintress
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -29,8 +35,11 @@ builds:
   - id: paintress-tg
     main: ./cmd/paintress-tg/
     binary: paintress-tg
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -44,8 +53,11 @@ builds:
   - id: paintress-discord
     main: ./cmd/paintress-discord/
     binary: paintress-discord
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -59,8 +71,11 @@ builds:
   - id: paintress-slack
     main: ./cmd/paintress-slack/
     binary: paintress-slack
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
