@@ -122,7 +122,7 @@ WorktreePool               <- Isolated worktrees for parallel workers (Swarm Mod
 Expedition (Claude Code)   <- One session per issue
     |
     v
-Review Gate (exec)         <- Codex review + Claude Code --continue (up to 3 cycles)
+Review Gate (exec)         <- Code review tool + Claude Code --continue (up to 3 cycles)
     |
     v
 Continent (Git repo)       <- Persistent world
@@ -172,7 +172,7 @@ When `--workers 0`, no pool is created and expeditions run directly on the repos
 
 ## Code Review Gate
 
-After a successful Expedition creates a PR, Paintress runs an automated code review using [Codex CLI](https://github.com/openai/codex) (default: `codex review --base main`). The review itself runs outside the LLM context window to avoid polluting the Expedition's Canvas.
+After a successful Expedition creates a PR, Paintress runs an automated code review via a configurable command (default: `codex review --base main`). The review tool is customizable via `--review-cmd` and can be any linter, code review tool, or custom script. The review runs outside the LLM context window to avoid polluting the Expedition's Canvas.
 
 - **Pass**: Review finds no actionable issues → proceed to next Expedition
 - **Fail**: Review comments tagged `[P0]`–`[P4]` are detected → Claude Code resumes the Expedition session (`--continue`) to fix them, reusing full implementation context
@@ -182,14 +182,28 @@ After a successful Expedition creates a PR, Paintress runs an automated code rev
 
 The review command is customizable via `--review-cmd`. Set to empty string (`--review-cmd ""`) to disable.
 
+## Scope
+
+**What Paintress does:**
+- Autonomously pick Linear issues and implement code changes via Claude Code
+- Create branches, run tests, open PRs, and iterate through code review cycles
+- Manage parallel expeditions in isolated git worktrees (Swarm Mode)
+- Send report D-Mails to downstream tools after successful expeditions
+
+**What Paintress does NOT do:**
+- Edit Linear issues directly (only reads issues for implementation)
+- Manage git branches on the main repository (uses worktrees for isolation)
+- Handle authentication setup (assumes Linear, GitHub CLI, and Claude Code are pre-configured)
+- Verify post-merge design integrity (amadeus handles that)
+
 ## Setup
 
 ```bash
-# Install via Homebrew
+# Install via Homebrew (WIP — tap may not be published yet)
 brew install hironow/tap/paintress
 
-# Or install from source
-go install github.com/hironow/paintress/cmd/paintress@latest
+# Or build from source
+just install
 
 # Initialize project config (Linear team key, etc.)
 paintress init /path/to/your/repo
@@ -330,65 +344,24 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
 # View traces at http://localhost:16686
 ```
 
-## File Structure
+## Project Layout
 
 ```
-+-- cmd/paintress/
-|   +-- main.go              CLI entry point (signal, NeedsDefaultRun, ExecuteContext)
-+-- cmd/paintress-tg/
-|   +-- *.go                 Telegram companion (notify/approve via Bot API)
-+-- cmd/paintress-discord/
-|   +-- *.go                 Discord companion (notify/approve via Bot Gateway)
-+-- cmd/paintress-slack/
-|   +-- *.go                 Slack companion (notify/approve via Socket Mode)
-+-- internal/cmd/
-|   +-- root.go              Root cobra command + global flags
-|   +-- run.go               Run subcommand + expedition wiring
-|   +-- init.go              Init subcommand
-|   +-- doctor.go            Doctor subcommand
-|   +-- issues.go            Issues subcommand
-|   +-- archive_prune.go     Archive-prune subcommand
-|   +-- version.go           Version subcommand (-j for JSON)
-|   +-- update.go            Self-update subcommand (go-selfupdate)
-|   +-- default_run.go       NeedsDefaultRun (bare path → run delegation)
-|   +-- errors.go            ExitError type
-|   +-- *_test.go            Tests
-+-- internal/usecase/         Use case layer (PolicyEngine + handlers)
-+-- internal/session/         I/O orchestration layer
-|   +-- paintress.go          Paintress orchestrator (Run, main loop)
-|   +-- expedition.go         Expedition execution (subprocess, file I/O)
-|   +-- dmail.go              D-Mail file I/O (archive, inbox, outbox)
-|   +-- config.go             LoadConfig, SaveConfig
-|   +-- project_config.go     LoadProjectConfig (.expedition/config.yaml)
-|   +-- flag.go               ReadFlag, WriteFlag
-|   +-- flag_watcher.go       FlagWatcher (filesystem polling)
-|   +-- inbox_watcher.go      InboxWatcher (filesystem polling)
-|   +-- issues.go             FetchIssues (HTTP)
-|   +-- review.go             RunReview (subprocess)
-|   +-- approve.go            StdinApprover, CmdApprover, AutoApprover
-|   +-- notify.go             CmdNotifier, NullNotifier
-|   +-- doctor.go             RunDoctor, health checks
-|   +-- archive_prune.go      Archive file discovery/deletion
-|   +-- worktree.go           Git worktree operations
-|   +-- devserver.go          Dev server management
-+-- internal/eventsource/     Event persistence adapter (JSONL append-only, AWS Event Sourcing pattern)
-+-- internal/domain/          Pure domain functions
-+-- internal/tools/docgen/    CLI documentation generator
-+-- doc.go                    Package declaration (root-zero: all code in internal/)
-+-- internal/platform/templates/  AI prompt templates ({en,ja,fr})
-|   +-- skills/               D-Mail SKILL.md templates
-+-- tests/scenario/           Scenario tests (L1-L4, //go:build scenario)
-+-- tests/e2e/                Docker E2E tests (//go:build e2e)
-+-- docs/
-|   +-- dmail-protocol.md    D-Mail wire format, schema versioning
-|   +-- expedition-directory.md  .expedition/ directory structure
-|   +-- approval-contract.md Approval contract
-|   +-- cli/                 Auto-generated CLI reference
-+-- .semgrep/                 Semgrep rules (layer enforcement)
-+-- .goreleaser.yaml          GoReleaser v2 config (multi-platform + Homebrew)
-+-- .github/workflows/        CI + Release
-+-- docker/                   Jaeger v2 for trace viewing
+cmd/paintress/          CLI entry point
+cmd/paintress-{tg,discord,slack}/  Companion binaries (notify/approve)
+internal/
+  cmd/                  Cobra commands (run, init, doctor, issues, etc.)
+  usecase/              Business logic (PolicyEngine + handlers)
+  session/              I/O orchestration (expedition, worktree, review)
+  eventsource/          Event persistence (JSONL append-only)
+  domain/               Pure domain types
+  platform/             Platform adapters (OTel, templates, logger)
+docs/                   Documentation, ADRs, CLI reference
+tests/                  Scenario (L1-L4) and Docker E2E tests
+.semgrep/               Layer enforcement rules
 ```
+
+For detailed structure, see [docs/conformance.md](docs/conformance.md).
 
 ## Companion Binaries
 
@@ -417,12 +390,14 @@ paintress-slack doctor
 
 All companions follow the [approval contract](docs/approval-contract.md): exit 0 = approved, exit non-zero = denied.
 
-Install via Homebrew (`brew install hironow/tap/paintress` includes all binaries) or build from source:
+Build from source:
 
 ```bash
 just build-all       # build all 4 binaries
 just install-all     # install all to /usr/local/bin
 ```
+
+Homebrew installation (`brew install hironow/tap/paintress`) is WIP — the tap may not be published yet.
 
 ## What / Why / How
 
