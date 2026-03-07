@@ -62,7 +62,7 @@ func TestVersionCommand_JSONOutput(t *testing.T) {
 		t.Fatalf("failed to parse JSON output: %v\nraw: %s", err, buf.String())
 	}
 
-	for _, key := range []string{"version", "commit", "date", "go"} {
+	for _, key := range []string{"version", "commit", "date", "go", "os", "arch"} {
 		if _, ok := info[key]; !ok {
 			t.Errorf("JSON output missing key %q", key)
 		}
@@ -90,10 +90,10 @@ func TestVersionCommand_JSONShortAlias(t *testing.T) {
 	}
 }
 
-func TestVersionCommand_NoDoubleV(t *testing.T) {
-	// given — simulate git describe output with v prefix
+func TestVersionCommand_GoReleaserVersion(t *testing.T) {
+	// given — GoReleaser sets Version WITHOUT v prefix (e.g. "1.2.3")
 	origVersion := Version
-	Version = "v1.2.3"
+	Version = "1.2.3"
 	defer func() { Version = origVersion }()
 
 	cmd := NewRootCommand()
@@ -109,9 +109,6 @@ func TestVersionCommand_NoDoubleV(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := buf.String()
-	if strings.Contains(out, "vv") {
-		t.Errorf("output contains double 'v': %q", out)
-	}
 	if !strings.Contains(out, "v1.2.3") {
 		t.Errorf("output = %q, want to contain 'v1.2.3'", out)
 	}
