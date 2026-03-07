@@ -110,6 +110,7 @@ brews:
       owner: hironow
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/hironow/paintress"
     description: "Claude Code expedition orchestrator"
     license: "Apache-2.0"
@@ -118,5 +119,6 @@ brews:
       bin.install "paintress-tg"
       bin.install "paintress-discord"
       bin.install "paintress-slack"
+      generate_completions_from_executable(bin/"paintress", "completion")
     test: |
       system "#{bin}/paintress", "version"
