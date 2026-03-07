@@ -1,4 +1,4 @@
-# 0006. Game-Inspired Expedition System
+# 0001. Game-Inspired Expedition System
 
 **Date:** 2026-02-23
 **Status:** Accepted

@@ -1,4 +1,4 @@
-# 0013. Root Package Layer Separation
+# 0008. Root Package Layer Separation
 
 **Date:** 2026-02-26
 **Status:** Superseded by [0014]

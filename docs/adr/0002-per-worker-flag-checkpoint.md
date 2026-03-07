@@ -1,4 +1,4 @@
-# 0007. Per-Worker Flag Checkpoint with Reconciliation
+# 0002. Per-Worker Flag Checkpoint with Reconciliation
 
 **Date:** 2026-02-23
 **Status:** Accepted

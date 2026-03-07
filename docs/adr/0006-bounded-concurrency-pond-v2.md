@@ -1,4 +1,4 @@
-# 0011. Bounded Concurrency with pond/v2
+# 0006. Bounded Concurrency with pond/v2
 
 **Date:** 2026-02-25
 **Status:** Accepted

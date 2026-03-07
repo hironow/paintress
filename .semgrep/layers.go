@@ -29,7 +29,10 @@ import "github.com/hironow/paintress/internal/session"
 // ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, s0008-cmd-no-import-eventsource, layer-usecase-no-import-eventsource, layer-platform-no-import-upper, layer-port-no-import-upper
 import "github.com/hironow/paintress/internal/eventsource"
 
-// ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, layer-eventsource-no-import-upper, layer-platform-no-import-upper
+// ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, layer-eventsource-no-import-upper, layer-platform-no-import-upper, no-import-old-port
+import "github.com/hironow/paintress/internal/port"
+
+// ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, layer-eventsource-no-import-upper, layer-platform-no-import-upper, layer-port-no-import-upper
 import "github.com/hironow/paintress/internal/usecase/port"
 
 // ruleid: layer-root-no-import-internal, layer-domain-no-import-upper, layer-eventsource-no-import-upper, layer-port-no-import-upper

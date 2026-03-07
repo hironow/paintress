@@ -1,4 +1,4 @@
-# 0010. Three-Way Approval Contract
+# 0005. Three-Way Approval Contract
 
 **Date:** 2026-02-23
 **Status:** Accepted

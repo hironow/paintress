@@ -1,4 +1,4 @@
-# 0015. Event Sourcing with Projections and Replay
+# 0010. Event Sourcing with Projections and Replay
 
 **Date:** 2026-03-05
 **Status:** Accepted — supersedes 0014 (event sourcing without projections)

@@ -1,4 +1,4 @@
-# 0009. Reserve Party Rate Limit Fallback
+# 0004. Reserve Party Rate Limit Fallback
 
 **Date:** 2026-02-23
 **Status:** Accepted

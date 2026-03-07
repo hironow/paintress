@@ -1,4 +1,4 @@
-# 0012. Defer-Unlock Enforcement via Semgrep
+# 0007. Defer-Unlock Enforcement via Semgrep
 
 **Date:** 2026-02-25
 **Status:** Accepted

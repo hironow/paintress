@@ -1,4 +1,4 @@
-# 0016. Usecase-Adapter Dependency Inversion
+# 0011. Usecase-Adapter Dependency Inversion
 
 **Date:** 2026-03-05
 **Status:** Accepted

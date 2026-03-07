@@ -1,4 +1,4 @@
-# 0008. Archive-First D-Mail Write Pattern
+# 0003. Archive-First D-Mail Write Pattern
 
 **Date:** 2026-02-23
 **Status:** Accepted
