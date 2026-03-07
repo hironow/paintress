@@ -4,6 +4,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -29,7 +30,25 @@ func TestHelperProcess(t *testing.T) {
 	exitCode := 0
 	fmt.Sscanf(os.Getenv("GO_TEST_HELPER_EXIT_CODE"), "%d", &exitCode)
 
-	fmt.Fprint(os.Stdout, output)
+	// Emit stream-json NDJSON: assistant message with text, then result message.
+	assistantMsg := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"id":    "msg_test",
+			"role":  "assistant",
+			"model": "claude-sonnet-4-20250514",
+			"content": []map[string]any{
+				{"type": "text", "text": output},
+			},
+		},
+	}
+	resultMsg := map[string]any{
+		"type":   "result",
+		"result": output,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.Encode(assistantMsg)
+	enc.Encode(resultMsg)
 	os.Exit(exitCode)
 }
 

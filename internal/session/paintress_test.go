@@ -47,6 +47,37 @@ func newTestServer(t *testing.T) *httptest.Server {
 	return srv
 }
 
+// streamJSONScript creates a bash script that emits the given text as
+// stream-json NDJSON (assistant message + result), matching the format
+// expected by StreamReader after switching to --output-format stream-json.
+func streamJSONScript(t *testing.T, dir, name, text string) string {
+	t.Helper()
+	assistantMsg := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"id":    "msg_test",
+			"role":  "assistant",
+			"model": "claude-sonnet-4-20250514",
+			"content": []map[string]any{
+				{"type": "text", "text": text},
+			},
+		},
+	}
+	resultMsg := map[string]any{
+		"type":   "result",
+		"result": text,
+	}
+	aJSON, _ := json.Marshal(assistantMsg)
+	rJSON, _ := json.Marshal(resultMsg)
+
+	scriptPath := filepath.Join(dir, name)
+	content := fmt.Sprintf("#!/bin/bash\necho '%s'\necho '%s'\n", string(aJSON), string(rJSON))
+	if err := os.WriteFile(scriptPath, []byte(content), 0755); err != nil {
+		t.Fatal(err)
+	}
+	return scriptPath
+}
+
 func TestPaintressRun_DryRun_FirstRun_StartsAtExpedition1(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
@@ -628,11 +659,8 @@ func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	// Create a script that outputs __EXPEDITION_COMPLETE__
-	completeScript := filepath.Join(dir, "complete.sh")
-	if err := os.WriteFile(completeScript, []byte("#!/bin/bash\necho '__EXPEDITION_COMPLETE__'\n"), 0755); err != nil {
-		t.Fatal(err)
-	}
+	// Create a script that outputs __EXPEDITION_COMPLETE__ as stream-json
+	completeScript := streamJSONScript(t, dir, "complete.sh", "__EXPEDITION_COMPLETE__")
 
 	cfg := domain.Config{
 		Continent:      dir,
@@ -885,24 +913,20 @@ func TestSwarmMode_TwoWorkers_Consolidation(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	// fakeClaude outputs a valid success report
-	script := filepath.Join(dir, "fakeclaude.sh")
-	if err := os.WriteFile(script, []byte(`#!/bin/bash
-echo '__EXPEDITION_REPORT__'
-echo 'issue_id: TEST-1'
-echo 'issue_title: consolidation test'
-echo 'mission_type: implement'
-echo 'branch: none'
-echo 'pr_url: none'
-echo 'status: success'
-echo 'reason: done'
-echo 'remaining_issues: 3'
-echo 'bugs_found: 0'
-echo 'bug_issues: none'
-echo '__EXPEDITION_END__'
-`), 0755); err != nil {
-		t.Fatal(err)
-	}
+	// fakeClaude outputs a valid success report as stream-json
+	reportText := `__EXPEDITION_REPORT__
+issue_id: TEST-1
+issue_title: consolidation test
+mission_type: implement
+branch: none
+pr_url: none
+status: success
+reason: done
+remaining_issues: 3
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	script := streamJSONScript(t, dir, "fakeclaude.sh", reportText)
 
 	cfg := domain.Config{
 		Continent:      dir,
@@ -959,24 +983,20 @@ func TestSwarmMode_TwoWorkers_ArchiveIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// fakeClaude outputs a valid success report
-	script := filepath.Join(dir, "fakeclaude.sh")
-	if err := os.WriteFile(script, []byte(`#!/bin/bash
-echo '__EXPEDITION_REPORT__'
-echo 'issue_id: TEST-1'
-echo 'issue_title: archive test'
-echo 'mission_type: implement'
-echo 'branch: none'
-echo 'pr_url: none'
-echo 'status: success'
-echo 'reason: done'
-echo 'remaining_issues: 5'
-echo 'bugs_found: 0'
-echo 'bug_issues: none'
-echo '__EXPEDITION_END__'
-`), 0755); err != nil {
-		t.Fatal(err)
-	}
+	// fakeClaude outputs a valid success report as stream-json
+	archiveReportText := `__EXPEDITION_REPORT__
+issue_id: TEST-1
+issue_title: archive test
+mission_type: implement
+branch: none
+pr_url: none
+status: success
+reason: done
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	script := streamJSONScript(t, dir, "fakeclaude.sh", archiveReportText)
 
 	cfg := domain.Config{
 		Continent:      dir,
@@ -1031,6 +1051,29 @@ func TestSwarmMode_TwoWorkers_MidHighSeverityAggregation(t *testing.T) {
 
 	// Script writes a unique HIGH severity D-Mail (using PID for uniqueness)
 	// to Continent's inbox mid-execution, waits for watcher, then outputs report.
+	highReportText := `__EXPEDITION_REPORT__
+issue_id: TEST-1
+issue_title: high severity test
+mission_type: implement
+branch: none
+pr_url: none
+status: success
+reason: done
+remaining_issues: 3
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	highAssistant := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"id": "msg_test", "role": "assistant", "model": "claude-sonnet-4-20250514",
+			"content": []map[string]any{{"type": "text", "text": highReportText}},
+		},
+	}
+	highResult := map[string]any{"type": "result", "result": highReportText}
+	highAJSON, _ := json.Marshal(highAssistant)
+	highRJSON, _ := json.Marshal(highResult)
+
 	script := filepath.Join(dir, "fakeclaude-high.sh")
 	scriptContent := fmt.Sprintf(`#!/bin/bash
 DMAIL_NAME="high-$$"
@@ -1046,19 +1089,9 @@ High severity body
 DMEOF
 # Wait for inbox watcher (fsnotify) to detect the new file
 sleep 2
-echo '__EXPEDITION_REPORT__'
-echo 'issue_id: TEST-1'
-echo 'issue_title: high severity test'
-echo 'mission_type: implement'
-echo 'branch: none'
-echo 'pr_url: none'
-echo 'status: success'
-echo 'reason: done'
-echo 'remaining_issues: 3'
-echo 'bugs_found: 0'
-echo 'bug_issues: none'
-echo '__EXPEDITION_END__'
-`, inboxDir)
+echo '%s'
+echo '%s'
+`, inboxDir, string(highAJSON), string(highRJSON))
 	if err := os.WriteFile(script, []byte(scriptContent), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1108,12 +1141,7 @@ func TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag(t *testing.T) {
 	defer srv.Close()
 
 	// fakeClaude outputs __EXPEDITION_COMPLETE__ which triggers StatusComplete
-	script := filepath.Join(dir, "fakeclaude.sh")
-	if err := os.WriteFile(script, []byte(`#!/bin/bash
-echo '__EXPEDITION_COMPLETE__'
-`), 0755); err != nil {
-		t.Fatal(err)
-	}
+	script := streamJSONScript(t, dir, "fakeclaude.sh", "__EXPEDITION_COMPLETE__")
 
 	cfg := domain.Config{
 		Continent:      dir,
@@ -1178,23 +1206,19 @@ func TestSwarmMode_StaleWorktreeFlag_IgnoredAfterInit(t *testing.T) {
 
 	// fakeClaude outputs a success report — if stale flag is read,
 	// startExp would be 100 and this expedition would not run.
-	script := filepath.Join(dir, "fakeclaude.sh")
-	if err := os.WriteFile(script, []byte(`#!/bin/bash
-echo '__EXPEDITION_REPORT__'
-echo 'issue_id: MY-2'
-echo 'issue_title: not stale'
-echo 'mission_type: implement'
-echo 'branch: none'
-echo 'pr_url: none'
-echo 'status: success'
-echo 'reason: done'
-echo 'remaining_issues: 4'
-echo 'bugs_found: 0'
-echo 'bug_issues: none'
-echo '__EXPEDITION_END__'
-`), 0755); err != nil {
-		t.Fatal(err)
-	}
+	staleReportText := `__EXPEDITION_REPORT__
+issue_id: MY-2
+issue_title: not stale
+mission_type: implement
+branch: none
+pr_url: none
+status: success
+reason: done
+remaining_issues: 4
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	script := streamJSONScript(t, dir, "fakeclaude.sh", staleReportText)
 
 	cfg := domain.Config{
 		Continent:      dir,
