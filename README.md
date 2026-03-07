@@ -1,6 +1,6 @@
 # Paintress
 
-**An autonomous loop that sends AI agents to drain your Linear issues to zero.**
+**An autonomous expedition loop that picks Linear issues, implements code changes, opens PRs, and iterates through review cycles until the backlog is drained.**
 
 Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues — implementing code, running tests, creating PRs, running code reviews, verifying UI, and fixing bugs — with no human intervention, until every issue is done. In Swarm Mode (`--workers N`), multiple expeditions run in parallel using git worktrees for isolation.
 
