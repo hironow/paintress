@@ -288,11 +288,19 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 				}
 			}
 		}
+		var reviewStatus domain.ReviewGateStatus
 		if report.PRUrl != "" && report.PRUrl != "none" && p.config.ReviewCmd != "" {
 			totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
 			remaining := totalTimeout - time.Since(expStart)
 			if remaining > 0 {
-				p.runReviewLoop(ctx, report, remaining, workDir)
+				reviewStatus = p.runReviewLoop(ctx, report, remaining, workDir)
+			}
+		} else if report.PRUrl != "" && report.PRUrl != "none" {
+			reviewStatus = domain.ReviewGateStatus{Skipped: true}
+		}
+		if report.PRUrl != "" && report.PRUrl != "none" {
+			if err := UpdatePRReviewGate(ctx, report.PRUrl, reviewStatus, p.Logger); err != nil {
+				p.Logger.Warn("PR review gate update: %v", err)
 			}
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
