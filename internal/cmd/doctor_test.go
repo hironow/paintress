@@ -23,8 +23,8 @@ func TestDoctorCommand_NoArgs(t *testing.T) {
 	// when
 	err := cmd.Execute()
 
-	// then: should succeed with no args
-	if err != nil {
+	// then: should succeed or report missing required commands (CI has no claude)
+	if err != nil && !strings.Contains(err.Error(), "required commands are missing") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -49,13 +49,15 @@ func TestDoctorCommand_RejectsTwoArgs(t *testing.T) {
 func TestDoctorCommand_OutputFlagDefault(t *testing.T) {
 	// given
 	cmd := NewRootCommand()
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{"doctor"})
 
 	// when
 	err := cmd.Execute()
 
 	// then
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "required commands are missing") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	outputFlag, err := cmd.PersistentFlags().GetString("output")
@@ -72,13 +74,14 @@ func TestDoctorCommand_OutputFlagJSON(t *testing.T) {
 	cmd := NewRootCommand()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
+	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{"doctor", "--output", "json"})
 
 	// when
 	err := cmd.Execute()
 
 	// then
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "required commands are missing") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	outputFlag, err := cmd.PersistentFlags().GetString("output")
@@ -208,8 +211,8 @@ func TestDoctorCommand_AcceptsOneArg(t *testing.T) {
 	// when
 	err := cmd.Execute()
 
-	// then: should not error on one arg
-	if err != nil {
+	// then: should not error on one arg (missing required commands is acceptable in CI)
+	if err != nil && !strings.Contains(err.Error(), "required commands are missing") {
 		t.Fatalf("unexpected error for one arg: %v", err)
 	}
 }
