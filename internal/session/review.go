@@ -73,7 +73,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 	}, nil
 }
 
-func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.ExpeditionReport, budget time.Duration, workDir string) {
+func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.ExpeditionReport, budget time.Duration, workDir string) domain.ReviewGateStatus {
 	ctx, loopSpan := platform.Tracer.Start(ctx, "review.loop",
 		trace.WithAttributes(
 			attribute.String("pr_url", report.PRUrl),
@@ -89,6 +89,10 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 	var consumed time.Duration
 
+	notResolved := func(cycle int, comments string) domain.ReviewGateStatus {
+		return domain.ReviewGateStatus{Cycle: cycle, MaxCycles: maxReviewGateCycles, LastComments: comments}
+	}
+
 	reviewTimeout := max(
 		time.Duration(p.config.TimeoutSec)*time.Second/time.Duration(maxReviewGateCycles),
 		minReviewTimeout,
@@ -103,7 +107,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
 			}
 			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), ctx.Err()))
-			return
+			return notResolved(cycle, lastComments)
 		}
 
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("review_running"), cycle, maxReviewGateCycles))
@@ -124,7 +128,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
 			}
 			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), err))
-			return
+			return notResolved(cycle, lastComments)
 		}
 
 		revSpan.SetAttributes(attribute.Bool("passed", result.Passed))
@@ -132,7 +136,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 		if result.Passed {
 			p.Logger.OK("%s", domain.Msg("review_passed"))
-			return
+			return domain.ReviewGateStatus{Passed: true, Cycle: cycle, MaxCycles: maxReviewGateCycles}
 		}
 
 		lastComments = result.Comments
@@ -144,7 +148,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				report.Insight += " | "
 			}
 			report.Insight += "Reviewfix skipped: no valid branch"
-			return
+			return notResolved(cycle, lastComments)
 		}
 
 		gitCtx, gitCancel := context.WithTimeout(ctx, gitCmdTimeout)
@@ -157,7 +161,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				report.Insight += " | "
 			}
 			report.Insight += fmt.Sprintf("Reviewfix skipped: checkout %s failed: %v", branch, err)
-			return
+			return notResolved(cycle, lastComments)
 		}
 
 		remaining := budget - consumed
@@ -167,7 +171,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			}
 			report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
 			p.Logger.Warn("%s", domain.Msg("review_limit"))
-			return
+			return notResolved(cycle, lastComments)
 		}
 
 		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
@@ -211,7 +215,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				report.Insight += " | "
 			}
 			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(string(out))
-			return
+			return notResolved(cycle, lastComments)
 		}
 	}
 
@@ -220,6 +224,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 	}
 	report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
 	p.Logger.Warn("%s", domain.Msg("review_limit"))
+	return notResolved(maxReviewGateCycles, lastComments)
 }
 
 func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration) {

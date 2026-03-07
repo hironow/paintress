@@ -1,7 +1,6 @@
 package session
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -198,6 +197,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	cmd := newCmd(expCtx, claudeCmd,
 		"--model", model,
+		"--output-format", "stream-json",
 		"--dangerously-skip-permissions",
 		"--print",
 		"-p", prompt,
@@ -216,7 +216,8 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("stdout pipe failed: %w", err)
 	}
-	cmd.Stderr = cmd.Stdout
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
 
 	outputFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-output.txt", e.Number))
 	outFile, err := os.Create(outputFile)
@@ -279,11 +280,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	// Streaming goroutine: tee to terminal + file + buffer + rate limit detection
 	var output strings.Builder
+	var responseModel, responseID string
+	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 
 	go func() {
 		defer close(done)
-		reader := bufio.NewReader(stdout)
+		sr := platform.NewStreamReader(stdout)
 		streamDest := e.DataOut
 		if e.Config.OutputFormat == "json" {
 			streamDest = nil
@@ -295,25 +298,51 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			writer = outFile
 		}
 
-		buf := make([]byte, 4096)
 		for {
-			n, err := reader.Read(buf)
-			if n > 0 {
-				chunk := buf[:n]
-				writer.Write(chunk)
-				output.Write(chunk)
-
-				if e.Reserve.CheckOutput(string(chunk)) {
+			msg, readErr := sr.Next()
+			if readErr == io.EOF {
+				return
+			}
+			if readErr != nil {
+				streamErr <- readErr
+				return
+			}
+			switch msg.Type {
+			case "assistant":
+				text, _ := msg.ExtractText()
+				if text != "" {
+					writer.Write([]byte(text))
+					output.WriteString(text)
+				}
+				if e.Reserve.CheckOutput(text) {
 					invokeSpan.AddEvent("rate_limit.detected")
 				}
-			}
-			if err != nil {
-				break
+				if am, _ := msg.ParseAssistantMessage(); am != nil {
+					if am.Model != "" {
+						responseModel = am.Model
+					}
+					if am.ID != "" {
+						responseID = am.ID
+					}
+				}
+			case "result":
+				if msg.Result != "" {
+					output.Reset()
+					output.WriteString(msg.Result)
+				}
+				invokeSpan.SetAttributes(platform.GenAIResultAttrs(msg, responseModel, responseID)...)
 			}
 		}
 	}()
 
 	<-done
+
+	var readError error
+	select {
+	case sErr := <-streamErr:
+		readError = sErr
+	default:
+	}
 
 	watchCancel()
 	<-inboxDone
@@ -331,6 +360,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	}
 	if ctx.Err() == context.Canceled {
 		return output.String(), fmt.Errorf("interrupted")
+	}
+
+	if readError != nil {
+		return output.String(), fmt.Errorf("stream read: %w", readError)
 	}
 
 	return output.String(), err

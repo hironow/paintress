@@ -7,12 +7,18 @@ before:
     - go mod tidy
     - go test ./... -count=1 -short
 
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
 builds:
   - id: paintress
     main: ./cmd/paintress/
     binary: paintress
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -24,13 +30,16 @@ builds:
       - -s -w
       - -X github.com/hironow/paintress/internal/cmd.Version={{.Version}}
       - -X github.com/hironow/paintress/internal/cmd.Commit={{.ShortCommit}}
-      - -X github.com/hironow/paintress/internal/cmd.Date={{.Date}}
+      - -X github.com/hironow/paintress/internal/cmd.Date={{.CommitDate}}
 
   - id: paintress-tg
     main: ./cmd/paintress-tg/
     binary: paintress-tg
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -44,8 +53,11 @@ builds:
   - id: paintress-discord
     main: ./cmd/paintress-discord/
     binary: paintress-discord
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -59,8 +71,11 @@ builds:
   - id: paintress-slack
     main: ./cmd/paintress-slack/
     binary: paintress-slack
+    flags:
+      - -trimpath
     env:
       - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
     goos:
       - darwin
       - linux
@@ -82,6 +97,9 @@ archives:
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
+
+sboms:
+  - artifacts: archive
 
 checksum:
   name_template: checksums.txt
@@ -110,6 +128,7 @@ brews:
       owner: hironow
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: "https://github.com/hironow/paintress"
     description: "Claude Code expedition orchestrator"
     license: "Apache-2.0"
@@ -118,5 +137,6 @@ brews:
       bin.install "paintress-tg"
       bin.install "paintress-discord"
       bin.install "paintress-slack"
+      generate_completions_from_executable(bin/"paintress", "completion")
     test: |
       system "#{bin}/paintress", "version"

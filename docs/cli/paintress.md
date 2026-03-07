@@ -26,5 +26,5 @@ The Paintress — drives the Expedition loop for Claude Code.
 * [paintress run](paintress_run.md)	 - Run the expedition loop
 * [paintress status](paintress_status.md)	 - Show paintress operational status
 * [paintress update](paintress_update.md)	 - Self-update paintress to the latest release
-* [paintress version](paintress_version.md)	 - Show version information
+* [paintress version](paintress_version.md)	 - Print version, commit, and build information
 

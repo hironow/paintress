@@ -14,13 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version, Commit, and Date are set at build time via -ldflags.
-var (
-	Version = "dev"
-	Commit  = "dev"
-	Date    = "dev"
-)
-
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run <repo-path>",

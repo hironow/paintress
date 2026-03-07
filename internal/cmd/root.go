@@ -13,6 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version, Commit, and Date are set at build time via -ldflags.
+var (
+	Version = "dev"
+	Commit  = "dev"
+	Date    = "dev"
+)
+
 type loggerKeyType struct{}
 
 var loggerKey loggerKeyType
