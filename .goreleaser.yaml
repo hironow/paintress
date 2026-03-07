@@ -24,7 +24,7 @@ builds:
       - -s -w
       - -X github.com/hironow/paintress/internal/cmd.Version={{.Version}}
       - -X github.com/hironow/paintress/internal/cmd.Commit={{.ShortCommit}}
-      - -X github.com/hironow/paintress/internal/cmd.Date={{.Date}}
+      - -X github.com/hironow/paintress/internal/cmd.Date={{.CommitDate}}
 
   - id: paintress-tg
     main: ./cmd/paintress-tg/
