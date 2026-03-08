@@ -82,6 +82,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
+		// Pre-flight triage: process action fields before expedition creation.
+		// escalate/resolve D-Mails are handled immediately and removed;
+		// only pass-through D-Mails reach the expedition prompt.
+		inboxDMails = p.triagePreFlightDMails(expCtx, inboxDMails)
+
 		flagDir := workDir
 		if flagDir == "" {
 			flagDir = p.config.Continent
