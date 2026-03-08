@@ -107,12 +107,37 @@ func (g *GradientGauge) FormatForPrompt() string {
 	return fmt.Sprintf("Gradient Gauge: [%s] %d/%d\n%s", bar, g.level, g.max, g.priorityHint())
 }
 
-// FormatLog returns the gauge history.
+// FormatLog returns the gauge history as a single-line summary.
+// Shows the final state and total charge/discharge counts to avoid
+// multi-line output that breaks logger prefix formatting.
 func (g *GradientGauge) FormatLog() string {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	if len(g.log) == 0 {
 		return "(empty)"
 	}
-	return strings.Join(g.log, "\n")
+	charges := 0
+	discharges := 0
+	resets := 0
+	for _, entry := range g.log {
+		switch {
+		case strings.HasPrefix(entry, "+1"):
+			charges++
+		case strings.HasPrefix(entry, "-1"):
+			discharges++
+		case strings.HasPrefix(entry, "RESET"):
+			resets++
+		}
+	}
+	parts := []string{fmt.Sprintf("level %d/%d", g.level, g.max)}
+	if charges > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", charges))
+	}
+	if discharges > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", discharges))
+	}
+	if resets > 0 {
+		parts = append(parts, fmt.Sprintf("resets=%d", resets))
+	}
+	return strings.Join(parts, ", ")
 }

@@ -72,10 +72,10 @@ func TestGradient_FormatLog_WithHistory(t *testing.T) {
 	g.Discharge()
 	log := g.FormatLog()
 	if !containsStr(log, "+1") {
-		t.Errorf("log should contain charge: %q", log)
+		t.Errorf("log should contain charge count: %q", log)
 	}
-	if !containsStr(log, "RESET") {
-		t.Errorf("log should contain discharge: %q", log)
+	if !containsStr(log, "resets=") {
+		t.Errorf("log should contain reset count: %q", log)
 	}
 }
 
@@ -293,8 +293,8 @@ func TestGradient_DischargeAtZero(t *testing.T) {
 
 	// Log should record the reset
 	log := g.FormatLog()
-	if !containsStr(log, "RESET 0") {
-		t.Errorf("log should record 0->0 reset: %q", log)
+	if !containsStr(log, "resets=") {
+		t.Errorf("log should record reset count: %q", log)
 	}
 }
 
