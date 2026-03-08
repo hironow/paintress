@@ -99,8 +99,10 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	// Preflight: verify git remote exists (required for PR creation)
-	if err := session.PreflightCheckRemote(continent); err != nil {
-		return err
+	if !dryRun {
+		if err := session.PreflightCheckRemote(continent); err != nil {
+			return err
+		}
 	}
 
 	cfg := domain.Config{}
