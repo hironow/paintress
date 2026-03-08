@@ -76,6 +76,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
 		for _, dm := range inboxDMails {
+			domain.LogBanner(p.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
 			if err := p.Emitter.EmitInboxReceived(dm.Name, dm.Severity, time.Now()); err != nil {
 				p.Logger.Warn("inbox received event: %v", err)
 			}
@@ -309,6 +310,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		if dm := domain.NewReportDMail(report); dm.Name != "" {
+			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
 			}

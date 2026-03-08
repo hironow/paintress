@@ -262,6 +262,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				return
 			}
 			seenFiles[dm.Name] = true
+			domain.LogBanner(e.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
 			if dm.Severity == "high" {
 				e.appendMidHighName(dm.Name)
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)

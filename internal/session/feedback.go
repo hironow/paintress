@@ -16,6 +16,7 @@ func (p *Paintress) stageEscalation(ctx context.Context, expedition, failureCoun
 		return
 	}
 	dm := domain.NewEscalationDMail(expedition, failureCount)
+	domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 	if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 		p.Logger.Warn("escalation dmail: %v", err)
 	}
