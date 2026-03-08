@@ -27,6 +27,23 @@ type Config struct {
 	MaxRetries     int    // Maximum retry attempts per unique issue set (default: 3)
 }
 
+// DefaultConfig returns a Config populated with sensible defaults.
+// These values match the CLI flag defaults in cmd/run.go.
+func DefaultConfig() Config {
+	return Config{
+		MaxExpeditions: 50,
+		TimeoutSec:     1980, // 33 minutes
+		Model:          "opus",
+		BaseBranch:     "main",
+		ClaudeCmd:      "claude",
+		DevCmd:         "npm run dev",
+		DevURL:         "http://localhost:3000",
+		Workers:        1,
+		OutputFormat:   "text",
+		MaxRetries:     3,
+	}
+}
+
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 type ProjectConfig struct {
 	Tracker IssueTrackerConfig `yaml:"tracker"`

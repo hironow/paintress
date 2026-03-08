@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -25,6 +26,24 @@ func LoadProjectConfig(continent string) (*domain.ProjectConfig, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// UpdateProjectConfig reads the project config, updates a single key, and writes back.
+// Supported keys: tracker.team, tracker.project.
+func UpdateProjectConfig(continent string, key string, value string) error {
+	cfg, err := LoadProjectConfig(continent)
+	if err != nil {
+		return err
+	}
+	switch key {
+	case "tracker.team":
+		cfg.Tracker.Team = value
+	case "tracker.project":
+		cfg.Tracker.Project = value
+	default:
+		return fmt.Errorf("unknown config key %q", key)
+	}
+	return SaveProjectConfig(continent, cfg)
 }
 
 // SaveProjectConfig writes the project config to .expedition/config.yaml.
