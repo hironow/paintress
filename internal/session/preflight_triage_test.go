@@ -4,6 +4,8 @@ package session
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -156,6 +158,158 @@ func TestTriagePreFlightDMails(t *testing.T) {
 			}
 			if emitter.retryAttemptedCount != tt.wantRetryAttempted {
 				t.Errorf("retryAttempted count = %d, want %d", emitter.retryAttemptedCount, tt.wantRetryAttempted)
+			}
+		})
+	}
+}
+
+// writeDMailFile marshals a DMail and writes it to the inbox directory.
+func writeDMailFile(t *testing.T, inboxDir string, dm domain.DMail) {
+	t.Helper()
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("marshal dmail %s: %v", dm.Name, err)
+	}
+	if err := os.WriteFile(filepath.Join(inboxDir, dm.Name+".md"), data, 0644); err != nil {
+		t.Fatalf("write dmail %s: %v", dm.Name, err)
+	}
+}
+
+// fileExists reports whether the given path exists on the filesystem.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		dmails         []domain.DMail
+		maxRetries     int
+		preloadRetries int
+		preloadIssues  []string
+		wantInInbox    []string // file names expected to remain in inbox
+		wantInArchive  []string // file names expected to appear in archive
+	}{
+		{
+			name: "escalate moves file from inbox to archive",
+			dmails: []domain.DMail{
+				{Name: "esc-fs-1", Kind: "feedback", Description: "critical", Action: "escalate", Issues: []string{"FS-10"}, SchemaVersion: domain.DMailSchemaVersion},
+			},
+			maxRetries:    3,
+			wantInInbox:   nil,
+			wantInArchive: []string{"esc-fs-1"},
+		},
+		{
+			name: "resolve moves file from inbox to archive",
+			dmails: []domain.DMail{
+				{Name: "res-fs-1", Kind: "feedback", Description: "done", Action: "resolve", Issues: []string{"FS-20"}, SchemaVersion: domain.DMailSchemaVersion},
+			},
+			maxRetries:    3,
+			wantInInbox:   nil,
+			wantInArchive: []string{"res-fs-1"},
+		},
+		{
+			name: "no action keeps file in inbox",
+			dmails: []domain.DMail{
+				{Name: "info-fs-1", Kind: "report", Description: "status update", SchemaVersion: domain.DMailSchemaVersion},
+			},
+			maxRetries:    3,
+			wantInInbox:   []string{"info-fs-1"},
+			wantInArchive: nil,
+		},
+		{
+			name: "retry under limit keeps file in inbox",
+			dmails: []domain.DMail{
+				{Name: "retry-fs-1", Kind: "feedback", Description: "flaky", Action: "retry", Issues: []string{"FS-30"}, SchemaVersion: domain.DMailSchemaVersion},
+			},
+			maxRetries:    3,
+			wantInInbox:   []string{"retry-fs-1"},
+			wantInArchive: nil,
+		},
+		{
+			name: "retry over limit moves file to archive",
+			dmails: []domain.DMail{
+				{Name: "retry-fs-max", Kind: "feedback", Description: "stuck", Action: "retry", Issues: []string{"FS-40"}, SchemaVersion: domain.DMailSchemaVersion},
+			},
+			maxRetries:     3,
+			preloadRetries: 3,
+			preloadIssues:  []string{"FS-40"},
+			wantInInbox:    nil,
+			wantInArchive:  []string{"retry-fs-max"},
+		},
+		{
+			name: "mixed actions archive consumed and keep pass-through",
+			dmails: []domain.DMail{
+				{Name: "esc-fs-mix", Kind: "feedback", Description: "escalate me", Action: "escalate", Issues: []string{"FS-50"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "pass-fs-mix", Kind: "report", Description: "just info", SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "res-fs-mix", Kind: "feedback", Description: "resolved", Action: "resolve", Issues: []string{"FS-51"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "retry-fs-mix", Kind: "feedback", Description: "try again", Action: "retry", Issues: []string{"FS-52"}, SchemaVersion: domain.DMailSchemaVersion},
+			},
+			maxRetries:    3,
+			wantInInbox:   []string{"pass-fs-mix", "retry-fs-mix"},
+			wantInArchive: []string{"esc-fs-mix", "res-fs-mix"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// given — set up real filesystem with inbox and archive dirs
+			tmpDir := t.TempDir()
+			inboxDir := filepath.Join(tmpDir, domain.StateDir, "inbox")
+			archiveDir := filepath.Join(tmpDir, domain.StateDir, "archive")
+			if err := os.MkdirAll(inboxDir, 0755); err != nil {
+				t.Fatalf("mkdir inbox: %v", err)
+			}
+
+			for _, dm := range tt.dmails {
+				writeDMailFile(t, inboxDir, dm)
+			}
+
+			emitter := &countingEmitter{}
+			tracker := domain.NewRetryTracker()
+			for range tt.preloadRetries {
+				tracker.Track(tt.preloadIssues)
+			}
+
+			p := &Paintress{
+				Emitter:      emitter,
+				config:       domain.Config{Continent: tmpDir, MaxRetries: tt.maxRetries},
+				Logger:       &domain.NopLogger{},
+				retryTracker: tracker,
+			}
+
+			// when
+			result := p.triagePreFlightDMails(context.Background(), tt.dmails)
+
+			// then — verify return value length
+			wantRemaining := len(tt.wantInInbox)
+			if got := len(result); got != wantRemaining {
+				t.Errorf("remaining D-Mails = %d, want %d", got, wantRemaining)
+			}
+
+			// then — verify files still in inbox
+			for _, name := range tt.wantInInbox {
+				path := filepath.Join(inboxDir, name+".md")
+				if !fileExists(path) {
+					t.Errorf("expected %s to remain in inbox, but file not found", name)
+				}
+			}
+
+			// then — verify files moved to archive
+			for _, name := range tt.wantInArchive {
+				srcPath := filepath.Join(inboxDir, name+".md")
+				dstPath := filepath.Join(archiveDir, name+".md")
+				if fileExists(srcPath) {
+					t.Errorf("expected %s to be removed from inbox, but file still exists", name)
+				}
+				if !fileExists(dstPath) {
+					t.Errorf("expected %s to appear in archive, but file not found", name)
+				}
 			}
 		})
 	}
