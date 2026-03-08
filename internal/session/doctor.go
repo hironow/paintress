@@ -71,6 +71,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 		checks = append(checks, checkContinent(continent))
 		checks = append(checks, checkConfig(continent))
 		checks = append(checks, checkGitRepo(continent))
+		checks = append(checks, checkGitRemote(continent))
 		checks = append(checks, checkWritability(continent))
 		checks = append(checks, checkSkills(continent))
 		checks = append(checks, checkEventStore(continent))
@@ -164,6 +165,37 @@ func checkGitRepo(continent string) domain.DoctorCheck {
 	check.OK = true
 	check.Path = strings.TrimSpace(string(out))
 	check.Version = "git repo OK"
+	return check
+}
+
+// checkGitRemote verifies that the git repository has at least one remote configured.
+// Paintress creates Pull Requests for Linear issues, so a remote is required.
+// Returns a Warning-level check (Required=false).
+func checkGitRemote(continent string) domain.DoctorCheck {
+	check := domain.DoctorCheck{
+		Name:     "git-remote",
+		Required: false,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	cmd := exec.CommandContext(ctx, "git", "-C", continent, "remote")
+	out, err := cmd.Output()
+	cancel()
+	if err != nil {
+		check.Version = "failed to check git remote"
+		check.Hint = `ensure the directory is a git repository`
+		return check
+	}
+
+	if strings.TrimSpace(string(out)) == "" {
+		check.Version = "no remote configured"
+		check.Hint = `paintress creates Pull Requests for Linear issues — run "git remote add origin <url>" to connect to GitHub`
+		return check
+	}
+
+	remotes := strings.Fields(strings.TrimSpace(string(out)))
+	check.OK = true
+	check.Version = fmt.Sprintf("%d remote(s): %s", len(remotes), strings.Join(remotes, ", "))
 	return check
 }
 
@@ -268,6 +300,26 @@ func checkSkills(continent string) domain.DoctorCheck {
 		return check
 	}
 
+	// Check for deprecated "kind: feedback" (split into design-feedback / implementation-feedback)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		skillFile := filepath.Join(skillsDir, entry.Name(), "SKILL.md")
+		data, err := os.ReadFile(skillFile)
+		if err != nil {
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "kind: feedback") &&
+			!strings.Contains(content, "kind: design-feedback") &&
+			!strings.Contains(content, "kind: implementation-feedback") {
+			check.Version = fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", entry.Name())
+			check.Hint = `run "paintress init --force <repo-path>" to regenerate skills with updated kind (feedback → implementation-feedback)`
+			return check
+		}
+	}
+
 	check.OK = true
 	check.Path = skillsDir
 	check.Version = fmt.Sprintf("%d skills OK", found)
@@ -346,7 +398,7 @@ func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	}
 	if mcpErr != nil {
 		check.Version = "not authenticated: " + mcpErr.Error()
-		check.Hint = `run "claude login" to authenticate`
+		check.Hint = `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`
 		return check
 	}
 	check.OK = true
