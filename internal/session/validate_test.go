@@ -1,11 +1,14 @@
 package session_test
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -13,7 +16,7 @@ func TestValidateContinent_ExistingDir(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Errorf("expected nil, got %v", err)
 	}
 }
@@ -21,7 +24,7 @@ func TestValidateContinent_ExistingDir(t *testing.T) {
 func TestValidateContinent_CreatesExpeditionDir(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("should create .expedition dir, got error: %v", err)
 	}
 
@@ -39,7 +42,7 @@ func TestValidateContinent_CreatesExpeditionDir(t *testing.T) {
 func TestValidateContinent_CreatesGitignore(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -62,7 +65,7 @@ func TestValidateContinent_AppendsRunToExistingGitignore(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".logs/\nworktrees/\n"), 0644)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -84,7 +87,7 @@ func TestValidateContinent_AppendsRunWithMissingTrailingNewline(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte("worktrees/"), 0644)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -117,7 +120,7 @@ func TestValidateContinent_DoesNotDuplicateRunInGitignore(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".run/\n"), 0644)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -150,7 +153,7 @@ func TestValidateContinent_PreservesGitignoreOnReadError(t *testing.T) {
 	defer os.Chmod(gitignore, 0644) // restore for cleanup
 
 	// ValidateContinent should return an error, not silently overwrite
-	err := session.ValidateContinent(dir)
+	err := session.ValidateContinent(dir, nil)
 	if err == nil {
 		// If no error, the file must not have been overwritten
 		os.Chmod(gitignore, 0644)
@@ -174,7 +177,7 @@ func TestValidateContinent_WriteStringErrorsPropagate(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte("worktrees/"), 0644)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -188,7 +191,7 @@ func TestValidateContinent_WriteStringErrorsPropagate(t *testing.T) {
 func TestValidateContinent_CreatesDMailDirs(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -203,7 +206,7 @@ func TestValidateContinent_CreatesDMailDirs(t *testing.T) {
 func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -211,7 +214,7 @@ func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .gitignore: %v", err)
 	}
-	for _, entry := range []string{"inbox/", "outbox/"} {
+	for _, entry := range []string{"inbox/", "outbox/", "events/"} {
 		if !strings.Contains(string(content), entry) {
 			t.Errorf(".gitignore should contain %q, got: %q", entry, string(content))
 		}
@@ -221,7 +224,7 @@ func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
 func TestValidateContinent_ArchiveIsNotGitignored(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -243,7 +246,7 @@ func TestValidateContinent_AppendsInboxOutboxToExistingGitignore(t *testing.T) {
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".run/\n"), 0644)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -267,7 +270,7 @@ func TestValidateContinent_DoesNotDuplicateInboxOutboxInGitignore(t *testing.T) 
 	gitignore := filepath.Join(expDir, ".gitignore")
 	os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n"), 0644)
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -286,7 +289,7 @@ func TestValidateContinent_DoesNotDuplicateInboxOutboxInGitignore(t *testing.T) 
 func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("ValidateContinent: %v", err)
 	}
 
@@ -294,7 +297,7 @@ func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 		dir      string
 		contains []string
 	}{
-		{"dmail-sendable", []string{"produces:", "kind: report", "license: Apache-2.0", "dmail-schema-version:"}},
+		{"dmail-sendable", []string{"produces:", "kind: report", "kind: feedback", "license: Apache-2.0", "dmail-schema-version:"}},
 		{"dmail-readable", []string{"consumes:", "kind: specification", "kind: feedback", "license: Apache-2.0", "dmail-schema-version:"}},
 	}
 
@@ -319,7 +322,7 @@ func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 	dir := t.TempDir()
 
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
 
@@ -331,7 +334,7 @@ func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 	}
 
 	// Second call should not error and should not overwrite
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("second call: %v", err)
 	}
 
@@ -345,11 +348,38 @@ func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 	}
 }
 
+func TestValidateContinent_SkillFilesUpdatedWhenOutdated(t *testing.T) {
+	dir := t.TempDir()
+
+	// given — pre-existing SKILL.md with outdated content (missing feedback kind)
+	skillDir := filepath.Join(dir, ".expedition", "skills", "dmail-sendable")
+	os.MkdirAll(skillDir, 0755)
+	outdated := []byte("---\nname: dmail-sendable\ndescription: old\nlicense: Apache-2.0\nmetadata:\n  dmail-schema-version: \"1\"\n  produces:\n    - kind: report\n---\n\nold content\n")
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), outdated, 0644)
+
+	// when
+	if err := session.ValidateContinent(dir, nil); err != nil {
+		t.Fatalf("ValidateContinent: %v", err)
+	}
+
+	// then — SKILL.md should be overwritten with the latest embedded template
+	content, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read SKILL.md: %v", err)
+	}
+	if strings.Contains(string(content), "old content") {
+		t.Error("outdated SKILL.md should be overwritten with latest template")
+	}
+	if !strings.Contains(string(content), "kind: feedback") {
+		t.Error("updated SKILL.md should contain 'kind: feedback'")
+	}
+}
+
 func TestValidateContinent_SkillStatErrorPropagates(t *testing.T) {
 	dir := t.TempDir()
 
 	// First call creates the skill directory and file
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, nil); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
 
@@ -359,7 +389,7 @@ func TestValidateContinent_SkillStatErrorPropagates(t *testing.T) {
 	defer os.Chmod(skillDir, 0755)
 
 	// ValidateContinent should propagate the stat error, not silently skip
-	err := session.ValidateContinent(dir)
+	err := session.ValidateContinent(dir, nil)
 	if err == nil {
 		t.Error("expected error when skill directory is unreadable, got nil")
 	}
@@ -367,12 +397,63 @@ func TestValidateContinent_SkillStatErrorPropagates(t *testing.T) {
 
 func TestValidateContinent_Idempotent(t *testing.T) {
 	dir := t.TempDir()
+	logger := platform.NewLogger(io.Discard, false)
 
 	// Call twice — should not error on second call
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, logger); err != nil {
 		t.Fatalf("first call: %v", err)
 	}
-	if err := session.ValidateContinent(dir); err != nil {
+	if err := session.ValidateContinent(dir, logger); err != nil {
 		t.Fatalf("second call: %v", err)
+	}
+}
+
+func TestValidateContinent_LogsWhenSkillUpdated(t *testing.T) {
+	dir := t.TempDir()
+	logger := platform.NewLogger(io.Discard, false)
+
+	// given — first init creates SKILL.md
+	if err := session.ValidateContinent(dir, logger); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+
+	// given — overwrite with outdated content
+	skillDir := filepath.Join(dir, ".expedition", "skills", "dmail-sendable")
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("outdated"), 0644)
+
+	// when — second init should log the update
+	var buf bytes.Buffer
+	logCapture := platform.NewLogger(&buf, false)
+	if err := session.ValidateContinent(dir, logCapture); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+
+	// then — log should mention the updated skill
+	output := buf.String()
+	if !strings.Contains(output, "dmail-sendable") {
+		t.Errorf("expected log to mention dmail-sendable, got: %q", output)
+	}
+}
+
+func TestValidateContinent_NoLogWhenSkillUnchanged(t *testing.T) {
+	dir := t.TempDir()
+	logger := platform.NewLogger(io.Discard, false)
+
+	// given — first init
+	if err := session.ValidateContinent(dir, logger); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+
+	// when — second init with no changes
+	var buf bytes.Buffer
+	logCapture := platform.NewLogger(&buf, false)
+	if err := session.ValidateContinent(dir, logCapture); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+
+	// then — no skill update logs
+	output := buf.String()
+	if strings.Contains(output, "SKILL.md") {
+		t.Errorf("should not log when skills are unchanged, got: %q", output)
 	}
 }

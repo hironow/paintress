@@ -201,6 +201,123 @@ func TestLogger_Writer(t *testing.T) {
 	}
 }
 
+func TestLogFunctions_ColorWhenEnabled(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false) // force color on
+
+	logger.Info("color test")
+	logger.OK("ok test")
+	logger.Warn("warn test")
+	logger.Error("error test")
+
+	out := buf.String()
+	if !containsStr(out, "\033[") {
+		t.Errorf("expected ANSI color codes when color enabled, got %q", out)
+	}
+	// Verify reset code is present (each colored line must reset)
+	if !containsStr(out, "\033[0m") {
+		t.Errorf("expected reset code in colored output, got %q", out)
+	}
+}
+
+func TestLogFunctions_ColorLevelDistinct(t *testing.T) {
+	levels := []struct {
+		name string
+		fn   func(*platform.Logger)
+	}{
+		{"Info", func(l *platform.Logger) { l.Info("msg") }},
+		{"OK", func(l *platform.Logger) { l.OK("msg") }},
+		{"Warn", func(l *platform.Logger) { l.Warn("msg") }},
+		{"Error", func(l *platform.Logger) { l.Error("msg") }},
+	}
+
+	codes := make(map[string]string)
+	for _, lv := range levels {
+		var buf bytes.Buffer
+		logger := platform.NewLogger(&buf, false)
+		logger.SetNoColor(false)
+		lv.fn(logger)
+		codes[lv.name] = buf.String()
+	}
+
+	// Verify each level uses a distinct ANSI code
+	// Extract the ANSI sequence before the prefix
+	for i, a := range levels {
+		for j, b := range levels {
+			if i >= j {
+				continue
+			}
+			// Different levels should not produce identical output (colors differ)
+			if codes[a.name] == codes[b.name] {
+				t.Errorf("%s and %s produced identical output", a.name, b.name)
+			}
+		}
+	}
+}
+
+func TestLogFunctions_NoColorEnvVar(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false) // try to force on — but NO_COLOR should win? No, SetNoColor is explicit override
+
+	// SetNoColor(false) should override even with NO_COLOR set
+	// The env var is only checked at construction time
+	logger.Info("env test")
+	out := buf.String()
+	if !containsStr(out, "\033[") {
+		t.Errorf("SetNoColor(false) should override NO_COLOR env, got %q", out)
+	}
+}
+
+func TestLogFunctions_NoColorEnvVarAtConstruction(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+
+	logger.Info("env test")
+	out := buf.String()
+	if containsStr(out, "\033[") {
+		t.Errorf("NO_COLOR=1 should disable color at construction, got %q", out)
+	}
+}
+
+func TestLogFunctions_DebugColor(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, true) // verbose
+	logger.SetNoColor(false)
+
+	logger.Debug("debug color")
+	out := buf.String()
+	if !containsStr(out, "\033[") {
+		t.Errorf("debug with color should have ANSI codes, got %q", out)
+	}
+}
+
+func TestLogger_SetNoColor(t *testing.T) {
+	var buf bytes.Buffer
+	logger := platform.NewLogger(&buf, false)
+	logger.SetNoColor(false)
+
+	logger.Info("colored")
+	colored := buf.String()
+
+	buf.Reset()
+	logger.SetNoColor(true)
+	logger.Info("plain")
+	plain := buf.String()
+
+	if !containsStr(colored, "\033[") {
+		t.Errorf("expected color codes when SetNoColor(false), got %q", colored)
+	}
+	if containsStr(plain, "\033[") {
+		t.Errorf("expected no color codes when SetNoColor(true), got %q", plain)
+	}
+}
+
 // --- from edge_cases_test.go ---
 
 func TestLogFunctions_ConcurrentLogging(t *testing.T) {

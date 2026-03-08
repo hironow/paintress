@@ -122,7 +122,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	stateDir := filepath.Join(continent, domain.StateDir)
 	eventStore := session.NewEventStore(stateDir, logger)
 
-	if err := session.ValidateContinent(cfg.Continent); err != nil {
+	if err := session.ValidateContinent(cfg.Continent, logger); err != nil {
 		return err
 	}
 
