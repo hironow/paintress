@@ -88,7 +88,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 				{Name: "retry-max", Kind: "feedback", Description: "stuck", Action: "retry", Issues: []string{"MY-40"}},
 			},
 			maxRetries:     3,
-			preloadRetries: 2, // Track called 2 times before; triage call will be the 3rd = maxRetries
+			preloadRetries: 3, // Track called 3 times before; triage call will be the 4th > maxRetries
 			preloadIssues:  []string{"MY-40"},
 			wantRemaining:  0,
 			wantEscalated:  1,
