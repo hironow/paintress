@@ -24,6 +24,7 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 | Event | Payload Type | Fields |
 |---|---|---|
 | expedition.completed | `domain.ExpeditionCompletedData` | `Expedition`, `Status` |
+| expedition.resolved | `domain.ResolvedData` | `DMail`, `Issues` |
 | inbox.received | (none) | uses `event.Type` |
 | gradient.changed | (none) | uses `event.Type` |
 | dmail.staged | (none) | uses `event.Type` |
