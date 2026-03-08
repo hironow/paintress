@@ -172,6 +172,7 @@ func (n *nopEmitter) EmitGommage(_ int, _ time.Time) error                  { re
 func (n *nopEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error { return nil }
 func (n *nopEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return nil }
 func (n *nopEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return nil }
+func (n *nopEmitter) EmitResolved(_ string, _ []string, _ time.Time) error { return nil }
 func (n *nopEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
 func (n *nopEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
 func (n *nopEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }

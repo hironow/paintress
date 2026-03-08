@@ -31,6 +31,7 @@ const (
 	EventInboxReceived       EventType = "inbox.received"
 	EventRetryAttempted      EventType = "retry.attempted"
 	EventEscalated           EventType = "escalated"
+	EventResolved            EventType = "resolved"
 )
 
 // Event is the envelope for all domain events in the event store.
@@ -150,6 +151,12 @@ type RetryAttemptedData struct {
 
 // EscalatedData is the payload for EventEscalated.
 type EscalatedData struct {
+	DMail  string   `json:"dmail"`
+	Issues []string `json:"issues"`
+}
+
+// ResolvedData is the payload for EventResolved.
+type ResolvedData struct {
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }

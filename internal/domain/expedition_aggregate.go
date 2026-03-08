@@ -99,6 +99,14 @@ func (a *ExpeditionAggregate) RecordEscalated(dmailName string, issues []string,
 	}, now)
 }
 
+// RecordResolved produces a resolved event.
+func (a *ExpeditionAggregate) RecordResolved(dmailName string, issues []string, now time.Time) (Event, error) {
+	return NewEvent(EventResolved, ResolvedData{
+		DMail:  dmailName,
+		Issues: issues,
+	}, now)
+}
+
 // RecordDMailStaged produces a dmail.staged event.
 func (a *ExpeditionAggregate) RecordDMailStaged(name string, now time.Time) (Event, error) {
 	return NewEvent(EventDMailStaged, DMailStagedData{Name: name}, now)

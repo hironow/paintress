@@ -124,6 +124,7 @@ func (f *failingEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error 
 }
 func (f *failingEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return f.err }
 func (f *failingEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return f.err }
+func (f *failingEmitter) EmitResolved(_ string, _ []string, _ time.Time) error { return f.err }
 func (f *failingEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return f.err }
 func (f *failingEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return f.err }
 func (f *failingEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return f.err }

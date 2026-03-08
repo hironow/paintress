@@ -17,8 +17,9 @@ import (
 // and EmitRetryAttempted calls for assertion in triage tests.
 type countingEmitter struct {
 	port.NopExpeditionEventEmitter
-	escalatedCount     int
+	escalatedCount      int
 	retryAttemptedCount int
+	resolvedCount       int
 }
 
 func (c *countingEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error {
@@ -28,6 +29,11 @@ func (c *countingEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error
 
 func (c *countingEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error {
 	c.retryAttemptedCount++
+	return nil
+}
+
+func (c *countingEmitter) EmitResolved(_ string, _ []string, _ time.Time) error {
+	c.resolvedCount++
 	return nil
 }
 
@@ -43,6 +49,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		wantRemaining      int
 		wantEscalated      int
 		wantRetryAttempted int
+		wantResolved       int
 	}{
 		{
 			name: "no action passes through",
@@ -74,6 +81,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 			},
 			maxRetries:    3,
 			wantRemaining: 0,
+			wantResolved:  1,
 		},
 		{
 			name: "retry with issues under limit keeps dmail",
@@ -115,6 +123,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 			wantRemaining:      2, // pass-mix + retry-mix
 			wantEscalated:      1, // esc-mix
 			wantRetryAttempted: 1, // retry-mix
+			wantResolved:       1, // res-mix
 		},
 		{
 			name: "unknown action passes through",
@@ -158,6 +167,9 @@ func TestTriagePreFlightDMails(t *testing.T) {
 			}
 			if emitter.retryAttemptedCount != tt.wantRetryAttempted {
 				t.Errorf("retryAttempted count = %d, want %d", emitter.retryAttemptedCount, tt.wantRetryAttempted)
+			}
+			if emitter.resolvedCount != tt.wantResolved {
+				t.Errorf("resolved count = %d, want %d", emitter.resolvedCount, tt.wantResolved)
 			}
 		})
 	}

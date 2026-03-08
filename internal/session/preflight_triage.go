@@ -28,6 +28,9 @@ func (p *Paintress) triagePreFlightDMails(ctx context.Context, dmails []domain.D
 
 		case "resolve":
 			p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
+			if err := p.Emitter.EmitResolved(dm.Name, dm.Issues, time.Now()); err != nil {
+				p.Logger.Warn("pre-flight resolved event: %v", err)
+			}
 			if archErr := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); archErr != nil {
 				p.Logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
 			}

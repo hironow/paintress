@@ -53,6 +53,9 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 		}
 	case "resolve":
 		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
+		if err := p.Emitter.EmitResolved(dm.Name, dm.Issues, time.Now()); err != nil {
+			p.Logger.Warn("resolved event: %v", err)
+		}
 	default:
 		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 	}

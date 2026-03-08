@@ -107,6 +107,14 @@ func (e *expeditionEventEmitter) EmitEscalated(dmailName string, issues []string
 	return e.emit(ev)
 }
 
+func (e *expeditionEventEmitter) EmitResolved(dmailName string, issues []string, now time.Time) error {
+	ev, err := e.agg.RecordResolved(dmailName, issues, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
 func (e *expeditionEventEmitter) EmitDMailStaged(name string, now time.Time) error {
 	ev, err := e.agg.RecordDMailStaged(name, now)
 	if err != nil {
