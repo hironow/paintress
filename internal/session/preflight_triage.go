@@ -12,7 +12,7 @@ import (
 // expedition prompt. Actions "escalate" and "resolve" are consumed (removed
 // from the result); "retry" is kept unless the retry count exceeds the
 // configured maximum, in which case it is escalated and removed.
-func (p *Paintress) triagePreFlightDMails(_ context.Context, dmails []domain.DMail) []domain.DMail {
+func (p *Paintress) triagePreFlightDMails(ctx context.Context, dmails []domain.DMail) []domain.DMail {
 	result := make([]domain.DMail, 0, len(dmails))
 
 	for _, dm := range dmails {
@@ -21,10 +21,16 @@ func (p *Paintress) triagePreFlightDMails(_ context.Context, dmails []domain.DMa
 			if err := p.handleEscalation(dm); err != nil {
 				p.Logger.Error("pre-flight escalation event lost: %v", err)
 			}
+			if archErr := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); archErr != nil {
+				p.Logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
+			}
 			// consumed — do not pass to expedition
 
 		case "resolve":
 			p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
+			if archErr := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); archErr != nil {
+				p.Logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
+			}
 			// consumed — do not pass to expedition
 
 		case "retry":
@@ -40,6 +46,9 @@ func (p *Paintress) triagePreFlightDMails(_ context.Context, dmails []domain.DMa
 				p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)
 				if err := p.handleEscalation(dm); err != nil {
 					p.Logger.Error("pre-flight escalation event lost: %v", err)
+				}
+				if archErr := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); archErr != nil {
+					p.Logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
 				}
 				continue
 			}
