@@ -24,15 +24,19 @@ flags for interactive prompts. This must be run once before
 		Example: `  # Non-interactive with flags
   paintress init --team MY --project Hades /path/to/repo
 
+  # Re-initialize (overwrite config, keep state)
+  paintress init --force --team MY --project Hades /path/to/repo
+
   # Defaults only (no prompts)
   paintress init /path/to/repo`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoPath := args[0]
 
+			force, _ := cmd.Flags().GetBool("force")
 			cfgPath := domain.ProjectConfigPath(repoPath)
-			if _, err := os.Stat(cfgPath); err == nil {
-				return fmt.Errorf("%s already exists", cfgPath)
+			if _, err := os.Stat(cfgPath); err == nil && !force {
+				return fmt.Errorf("%s already exists\nUse --force to overwrite", cfgPath)
 			}
 
 			team, _ := cmd.Flags().GetString("team")
@@ -66,6 +70,7 @@ flags for interactive prompts. This must be run once before
 			return nil
 		},
 	}
+	cmd.Flags().Bool("force", false, "Overwrite existing config (preserves state directories)")
 	cmd.Flags().String("team", "", "Linear team key (e.g. MY)")
 	cmd.Flags().String("project", "", "Linear project name")
 	cmd.Flags().String("otel-backend", "", "OTel backend: jaeger, weave")
