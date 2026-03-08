@@ -20,6 +20,7 @@ paintress rebuild [repo-path] [flags]
 
 ```
   -l, --lang string     Output language: en, ja, fr (default "en")
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output
 ```

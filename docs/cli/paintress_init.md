@@ -20,6 +20,9 @@ paintress init <repo-path> [flags]
   # Non-interactive with flags
   paintress init --team MY --project Hades /path/to/repo
 
+  # Re-initialize (overwrite config, keep state)
+  paintress init --force --team MY --project Hades /path/to/repo
+
   # Defaults only (no prompts)
   paintress init /path/to/repo
 ```
@@ -27,6 +30,7 @@ paintress init <repo-path> [flags]
 ### Options
 
 ```
+      --force                 Overwrite existing config (preserves state directories)
   -h, --help                  help for init
       --otel-backend string   OTel backend: jaeger, weave
       --otel-entity string    Weave entity/team (required for weave)
@@ -39,6 +43,7 @@ paintress init <repo-path> [flags]
 
 ```
   -l, --lang string     Output language: en, ja, fr (default "en")
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output
 ```

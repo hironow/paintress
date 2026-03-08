@@ -1,20 +1,19 @@
-## paintress clean
+## paintress config show
 
-Remove state directory (.expedition/)
+Display project configuration
 
 ### Synopsis
 
-Delete the .expedition/ directory to reset to a clean state. Use 'paintress init' to reinitialize.
+Display the project configuration from .expedition/config.yaml.
 
 ```
-paintress clean [path] [flags]
+paintress config show [path] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for clean
-      --yes    Skip confirmation prompt
+  -h, --help   help for show
 ```
 
 ### Options inherited from parent commands
@@ -28,5 +27,5 @@ paintress clean [path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress config](paintress_config.md)	 - View or update paintress project configuration
 

@@ -1,30 +1,22 @@
-## paintress version
+## paintress config
 
-Print version, commit, and build information
+View or update paintress project configuration
 
 ### Synopsis
 
-Print version, commit hash, build date, Go version, and OS/arch.
-
-By default outputs a human-readable single line. Use --json
-for structured output suitable for scripts and CI.
-
-```
-paintress version [flags]
-```
+View or update the .expedition/config.yaml project configuration file.
 
 ### Examples
 
 ```
-  paintress version
-  paintress version -j
+  paintress config show /path/to/repo
+  paintress config set tracker.team MY /path/to/repo
 ```
 
 ### Options
 
 ```
-  -h, --help   help for version
-  -j, --json   Output version info as JSON
+  -h, --help   help for config
 ```
 
 ### Options inherited from parent commands
@@ -39,4 +31,6 @@ paintress version [flags]
 ### SEE ALSO
 
 * [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress config set](paintress_config_set.md)	 - Update a project configuration value
+* [paintress config show](paintress_config_show.md)	 - Display project configuration
 
