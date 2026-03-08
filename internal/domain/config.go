@@ -38,7 +38,7 @@ type IssueTrackerConfig struct {
 	Project string `yaml:"project,omitempty"`
 }
 
-// TrackerTeam returns the issue tracker team name.
+// TrackerTeam returns the issue tracker team key (e.g. "MY").
 func (c ProjectConfig) TrackerTeam() string { return c.Tracker.Team }
 
 // TrackerProject returns the issue tracker project name.
