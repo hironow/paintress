@@ -48,8 +48,8 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail: %v", err)
 	}
-	if dm.Kind != "feedback" {
-		t.Errorf("Kind = %q, want %q", dm.Kind, "feedback")
+	if dm.Kind != "implementation-feedback" {
+		t.Errorf("Kind = %q, want %q", dm.Kind, "implementation-feedback")
 	}
 	if dm.Severity != "high" {
 		t.Errorf("Severity = %q, want %q", dm.Severity, "high")

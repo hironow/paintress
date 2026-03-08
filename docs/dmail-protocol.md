@@ -29,7 +29,7 @@ dmail-schema-version: "1"
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique message identifier (e.g., `report-my-42`) |
-| `kind` | string | Yes | Message type: `report`, `specification`, `feedback` |
+| `kind` | string | Yes | Message type: `report`, `specification`, `design-feedback`, `implementation-feedback` |
 | `description` | string | Yes | Human-readable summary |
 | `issues` | string[] | No | Related Linear issue IDs |
 | `severity` | string | No | `high` triggers the approval gate |
@@ -140,13 +140,13 @@ metadata:
 ```yaml
 ---
 name: dmail-readable
-description: Consumes D-Mail specifications and feedback from inbox/.
+description: Consumes D-Mail specifications and implementation-feedback from inbox/.
 license: Apache-2.0
 metadata:
   dmail-schema-version: "1"
   consumes:
     - kind: specification
-    - kind: feedback
+    - kind: implementation-feedback
 ---
 ```
 

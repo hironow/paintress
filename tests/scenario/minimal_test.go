@@ -76,7 +76,7 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	// .siren/inbox: feedback delivered by phonewave
 	// .gate/inbox: empty (amadeus consumed the report)
 	feedbackPath := ws.WaitForDMail(t, ".expedition", "inbox", 30*time.Second)
-	obs.AssertDMailKind(feedbackPath, "feedback")
+	obs.AssertDMailKind(feedbackPath, "implementation-feedback")
 	ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
 
 	// Final state: all outboxes empty

@@ -293,7 +293,7 @@ func TestFormatDMailForPrompt_MultipleDMails(t *testing.T) {
 	// given
 	dmails := []domain.DMail{
 		{Name: "spec-my-10", Kind: "specification", Description: "First"},
-		{Name: "feedback-d-071", Kind: "feedback", Description: "Second", Severity: "medium"},
+		{Name: "feedback-d-071", Kind: "implementation-feedback", Description: "Second", Severity: "medium"},
 	}
 
 	// when
@@ -484,7 +484,7 @@ func TestParseDMail_MultipleIssues(t *testing.T) {
 	// given — d-mail referencing multiple issues
 	input := []byte(`---
 name: "multi-issue"
-kind: feedback
+kind: implementation-feedback
 description: "Affects multiple issues"
 issues:
   - MY-10
@@ -1014,7 +1014,7 @@ func TestSendDMail_ContentMatchesAfterParse(t *testing.T) {
 	store := testOutboxStore(t, continent)
 	dm := domain.DMail{
 		Name:        "full-content",
-		Kind:        "feedback",
+		Kind:        "implementation-feedback",
 		Description: "Complete content verification",
 		Issues:      []string{"MY-1", "MY-2"},
 		Severity:    "high",
@@ -1361,7 +1361,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	}
 	feedback := domain.DMail{
 		Name:        "feedback-d-071",
-		Kind:        "feedback",
+		Kind:        "implementation-feedback",
 		Description: "Architecture drift in auth module",
 		Severity:    "high",
 		Body:        "## Findings\n\nSession handling does not match design doc.\n",
@@ -1506,7 +1506,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// Verify each archived file is parseable and content-correct
 	wantArchived := map[string]string{
-		"feedback-d-071.md": "feedback",
+		"feedback-d-071.md": "implementation-feedback",
 		"report-my-42.md":   "report",
 		"spec-my-42.md":     "specification",
 	}
@@ -1623,7 +1623,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	// ── Between expeditions: new feedback arrives ──
 
-	fb := domain.DMail{Name: "feedback-d-001", Kind: "feedback", Description: "Review feedback", Severity: "medium"}
+	fb := domain.DMail{Name: "feedback-d-001", Kind: "implementation-feedback", Description: "Review feedback", Severity: "medium"}
 	data, _ = fb.Marshal()
 	os.WriteFile(filepath.Join(inboxDir, "feedback-d-001.md"), data, 0644)
 
@@ -1695,7 +1695,7 @@ func TestBuildFollowUpPrompt_SingleDMail(t *testing.T) {
 func TestBuildFollowUpPrompt_MultipleDMails(t *testing.T) {
 	dmails := []domain.DMail{
 		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting"},
-		{Name: "feedback-d-001", Kind: "feedback", Description: "Review feedback", Severity: "medium"},
+		{Name: "feedback-d-001", Kind: "implementation-feedback", Description: "Review feedback", Severity: "medium"},
 	}
 
 	prompt := domain.BuildFollowUpPrompt(dmails)

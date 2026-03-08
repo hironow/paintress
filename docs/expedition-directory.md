@@ -19,8 +19,8 @@ This document describes what each directory/file does, who creates it, and how i
     dmail-sendable/
       SKILL.md          # Agent Skills spec manifest (produces: report)
     dmail-readable/
-      SKILL.md          # Agent Skills spec manifest (consumes: specification, feedback)
-  inbox/                # incoming d-mails (specifications, feedback)
+      SKILL.md          # Agent Skills spec manifest (consumes: specification, implementation-feedback)
+  inbox/                # incoming d-mails (specifications, implementation-feedback)
     *.md
   outbox/               # outgoing d-mails (reports)
     *.md

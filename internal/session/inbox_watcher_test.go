@@ -422,7 +422,7 @@ func TestWatchInbox_ParsesCorrectly(t *testing.T) {
 		t.Fatal("timeout waiting for watcher ready")
 	}
 
-	content := "---\nname: feedback-d-072\nkind: feedback\ndescription: arch drift detected\nseverity: high\nissues:\n  - MY-42\n  - MY-43\n---\n\n## Findings\n\nDrift in module X.\n"
+	content := "---\nname: feedback-d-072\nkind: implementation-feedback\ndescription: arch drift detected\nseverity: high\nissues:\n  - MY-42\n  - MY-43\n---\n\n## Findings\n\nDrift in module X.\n"
 	os.WriteFile(filepath.Join(inboxDir, "feedback-d-072.md"), []byte(content), 0644)
 
 	select {
@@ -436,8 +436,8 @@ func TestWatchInbox_ParsesCorrectly(t *testing.T) {
 	if got.Name != "feedback-d-072" {
 		t.Errorf("name = %q, want feedback-d-072", got.Name)
 	}
-	if got.Kind != "feedback" {
-		t.Errorf("kind = %q, want feedback", got.Kind)
+	if got.Kind != "implementation-feedback" {
+		t.Errorf("kind = %q, want implementation-feedback", got.Kind)
 	}
 	if got.Severity != "high" {
 		t.Errorf("severity = %q, want high", got.Severity)

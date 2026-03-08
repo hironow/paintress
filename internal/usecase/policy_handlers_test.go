@@ -198,7 +198,7 @@ func TestPolicyHandler_DMailStaged_RecordsMetrics(t *testing.T) {
 	registerExpeditionPolicies(engine, logger, &port.NopNotifier{}, spy)
 
 	ev, err := domain.NewEvent(domain.EventDMailStaged, map[string]string{
-		"kind": "feedback",
+		"kind": "implementation-feedback",
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +256,7 @@ func TestPolicyHandler_DMailStaged_NotifiesSideEffect(t *testing.T) {
 	registerExpeditionPolicies(engine, logger, spy, &port.NopPolicyMetrics{})
 
 	ev, err := domain.NewEvent(domain.EventDMailStaged, map[string]string{
-		"kind": "feedback",
+		"kind": "implementation-feedback",
 	}, time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)

@@ -297,8 +297,8 @@ func TestValidateContinent_CreatesSkillFiles(t *testing.T) {
 		dir      string
 		contains []string
 	}{
-		{"dmail-sendable", []string{"produces:", "kind: report", "kind: feedback", "license: Apache-2.0", "dmail-schema-version:"}},
-		{"dmail-readable", []string{"consumes:", "kind: specification", "kind: feedback", "license: Apache-2.0", "dmail-schema-version:"}},
+		{"dmail-sendable", []string{"produces:", "kind: report", "license: Apache-2.0", "dmail-schema-version:"}},
+		{"dmail-readable", []string{"consumes:", "kind: specification", "kind: implementation-feedback", "license: Apache-2.0", "dmail-schema-version:"}},
 	}
 
 	for _, s := range skills {
@@ -351,7 +351,7 @@ func TestValidateContinent_SkillFilesAreIdempotent(t *testing.T) {
 func TestValidateContinent_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	dir := t.TempDir()
 
-	// given — pre-existing SKILL.md with outdated content (missing feedback kind)
+	// given — pre-existing SKILL.md with outdated content (old description)
 	skillDir := filepath.Join(dir, ".expedition", "skills", "dmail-sendable")
 	os.MkdirAll(skillDir, 0755)
 	outdated := []byte("---\nname: dmail-sendable\ndescription: old\nlicense: Apache-2.0\nmetadata:\n  dmail-schema-version: \"1\"\n  produces:\n    - kind: report\n---\n\nold content\n")
@@ -370,8 +370,8 @@ func TestValidateContinent_SkillFilesUpdatedWhenOutdated(t *testing.T) {
 	if strings.Contains(string(content), "old content") {
 		t.Error("outdated SKILL.md should be overwritten with latest template")
 	}
-	if !strings.Contains(string(content), "kind: feedback") {
-		t.Error("updated SKILL.md should contain 'kind: feedback'")
+	if !strings.Contains(string(content), "kind: report") {
+		t.Error("updated SKILL.md should contain 'kind: report'")
 	}
 }
 

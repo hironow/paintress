@@ -1,6 +1,6 @@
 ---
 dmail-schema-version: "1"
 name: test-minimal
-kind: feedback
+kind: implementation-feedback
 description: Minimal valid D-Mail
 ---
