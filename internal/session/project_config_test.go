@@ -112,6 +112,30 @@ func TestUpdateProjectConfig_SetProject(t *testing.T) {
 	}
 }
 
+func TestUpdateProjectConfig_SetCycle(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfg := &domain.ProjectConfig{
+		Tracker: domain.IssueTrackerConfig{Team: "MY", Project: "Test"},
+	}
+	session.SaveProjectConfig(dir, cfg)
+
+	// when
+	err := session.UpdateProjectConfig(dir, "tracker.cycle", "2026-Q1")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateProjectConfig: %v", err)
+	}
+	loaded, _ := session.LoadProjectConfig(dir)
+	if loaded.Tracker.Cycle != "2026-Q1" {
+		t.Errorf("expected cycle '2026-Q1', got %q", loaded.Tracker.Cycle)
+	}
+	if loaded.Tracker.Team != "MY" {
+		t.Errorf("team should be preserved, got %q", loaded.Tracker.Team)
+	}
+}
+
 func TestUpdateProjectConfig_InvalidKey(t *testing.T) {
 	// given
 	dir := t.TempDir()

@@ -93,6 +93,7 @@ func DefaultProjectConfig() ProjectConfig {
 type IssueTrackerConfig struct {
 	Team    string `yaml:"team"`
 	Project string `yaml:"project"`
+	Cycle   string `yaml:"cycle"`
 }
 
 // TrackerTeam returns the issue tracker team key (e.g. "MY").

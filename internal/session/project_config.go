@@ -56,6 +56,8 @@ func setProjectConfigField(cfg *domain.ProjectConfig, key string, value string) 
 		cfg.Tracker.Team = value
 	case "tracker.project":
 		cfg.Tracker.Project = value
+	case "tracker.cycle":
+		cfg.Tracker.Cycle = value
 	case "lang":
 		if !domain.ValidLang(value) {
 			return fmt.Errorf("invalid lang %q: must be ja or en", value)
