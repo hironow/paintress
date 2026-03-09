@@ -142,7 +142,7 @@ func TestDoctorCommand_JSONWithRepoPath(t *testing.T) {
 }
 
 func TestDoctorCommand_JSONWithoutRepoPath(t *testing.T) {
-	// given
+	// given: no args → falls back to cwd, metrics are computed from cwd
 	cmd := NewRootCommand()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -152,7 +152,7 @@ func TestDoctorCommand_JSONWithoutRepoPath(t *testing.T) {
 	// when
 	_ = cmd.Execute()
 
-	// then
+	// then: should produce valid JSON (metrics may or may not be present depending on cwd)
 	var output struct {
 		Checks  []json.RawMessage      `json:"checks"`
 		Metrics map[string]interface{} `json:"metrics"`
@@ -160,9 +160,9 @@ func TestDoctorCommand_JSONWithoutRepoPath(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
 	}
-	// metrics should be nil (omitempty) when no repo-path
-	if output.Metrics != nil {
-		t.Errorf("expected no metrics without repo-path, got %v", output.Metrics)
+	// With cwd fallback, checks should always be present
+	if len(output.Checks) == 0 {
+		t.Error("expected at least one check in JSON output")
 	}
 }
 

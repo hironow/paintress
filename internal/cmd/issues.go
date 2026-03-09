@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -14,14 +13,19 @@ import (
 
 func newIssuesCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "issues <repo-path>",
+		Use:   "issues [repo-path]",
 		Short: "List Linear issues via Claude MCP",
 		Long: `Query Linear issues via Claude MCP tools for the configured team and project.
 
 Reads the team/project from .expedition/config.yaml. Supports filtering
 by issue state (e.g. todo, in-progress). Hyphens in state names are
-converted to spaces automatically.`,
-		Example: `  # List all issues
+converted to spaces automatically.
+
+If repo-path is omitted, the current working directory is used.`,
+		Example: `  # List all issues (current directory)
+  paintress issues
+
+  # List all issues (explicit path)
   paintress issues /path/to/repo
 
   # Filter by state
@@ -29,7 +33,7 @@ converted to spaces automatically.`,
 
   # JSON output for scripting
   paintress issues -o json /path/to/repo`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: runIssues,
 	}
 
@@ -39,7 +43,10 @@ converted to spaces automatically.`,
 }
 
 func runIssues(cmd *cobra.Command, args []string) error {
-	repoPath := args[0]
+	absPath, err := resolveRepoPath(args)
+	if err != nil {
+		return err
+	}
 	outputFmt, _ := cmd.Flags().GetString("output")
 	stateRaw, _ := cmd.Flags().GetString("state")
 
@@ -53,11 +60,6 @@ func runIssues(cmd *cobra.Command, args []string) error {
 				stateFilter = append(stateFilter, p)
 			}
 		}
-	}
-
-	absPath, err := filepath.Abs(repoPath)
-	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
 	}
 
 	projectOps := session.NewProjectOps()

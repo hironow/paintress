@@ -16,15 +16,20 @@ import (
 
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run <repo-path>",
+		Use:   "run [repo-path]",
 		Short: "Run the expedition loop",
 		Long: `Run the expedition loop against a target repository.
 
 Each expedition picks a Linear issue, creates a worktree branch,
 invokes Claude Code to implement the change, opens a pull request,
 and optionally runs a review cycle. The loop continues until
-max-expeditions is reached or the issue queue is empty.`,
-		Example: `  # Run with defaults (opus model, 50 expeditions, 33min timeout)
+max-expeditions is reached or the issue queue is empty.
+
+If repo-path is omitted, the current working directory is used.`,
+		Example: `  # Run with defaults from current directory
+  paintress run
+
+  # Run with defaults (opus model, 50 expeditions, 33min timeout)
   paintress run /path/to/repo
 
   # Run with sonnet fallback and 3 parallel workers
@@ -35,7 +40,7 @@ max-expeditions is reached or the issue queue is empty.`,
 
   # Skip dev server and use custom review command
   paintress run --no-dev --review-cmd "pnpm lint" /path/to/repo`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Derive --review-cmd from --base-branch when not explicitly set
 			if !cmd.Flags().Changed("review-cmd") {
@@ -75,10 +80,9 @@ max-expeditions is reached or the issue queue is empty.`,
 }
 
 func runExpedition(cmd *cobra.Command, args []string) error {
-	repoPath := args[0]
-	continent, err := filepath.Abs(repoPath)
+	continent, err := resolveRepoPath(args)
 	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
+		return err
 	}
 
 	// Pre-flight check: ensure init has been run

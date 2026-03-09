@@ -10,14 +10,19 @@ Reads the team/project from .expedition/config.yaml. Supports filtering
 by issue state (e.g. todo, in-progress). Hyphens in state names are
 converted to spaces automatically.
 
+If repo-path is omitted, the current working directory is used.
+
 ```
-paintress issues <repo-path> [flags]
+paintress issues [repo-path] [flags]
 ```
 
 ### Examples
 
 ```
-  # List all issues
+  # List all issues (current directory)
+  paintress issues
+
+  # List all issues (explicit path)
   paintress issues /path/to/repo
 
   # Filter by state

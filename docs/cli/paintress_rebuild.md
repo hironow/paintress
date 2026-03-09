@@ -6,6 +6,8 @@ Rebuild projections from event store
 
 Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.
 
+If repo-path is omitted, the current working directory is used.
+
 ```
 paintress rebuild [repo-path] [flags]
 ```

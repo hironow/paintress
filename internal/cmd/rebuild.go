@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -14,12 +13,14 @@ func newRebuildCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rebuild [repo-path]",
 		Short: "Rebuild projections from event store",
-		Long:  "Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.",
-		Args:  cobra.ExactArgs(1),
+		Long: `Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.
+
+If repo-path is omitted, the current working directory is used.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot, err := filepath.Abs(args[0])
+			repoRoot, err := resolveRepoPath(args)
 			if err != nil {
-				return fmt.Errorf("invalid path: %w", err)
+				return err
 			}
 
 			logger := loggerFrom(cmd)
