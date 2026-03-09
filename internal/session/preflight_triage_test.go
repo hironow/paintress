@@ -68,7 +68,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		{
 			name: "escalate removes dmail and emits event",
 			dmails: []domain.DMail{
-				{Name: "esc-1", Kind: "feedback", Description: "critical", Action: "escalate", Issues: []string{"MY-10"}},
+				{Name: "esc-1", Kind: "implementation-feedback", Description: "critical", Action: "escalate", Issues: []string{"MY-10"}},
 			},
 			maxRetries:    3,
 			wantRemaining: 0,
@@ -77,7 +77,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		{
 			name: "resolve removes dmail",
 			dmails: []domain.DMail{
-				{Name: "res-1", Kind: "feedback", Description: "fixed", Action: "resolve", Issues: []string{"MY-20"}},
+				{Name: "res-1", Kind: "implementation-feedback", Description: "fixed", Action: "resolve", Issues: []string{"MY-20"}},
 			},
 			maxRetries:    3,
 			wantRemaining: 0,
@@ -86,7 +86,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		{
 			name: "retry with issues under limit keeps dmail",
 			dmails: []domain.DMail{
-				{Name: "retry-1", Kind: "feedback", Description: "flaky", Action: "retry", Issues: []string{"MY-30"}},
+				{Name: "retry-1", Kind: "implementation-feedback", Description: "flaky", Action: "retry", Issues: []string{"MY-30"}},
 			},
 			maxRetries:         3,
 			wantRemaining:      1,
@@ -95,7 +95,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		{
 			name: "retry with issues at max promotes to escalation",
 			dmails: []domain.DMail{
-				{Name: "retry-max", Kind: "feedback", Description: "stuck", Action: "retry", Issues: []string{"MY-40"}},
+				{Name: "retry-max", Kind: "implementation-feedback", Description: "stuck", Action: "retry", Issues: []string{"MY-40"}},
 			},
 			maxRetries:     3,
 			preloadRetries: 3, // Track called 3 times before; triage call will be the 4th > maxRetries
@@ -106,7 +106,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		{
 			name: "retry without issues passes through",
 			dmails: []domain.DMail{
-				{Name: "retry-noissue", Kind: "feedback", Description: "generic retry", Action: "retry"},
+				{Name: "retry-noissue", Kind: "implementation-feedback", Description: "generic retry", Action: "retry"},
 			},
 			maxRetries:    3,
 			wantRemaining: 1,
@@ -114,10 +114,10 @@ func TestTriagePreFlightDMails(t *testing.T) {
 		{
 			name: "mixed actions filter correctly",
 			dmails: []domain.DMail{
-				{Name: "esc-mix", Kind: "feedback", Description: "escalate me", Action: "escalate", Issues: []string{"MY-50"}},
+				{Name: "esc-mix", Kind: "implementation-feedback", Description: "escalate me", Action: "escalate", Issues: []string{"MY-50"}},
 				{Name: "pass-mix", Kind: "report", Description: "just info"},
-				{Name: "res-mix", Kind: "feedback", Description: "resolved", Action: "resolve", Issues: []string{"MY-51"}},
-				{Name: "retry-mix", Kind: "feedback", Description: "try again", Action: "retry", Issues: []string{"MY-52"}},
+				{Name: "res-mix", Kind: "implementation-feedback", Description: "resolved", Action: "resolve", Issues: []string{"MY-51"}},
+				{Name: "retry-mix", Kind: "implementation-feedback", Description: "try again", Action: "retry", Issues: []string{"MY-52"}},
 			},
 			maxRetries:         3,
 			wantRemaining:      2, // pass-mix + retry-mix
@@ -208,7 +208,7 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 		{
 			name: "escalate moves file from inbox to archive",
 			dmails: []domain.DMail{
-				{Name: "esc-fs-1", Kind: "feedback", Description: "critical", Action: "escalate", Issues: []string{"FS-10"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "esc-fs-1", Kind: "implementation-feedback", Description: "critical", Action: "escalate", Issues: []string{"FS-10"}, SchemaVersion: domain.DMailSchemaVersion},
 			},
 			maxRetries:    3,
 			wantInInbox:   nil,
@@ -217,7 +217,7 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 		{
 			name: "resolve moves file from inbox to archive",
 			dmails: []domain.DMail{
-				{Name: "res-fs-1", Kind: "feedback", Description: "done", Action: "resolve", Issues: []string{"FS-20"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "res-fs-1", Kind: "implementation-feedback", Description: "done", Action: "resolve", Issues: []string{"FS-20"}, SchemaVersion: domain.DMailSchemaVersion},
 			},
 			maxRetries:    3,
 			wantInInbox:   nil,
@@ -235,7 +235,7 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 		{
 			name: "retry under limit keeps file in inbox",
 			dmails: []domain.DMail{
-				{Name: "retry-fs-1", Kind: "feedback", Description: "flaky", Action: "retry", Issues: []string{"FS-30"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "retry-fs-1", Kind: "implementation-feedback", Description: "flaky", Action: "retry", Issues: []string{"FS-30"}, SchemaVersion: domain.DMailSchemaVersion},
 			},
 			maxRetries:    3,
 			wantInInbox:   []string{"retry-fs-1"},
@@ -244,7 +244,7 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 		{
 			name: "retry over limit moves file to archive",
 			dmails: []domain.DMail{
-				{Name: "retry-fs-max", Kind: "feedback", Description: "stuck", Action: "retry", Issues: []string{"FS-40"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "retry-fs-max", Kind: "implementation-feedback", Description: "stuck", Action: "retry", Issues: []string{"FS-40"}, SchemaVersion: domain.DMailSchemaVersion},
 			},
 			maxRetries:     3,
 			preloadRetries: 3,
@@ -255,10 +255,10 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 		{
 			name: "mixed actions archive consumed and keep pass-through",
 			dmails: []domain.DMail{
-				{Name: "esc-fs-mix", Kind: "feedback", Description: "escalate me", Action: "escalate", Issues: []string{"FS-50"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "esc-fs-mix", Kind: "implementation-feedback", Description: "escalate me", Action: "escalate", Issues: []string{"FS-50"}, SchemaVersion: domain.DMailSchemaVersion},
 				{Name: "pass-fs-mix", Kind: "report", Description: "just info", SchemaVersion: domain.DMailSchemaVersion},
-				{Name: "res-fs-mix", Kind: "feedback", Description: "resolved", Action: "resolve", Issues: []string{"FS-51"}, SchemaVersion: domain.DMailSchemaVersion},
-				{Name: "retry-fs-mix", Kind: "feedback", Description: "try again", Action: "retry", Issues: []string{"FS-52"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "res-fs-mix", Kind: "implementation-feedback", Description: "resolved", Action: "resolve", Issues: []string{"FS-51"}, SchemaVersion: domain.DMailSchemaVersion},
+				{Name: "retry-fs-mix", Kind: "implementation-feedback", Description: "try again", Action: "retry", Issues: []string{"FS-52"}, SchemaVersion: domain.DMailSchemaVersion},
 			},
 			maxRetries:    3,
 			wantInInbox:   []string{"pass-fs-mix", "retry-fs-mix"},
