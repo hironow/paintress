@@ -184,10 +184,12 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 		}
 
 		model := p.reserve.ActiveModel()
-		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called at line 777 [permanent]
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after CombinedOutput [permanent]
 			trace.WithAttributes(
-				attribute.Int("cycle", cycle),
-				attribute.String("model", model),
+				append([]attribute.KeyValue{
+					attribute.Int("cycle", cycle),
+					attribute.String("model", model),
+				}, platform.GenAISpanAttrs(model)...)...,
 			),
 		)
 
@@ -248,8 +250,10 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	model := p.reserve.ActiveModel()
 	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
 		trace.WithAttributes(
-			attribute.String("model", model),
-			attribute.Int("matched_dmails", len(dmails)),
+			append([]attribute.KeyValue{
+				attribute.String("model", model),
+				attribute.Int("matched_dmails", len(dmails)),
+			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
 	defer followUpSpan.End()
