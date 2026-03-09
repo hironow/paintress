@@ -48,8 +48,8 @@ func TestNewRootCommand_PersistentFlags_Lang(t *testing.T) {
 	if f == nil {
 		t.Fatal("--lang PersistentFlag not found")
 	}
-	if f.DefValue != "en" {
-		t.Errorf("--lang default = %q, want %q", f.DefValue, "en")
+	if f.DefValue != "" {
+		t.Errorf("--lang default = %q, want %q (empty = config default)", f.DefValue, "")
 	}
 	if f.Shorthand != "l" {
 		t.Errorf("--lang shorthand = %q, want %q", f.Shorthand, "l")

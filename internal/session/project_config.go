@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/hironow/paintress/internal/domain"
 	"gopkg.in/yaml.v3"
@@ -37,6 +38,19 @@ func UpdateProjectConfig(continent string, key string, value string) error {
 		return err
 	}
 
+	if err := setProjectConfigField(cfg, key, value); err != nil {
+		return err
+	}
+
+	// Validate before writing
+	if errs := domain.ValidateProjectConfig(*cfg); len(errs) > 0 {
+		return fmt.Errorf("invalid config after update: %s", errs[0])
+	}
+
+	return SaveProjectConfig(continent, cfg)
+}
+
+func setProjectConfigField(cfg *domain.ProjectConfig, key string, value string) error {
 	switch key {
 	case "tracker.team":
 		cfg.Tracker.Team = value
@@ -47,16 +61,66 @@ func UpdateProjectConfig(continent string, key string, value string) error {
 			return fmt.Errorf("invalid lang %q: must be ja or en", value)
 		}
 		cfg.Lang = value
+	case "max_expeditions":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid max_expeditions %q: must be non-negative integer", value)
+		}
+		cfg.MaxExpeditions = n
+	case "timeout_sec":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid timeout_sec %q: must be non-negative integer", value)
+		}
+		cfg.TimeoutSec = n
+	case "model":
+		cfg.Model = value
+	case "base_branch":
+		cfg.BaseBranch = value
+	case "claude_cmd":
+		cfg.ClaudeCmd = value
+	case "dev_cmd":
+		cfg.DevCmd = value
+	case "dev_dir":
+		cfg.DevDir = value
+	case "dev_url":
+		cfg.DevURL = value
+	case "review_cmd":
+		cfg.ReviewCmd = value
+	case "workers":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid workers %q: must be non-negative integer", value)
+		}
+		cfg.Workers = n
+	case "setup_cmd":
+		cfg.SetupCmd = value
+	case "no_dev":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid no_dev %q: must be true or false", value)
+		}
+		cfg.NoDev = b
+	case "notify_cmd":
+		cfg.NotifyCmd = value
+	case "approve_cmd":
+		cfg.ApproveCmd = value
+	case "auto_approve":
+		b, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid auto_approve %q: must be true or false", value)
+		}
+		cfg.AutoApprove = b
+	case "max_retries":
+		n, err := strconv.Atoi(value)
+		if err != nil || n < 0 {
+			return fmt.Errorf("invalid max_retries %q: must be non-negative integer", value)
+		}
+		cfg.MaxRetries = n
 	default:
 		return fmt.Errorf("unknown config key %q", key)
 	}
-
-	// Validate before writing
-	if errs := domain.ValidateProjectConfig(*cfg); len(errs) > 0 {
-		return fmt.Errorf("invalid config after update: %s", errs[0])
-	}
-
-	return SaveProjectConfig(continent, cfg)
+	return nil
 }
 
 // SaveProjectConfig writes the project config to .expedition/config.yaml.

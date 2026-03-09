@@ -127,6 +127,52 @@ func TestValidateProjectConfig_EmptyLangIsValid(t *testing.T) {
 	}
 }
 
+func TestDefaultProjectConfig_MatchesDefaultConfig(t *testing.T) {
+	// given
+	pc := domain.DefaultProjectConfig()
+	rc := domain.DefaultConfig()
+
+	// then — shared fields must match
+	if pc.Model != rc.Model {
+		t.Errorf("Model mismatch: ProjectConfig=%q, Config=%q", pc.Model, rc.Model)
+	}
+	if pc.Workers != rc.Workers {
+		t.Errorf("Workers mismatch: ProjectConfig=%d, Config=%d", pc.Workers, rc.Workers)
+	}
+	if pc.MaxExpeditions != rc.MaxExpeditions {
+		t.Errorf("MaxExpeditions mismatch: ProjectConfig=%d, Config=%d", pc.MaxExpeditions, rc.MaxExpeditions)
+	}
+	if pc.TimeoutSec != rc.TimeoutSec {
+		t.Errorf("TimeoutSec mismatch: ProjectConfig=%d, Config=%d", pc.TimeoutSec, rc.TimeoutSec)
+	}
+	if pc.BaseBranch != rc.BaseBranch {
+		t.Errorf("BaseBranch mismatch: ProjectConfig=%q, Config=%q", pc.BaseBranch, rc.BaseBranch)
+	}
+	if pc.MaxRetries != rc.MaxRetries {
+		t.Errorf("MaxRetries mismatch: ProjectConfig=%d, Config=%d", pc.MaxRetries, rc.MaxRetries)
+	}
+}
+
+func TestValidateProjectConfig_NegativeFields(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  domain.ProjectConfig
+	}{
+		{"negative max_expeditions", domain.ProjectConfig{MaxExpeditions: -1}},
+		{"negative timeout_sec", domain.ProjectConfig{TimeoutSec: -1}},
+		{"negative workers", domain.ProjectConfig{Workers: -1}},
+		{"negative max_retries", domain.ProjectConfig{MaxRetries: -1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := domain.ValidateProjectConfig(tt.cfg)
+			if len(errs) == 0 {
+				t.Error("expected validation error")
+			}
+		})
+	}
+}
+
 func TestProjectConfig_TrackerMethods(t *testing.T) {
 	// given
 	empty := domain.ProjectConfig{}

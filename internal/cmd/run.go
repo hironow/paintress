@@ -42,18 +42,11 @@ If repo-path is omitted, the current working directory is used.`,
   paintress run --no-dev --review-cmd "pnpm lint" /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Derive --review-cmd from --base-branch when not explicitly set
-			if !cmd.Flags().Changed("review-cmd") {
-				baseBranch, _ := cmd.Flags().GetString("base-branch")
-				cmd.Flags().Set("review-cmd", fmt.Sprintf("codex review --base %s", baseBranch))
-			}
-
 			// Set language global
 			lang, _ := cmd.Flags().GetString("lang")
-			if lang == "ja" || lang == "en" || lang == "fr" {
+			if lang != "" {
 				domain.Lang = lang
 			}
-
 			return nil
 		},
 		RunE: runExpedition,
@@ -77,6 +70,29 @@ If repo-path is omitted, the current working directory is used.`,
 	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for HIGH severity D-Mail")
 
 	return cmd
+}
+
+// configFromProject builds a runtime Config from a ProjectConfig.
+// Runtime-only fields (Continent, DryRun, OutputFormat) are set by the caller.
+func configFromProject(pc *domain.ProjectConfig) domain.Config {
+	return domain.Config{
+		MaxExpeditions: pc.MaxExpeditions,
+		TimeoutSec:     pc.TimeoutSec,
+		Model:          pc.Model,
+		BaseBranch:     pc.BaseBranch,
+		ClaudeCmd:      pc.ClaudeCmd,
+		DevCmd:         pc.DevCmd,
+		DevDir:         pc.DevDir,
+		DevURL:         pc.DevURL,
+		ReviewCmd:      pc.ReviewCmd,
+		Workers:        pc.Workers,
+		SetupCmd:       pc.SetupCmd,
+		NoDev:          pc.NoDev,
+		NotifyCmd:      pc.NotifyCmd,
+		ApproveCmd:     pc.ApproveCmd,
+		AutoApprove:    pc.AutoApprove,
+		MaxRetries:     pc.MaxRetries,
+	}
 }
 
 func runExpedition(cmd *cobra.Command, args []string) error {
@@ -109,25 +125,77 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	cfg := domain.Config{}
+	// Load project config as base, then override with explicit CLI flags
+	projectCfg, pcErr := session.LoadProjectConfig(continent)
+	if pcErr != nil {
+		return pcErr
+	}
+	cfg := configFromProject(projectCfg)
 	cfg.Continent = continent
-	cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
-	cfg.TimeoutSec, _ = cmd.Flags().GetInt("timeout")
-	cfg.Model, _ = cmd.Flags().GetString("model")
-	cfg.BaseBranch, _ = cmd.Flags().GetString("base-branch")
-	cfg.ClaudeCmd, _ = cmd.Flags().GetString("claude-cmd")
-	cfg.DevCmd, _ = cmd.Flags().GetString("dev-cmd")
-	cfg.DevDir, _ = cmd.Flags().GetString("dev-dir")
-	cfg.DevURL, _ = cmd.Flags().GetString("dev-url")
-	cfg.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
-	cfg.Workers, _ = cmd.Flags().GetInt("workers")
-	cfg.SetupCmd, _ = cmd.Flags().GetString("setup-cmd")
-	cfg.NoDev, _ = cmd.Flags().GetBool("no-dev")
 	cfg.DryRun, _ = cmd.Flags().GetBool("dry-run")
 	cfg.OutputFormat, _ = cmd.Flags().GetString("output")
-	cfg.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
-	cfg.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
-	cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
+
+	// Override with explicitly-set CLI flags only
+	if cmd.Flags().Changed("max-expeditions") {
+		cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
+	}
+	if cmd.Flags().Changed("timeout") {
+		cfg.TimeoutSec, _ = cmd.Flags().GetInt("timeout")
+	}
+	if cmd.Flags().Changed("model") {
+		cfg.Model, _ = cmd.Flags().GetString("model")
+	}
+	if cmd.Flags().Changed("base-branch") {
+		cfg.BaseBranch, _ = cmd.Flags().GetString("base-branch")
+	}
+	if cmd.Flags().Changed("claude-cmd") {
+		cfg.ClaudeCmd, _ = cmd.Flags().GetString("claude-cmd")
+	}
+	if cmd.Flags().Changed("dev-cmd") {
+		cfg.DevCmd, _ = cmd.Flags().GetString("dev-cmd")
+	}
+	if cmd.Flags().Changed("dev-dir") {
+		cfg.DevDir, _ = cmd.Flags().GetString("dev-dir")
+	}
+	if cmd.Flags().Changed("dev-url") {
+		cfg.DevURL, _ = cmd.Flags().GetString("dev-url")
+	}
+	if cmd.Flags().Changed("review-cmd") {
+		cfg.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
+	}
+	if cmd.Flags().Changed("workers") {
+		cfg.Workers, _ = cmd.Flags().GetInt("workers")
+	}
+	if cmd.Flags().Changed("setup-cmd") {
+		cfg.SetupCmd, _ = cmd.Flags().GetString("setup-cmd")
+	}
+	if cmd.Flags().Changed("no-dev") {
+		cfg.NoDev, _ = cmd.Flags().GetBool("no-dev")
+	}
+	if cmd.Flags().Changed("notify-cmd") {
+		cfg.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
+	}
+	if cmd.Flags().Changed("approve-cmd") {
+		cfg.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
+	}
+	if cmd.Flags().Changed("auto-approve") {
+		cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
+	}
+
+	// Derive review-cmd from base-branch if neither CLI nor config set it
+	if cfg.ReviewCmd == "" {
+		cfg.ReviewCmd = fmt.Sprintf("codex review --base %s", cfg.BaseBranch)
+	}
+
+	// Set language global: CLI flag > config > fallback "ja"
+	lang, _ := cmd.Flags().GetString("lang")
+	if lang == "" {
+		lang = projectCfg.Lang
+	}
+	if lang == "" {
+		lang = "ja"
+	}
+	domain.Lang = lang
 
 	logger := loggerFrom(cmd)
 	stateDir := filepath.Join(continent, domain.StateDir)

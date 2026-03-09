@@ -210,3 +210,117 @@ func TestUpdateProjectConfig_InvalidLang(t *testing.T) {
 		t.Error("expected error for invalid lang")
 	}
 }
+
+func TestUpdateProjectConfig_RuntimeKeys(t *testing.T) {
+	tests := []struct {
+		key   string
+		value string
+		check func(t *testing.T, cfg *domain.ProjectConfig)
+	}{
+		{"model", "sonnet", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if cfg.Model != "sonnet" {
+				t.Errorf("Model = %q, want sonnet", cfg.Model)
+			}
+		}},
+		{"workers", "3", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if cfg.Workers != 3 {
+				t.Errorf("Workers = %d, want 3", cfg.Workers)
+			}
+		}},
+		{"max_expeditions", "100", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if cfg.MaxExpeditions != 100 {
+				t.Errorf("MaxExpeditions = %d, want 100", cfg.MaxExpeditions)
+			}
+		}},
+		{"timeout_sec", "600", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if cfg.TimeoutSec != 600 {
+				t.Errorf("TimeoutSec = %d, want 600", cfg.TimeoutSec)
+			}
+		}},
+		{"base_branch", "develop", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if cfg.BaseBranch != "develop" {
+				t.Errorf("BaseBranch = %q, want develop", cfg.BaseBranch)
+			}
+		}},
+		{"auto_approve", "true", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if !cfg.AutoApprove {
+				t.Error("AutoApprove should be true")
+			}
+		}},
+		{"no_dev", "true", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if !cfg.NoDev {
+				t.Error("NoDev should be true")
+			}
+		}},
+		{"max_retries", "5", func(t *testing.T, cfg *domain.ProjectConfig) {
+			t.Helper()
+			if cfg.MaxRetries != 5 {
+				t.Errorf("MaxRetries = %d, want 5", cfg.MaxRetries)
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			// given
+			dir := t.TempDir()
+			session.SaveProjectConfig(dir, &domain.ProjectConfig{Lang: "ja"})
+
+			// when
+			err := session.UpdateProjectConfig(dir, tt.key, tt.value)
+
+			// then
+			if err != nil {
+				t.Fatalf("UpdateProjectConfig(%s, %s): %v", tt.key, tt.value, err)
+			}
+			loaded, _ := session.LoadProjectConfig(dir)
+			tt.check(t, loaded)
+		})
+	}
+}
+
+func TestUpdateProjectConfig_InvalidWorkers(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	session.SaveProjectConfig(dir, &domain.ProjectConfig{Lang: "ja"})
+
+	// when
+	err := session.UpdateProjectConfig(dir, "workers", "-1")
+
+	// then
+	if err == nil {
+		t.Error("expected error for negative workers")
+	}
+}
+
+func TestLoadProjectConfig_FileNotFound_AppliesRuntimeDefaults(t *testing.T) {
+	// given — no config file
+	dir := t.TempDir()
+
+	// when
+	cfg, err := session.LoadProjectConfig(dir)
+
+	// then — runtime fields should have defaults from DefaultProjectConfig
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if cfg.Model != "opus" {
+		t.Errorf("Model = %q, want opus", cfg.Model)
+	}
+	if cfg.Workers != 1 {
+		t.Errorf("Workers = %d, want 1", cfg.Workers)
+	}
+	if cfg.MaxExpeditions != 50 {
+		t.Errorf("MaxExpeditions = %d, want 50", cfg.MaxExpeditions)
+	}
+	if cfg.BaseBranch != "main" {
+		t.Errorf("BaseBranch = %q, want main", cfg.BaseBranch)
+	}
+}
