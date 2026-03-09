@@ -597,3 +597,21 @@ rules:
       許可: <var>.<forwardingMethod>() — forwarding メソッド経由
       除外: *_test.go
       Ref: Tell-Don't-Ask, Law of Demeter
+
+  # --- Rule: No hardcoded DefaultClaudeCmd outside cobra flag definitions ---
+
+  - id: config-no-hardcoded-claude-cmd
+    languages: [go]
+    severity: ERROR
+    pattern-regex: 'platform\.DefaultClaudeCmd'
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/cmd/run.go"
+        - "/internal/platform/**"
+        - "/internal/session/**"
+    message: |
+      Do not use platform.DefaultClaudeCmd outside cobra flag definitions.
+      Load claude_cmd from config.
