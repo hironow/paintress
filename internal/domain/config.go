@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"path/filepath"
 )
 
@@ -71,6 +72,21 @@ func (c ProjectConfig) TrackerProject() string { return c.Tracker.Project }
 
 // HasTrackerTeam reports whether a tracker team is configured.
 func (c ProjectConfig) HasTrackerTeam() bool { return c.Tracker.Team != "" }
+
+// ValidLang reports whether lang is a supported language code.
+func ValidLang(lang string) bool {
+	return lang == "ja" || lang == "en"
+}
+
+// ValidateProjectConfig checks the project config for consistency and returns errors.
+// An empty slice means the config is valid.
+func ValidateProjectConfig(cfg ProjectConfig) []string {
+	var errs []string
+	if cfg.Lang != "" && !ValidLang(cfg.Lang) {
+		errs = append(errs, fmt.Sprintf("lang must be \"ja\" or \"en\" (got %q)", cfg.Lang))
+	}
+	return errs
+}
 
 // ProjectConfigPath returns the path to the project config file.
 func ProjectConfigPath(continent string) string {

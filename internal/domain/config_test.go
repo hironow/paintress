@@ -72,6 +72,61 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	}
 }
 
+func TestValidLang(t *testing.T) {
+	// given/when/then
+	if !domain.ValidLang("ja") {
+		t.Error("ja should be valid")
+	}
+	if !domain.ValidLang("en") {
+		t.Error("en should be valid")
+	}
+	if domain.ValidLang("fr") {
+		t.Error("fr should be invalid")
+	}
+	if domain.ValidLang("") {
+		t.Error("empty should be invalid")
+	}
+}
+
+func TestValidateProjectConfig_Valid(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateProjectConfig_InvalidLang(t *testing.T) {
+	// given
+	cfg := domain.ProjectConfig{Lang: "fr"}
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
+	}
+}
+
+func TestValidateProjectConfig_EmptyLangIsValid(t *testing.T) {
+	// given — empty lang is acceptable (defaults will fill it)
+	cfg := domain.ProjectConfig{}
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty lang, got %v", errs)
+	}
+}
+
 func TestProjectConfig_TrackerMethods(t *testing.T) {
 	// given
 	empty := domain.ProjectConfig{}

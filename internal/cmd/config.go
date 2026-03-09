@@ -57,9 +57,11 @@ func newConfigSetCommand() *cobra.Command {
 
 Supported keys:
   tracker.team     Linear team key (e.g. MY)
-  tracker.project  Linear project name`,
+  tracker.project  Linear project name
+  lang             Language (ja or en)`,
 		Example: `  paintress config set tracker.team MY /path/to/repo
-  paintress config set tracker.project "My Project" /path/to/repo`,
+  paintress config set tracker.project "My Project" /path/to/repo
+  paintress config set lang en`,
 		Args: cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
