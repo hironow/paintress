@@ -429,6 +429,7 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 		}
 	}
 	check.Version = "Linear MCP not found or not connected"
-	check.Hint = `run "claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp" in your project root`
+	check.Hint = "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
+		"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)"
 	return check
 }
