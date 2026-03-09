@@ -11,21 +11,24 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 )
 
-func TestInitCommand_RequiresRepoPath(t *testing.T) {
-	// given
+func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
+	// given — no repo-path arg; resolveRepoPath falls back to os.Getwd()
+	// The cwd may or may not have .expedition/, so we just verify no args-validation error.
 	cmd := NewRootCommand()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
 	cmd.SetArgs([]string{"init"})
 
 	// when
 	err := cmd.Execute()
 
-	// then
-	if err == nil {
-		t.Fatal("expected error for missing repo-path, got nil")
+	// then — should NOT fail with "accepts 1 arg(s), received 0"
+	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
+		t.Fatalf("init should accept 0 args (cwd fallback), got: %v", err)
 	}
+	// May fail with "already exists" (cwd has .expedition/) — that's fine.
 }
 
 func TestInitCommand_AlreadyInitialized(t *testing.T) {
@@ -193,7 +196,7 @@ func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	if err == nil {
 		return // success
 	}
-	if err.Error() == `accepts 1 arg(s), received 0` {
+	if strings.Contains(err.Error(), "accepts") && strings.Contains(err.Error(), "arg") {
 		t.Fatalf("init should accept repo-path arg: %v", err)
 	}
 }
