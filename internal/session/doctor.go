@@ -21,6 +21,26 @@ var makeShellCmd = func(ctx context.Context, cmdLine string, args ...string) *ex
 	return platform.NewShellCmd(ctx, cmdLine, args...)
 }
 
+// OverrideShellCmd replaces the command constructor for testing and returns a
+// cleanup function.
+func OverrideShellCmd(fn func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd) func() {
+	old := makeShellCmd
+	makeShellCmd = fn
+	return func() { makeShellCmd = old }
+}
+
+// lookPath resolves the binary path for a command. Defaults to
+// platform.LookPathShell. Injectable for testing tool-not-found scenarios.
+var lookPath = platform.LookPathShell
+
+// OverrideLookPath replaces the path lookup function for testing and returns a
+// cleanup function.
+func OverrideLookPath(fn func(cmd string) (string, error)) func() {
+	old := lookPath
+	lookPath = fn
+	return func() { lookPath = old }
+}
+
 // RunDoctor checks all required external commands and returns the results.
 // claudeCmd is the configured Claude CLI command name (e.g. "claude", "cc-p").
 // continent is the optional .expedition/ root directory. When non-empty,
@@ -44,7 +64,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			Required: cmd.required,
 		}
 
-		path, err := platform.LookPathShell(cmd.name)
+		path, err := lookPath(cmd.name)
 		if err != nil {
 			if cmd.required {
 				check.Hint = fmt.Sprintf("install %s and ensure it is in PATH", cmd.name)

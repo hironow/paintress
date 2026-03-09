@@ -5,6 +5,14 @@ import (
 	"path/filepath"
 )
 
+// Default values for Config fields. Used by DefaultProjectConfig and post-load
+// validation to avoid hardcoded strings throughout the codebase.
+const (
+	DefaultClaudeCmd  = "claude"
+	DefaultModel      = "opus"
+	DefaultTimeoutSec = 1980
+)
+
 // Config holds the runtime configuration for a Paintress session.
 type Config struct {
 	Continent      string
@@ -78,10 +86,10 @@ func DefaultProjectConfig() ProjectConfig {
 	return ProjectConfig{
 		Lang:           "ja",
 		MaxExpeditions: 50,
-		TimeoutSec:     1980, // 33 minutes
-		Model:          "opus",
+		TimeoutSec:     DefaultTimeoutSec, // 33 minutes
+		Model:          DefaultModel,
 		BaseBranch:     "main",
-		ClaudeCmd:      "claude",
+		ClaudeCmd:      DefaultClaudeCmd,
 		DevCmd:         "npm run dev",
 		DevURL:         "http://localhost:3000",
 		Workers:        1,
