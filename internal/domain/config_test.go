@@ -105,7 +105,8 @@ func TestValidateProjectConfig_Valid(t *testing.T) {
 
 func TestValidateProjectConfig_InvalidLang(t *testing.T) {
 	// given
-	cfg := domain.ProjectConfig{Lang: "fr"}
+	cfg := domain.DefaultProjectConfig()
+	cfg.Lang = "fr"
 
 	// when
 	errs := domain.ValidateProjectConfig(cfg)
@@ -118,7 +119,8 @@ func TestValidateProjectConfig_InvalidLang(t *testing.T) {
 
 func TestValidateProjectConfig_EmptyLangIsValid(t *testing.T) {
 	// given — empty lang is acceptable (defaults will fill it)
-	cfg := domain.ProjectConfig{}
+	cfg := domain.DefaultProjectConfig()
+	cfg.Lang = ""
 
 	// when
 	errs := domain.ValidateProjectConfig(cfg)
@@ -160,10 +162,10 @@ func TestValidateProjectConfig_NegativeFields(t *testing.T) {
 		name string
 		cfg  domain.ProjectConfig
 	}{
-		{"negative max_expeditions", domain.ProjectConfig{MaxExpeditions: -1}},
-		{"negative timeout_sec", domain.ProjectConfig{TimeoutSec: -1}},
-		{"negative workers", domain.ProjectConfig{Workers: -1}},
-		{"negative max_retries", domain.ProjectConfig{MaxRetries: -1}},
+		{"negative max_expeditions", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.MaxExpeditions = -1; return c }()},
+		{"negative timeout_sec", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.TimeoutSec = -1; return c }()},
+		{"negative workers", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.Workers = -1; return c }()},
+		{"negative max_retries", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.MaxRetries = -1; return c }()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

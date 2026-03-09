@@ -487,7 +487,7 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 		check.Hint = "check API key, quota, and model access"
 		return check
 	}
-	if !strings.Contains(output, "2") {
+	if strings.TrimSpace(output) != "2" {
 		check.Version = "unexpected response"
 		check.Hint = "check API key, quota, and model access"
 		return check

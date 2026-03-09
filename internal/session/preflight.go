@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // PreflightCheck verifies that required binaries are available in PATH.
-// Unlike a full doctor check, this only uses exec.LookPath (no version execution).
+// Unlike a full doctor check, this uses platform.LookPathShell to handle
+// shell-like command strings (e.g. "KEY=VAL cmd arg").
 func PreflightCheck(binaries ...string) error {
 	for _, bin := range binaries {
-		if _, err := exec.LookPath(bin); err != nil {
+		if _, err := platform.LookPathShell(bin); err != nil {
 			return fmt.Errorf("preflight: %s not found in PATH", bin)
 		}
 	}

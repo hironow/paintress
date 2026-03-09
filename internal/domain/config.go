@@ -122,6 +122,12 @@ func ValidLang(lang string) bool {
 // An empty slice means the config is valid.
 func ValidateProjectConfig(cfg ProjectConfig) []string {
 	var errs []string
+	if cfg.ClaudeCmd == "" {
+		errs = append(errs, "claude_cmd must not be empty")
+	}
+	if cfg.Model == "" {
+		errs = append(errs, "model must not be empty")
+	}
 	if cfg.Lang != "" && !ValidLang(cfg.Lang) {
 		errs = append(errs, fmt.Sprintf("lang must be \"ja\" or \"en\" (got %q)", cfg.Lang))
 	}

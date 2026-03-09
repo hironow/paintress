@@ -42,7 +42,10 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 		var existingMap map[string]any
 		if yamlErr := yaml.Unmarshal(existing, &existingMap); yamlErr == nil {
 			var defaultMap map[string]any
-			defaultData, _ := yaml.Marshal(cfg)
+			defaultData, marshalErr := yaml.Marshal(cfg)
+			if marshalErr != nil {
+				return marshalErr
+			}
 			if err := yaml.Unmarshal(defaultData, &defaultMap); err != nil {
 				return err
 			}

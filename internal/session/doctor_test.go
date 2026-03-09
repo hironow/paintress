@@ -749,7 +749,7 @@ func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
 }
 
 func TestCheckClaudeInference_OK(t *testing.T) {
-	// given: output contains "2"
+	// given: trimmed output is exactly "2"
 	// when
 	check := session.ExportCheckClaudeInference("2", nil)
 
@@ -796,5 +796,30 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	}
 	if check.Version != "unexpected response" {
 		t.Errorf("expected version 'unexpected response', got %q", check.Version)
+	}
+}
+
+func TestCheckClaudeInference_FalsePositiveContaining2(t *testing.T) {
+	// given: output contains "2" but is not exactly "2" (e.g. "12")
+	// when
+	check := session.ExportCheckClaudeInference("12", nil)
+
+	// then
+	if check.OK {
+		t.Error("inference check should fail for '12' (false positive from Contains)")
+	}
+	if check.Version != "unexpected response" {
+		t.Errorf("expected version 'unexpected response', got %q", check.Version)
+	}
+}
+
+func TestCheckClaudeInference_OKWithWhitespace(t *testing.T) {
+	// given: output is "2" with surrounding whitespace (trimmed to exact match)
+	// when
+	check := session.ExportCheckClaudeInference("  2\n", nil)
+
+	// then
+	if !check.OK {
+		t.Errorf("inference check should pass for trimmed '2', version: %s", check.Version)
 	}
 }
