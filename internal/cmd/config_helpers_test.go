@@ -1,3 +1,4 @@
+// white-box-reason: tests unexported loadClaudeCmd function
 package cmd
 
 import (

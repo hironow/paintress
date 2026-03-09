@@ -122,8 +122,8 @@ test-package-audit:
     #!/usr/bin/env bash
     audit_dir() {
         local dir="$1" label="$2"
-        ext=$(grep -rl '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
-        same=$(grep -rL '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+        ext=$(grep -rl '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | grep -v '.expedition/' | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
+        same=$(grep -rL '^package .*_test$' "$dir" --include='*_test.go' 2>/dev/null | grep -v '.expedition/' | xargs grep -c '^func Test' 2>/dev/null | awk -F: '{s+=$2}END{print s+0}')
         total=$((ext + same))
         if [ $total -gt 0 ]; then pct=$((ext * 100 / total)); else pct=0; fi
         echo "$label: external $ext (${pct}%) / same $same ($((100 - pct))%)"
@@ -268,7 +268,7 @@ test-package-rationale-audit:
         echo "MISSING white-box-reason: $f" >&2
         missing=$((missing + 1))
       fi
-    done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null)
+    done < <(grep -rL '^package .*_test$' internal/ --include='*_test.go' 2>/dev/null | grep -v '.expedition/')
     if [ "$missing" -gt 0 ]; then
       echo "FAIL: $missing same-package test file(s) missing white-box-reason comment" >&2
       exit 1
