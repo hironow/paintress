@@ -193,7 +193,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			),
 		)
 
-		cmd := exec.CommandContext(fixCtx, claudeCmd,
+		cmd := platform.NewShellCmd(fixCtx, claudeCmd,
 			"--model", model,
 			"--continue",
 			"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
@@ -267,7 +267,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	followCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(followCtx, claudeCmd,
+	cmd := platform.NewShellCmd(followCtx, claudeCmd,
 		"--model", model,
 		"--continue",
 		"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),

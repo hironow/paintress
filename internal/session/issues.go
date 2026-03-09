@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -44,7 +43,7 @@ func FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir st
 		"-p", prompt,
 	}
 
-	cmd := exec.CommandContext(ctx, claudeCmd, args...)
+	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)
 	var stderr bytes.Buffer
 	cmd.Stdout = io.Discard
 	cmd.Stderr = &stderr

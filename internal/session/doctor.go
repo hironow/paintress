@@ -12,12 +12,13 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // makeMCPListCmd creates the exec.Cmd for `claude mcp list`.
 // Package-level variable for test injection.
 var makeMCPListCmd = func(ctx context.Context, claudeCmd string) *exec.Cmd {
-	return exec.CommandContext(ctx, claudeCmd, "mcp", "list")
+	return platform.NewShellCmd(ctx, claudeCmd, "mcp", "list")
 }
 
 // RunDoctor checks all required external commands and returns the results.
@@ -43,7 +44,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			Required: cmd.required,
 		}
 
-		path, err := exec.LookPath(cmd.name)
+		path, err := platform.LookPathShell(cmd.name)
 		if err != nil {
 			if cmd.required {
 				check.Hint = fmt.Sprintf("install %s and ensure it is in PATH", cmd.name)
@@ -57,7 +58,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 		// Try to get version (best-effort, 500ms timeout)
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		out, err := exec.CommandContext(ctx, path, "--version").Output()
+		out, err := platform.NewShellCmd(ctx, cmd.name, "--version").Output()
 		cancel()
 		if err == nil {
 			firstLine := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]

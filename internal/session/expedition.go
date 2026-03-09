@@ -185,14 +185,16 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	)
 	defer invokeSpan.End()
 
-	newCmd := e.makeCmd
-	if newCmd == nil {
-		newCmd = exec.CommandContext
-	}
-
 	claudeCmd := e.Config.ClaudeCmd
 	if claudeCmd == "" {
 		claudeCmd = platform.DefaultClaudeCmd
+	}
+
+	newCmd := e.makeCmd
+	if newCmd == nil {
+		newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return platform.NewShellCmd(ctx, name, args...)
+		}
 	}
 
 	cmd := newCmd(expCtx, claudeCmd,
