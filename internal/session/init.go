@@ -20,7 +20,7 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	if err := ValidateContinent(absPath); err != nil {
+	if err := ValidateContinent(absPath, nil); err != nil {
 		return fmt.Errorf("continent validation: %w", err)
 	}
 

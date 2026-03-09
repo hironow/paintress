@@ -16,6 +16,7 @@ func (p *Paintress) stageEscalation(ctx context.Context, expedition, failureCoun
 		return
 	}
 	dm := domain.NewEscalationDMail(expedition, failureCount)
+	domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 	if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 		p.Logger.Warn("escalation dmail: %v", err)
 	}
@@ -52,6 +53,9 @@ func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, w
 		}
 	case "resolve":
 		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
+		if err := p.Emitter.EmitResolved(dm.Name, dm.Issues, time.Now()); err != nil {
+			p.Logger.Warn("resolved event: %v", err)
+		}
 	default:
 		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 	}

@@ -48,6 +48,10 @@ func NewRootCommand() *cobra.Command {
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(domain.StateDir)
+			noColor, _ := cmd.Flags().GetBool("no-color")
+			if noColor {
+				os.Setenv("NO_COLOR", "1")
+			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			out := cmd.ErrOrStderr()
 			if os.Getenv("PAINTRESS_QUIET") != "" {
@@ -76,6 +80,7 @@ func NewRootCommand() *cobra.Command {
 	})
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (respects NO_COLOR env)")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 	rootCmd.PersistentFlags().StringP("lang", "l", "en", "Output language: en, ja, fr")
 
@@ -90,6 +95,7 @@ func NewRootCommand() *cobra.Command {
 		newRebuildCommand(),
 		newVersionCommand(),
 		newUpdateCommand(),
+		newConfigCommand(),
 	)
 
 	return rootCmd

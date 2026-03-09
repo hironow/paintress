@@ -11,6 +11,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 ```
   -h, --help            help for paintress
   -l, --lang string     Output language: en, ja, fr (default "en")
+      --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output
 ```
@@ -19,6 +20,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 
 * [paintress archive-prune](paintress_archive-prune.md)	 - Prune old archived d-mails
 * [paintress clean](paintress_clean.md)	 - Remove state directory (.expedition/)
+* [paintress config](paintress_config.md)	 - View or update paintress project configuration
 * [paintress doctor](paintress_doctor.md)	 - Check external command availability
 * [paintress init](paintress_init.md)	 - Initialize project configuration
 * [paintress issues](paintress_issues.md)	 - List Linear issues via Claude MCP

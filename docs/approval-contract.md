@@ -44,6 +44,7 @@ Run()
   +-- runWorker (loop)
         |
         +-- ScanInbox (per-expedition, for prompt data)
+        +-- triagePreFlightDMails (escalate/resolve/retry)
         +-- expedition.Run()
         |     +-- inbox_watcher (fsnotify)
         |           +-- [if HIGH] Notify  <-- notification only, no gate

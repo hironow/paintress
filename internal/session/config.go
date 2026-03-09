@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -13,7 +14,10 @@ import (
 )
 
 // ValidateContinent ensures the .expedition directory structure exists.
-func ValidateContinent(continent string) error {
+func ValidateContinent(continent string, logger domain.Logger) error {
+	if logger == nil {
+		logger = &domain.NopLogger{}
+	}
 	journalDir := filepath.Join(continent, domain.StateDir, "journal")
 	if err := os.MkdirAll(journalDir, 0755); err != nil {
 		return err
@@ -33,7 +37,9 @@ func ValidateContinent(continent string) error {
 		}
 	}
 
-	// Ensure Agent Skills SKILL.md files exist for phonewave discovery
+	// Ensure Agent Skills SKILL.md files are always up-to-date with the
+	// embedded template. SKILL.md is not user-editable — it is derived from
+	// the binary's embedded template and must stay in sync across upgrades.
 	skillDirs := []string{"dmail-sendable", "dmail-readable"}
 	for _, dir := range skillDirs {
 		skillDir := filepath.Join(continent, domain.StateDir, "skills", dir)
@@ -41,13 +47,14 @@ func ValidateContinent(continent string) error {
 			return err
 		}
 		skillFile := filepath.Join(skillDir, "SKILL.md")
-		if _, err := os.Stat(skillFile); err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				return err
-			}
-			content, err := fs.ReadFile(platform.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
-			if err != nil {
-				return fmt.Errorf("read embedded skill %s: %w", dir, err)
+		content, err := fs.ReadFile(platform.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
+		if err != nil {
+			return fmt.Errorf("read embedded skill %s: %w", dir, err)
+		}
+		existing, readErr := os.ReadFile(skillFile)
+		if readErr != nil || !bytes.Equal(existing, content) {
+			if readErr == nil {
+				logger.Info("updated SKILL.md: %s (template changed)", dir)
 			}
 			if err := os.WriteFile(skillFile, content, 0644); err != nil {
 				return err
@@ -62,11 +69,11 @@ func ValidateContinent(continent string) error {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		if err := os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n.otel.env\n"), 0644); err != nil {
+		if err := os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n.otel.env\nevents/\n"), 0644); err != nil {
 			return err
 		}
 	} else {
-		entries := []string{".run/", "inbox/", "outbox/", ".otel.env"}
+		entries := []string{".run/", "inbox/", "outbox/", ".otel.env", "events/"}
 		var missing []string
 		for _, entry := range entries {
 			if !strings.Contains(string(content), entry) {

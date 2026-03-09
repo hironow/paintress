@@ -322,6 +322,41 @@ func TestCheckSkills_MissingVersion(t *testing.T) {
 	}
 }
 
+func TestCheckSkills_DeprecatedFeedbackKind(t *testing.T) {
+	// given — SKILL.md with deprecated "kind: feedback" (pre-split)
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".expedition", "skills", "dmail-readable")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: dmail-readable\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: feedback\n---\n"), 0644)
+
+	// when
+	check := session.ExportCheckSkills(dir)
+
+	// then
+	if check.OK {
+		t.Error("skills check should fail when deprecated 'kind: feedback' is found")
+	}
+	if !strings.Contains(check.Hint, "init --force") {
+		t.Errorf("hint should suggest init --force, got %q", check.Hint)
+	}
+}
+
+func TestCheckSkills_UpdatedFeedbackKind(t *testing.T) {
+	// given — SKILL.md with updated "kind: implementation-feedback" (post-split)
+	dir := t.TempDir()
+	skillDir := filepath.Join(dir, ".expedition", "skills", "dmail-readable")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: dmail-readable\nmetadata:\n  dmail-schema-version: \"1\"\nconsumes:\n    - kind: implementation-feedback\n---\n"), 0644)
+
+	// when
+	check := session.ExportCheckSkills(dir)
+
+	// then
+	if !check.OK {
+		t.Errorf("skills check should pass for updated kind, version: %s", check.Version)
+	}
+}
+
 func TestCheckEventStore_Valid(t *testing.T) {
 	// given — valid JSONL event file
 	dir := t.TempDir()
@@ -509,6 +544,105 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	if !mcpFound {
 		t.Error("expected linear-mcp check in doctor output")
 	}
+}
+
+func TestCheckGitRemote_HasRemote(t *testing.T) {
+	// given — git repo with a remote configured
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", dir)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	addRemote := exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/example/repo.git")
+	if err := addRemote.Run(); err != nil {
+		t.Fatalf("git remote add failed: %v", err)
+	}
+
+	// when
+	check := session.ExportCheckGitRemote(dir)
+
+	// then
+	if !check.OK {
+		t.Errorf("git-remote check should pass when remote exists, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("git-remote check should NOT be required (warning)")
+	}
+	if check.Name != "git-remote" {
+		t.Errorf("expected name 'git-remote', got %q", check.Name)
+	}
+}
+
+func TestCheckGitRemote_NoRemote(t *testing.T) {
+	// given — git repo without any remote
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", dir)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+
+	// when
+	check := session.ExportCheckGitRemote(dir)
+
+	// then
+	if check.OK {
+		t.Error("git-remote check should fail when no remote configured")
+	}
+	if check.Hint == "" {
+		t.Error("hint should not be empty for missing remote")
+	}
+	if !strings.Contains(check.Hint, "Pull Request") && !strings.Contains(check.Hint, "PR") {
+		t.Errorf("hint should mention Pull Request, got %q", check.Hint)
+	}
+}
+
+func TestCheckGitRemote_NotGitRepo(t *testing.T) {
+	// given — a plain directory (not a git repo)
+	dir := t.TempDir()
+
+	// when
+	check := session.ExportCheckGitRemote(dir)
+
+	// then
+	if check.OK {
+		t.Error("git-remote check should fail for non-git directory")
+	}
+}
+
+func TestCheckGitRemote_IncludedInDoctorWithContinent(t *testing.T) {
+	// given — git repo with remote and valid .expedition/ structure
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", dir)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+	addRemote := exec.Command("git", "-C", dir, "remote", "add", "origin", "https://github.com/example/repo.git")
+	if err := addRemote.Run(); err != nil {
+		t.Fatalf("git remote add failed: %v", err)
+	}
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
+	}
+
+	// when
+	checks := session.RunDoctor("claude", dir)
+
+	// then — git-remote check should be present
+	for _, c := range checks {
+		if c.Name == "git-remote" {
+			if !c.OK {
+				t.Errorf("git-remote should pass, version: %s", c.Version)
+			}
+			return
+		}
+	}
+	t.Error("expected git-remote check in doctor output when continent is provided")
 }
 
 func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {

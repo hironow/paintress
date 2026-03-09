@@ -17,6 +17,7 @@ var ExportCheckLinearMCP = checkLinearMCP
 var ExportCheckContinent = checkContinent
 var ExportCheckConfig = checkConfig
 var ExportCheckGitRepo = checkGitRepo
+var ExportCheckGitRemote = checkGitRemote
 var ExportCheckWritability = checkWritability
 var ExportCheckSkills = checkSkills
 var ExportCheckEventStore = checkEventStore

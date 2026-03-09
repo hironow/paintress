@@ -16,8 +16,8 @@ func TestNewEscalationDMail_Kind(t *testing.T) {
 	dm := domain.NewEscalationDMail(exp, failures)
 
 	// then
-	if dm.Kind != "feedback" {
-		t.Errorf("Kind = %q, want %q", dm.Kind, "feedback")
+	if dm.Kind != "implementation-feedback" {
+		t.Errorf("Kind = %q, want %q", dm.Kind, "implementation-feedback")
 	}
 }
 
@@ -93,8 +93,8 @@ func TestNewEscalationDMail_Marshal_Roundtrip(t *testing.T) {
 	}
 
 	// then
-	if parsed.Kind != "feedback" {
-		t.Errorf("parsed Kind = %q, want %q", parsed.Kind, "feedback")
+	if parsed.Kind != "implementation-feedback" {
+		t.Errorf("parsed Kind = %q, want %q", parsed.Kind, "implementation-feedback")
 	}
 	if parsed.Severity != "high" {
 		t.Errorf("parsed Severity = %q, want %q", parsed.Severity, "high")

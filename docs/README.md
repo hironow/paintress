@@ -13,11 +13,13 @@
 ## CLI Reference
 
 - [paintress](cli/paintress.md) — Root command
-- [paintress init](cli/paintress_init.md) — Initialize a project
+- [paintress init](cli/paintress_init.md) — Initialize a project (`--force` to regenerate)
 - [paintress run](cli/paintress_run.md) — Run the autonomous expedition loop
 - [paintress issues](cli/paintress_issues.md) — Query Linear issues via Claude MCP
 - [paintress status](cli/paintress_status.md) — Show expedition status
-- [paintress doctor](cli/paintress_doctor.md) — Diagnose configuration issues
+- [paintress config show](cli/paintress_config.md) — Display project configuration
+- [paintress config set](cli/paintress_config.md) — Update a project configuration value
+- [paintress doctor](cli/paintress_doctor.md) — Diagnose configuration issues (git-remote, deprecated kind detection)
 - [paintress clean](cli/paintress_clean.md) — Clean state files
 - [paintress rebuild](cli/paintress_rebuild.md) — Rebuild state from events
 - [paintress archive-prune](cli/paintress_archive-prune.md) — Prune archived data

@@ -29,7 +29,7 @@ dmail-schema-version: "1"
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Unique message identifier (e.g., `report-my-42`) |
-| `kind` | string | Yes | Message type: `report`, `specification`, `feedback` |
+| `kind` | string | Yes | Message type: `report`, `specification`, `design-feedback`, `implementation-feedback` |
 | `description` | string | Yes | Human-readable summary |
 | `issues` | string[] | No | Related Linear issue IDs |
 | `severity` | string | No | `high` triggers the approval gate |
@@ -68,6 +68,10 @@ Bump `DMailSchemaVersion` when the frontmatter format changes.
      | writes to inbox/     |                              |
      |--------------------->|                              |
      |                      | ScanInbox()                  |
+     |                      | triagePreFlightDMails()      |
+     |                      |   escalate -> archive + emit |
+     |                      |   resolve  -> archive + emit |
+     |                      |   retry    -> pass or escalate|
      |                      | FormatDMailForPrompt()        |
      |                      | -> embedded in prompt         |
      |                      |                              |
@@ -81,6 +85,19 @@ Bump `DMailSchemaVersion` when the frontmatter format changes.
      |                      |              reads outbox/   |
      |                      |----------------------------->|
 ```
+
+### Pre-Flight D-Mail Triage
+
+Before creating an expedition, `triagePreFlightDMails` processes the `action` field on each inbox D-Mail:
+
+| Action | Behavior | Passed to Expedition |
+|--------|----------|---------------------|
+| `escalate` | Emit escalation event, archive immediately | No (consumed) |
+| `resolve` | Emit resolved event, archive immediately | No (consumed) |
+| `retry` | Track retry count; pass through if under max retries, escalate if exceeded | Yes (if under limit) |
+| (none/other) | Pass through unchanged | Yes |
+
+Triaged-out D-Mails (escalate, resolve, over-limit retry) are archived immediately during pre-flight, not after expedition completion. This prevents re-processing on the next scan.
 
 ### Ordering Guarantees
 
@@ -107,6 +124,7 @@ D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logg
 | `SendDMail` | `internal/session/dmail.go` | Write to archive/ then outbox/ |
 | `ScanInbox` | `internal/session/dmail.go` | Read all .md files from inbox/ |
 | `ArchiveInboxDMail` | `internal/session/dmail.go` | Move inbox/ file to archive/ (idempotent if already archived) |
+| `triagePreFlightDMails` | `internal/session/preflight_triage.go` | Pre-flight action processing (escalate/resolve/retry) |
 
 ## HIGH Severity Gate
 
@@ -140,13 +158,13 @@ metadata:
 ```yaml
 ---
 name: dmail-readable
-description: Consumes D-Mail specifications and feedback from inbox/.
+description: Consumes D-Mail specifications and implementation-feedback from inbox/.
 license: Apache-2.0
 metadata:
   dmail-schema-version: "1"
   consumes:
     - kind: specification
-    - kind: feedback
+    - kind: implementation-feedback
 ---
 ```
 

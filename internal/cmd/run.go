@@ -98,6 +98,13 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Preflight: verify git remote exists (required for PR creation)
+	if !dryRun {
+		if err := session.PreflightCheckRemote(continent); err != nil {
+			return err
+		}
+	}
+
 	cfg := domain.Config{}
 	cfg.Continent = continent
 	cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
@@ -122,7 +129,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	stateDir := filepath.Join(continent, domain.StateDir)
 	eventStore := session.NewEventStore(stateDir, logger)
 
-	if err := session.ValidateContinent(cfg.Continent); err != nil {
+	if err := session.ValidateContinent(cfg.Continent, logger); err != nil {
 		return err
 	}
 

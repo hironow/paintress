@@ -262,6 +262,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				return
 			}
 			seenFiles[dm.Name] = true
+			domain.LogBanner(e.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
 			if dm.Severity == "high" {
 				e.appendMidHighName(dm.Name)
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)
@@ -298,15 +299,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			writer = outFile
 		}
 
-		for {
-			msg, readErr := sr.Next()
-			if readErr == io.EOF {
-				return
-			}
-			if readErr != nil {
-				streamErr <- readErr
-				return
-			}
+		emitter := platform.NewSpanEmittingStreamReader(sr, expCtx, platform.Tracer)
+		result, messages, readErr := emitter.CollectAll()
+		if readErr != nil {
+			streamErr <- readErr
+			return
+		}
+
+		for _, msg := range messages {
 			switch msg.Type {
 			case "assistant":
 				text, _ := msg.ExtractText()
@@ -332,6 +332,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				}
 				invokeSpan.SetAttributes(platform.GenAIResultAttrs(msg, responseModel, responseID)...)
 			}
+		}
+
+		// Attach raw events and session ID to the invoke span
+		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
+			invokeSpan.SetAttributes(attribute.StringSlice("stream.raw_events", rawEvents))
+		}
+		if result != nil && result.SessionID != "" {
+			invokeSpan.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
 		}
 	}()
 

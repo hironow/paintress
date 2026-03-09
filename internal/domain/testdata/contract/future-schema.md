@@ -1,7 +1,7 @@
 ---
 dmail-schema-version: "2"
 name: test-future-schema
-kind: feedback
+kind: implementation-feedback
 description: A D-Mail with schema version 2
 ---
 

@@ -19,13 +19,15 @@ This document describes what each directory/file does, who creates it, and how i
     dmail-sendable/
       SKILL.md          # Agent Skills spec manifest (produces: report)
     dmail-readable/
-      SKILL.md          # Agent Skills spec manifest (consumes: specification, feedback)
-  inbox/                # incoming d-mails (specifications, feedback)
+      SKILL.md          # Agent Skills spec manifest (consumes: specification, implementation-feedback)
+  inbox/                # incoming d-mails (specifications, implementation-feedback from sightjack/amadeus)
     *.md
   outbox/               # outgoing d-mails (reports)
     *.md
   archive/              # processed d-mails (inbox moves here after expedition)
     *.md
+  events/               # append-only event store (JSONL)
+    YYYY-MM-DD.jsonl
   .run/                 # ephemeral runtime data
     flag.md             # consolidated checkpoint (written at exit from per-worker max)
     logs/
@@ -53,6 +55,8 @@ This document describes what each directory/file does, who creates it, and how i
 .run/
 inbox/
 outbox/
+.otel.env
+events/
 ```
 
 | Path | Git Status | Reason |
@@ -62,6 +66,7 @@ outbox/
 | `skills/` | Tracked | Agent Skills spec manifests for phonewave discovery (see [dmail-protocol.md](./dmail-protocol.md#agent-skills-skillmd)) |
 | `config.yaml` | Tracked | Project-level configuration |
 | `archive/` | Tracked | Audit trail of processed d-mails |
+| `events/` | Ignored | Append-only event store (JSONL, expedition events) |
 | `.run/` | Ignored | Ephemeral runtime state (logs, flag, worktrees) |
 | `inbox/` | Ignored | Transient; consumed and archived per expedition |
 | `outbox/` | Ignored | Transient; courier picks up and delivers |
@@ -120,7 +125,8 @@ Journals serve two purposes simultaneously:
      |                      |----------------------------->|
 ```
 
-- **inbox/** -> prompt injection -> **archive/** (after success)
+- **Pre-flight triage**: `triagePreFlightDMails` processes action fields (escalate/resolve/retry) before expedition creation. Triaged-out D-Mails are archived immediately.
+- **inbox/** -> triage -> prompt injection -> **archive/** (after success)
 - **report** -> **archive/** first, then **outbox/** (archive-first for durability)
 - `SendDMail` and `ArchiveInboxDMail` are best-effort (LogWarn on failure, never block success)
 - `ArchiveInboxDMail` is idempotent — returns nil only if source is gone AND destination already exists in archive (confirmed by `os.Stat`), errors on genuinely missing source
@@ -140,7 +146,8 @@ For full protocol details (wire format, schema versioning, function map), see [d
 | `config.yaml` | User or `SaveProjectConfig` | Manual or programmatic |
 | `journal/NNN.md` | `WriteJournal` | After each expedition (success, skip, or fail) |
 | `context/*.md` | User | Manual placement |
-| `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates if absent, never overwrites) |
+| `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates, updated when template changes) |
+| `events/YYYY-MM-DD.jsonl` | `ExpeditionEventEmitter` | During expedition lifecycle (append-only) |
 | `inbox/*.md` | External tool (courier/sightjack) | Before expedition |
 | `outbox/*.md` | `SendDMail` | After successful expedition |
 | `archive/*.md` | `SendDMail` + `ArchiveInboxDMail` | After successful expedition |

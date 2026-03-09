@@ -102,6 +102,7 @@ type ExpeditionEventEmitter interface {
 	EmitGradientChange(level int, operator string, now time.Time) error
 	EmitRetryAttempted(dmailKey string, attempt int, now time.Time) error
 	EmitEscalated(dmailName string, issues []string, now time.Time) error
+	EmitResolved(dmailName string, issues []string, now time.Time) error
 	EmitDMailStaged(name string, now time.Time) error
 	EmitDMailFlushed(count int, now time.Time) error
 	EmitDMailArchived(name string, now time.Time) error
@@ -124,6 +125,7 @@ func (*NopExpeditionEventEmitter) EmitGradientChange(_ int, _ string, _ time.Tim
 }
 func (*NopExpeditionEventEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return nil }
 func (*NopExpeditionEventEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return nil }
+func (*NopExpeditionEventEmitter) EmitResolved(_ string, _ []string, _ time.Time) error  { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }

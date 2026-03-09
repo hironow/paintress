@@ -48,8 +48,8 @@ func TestStageEscalation_StagesFeedbackDMail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail: %v", err)
 	}
-	if dm.Kind != "feedback" {
-		t.Errorf("Kind = %q, want %q", dm.Kind, "feedback")
+	if dm.Kind != "implementation-feedback" {
+		t.Errorf("Kind = %q, want %q", dm.Kind, "implementation-feedback")
 	}
 	if dm.Severity != "high" {
 		t.Errorf("Severity = %q, want %q", dm.Severity, "high")
@@ -172,6 +172,7 @@ func (n *nopEmitter) EmitGommage(_ int, _ time.Time) error                  { re
 func (n *nopEmitter) EmitGradientChange(_ int, _ string, _ time.Time) error { return nil }
 func (n *nopEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return nil }
 func (n *nopEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return nil }
+func (n *nopEmitter) EmitResolved(_ string, _ []string, _ time.Time) error  { return nil }
 func (n *nopEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
 func (n *nopEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
 func (n *nopEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }

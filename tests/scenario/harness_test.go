@@ -210,9 +210,9 @@ func (w *Workspace) verifyPhonewaveRoutes(t *testing.T) {
 	}
 
 	requiredKinds := map[string]bool{
-		"specification": false,
-		"report":        false,
-		"feedback":      false,
+		"specification":           false,
+		"report":                  false,
+		"implementation-feedback": false,
 	}
 	for _, route := range cfg.Routes {
 		if _, ok := requiredKinds[route.Kind]; ok {

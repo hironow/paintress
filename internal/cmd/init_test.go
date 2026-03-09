@@ -114,6 +114,69 @@ func TestInitCmd_MissingFlags_UsesDefaults(t *testing.T) {
 	}
 }
 
+func TestInitCommand_AlreadyExists_SuggestsForce(t *testing.T) {
+	// given: .expedition/config.yaml already exists
+	dir := t.TempDir()
+	cfgDir := dir + "/.expedition"
+	if err := os.MkdirAll(cfgDir, 0755); err != nil {
+		t.Fatalf("create expedition dir: %v", err)
+	}
+	cfgPath := domain.ProjectConfigPath(dir)
+	if err := os.WriteFile(cfgPath, []byte("tracker:\n  team: OLD\n"), 0644); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetArgs([]string{"init", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error when config already exists")
+	}
+	if !strings.Contains(err.Error(), "--force") {
+		t.Errorf("expected '--force' hint in error, got: %v", err)
+	}
+}
+
+func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
+	// given: existing config with old content
+	dir := t.TempDir()
+	cfgDir := dir + "/.expedition"
+	if err := os.MkdirAll(cfgDir, 0755); err != nil {
+		t.Fatalf("create expedition dir: %v", err)
+	}
+	cfgPath := domain.ProjectConfigPath(dir)
+	if err := os.WriteFile(cfgPath, []byte("tracker:\n  team: OLD\n"), 0644); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--force", "--team", "NEW", "--project", "NewProject", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --force failed: %v", err)
+	}
+	data, _ := os.ReadFile(cfgPath)
+	content := string(data)
+	if !strings.Contains(content, "NEW") {
+		t.Errorf("expected 'NEW' in overwritten config, got:\n%s", content)
+	}
+}
+
 func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	// given — provide deterministic stdin to avoid hanging
 	cmd := NewRootCommand()

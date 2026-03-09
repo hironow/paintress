@@ -92,10 +92,13 @@ paintress --model opus,sonnet,haiku ./repo
 
 Paintress communicates with external tools (phonewave, sightjack, amadeus) via the D-Mail protocol — Markdown files with YAML frontmatter exchanged through `inbox/` and `outbox/` directories. Each message carries a `dmail-schema-version` field (currently `"1"`) for protocol compatibility.
 
-- **Inbound**: External tools write specification/feedback d-mails to `inbox/`. Paintress scans and embeds them in the expedition prompt.
+- **Inbound**: External tools write specification/implementation-feedback d-mails to `inbox/`. Paintress scans and embeds them in the expedition prompt.
+- **Pre-Flight Triage**: Before each expedition, `triagePreFlightDMails` processes action fields: `escalate` (consume + emit event), `resolve` (consume + emit resolved event), `retry` (pass through or escalate if over max retries). Triaged-out D-Mails are archived immediately.
 - **Outbound**: After a successful expedition, a report d-mail is written to `archive/` first, then `outbox/` (archive-first for durability).
 - **HIGH Severity Gate**: HIGH severity d-mails trigger desktop notification + human approval before the expedition starts. See [docs/approval-contract.md](docs/approval-contract.md).
 - **Skills**: Agent skill manifests (`SKILL.md`) in `.expedition/skills/` follow the [Agent Skills](https://agentskills.io) specification, declaring D-Mail capabilities under `metadata`.
+
+**BREAKING**: The `feedback` kind has been split into `design-feedback` and `implementation-feedback`. Paintress consumes `implementation-feedback` (not the old `feedback`). Run `paintress doctor` to detect deprecated kinds and `paintress init --force <repo-path>` to regenerate SKILL.md files.
 
 Full protocol details: **[docs/dmail-protocol.md](docs/dmail-protocol.md)** | Directory structure: **[docs/expedition-directory.md](docs/expedition-directory.md)**
 
@@ -106,9 +109,11 @@ Paintress (binary)         <- Outside the repository
     |
     |  Pre-flight:
     |  +-- goroutine: parallel journal scan -> Lumina extraction
+    |  +-- PreflightCheckRemote (verify git remote exists)
     |  +-- WorktreePool.Init (when --workers >= 1)
     |
     |  Per Expedition:
+    |  +-- triagePreFlightDMails (escalate/resolve/retry)
     |  +-- Gradient Gauge check -> difficulty hint
     |  +-- Reserve Party check -> primary recovery attempt
     |
@@ -137,6 +142,7 @@ Continent (Git repo)       <- Persistent world
          +-- inbox/        <- Incoming d-mails (gitignored, transient)
          +-- outbox/       <- Outgoing d-mails (gitignored, transient)
          +-- archive/      <- Processed d-mails (tracked, audit trail)
+         +-- events/       <- Append-only event store (JSONL, gitignored)
          +-- .run/         <- Ephemeral (gitignored)
               +-- flag.md       <- Checkpoint (consolidated from per-worker flags at exit)
               +-- logs/         <- Expedition logs
@@ -185,12 +191,14 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 ## Scope
 
 **What Paintress does:**
+
 - Autonomously pick Linear issues and implement code changes via Claude Code
 - Create branches, run tests, open PRs, and iterate through code review cycles
 - Manage parallel expeditions in isolated git worktrees (Swarm Mode)
 - Send report D-Mails to downstream tools after successful expeditions
 
 **What Paintress does NOT do:**
+
 - Edit Linear issues directly (only reads issues for implementation)
 - Manage git branches on the main repository (uses worktrees for isolation)
 - Handle authentication setup (assumes Linear, GitHub CLI, and Claude Code are pre-configured)
@@ -208,7 +216,10 @@ just install
 # Initialize project config (Linear team key, etc.)
 paintress init /path/to/your/repo
 
-# Check external command availability
+# Upgrade existing project (regenerate SKILL.md, etc.)
+paintress init --force /path/to/your/repo
+
+# Check external command availability, git remote, deprecated kinds
 paintress doctor
 
 # Run — .expedition/ is created automatically
@@ -226,9 +237,11 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 | Command | Description |
 |---------|-------------|
 | `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
-| `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively |
-| `paintress doctor` | Check required external commands (git, claude, gh, docker) |
+| `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively (`--force` to regenerate) |
+| `paintress doctor` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint |
 | `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
+| `paintress config show [repo-path]` | Display project configuration |
+| `paintress config set <key> <value> [repo-path]` | Update a configuration value (e.g. `tracker.team`, `tracker.project`) |
 | `paintress status [repo-path]` | Show paintress operational status |
 | `paintress clean <repo-path>` | Remove state directory (`.expedition/`) |
 | `paintress rebuild <repo-path>` | Rebuild projections from event store |

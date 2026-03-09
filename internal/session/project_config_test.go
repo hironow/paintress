@@ -67,6 +67,68 @@ func TestSaveProjectConfig_CreatesParentDir(t *testing.T) {
 	}
 }
 
+func TestUpdateProjectConfig_SetTeam(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfg := &domain.ProjectConfig{
+		Tracker: domain.IssueTrackerConfig{Team: "OLD", Project: "Test"},
+	}
+	session.SaveProjectConfig(dir, cfg)
+
+	// when
+	err := session.UpdateProjectConfig(dir, "tracker.team", "NEW")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateProjectConfig: %v", err)
+	}
+	loaded, _ := session.LoadProjectConfig(dir)
+	if loaded.Tracker.Team != "NEW" {
+		t.Errorf("expected team 'NEW', got %q", loaded.Tracker.Team)
+	}
+	if loaded.Tracker.Project != "Test" {
+		t.Errorf("project should be preserved, got %q", loaded.Tracker.Project)
+	}
+}
+
+func TestUpdateProjectConfig_SetProject(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfg := &domain.ProjectConfig{
+		Tracker: domain.IssueTrackerConfig{Team: "MY"},
+	}
+	session.SaveProjectConfig(dir, cfg)
+
+	// when
+	err := session.UpdateProjectConfig(dir, "tracker.project", "NewProject")
+
+	// then
+	if err != nil {
+		t.Fatalf("UpdateProjectConfig: %v", err)
+	}
+	loaded, _ := session.LoadProjectConfig(dir)
+	if loaded.Tracker.Project != "NewProject" {
+		t.Errorf("expected project 'NewProject', got %q", loaded.Tracker.Project)
+	}
+}
+
+func TestUpdateProjectConfig_InvalidKey(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	cfg := &domain.ProjectConfig{
+		Tracker: domain.IssueTrackerConfig{Team: "MY"},
+	}
+	session.SaveProjectConfig(dir, cfg)
+
+	// when
+	err := session.UpdateProjectConfig(dir, "bad.key", "value")
+
+	// then
+	if err == nil {
+		t.Error("expected error for invalid key")
+	}
+}
+
 func TestLoadProjectConfig_FileNotFound(t *testing.T) {
 	dir := t.TempDir()
 

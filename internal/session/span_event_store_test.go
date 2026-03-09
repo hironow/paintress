@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -59,12 +58,8 @@ func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResu
 
 // --- tests ---
 
-func TestSpanEventStore_BasicMode_OmitsDebugAttributes(t *testing.T) {
+func TestSpanEventStore_IncludesAllAttributes(t *testing.T) {
 	exp := setupTestTracer(t)
-
-	prev := platform.OTELDetailLevel
-	platform.OTELDetailLevel = platform.DetailBasic
-	t.Cleanup(func() { platform.OTELDetailLevel = prev })
 
 	inner := &stubEventStore{
 		appendResult: domain.AppendResult{BytesWritten: 42},
@@ -85,113 +80,42 @@ func TestSpanEventStore_BasicMode_OmitsDebugAttributes(t *testing.T) {
 
 	spans := exp.GetSpans()
 
-	// --- Append span ---
-	appendSpan := findSpanByName(spans, "eventsource.append")
-	if appendSpan == nil {
-		t.Fatal("missing eventsource.append span")
-	}
-	if !hasAttribute(appendSpan, "event.count.in") {
-		t.Error("basic mode: expected event.count.in on append span")
-	}
-	if hasAttribute(appendSpan, "event.append.bytes") {
-		t.Error("basic mode: event.append.bytes must NOT be present on append span")
-	}
-
-	// --- LoadAll span ---
-	loadAllSpan := findSpanByName(spans, "eventsource.load_all")
-	if loadAllSpan == nil {
-		t.Fatal("missing eventsource.load_all span")
-	}
-	if !hasAttribute(loadAllSpan, "event.count.out") {
-		t.Error("basic mode: expected event.count.out on load_all span")
-	}
-	if hasAttribute(loadAllSpan, "event.file.count") {
-		t.Error("basic mode: event.file.count must NOT be present on load_all span")
-	}
-	if hasAttribute(loadAllSpan, "event.corrupt_line.count") {
-		t.Error("basic mode: event.corrupt_line.count must NOT be present on load_all span")
-	}
-
-	// --- LoadSince span ---
-	loadSinceSpan := findSpanByName(spans, "eventsource.load_since")
-	if loadSinceSpan == nil {
-		t.Fatal("missing eventsource.load_since span")
-	}
-	if !hasAttribute(loadSinceSpan, "event.count.out") {
-		t.Error("basic mode: expected event.count.out on load_since span")
-	}
-	if hasAttribute(loadSinceSpan, "event.file.count") {
-		t.Error("basic mode: event.file.count must NOT be present on load_since span")
-	}
-	if hasAttribute(loadSinceSpan, "event.corrupt_line.count") {
-		t.Error("basic mode: event.corrupt_line.count must NOT be present on load_since span")
-	}
-}
-
-func TestSpanEventStore_DebugMode_IncludesAllAttributes(t *testing.T) {
-	exp := setupTestTracer(t)
-
-	prev := platform.OTELDetailLevel
-	platform.OTELDetailLevel = platform.DetailDebug
-	t.Cleanup(func() { platform.OTELDetailLevel = prev })
-
-	inner := &stubEventStore{
-		appendResult: domain.AppendResult{BytesWritten: 42},
-		loadEvents: []domain.Event{
-			{ID: "e1", Type: domain.EventDMailStaged, Timestamp: time.Now(), Data: []byte(`{"name":"x"}`)},
-		},
-		loadResult: domain.LoadResult{FileCount: 3, CorruptLineCount: 1},
-	}
-
-	store := session.NewSpanEventStore(inner)
-
-	evt, _ := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "test"}, time.Now())
-	store.Append(evt)            // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
-	store.LoadAll()              // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
-	store.LoadSince(time.Time{}) // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
-
-	spans := exp.GetSpans()
-
-	// --- Append span: basic + debug attributes ---
+	// --- Append span: all attributes always present ---
 	appendSpan := findSpanByName(spans, "eventsource.append")
 	if appendSpan == nil {
 		t.Fatal("missing eventsource.append span")
 	}
 	for _, key := range []string{"event.count.in", "event.append.bytes"} {
 		if !hasAttribute(appendSpan, key) {
-			t.Errorf("debug mode: expected %s on append span", key)
+			t.Errorf("expected %s on append span", key)
 		}
 	}
 
-	// --- LoadAll span: basic + debug attributes ---
+	// --- LoadAll span: all attributes always present ---
 	loadAllSpan := findSpanByName(spans, "eventsource.load_all")
 	if loadAllSpan == nil {
 		t.Fatal("missing eventsource.load_all span")
 	}
 	for _, key := range []string{"event.count.out", "event.file.count", "event.corrupt_line.count"} {
 		if !hasAttribute(loadAllSpan, key) {
-			t.Errorf("debug mode: expected %s on load_all span", key)
+			t.Errorf("expected %s on load_all span", key)
 		}
 	}
 
-	// --- LoadSince span: basic + debug attributes ---
+	// --- LoadSince span: all attributes always present ---
 	loadSinceSpan := findSpanByName(spans, "eventsource.load_since")
 	if loadSinceSpan == nil {
 		t.Fatal("missing eventsource.load_since span")
 	}
 	for _, key := range []string{"event.count.out", "event.file.count", "event.corrupt_line.count"} {
 		if !hasAttribute(loadSinceSpan, key) {
-			t.Errorf("debug mode: expected %s on load_since span", key)
+			t.Errorf("expected %s on load_since span", key)
 		}
 	}
 }
 
 func TestSpanEventStore_NoPIILeakage(t *testing.T) {
 	exp := setupTestTracer(t)
-
-	prev := platform.OTELDetailLevel
-	platform.OTELDetailLevel = platform.DetailDebug // use debug for maximum attribute exposure
-	t.Cleanup(func() { platform.OTELDetailLevel = prev })
 
 	inner := &stubEventStore{
 		appendResult: domain.AppendResult{BytesWritten: 128},
