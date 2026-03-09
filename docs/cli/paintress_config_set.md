@@ -36,8 +36,9 @@ paintress config set <key> <value> [path] [flags]
 
 ```
   paintress config set tracker.team MY /path/to/repo
-  paintress config set tracker.project "My Project" /path/to/repo
-  paintress config set tracker.cycle "2026-Q1" /path/to/repo
+  paintress config set model opus,sonnet /path/to/repo
+  paintress config set workers 3
+  paintress config set lang en
 ```
 
 ### Options
@@ -49,7 +50,7 @@ paintress config set <key> <value> [path] [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output
@@ -57,4 +58,5 @@ paintress config set <key> <value> [path] [flags]
 
 ### SEE ALSO
 
-* [paintress config](paintress_config.md)  - View or update paintress project configuration
+* [paintress config](paintress_config.md)	 - View or update paintress project configuration
+

@@ -19,7 +19,7 @@ paintress config show [path] [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output
@@ -27,4 +27,5 @@ paintress config show [path] [flags]
 
 ### SEE ALSO
 
-* [paintress config](paintress_config.md)  - View or update paintress project configuration
+* [paintress config](paintress_config.md)	 - View or update paintress project configuration
+

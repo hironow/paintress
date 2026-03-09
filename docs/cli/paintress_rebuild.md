@@ -21,7 +21,7 @@ paintress rebuild [repo-path] [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output
@@ -29,4 +29,5 @@ paintress rebuild [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+
