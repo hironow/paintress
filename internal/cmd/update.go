@@ -2,12 +2,25 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/creativeprojects/go-selfupdate"
 	"github.com/spf13/cobra"
 )
+
+// isUpToDate returns true if current version is >= latest version.
+// Non-semver versions (e.g. "dev") are always considered out of date.
+func isUpToDate(current, latest string) bool {
+	cv, err := semver.NewVersion(current)
+	if err != nil {
+		return false
+	}
+	lv, err := semver.NewVersion(latest)
+	if err != nil {
+		return false
+	}
+	return !cv.LessThan(lv)
+}
 
 func newUpdateCommand() *cobra.Command {
 	var checkOnly bool
@@ -43,20 +56,13 @@ installing.`,
 				return nil
 			}
 
-			// Guard: version may be "dev" for local builds (non-semver).
-			ver := strings.TrimPrefix(Version, "v")
-			if _, err := semver.NewVersion(ver); err != nil {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Development build (version %q) — cannot compare versions.\nLatest release: v%s\n", Version, latest.Version())
-				return nil
-			}
-
-			if latest.LessOrEqual(Version) {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", ver)
+			if isUpToDate(Version, latest.Version()) {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Already up to date (v%s).\n", Version)
 				return nil
 			}
 
 			if checkOnly {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", ver, latest.Version())
+				fmt.Fprintf(cmd.ErrOrStderr(), "Update available: v%s → v%s\n", Version, latest.Version())
 				return nil
 			}
 
