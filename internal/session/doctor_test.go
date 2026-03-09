@@ -5,12 +5,37 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 )
+
+// buildFakeClaude compiles the fake-claude binary and returns its absolute path.
+func buildFakeClaude(t *testing.T) string {
+	t.Helper()
+	binDir := t.TempDir()
+	binPath := filepath.Join(binDir, "fake-claude")
+
+	// Locate fake-claude source relative to this test file.
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot determine test file location")
+	}
+	// thisFile = internal/session/doctor_test.go → project root = ../../
+	projectRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
+	fakeSrc := filepath.Join(projectRoot, "tests", "scenario", "testdata", "fake-claude")
+
+	cmd := exec.Command("go", "build", "-o", binPath, ".")
+	cmd.Dir = fakeSrc
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build fake-claude: %v\n%s", err, out)
+	}
+	return binPath
+}
 
 func TestRunDoctor_GitFound(t *testing.T) {
 	// given/when
@@ -646,6 +671,49 @@ func TestCheckGitRemote_IncludedInDoctorWithContinent(t *testing.T) {
 		}
 	}
 	t.Error("expected git-remote check in doctor output when continent is provided")
+}
+
+func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
+	// given — fake-claude binary, valid continent with expedition structure
+	fakeClaude := buildFakeClaude(t)
+	dir := t.TempDir()
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
+	}
+
+	// when
+	checks := session.RunDoctor(fakeClaude, dir)
+
+	// then — claude binary check should pass (fake-claude supports --version)
+	var claudeFound, authFound, mcpFound bool
+	for _, c := range checks {
+		switch c.Name {
+		case fakeClaude:
+			claudeFound = true
+			if !c.OK {
+				t.Errorf("claude check should pass with fake-claude, version: %s", c.Version)
+			}
+		case "claude-auth":
+			authFound = true
+			if !c.OK {
+				t.Errorf("claude-auth should be OK with fake-claude, version: %s", c.Version)
+			}
+		case "linear-mcp":
+			mcpFound = true
+			if !c.OK {
+				t.Errorf("linear-mcp should be OK with fake-claude, version: %s", c.Version)
+			}
+		}
+	}
+	if !claudeFound {
+		t.Error("expected claude binary check in doctor output")
+	}
+	if !authFound {
+		t.Error("expected claude-auth check in doctor output")
+	}
+	if !mcpFound {
+		t.Error("expected linear-mcp check in doctor output")
+	}
 }
 
 func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
