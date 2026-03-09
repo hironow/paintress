@@ -251,53 +251,58 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 
 ## Usage
 
-Flags and repo path can be placed in any order. Both short (`-m`) and long (`--model`) forms are supported (GNU/POSIX hybrid):
+All commands accept an optional `[repo-path]` argument. When omitted, the current working directory is used.
 
 ```bash
-paintress -l ja .              # short flags
-paintress -lja .               # short flag with inline value
-paintress --lang ja .          # long flags
-paintress --model=opus .       # --flag=value form
-paintress -- ./my-repo         # -- terminates flags
+# Run from the repo directory (cwd fallback)
+cd /path/to/repo
+paintress run
+
+# Or specify the path explicitly
+paintress run /path/to/repo
+
+# Flags support GNU/POSIX long (--flag) and short (-f) forms
+paintress run -m opus,sonnet       # short flag
+paintress run --model=opus         # --flag=value form
 ```
 
 ```bash
 # Basic (Opus only, English prompts)
-paintress /path/to/repo
+paintress run
 
 # Japanese prompts
-paintress -l ja /path/to/repo
+paintress run -l ja
 
 # With Reserve Party
-paintress -m opus,sonnet /path/to/repo
+paintress run -m opus,sonnet
 
 # Swarm Mode: 3 parallel workers with setup command
-paintress -m opus,sonnet -w 3 --setup-cmd "bun install" /path/to/repo
+paintress run -m opus,sonnet -w 3 --setup-cmd "bun install"
 
 # Skip dev server (CLI tools, backend-only repos)
-paintress --no-dev /path/to/repo
+paintress run --no-dev
 
 # Dry run (generate prompts only)
-paintress -n /path/to/repo
+paintress run -n
 
 # Prune archived d-mails (dry-run, then execute)
-paintress archive-prune /path/to/repo
-paintress archive-prune -d 14 -x /path/to/repo
+paintress archive-prune
+paintress archive-prune -d 14 -x
 
 # Skip code review gate
-paintress --review-cmd "" /path/to/repo
+paintress run --review-cmd ""
 
 # Notify via ntfy.sh when HIGH severity D-Mail arrives
-paintress --notify-cmd 'curl -d "{message}" ntfy.sh/paintress' /path/to/repo
+paintress run --notify-cmd 'curl -d "{message}" ntfy.sh/paintress'
 
 # Skip approval gate (CI/automated runs)
-paintress --auto-approve /path/to/repo
+paintress run --auto-approve
 
 # Custom approval script
-paintress --approve-cmd './scripts/approve.sh "{message}"' /path/to/repo
+paintress run --approve-cmd './scripts/approve.sh "{message}"'
 
 # All options
-paintress \
+paintress run \
   -m opus,sonnet,haiku \
   -l ja \
   --max-expeditions 20 \
@@ -307,8 +312,7 @@ paintress \
   --dev-cmd "pnpm dev" \
   --dev-dir /path/to/frontend \
   --dev-url "http://localhost:3000" \
-  --review-cmd "codex review --base main" \
-  /path/to/repo
+  --review-cmd "codex review --base main"
 ```
 
 ## Options
@@ -352,7 +356,7 @@ Paintress instruments key operations (expedition, review loop, worktree pool, de
 docker compose -f docker/compose.yaml up -d
 
 # Run paintress with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress run
 
 # View traces at http://localhost:16686
 ```
