@@ -24,15 +24,18 @@ Triaged-out D-Mails are archived immediately via `ArchiveInboxDMail`. Pass-throu
 ## Consequences
 
 ### Positive
+
 - All D-Mail action fields are processed regardless of issue matching
 - Escalation path works for cross-tool feedback (amadeus -> paintress)
 - Retry counting works for repeated failures without mid-expedition match
 - Consistent with Postel's law (S0021): unknown actions pass through
 
 ### Negative
+
 - Two code paths for action processing: pre-flight (all D-Mails) and post-expedition (mid-matched only)
 - Pre-flight triage adds latency before expedition start (negligible: O(n) loop over inbox)
 
 ### Neutral
+
 - Mid-expedition D-Mail handling (watchInbox + handleFeedbackAction) unchanged
 - D-Mails without action continue to be included in expedition prompts as before

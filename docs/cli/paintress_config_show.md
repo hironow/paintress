@@ -27,5 +27,4 @@ paintress config show [path] [flags]
 
 ### SEE ALSO
 
-* [paintress config](paintress_config.md)	 - View or update paintress project configuration
-
+* [paintress config](paintress_config.md)  - View or update paintress project configuration

@@ -191,12 +191,14 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 ## Scope
 
 **What Paintress does:**
+
 - Autonomously pick Linear issues and implement code changes via Claude Code
 - Create branches, run tests, open PRs, and iterate through code review cycles
 - Manage parallel expeditions in isolated git worktrees (Swarm Mode)
 - Send report D-Mails to downstream tools after successful expeditions
 
 **What Paintress does NOT do:**
+
 - Edit Linear issues directly (only reads issues for implementation)
 - Manage git branches on the main repository (uses worktrees for isolation)
 - Handle authentication setup (assumes Linear, GitHub CLI, and Claude Code are pre-configured)
