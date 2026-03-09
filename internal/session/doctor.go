@@ -15,10 +15,10 @@ import (
 	"github.com/hironow/paintress/internal/platform"
 )
 
-// makeMCPListCmd creates the exec.Cmd for `claude mcp list`.
-// Package-level variable for test injection.
-var makeMCPListCmd = func(ctx context.Context, claudeCmd string) *exec.Cmd {
-	return platform.NewShellCmd(ctx, claudeCmd, "mcp", "list")
+// makeShellCmd creates an exec.Cmd via platform.NewShellCmd.
+// Package-level variable for test injection. Used for --version and mcp list.
+var makeShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	return platform.NewShellCmd(ctx, cmdLine, args...)
 }
 
 // RunDoctor checks all required external commands and returns the results.
@@ -58,7 +58,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 		// Try to get version (best-effort, 500ms timeout)
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		out, err := platform.NewShellCmd(ctx, cmd.name, "--version").Output()
+		out, err := makeShellCmd(ctx, cmd.name, "--version").Output()
 		cancel()
 		if err == nil {
 			firstLine := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
@@ -95,8 +95,8 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				Version: "skipped (claude not available)",
 			})
 		} else {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			cmd := makeMCPListCmd(ctx, claudeCmd)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			cmd := makeShellCmd(ctx, claudeCmd, "mcp", "list")
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
