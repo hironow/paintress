@@ -186,9 +186,6 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	defer invokeSpan.End()
 
 	claudeCmd := e.Config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = platform.DefaultClaudeCmd
-	}
 
 	newCmd := e.makeCmd
 	if newCmd == nil {

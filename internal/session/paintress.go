@@ -237,10 +237,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("gradient_info"), p.gradient.FormatForPrompt()))
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("timeout_info"), p.config.TimeoutSec))
 	claudeCmd := p.config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = platform.DefaultClaudeCmd
-	}
-	if claudeCmd != platform.DefaultClaudeCmd {
+	if claudeCmd != domain.DefaultClaudeCmd {
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("claude_cmd_info"), claudeCmd))
 	}
 	if p.config.DryRun {

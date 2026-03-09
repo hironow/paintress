@@ -179,9 +179,6 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 		prompt := domain.BuildReviewFixPrompt(branch, result.Comments)
 
 		claudeCmd := p.config.ClaudeCmd
-		if claudeCmd == "" {
-			claudeCmd = platform.DefaultClaudeCmd
-		}
 
 		model := p.reserve.ActiveModel()
 		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after CombinedOutput [permanent]
@@ -243,9 +240,6 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 
 	prompt := domain.BuildFollowUpPrompt(dmails)
 	claudeCmd := p.config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = platform.DefaultClaudeCmd
-	}
 
 	model := p.reserve.ActiveModel()
 	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
