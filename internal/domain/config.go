@@ -47,6 +47,14 @@ func DefaultConfig() Config {
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 type ProjectConfig struct {
 	Tracker IssueTrackerConfig `yaml:"tracker"`
+	Lang    string             `yaml:"lang,omitempty"`
+}
+
+// DefaultProjectConfig returns a ProjectConfig populated with sensible defaults.
+func DefaultProjectConfig() ProjectConfig {
+	return ProjectConfig{
+		Lang: "ja",
+	}
 }
 
 // IssueTrackerConfig holds issue tracker integration settings.
