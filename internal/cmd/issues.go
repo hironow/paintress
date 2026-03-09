@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
@@ -63,7 +62,8 @@ func runIssues(cmd *cobra.Command, args []string) error {
 	}
 
 	projectOps := session.NewProjectOps()
-	issues, err := usecase.FetchIssues(cmd.Context(), absPath, platform.DefaultClaudeCmd, stateFilter, projectOps)
+	claudeCmd := loadClaudeCmd(absPath)
+	issues, err := usecase.FetchIssues(cmd.Context(), absPath, claudeCmd, stateFilter, projectOps)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
@@ -35,7 +34,6 @@ When repo-path is provided (or defaults to current directory), also checks
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
-	claudeCmd := platform.DefaultClaudeCmd
 
 	// Resolve continent: explicit arg or current working directory (aligned with amadeus/sightjack)
 	continent, err := resolveRepoPath(args)
@@ -43,6 +41,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve repo path: %w", err)
 	}
 
+	claudeCmd := loadClaudeCmd(continent)
 	checks := session.RunDoctor(claudeCmd, continent)
 
 	hasFail := false
