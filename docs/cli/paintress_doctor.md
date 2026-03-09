@@ -1,15 +1,14 @@
 ## paintress doctor
 
-Check external command availability
+Run health checks
 
 ### Synopsis
 
-Check that all external commands required by paintress are installed.
+Check environment health and tool availability.
 
-Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and
-docker. Reports version and path for each found command.
-
-If repo-path is provided, also computes expedition success rate metrics.
+Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and docker.
+When repo-path is provided (or defaults to current directory), also checks
+.expedition/ structure, skills, config, and computes success rate metrics.
 
 ```
 paintress doctor [repo-path] [flags]
@@ -18,14 +17,14 @@ paintress doctor [repo-path] [flags]
 ### Examples
 
 ```
-  # Check all dependencies
+  # Check current directory
   paintress doctor
+
+  # Check a specific project directory
+  paintress doctor /path/to/project
 
   # Machine-readable output
   paintress doctor -o json
-
-  # Include repo metrics
-  paintress doctor -o json ./my-repo
 ```
 
 ### Options
@@ -45,5 +44,4 @@ paintress doctor [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
-
+* [paintress](paintress.md)  - Claude Code expedition orchestrator

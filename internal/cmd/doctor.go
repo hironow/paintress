@@ -14,21 +14,20 @@ import (
 func newDoctorCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor [repo-path]",
-		Short: "Check external command availability",
-		Long: `Check that all external commands required by paintress are installed.
+		Short: "Run health checks",
+		Long: `Check environment health and tool availability.
 
-Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and
-docker. Reports version and path for each found command.
-
-If repo-path is provided, also computes expedition success rate metrics.`,
-		Example: `  # Check all dependencies
+Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and docker.
+When repo-path is provided (or defaults to current directory), also checks
+.expedition/ structure, skills, config, and computes success rate metrics.`,
+		Example: `  # Check current directory
   paintress doctor
 
-  # Machine-readable output
-  paintress doctor -o json
+  # Check a specific project directory
+  paintress doctor /path/to/project
 
-  # Include repo metrics
-  paintress doctor -o json ./my-repo`,
+  # Machine-readable output
+  paintress doctor -o json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runDoctor,
 	}
@@ -37,26 +36,27 @@ If repo-path is provided, also computes expedition success rate metrics.`,
 func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
 	claudeCmd := platform.DefaultClaudeCmd
-	var continent string
-	if len(args) > 0 {
-		continent = args[0]
+
+	// Resolve continent: explicit arg or current working directory (aligned with amadeus/sightjack)
+	continent, err := resolveRepoPath(args)
+	if err != nil {
+		return fmt.Errorf("resolve repo path: %w", err)
 	}
+
 	checks := session.RunDoctor(claudeCmd, continent)
 
-	allRequired := true
+	hasFail := false
 	for _, c := range checks {
 		if c.Required && !c.OK {
-			allRequired = false
+			hasFail = true
 			break
 		}
 	}
 
 	var metrics *domain.DoctorMetrics
-	if len(args) > 0 {
-		stateDir := filepath.Join(args[0], domain.StateDir)
-		eventStore := session.NewEventStore(stateDir, loggerFrom(cmd))
-		metrics = usecase.ComputeSuccessRate(eventStore)
-	}
+	stateDir := filepath.Join(continent, domain.StateDir)
+	eventStore := session.NewEventStore(stateDir, loggerFrom(cmd))
+	metrics = usecase.ComputeSuccessRate(eventStore)
 
 	if outputFmt == "json" {
 		output := domain.DoctorOutput{
@@ -68,39 +68,41 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), out)
-		if !allRequired {
-			return fmt.Errorf("some required commands are missing")
+		if hasFail {
+			return fmt.Errorf("some checks failed")
 		}
 		return nil
 	}
 
-	// text output
+	// text output — aligned with amadeus/sightjack format
 	w := cmd.ErrOrStderr()
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
-	fmt.Fprintln(w, "║          Paintress Doctor                    ║")
-	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
+	fmt.Fprintln(w, "paintress doctor — environment health check")
 	fmt.Fprintln(w)
 
-	allOK := true
+	var fails, skips int
 	for _, c := range checks {
-		if c.OK {
-			fmt.Fprintf(w, "  ✓  %-12s %s (%s)\n", c.Name, c.Version, c.Path)
-		} else {
-			marker := "✗"
-			label := "MISSING (required)"
-			if !c.Required {
-				label = "not found (optional)"
-				if c.Version != "" {
-					label = c.Version + " (optional)"
-				}
+		status := "OK  "
+		if !c.OK {
+			if c.Required {
+				status = "FAIL"
+				fails++
 			} else {
-				allOK = false
+				status = "SKIP"
+				skips++
 			}
-			fmt.Fprintf(w, "  %s  %-12s %s\n", marker, c.Name, label)
-			if c.Hint != "" {
-				fmt.Fprintf(w, "         %-12s hint: %s\n", "", c.Hint)
-			}
+		}
+
+		msg := c.Version
+		if msg == "" && c.OK {
+			msg = "OK"
+		}
+		if c.Path != "" {
+			msg += " (" + c.Path + ")"
+		}
+
+		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", status, c.Name, msg)
+		if c.Hint != "" {
+			fmt.Fprintf(w, "         %-16s hint: %s\n", "", c.Hint)
 		}
 	}
 
@@ -110,9 +112,23 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintln(w)
-	if !allOK {
-		return fmt.Errorf("some required commands are missing. Install them and try again")
+	if fails == 0 && skips == 0 {
+		fmt.Fprintln(w, "All checks passed.")
+		return nil
 	}
-	fmt.Fprintln(w, "All checks passed.")
+	var msg string
+	if fails > 0 {
+		msg = fmt.Sprintf("%d check(s) failed", fails)
+	}
+	if skips > 0 {
+		if msg != "" {
+			msg += ", "
+		}
+		msg += fmt.Sprintf("%d skipped", skips)
+	}
+	fmt.Fprintln(w, msg+".")
+	if fails > 0 {
+		return fmt.Errorf("%d check(s) failed", fails)
+	}
 	return nil
 }

@@ -27,5 +27,4 @@ paintress rebuild [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
-
+* [paintress](paintress.md)  - Claude Code expedition orchestrator
