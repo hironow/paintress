@@ -53,6 +53,12 @@ func main() {
 		return
 	}
 
+	// Handle --print flag (used by doctor's inference check).
+	if hasFlag(os.Args[1:], "--print") {
+		fmt.Print("2")
+		return
+	}
+
 	proto, prompt := detectProtocol(os.Args[1:])
 	outputFormat := extractOutputFormat(os.Args[1:])
 

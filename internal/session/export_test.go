@@ -21,3 +21,4 @@ var ExportCheckGitRemote = checkGitRemote
 var ExportCheckWritability = checkWritability
 var ExportCheckSkills = checkSkills
 var ExportCheckEventStore = checkEventStore
+var ExportCheckClaudeInference = checkClaudeInference

@@ -544,8 +544,8 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	// when
 	checks := session.RunDoctor("nonexistent-claude-xyz-12345", dir)
 
-	// then — claude-auth and linear-mcp should exist with skip message
-	var authFound, mcpFound bool
+	// then — claude-auth, linear-mcp, and claude-inference should exist with skip message
+	var authFound, mcpFound, inferFound bool
 	for _, c := range checks {
 		switch c.Name {
 		case "claude-auth":
@@ -564,6 +564,14 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 			if !strings.Contains(c.Version, "skipped") {
 				t.Errorf("expected 'skipped' in version, got %q", c.Version)
 			}
+		case "claude-inference":
+			inferFound = true
+			if c.OK {
+				t.Error("claude-inference should not be OK when claude unavailable")
+			}
+			if !strings.Contains(c.Version, "skipped") {
+				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			}
 		}
 	}
 	if !authFound {
@@ -571,6 +579,9 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	}
 	if !mcpFound {
 		t.Error("expected linear-mcp check in doctor output")
+	}
+	if !inferFound {
+		t.Error("expected claude-inference check in doctor output")
 	}
 }
 
@@ -685,7 +696,7 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	checks := session.RunDoctor(fakeClaude, dir)
 
 	// then — claude binary check should pass (fake-claude supports --version)
-	var claudeFound, authFound, mcpFound bool
+	var claudeFound, authFound, mcpFound, inferFound bool
 	for _, c := range checks {
 		switch c.Name {
 		case fakeClaude:
@@ -703,6 +714,11 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 			if !c.OK {
 				t.Errorf("linear-mcp should be OK with fake-claude, version: %s", c.Version)
 			}
+		case "claude-inference":
+			inferFound = true
+			if !c.OK {
+				t.Errorf("claude-inference should be OK with fake-claude, version: %s", c.Version)
+			}
 		}
 	}
 	if !claudeFound {
@@ -714,6 +730,9 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	if !mcpFound {
 		t.Error("expected linear-mcp check in doctor output")
 	}
+	if !inferFound {
+		t.Error("expected claude-inference check in doctor output")
+	}
 }
 
 func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
@@ -721,10 +740,61 @@ func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
 	// when
 	checks := session.RunDoctor("claude", "")
 
-	// then — MCP checks should not appear
+	// then — MCP/inference checks should not appear
 	for _, c := range checks {
-		if c.Name == "claude-auth" || c.Name == "linear-mcp" {
-			t.Errorf("MCP check %q should not appear without continent", c.Name)
+		if c.Name == "claude-auth" || c.Name == "linear-mcp" || c.Name == "claude-inference" {
+			t.Errorf("check %q should not appear without continent", c.Name)
 		}
+	}
+}
+
+func TestCheckClaudeInference_OK(t *testing.T) {
+	// given: output contains "2"
+	// when
+	check := session.ExportCheckClaudeInference("2", nil)
+
+	// then
+	if !check.OK {
+		t.Errorf("inference check should pass, version: %s", check.Version)
+	}
+	if check.Required {
+		t.Error("inference check should NOT be required")
+	}
+	if check.Name != "claude-inference" {
+		t.Errorf("expected name 'claude-inference', got %q", check.Name)
+	}
+	if check.Version != "inference OK" {
+		t.Errorf("expected version 'inference OK', got %q", check.Version)
+	}
+}
+
+func TestCheckClaudeInference_Error(t *testing.T) {
+	// given: command failed
+	// when
+	check := session.ExportCheckClaudeInference("", fmt.Errorf("exit status 1"))
+
+	// then
+	if check.OK {
+		t.Error("inference check should fail on error")
+	}
+	if !strings.Contains(check.Version, "inference failed") {
+		t.Errorf("version should contain 'inference failed', got %q", check.Version)
+	}
+	if check.Hint == "" {
+		t.Error("hint should not be empty on failure")
+	}
+}
+
+func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
+	// given: output does not contain "2"
+	// when
+	check := session.ExportCheckClaudeInference("hello world", nil)
+
+	// then
+	if check.OK {
+		t.Error("inference check should fail for unexpected response")
+	}
+	if check.Version != "unexpected response" {
+		t.Errorf("expected version 'unexpected response', got %q", check.Version)
 	}
 }

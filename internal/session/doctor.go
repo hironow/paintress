@@ -114,14 +114,33 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				Name: "linear-mcp", Required: false,
 				Version: "skipped (claude not available)",
 			})
+			checks = append(checks, domain.DoctorCheck{
+				Name: "claude-inference", Required: false,
+				Version: "skipped (claude not available)",
+			})
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			cmd := makeShellCmd(ctx, claudeCmd, "mcp", "list")
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
-			checks = append(checks, checkClaudeAuth(mcpOutput, err))
+			authCheck := checkClaudeAuth(mcpOutput, err)
+			checks = append(checks, authCheck)
 			checks = append(checks, checkLinearMCP(mcpOutput, err))
+
+			// claude-inference: skip if auth failed
+			if !authCheck.OK {
+				checks = append(checks, domain.DoctorCheck{
+					Name: "claude-inference", Required: false,
+					Version: "skipped (auth failed)",
+				})
+			} else {
+				inferCtx, inferCancel := context.WithTimeout(context.Background(), 15*time.Second)
+				inferCmd := makeShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferOut, inferErr := inferCmd.Output()
+				inferCancel()
+				checks = append(checks, checkClaudeInference(string(inferOut), inferErr))
+			}
 		}
 	}
 
@@ -453,5 +472,27 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	check.Version = "Linear MCP not found or not connected"
 	check.Hint = "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
 		"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)"
+	return check
+}
+
+// checkClaudeInference determines if the Claude CLI can perform inference
+// by interpreting the result of a minimal "1+1=" prompt.
+func checkClaudeInference(output string, err error) domain.DoctorCheck {
+	check := domain.DoctorCheck{
+		Name:     "claude-inference",
+		Required: false,
+	}
+	if err != nil {
+		check.Version = "inference failed: " + err.Error()
+		check.Hint = "check API key, quota, and model access"
+		return check
+	}
+	if !strings.Contains(output, "2") {
+		check.Version = "unexpected response"
+		check.Hint = "check API key, quota, and model access"
+		return check
+	}
+	check.OK = true
+	check.Version = "inference OK"
 	return check
 }
