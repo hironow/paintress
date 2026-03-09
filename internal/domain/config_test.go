@@ -1,9 +1,11 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDefaultConfig_AllFields(t *testing.T) {
@@ -203,5 +205,43 @@ func TestProjectConfig_TrackerMethods(t *testing.T) {
 	}
 	if full.TrackerProject() != "Test" {
 		t.Errorf("full: TrackerProject = %q", full.TrackerProject())
+	}
+}
+
+func TestProjectConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
+	// given/when
+	cfg := domain.DefaultProjectConfig()
+
+	// then
+	if cfg.Computed != (domain.ComputedConfig{}) {
+		t.Error("Computed should be zero-value by default")
+	}
+}
+
+func TestProjectConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+
+	// when: marshal
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	yamlStr := string(data)
+
+	// then: no "computed" key in output
+	if strings.Contains(yamlStr, "computed") {
+		t.Errorf("YAML should not contain 'computed' key, got:\n%s", yamlStr)
+	}
+
+	// when: unmarshal back
+	var restored domain.ProjectConfig
+	if err := yaml.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then: Lang preserved
+	if restored.Lang != cfg.Lang {
+		t.Errorf("Lang: expected %q, got %q", cfg.Lang, restored.Lang)
 	}
 }

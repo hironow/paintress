@@ -46,6 +46,9 @@ func DefaultConfig() Config {
 	}
 }
 
+// ComputedConfig holds system-written fields. Empty for paintress today.
+type ComputedConfig struct{}
+
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 // Runtime-only fields (Continent, DryRun, OutputFormat) are NOT persisted here.
 type ProjectConfig struct {
@@ -67,6 +70,7 @@ type ProjectConfig struct {
 	ApproveCmd     string             `yaml:"approve_cmd,omitempty"`
 	AutoApprove    bool               `yaml:"auto_approve,omitempty"`
 	MaxRetries     int                `yaml:"max_retries,omitempty"`
+	Computed       ComputedConfig     `yaml:"computed,omitempty"`
 }
 
 // DefaultProjectConfig returns a ProjectConfig populated with sensible defaults.
