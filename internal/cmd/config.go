@@ -58,6 +58,7 @@ func newConfigSetCommand() *cobra.Command {
 Supported keys:
   tracker.team     Linear team key (e.g. MY)
   tracker.project  Linear project name
+  tracker.cycle    Linear cycle name
   lang             Language (ja or en)
   max_expeditions  Maximum number of expeditions
   timeout_sec      Timeout per expedition in seconds
