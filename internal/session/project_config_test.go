@@ -378,3 +378,17 @@ func TestLoadProjectConfig_FileNotFound_AppliesRuntimeDefaults(t *testing.T) {
 		t.Errorf("BaseBranch = %q, want main", cfg.BaseBranch)
 	}
 }
+
+func TestUpdateProjectConfig_RejectComputedKey(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	session.SaveProjectConfig(dir, &domain.ProjectConfig{Lang: "ja"})
+
+	// when — attempt to set a computed-namespace key
+	err := session.UpdateProjectConfig(dir, "computed", "anything")
+
+	// then — should be rejected (unknown key)
+	if err == nil {
+		t.Error("expected error when setting computed key")
+	}
+}
