@@ -55,6 +55,8 @@ This document describes what each directory/file does, who creates it, and how i
 .run/
 inbox/
 outbox/
+.otel.env
+events/
 ```
 
 | Path | Git Status | Reason |
@@ -64,7 +66,7 @@ outbox/
 | `skills/` | Tracked | Agent Skills spec manifests for phonewave discovery (see [dmail-protocol.md](./dmail-protocol.md#agent-skills-skillmd)) |
 | `config.yaml` | Tracked | Project-level configuration |
 | `archive/` | Tracked | Audit trail of processed d-mails |
-| `events/` | Tracked | Append-only event store (JSONL, expedition events) |
+| `events/` | Ignored | Append-only event store (JSONL, expedition events) |
 | `.run/` | Ignored | Ephemeral runtime state (logs, flag, worktrees) |
 | `inbox/` | Ignored | Transient; consumed and archived per expedition |
 | `outbox/` | Ignored | Transient; courier picks up and delivers |
@@ -144,7 +146,7 @@ For full protocol details (wire format, schema versioning, function map), see [d
 | `config.yaml` | User or `SaveProjectConfig` | Manual or programmatic |
 | `journal/NNN.md` | `WriteJournal` | After each expedition (success, skip, or fail) |
 | `context/*.md` | User | Manual placement |
-| `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates if absent, never overwrites) |
+| `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates, updated when template changes) |
 | `events/YYYY-MM-DD.jsonl` | `ExpeditionEventEmitter` | During expedition lifecycle (append-only) |
 | `inbox/*.md` | External tool (courier/sightjack) | Before expedition |
 | `outbox/*.md` | `SendDMail` | After successful expedition |

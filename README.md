@@ -142,7 +142,7 @@ Continent (Git repo)       <- Persistent world
          +-- inbox/        <- Incoming d-mails (gitignored, transient)
          +-- outbox/       <- Outgoing d-mails (gitignored, transient)
          +-- archive/      <- Processed d-mails (tracked, audit trail)
-         +-- events/       <- Append-only event store (JSONL, tracked)
+         +-- events/       <- Append-only event store (JSONL, gitignored)
          +-- .run/         <- Ephemeral (gitignored)
               +-- flag.md       <- Checkpoint (consolidated from per-worker flags at exit)
               +-- logs/         <- Expedition logs
