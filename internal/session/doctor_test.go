@@ -336,6 +336,9 @@ func TestCheckSkills_DeprecatedFeedbackKind(t *testing.T) {
 	if check.OK {
 		t.Error("skills check should fail when deprecated 'kind: feedback' is found")
 	}
+	if !check.Required {
+		t.Error("deprecated feedback kind should be a blocking failure (Required=true), aligned with amadeus/sightjack")
+	}
 	if !strings.Contains(check.Hint, "init --force") {
 		t.Errorf("hint should suggest init --force, got %q", check.Hint)
 	}

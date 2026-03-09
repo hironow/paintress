@@ -314,6 +314,7 @@ func checkSkills(continent string) domain.DoctorCheck {
 		if strings.Contains(content, "kind: feedback") &&
 			!strings.Contains(content, "kind: design-feedback") &&
 			!strings.Contains(content, "kind: implementation-feedback") {
+			check.Required = true // deprecated kind is a blocking failure (aligned with amadeus/sightjack)
 			check.Version = fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", entry.Name())
 			check.Hint = `run "paintress init --force <repo-path>" to regenerate skills with updated kind (feedback → implementation-feedback)`
 			return check
