@@ -300,6 +300,60 @@ func TestUpdateProjectConfig_InvalidWorkers(t *testing.T) {
 	}
 }
 
+func TestProjectConfig_SaveLoadRoundTrip_AllFields(t *testing.T) {
+	// given: DefaultProjectConfig saved to disk
+	dir := t.TempDir()
+	original := domain.DefaultProjectConfig()
+	if err := session.SaveProjectConfig(dir, &original); err != nil {
+		t.Fatalf("SaveProjectConfig: %v", err)
+	}
+
+	// when: LoadProjectConfig from that directory
+	loaded, err := session.LoadProjectConfig(dir)
+
+	// then: no error
+	if err != nil {
+		t.Fatalf("LoadProjectConfig: %v", err)
+	}
+
+	// verify key fields survive round-trip
+	if loaded.Lang != "ja" {
+		t.Errorf("Lang: expected 'ja', got %q", loaded.Lang)
+	}
+	if loaded.Model != "opus" {
+		t.Errorf("Model: expected 'opus', got %q", loaded.Model)
+	}
+	if loaded.Workers != 1 {
+		t.Errorf("Workers: expected 1, got %d", loaded.Workers)
+	}
+	if loaded.ClaudeCmd != "claude" {
+		t.Errorf("ClaudeCmd: expected 'claude', got %q", loaded.ClaudeCmd)
+	}
+	if loaded.MaxExpeditions != 50 {
+		t.Errorf("MaxExpeditions: expected 50, got %d", loaded.MaxExpeditions)
+	}
+	if loaded.TimeoutSec != 1980 {
+		t.Errorf("TimeoutSec: expected 1980, got %d", loaded.TimeoutSec)
+	}
+	if loaded.BaseBranch != "main" {
+		t.Errorf("BaseBranch: expected 'main', got %q", loaded.BaseBranch)
+	}
+	if loaded.DevCmd != "npm run dev" {
+		t.Errorf("DevCmd: expected 'npm run dev', got %q", loaded.DevCmd)
+	}
+	if loaded.DevURL != "http://localhost:3000" {
+		t.Errorf("DevURL: expected 'http://localhost:3000', got %q", loaded.DevURL)
+	}
+	if loaded.MaxRetries != 3 {
+		t.Errorf("MaxRetries: expected 3, got %d", loaded.MaxRetries)
+	}
+
+	// verify Computed is zero-value after round-trip of defaults
+	if loaded.Computed != (domain.ComputedConfig{}) {
+		t.Errorf("Computed: expected zero-value, got %+v", loaded.Computed)
+	}
+}
+
 func TestLoadProjectConfig_FileNotFound_AppliesRuntimeDefaults(t *testing.T) {
 	// given — no config file
 	dir := t.TempDir()
