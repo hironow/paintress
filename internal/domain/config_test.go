@@ -210,6 +210,45 @@ func TestProjectConfig_TrackerMethods(t *testing.T) {
 	}
 }
 
+func TestValidateProjectConfig_EmptyDevCmd_NoDevFalse(t *testing.T) {
+	// given — dev_cmd empty with no_dev=false should be invalid
+	cfg := domain.DefaultProjectConfig()
+	cfg.DevCmd = ""
+	cfg.NoDev = false
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected validation error for empty dev_cmd when no_dev is false")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "dev_cmd") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected dev_cmd error, got: %v", errs)
+	}
+}
+
+func TestValidateProjectConfig_EmptyDevCmd_NoDevTrue_IsValid(t *testing.T) {
+	// given — dev_cmd empty is OK when no_dev=true
+	cfg := domain.DefaultProjectConfig()
+	cfg.DevCmd = ""
+	cfg.NoDev = true
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors when no_dev=true, got %v", errs)
+	}
+}
+
 func TestProjectConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
 	// given/when
 	cfg := domain.DefaultProjectConfig()

@@ -143,6 +143,9 @@ func ValidateProjectConfig(cfg ProjectConfig) []string {
 	if cfg.MaxRetries < 0 {
 		errs = append(errs, fmt.Sprintf("max_retries must be non-negative (got %d)", cfg.MaxRetries))
 	}
+	if !cfg.NoDev && cfg.DevCmd == "" {
+		errs = append(errs, "dev_cmd must not be empty when no_dev is false")
+	}
 	return errs
 }
 
