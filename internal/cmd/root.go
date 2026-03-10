@@ -94,7 +94,7 @@ func NewRootCommand() *cobra.Command {
 		newCleanCommand(),
 		newRebuildCommand(),
 		newVersionCommand(),
-		newUpdateCommand(),
+		newUpdateCmd(),
 		newConfigCommand(),
 	)
 
