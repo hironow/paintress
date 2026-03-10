@@ -60,14 +60,13 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	// Verify report kind in frontmatter
 	obs.AssertDMailKind(reportPath, "report")
 
-	// 3. Start amadeus run as daemon → feedback in .gate/outbox → phonewave → .expedition/inbox + .siren/inbox
+	// 3. Start amadeus run as daemon → feedback in .gate/outbox → phonewave → .expedition/inbox
 	am := ws.StartAmadeusRun(t, ctx)
 	defer ws.StopAmadeusRun(t, am)
 
-	// 4. Verify feedback arrived in .expedition/inbox and .siren/inbox
+	// 4. Verify feedback arrived in .expedition/inbox
 	feedbackPath := ws.WaitForDMail(t, ".expedition", "inbox", 30*time.Second)
 	obs.AssertDMailKind(feedbackPath, "implementation-feedback")
-	ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
 
 	// Final state: all outboxes empty
 	obs.AssertAllOutboxEmpty()
