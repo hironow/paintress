@@ -85,9 +85,11 @@ Insight files in `insights/` use YAML frontmatter + Markdown body format (same p
 | File | Kind | Content |
 |------|------|---------|
 | `lumina.md` | `lumina` | Offensive insights — proven patterns from successful expeditions |
-| `gommage.md` | `gommage` | Defensive insights — failure patterns and warnings |
+| `gommage.md` | `gommage` | Defensive insights — failure patterns and warnings (Why field enriched with actual failure reasons from recent journals) |
 
-Each entry has 6 required axes: **what**, **why**, **when**, **where**, **impact**, **action**. Optional tool-specific fields go under extra keys.
+Each entry has 6 required axes: **what**, **why**, **how**, **when**, **who**, **constraints**. Optional tool-specific fields go under extra keys.
+
+The gommage insight's **why** field is populated by scanning recent journal files for `**Reason**:` fields, deduplicating them, and joining them into a summary string. When no journal reasons are readable, it falls back to a generic message.
 
 Frontmatter includes `insight-schema-version` (currently `"1"`), `kind`, `tool`, `updated_at`, and `entries` count. The `InsightWriter` uses flock-based locking (`insights.lock` in `.run/`) for concurrent safety and temp-file-rename for atomicity. Appends are idempotent — entries with duplicate titles are skipped.
 

@@ -41,7 +41,7 @@ This structure maps directly to AI agent loop design:
 
 1. **Always destroy the Canvas** — LLM context is reset every run. A fresh start beats a polluted context.
 2. **Plant the Flag well** — Loop quality depends on what you pass to the next Expedition. Checkpoints and Lumina are the lifeline.
-3. **Make the Gommage your ally** — Failure (erasure) isn't the end; it's a chance to accumulate Lumina. Consecutive failures trigger a halt.
+3. **Make the Gommage your ally** — Failure (erasure) isn't the end; it's a chance to accumulate Lumina. Consecutive failures trigger a halt and write a defensive insight to `gommage.md` with actual failure reasons extracted from recent journals.
 
 ---
 
