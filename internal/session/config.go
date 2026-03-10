@@ -30,7 +30,7 @@ func ValidateContinent(continent string, logger domain.Logger) error {
 	}
 
 	// Ensure d-mail directories exist (inbox, outbox, archive)
-	for _, sub := range []string{"inbox", "outbox", "archive"} {
+	for _, sub := range []string{"inbox", "outbox", "archive", "insights"} {
 		d := filepath.Join(continent, domain.StateDir, sub)
 		if err := os.MkdirAll(d, 0755); err != nil {
 			return err
