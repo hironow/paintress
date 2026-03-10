@@ -37,6 +37,30 @@ dmail-schema-version: "1"
 | `priority` | int | No | Priority level (0 = unset, higher = more urgent) |
 | `dmail-schema-version` | string | No | Protocol version (currently `"1"`) |
 | `metadata` | map | No | Arbitrary key-value pairs |
+| `context` | object | No | Insight context attached to outbound D-Mails (ADR S0031) |
+
+#### Context Field (S0031)
+
+The optional `context` field carries insight summaries from the Insight Ledger, enabling downstream tools to receive accumulated knowledge without reading insight files directly.
+
+```yaml
+---
+name: report-my-42
+kind: report
+description: "Expedition #1 completed implement for MY-42"
+issues:
+    - MY-42
+dmail-schema-version: "1"
+context:
+  insights:
+    - source: ".expedition/insights/lumina.md"
+      summary: "auth CI flaky"
+    - source: ".expedition/insights/gommage.md"
+      summary: "timeout on large repos needs --timeout 2400"
+---
+```
+
+The `context.insights` array contains `InsightSummary` objects with `source` (file path) and `summary` (human-readable text). When no insights exist, the `context` field is omitted entirely.
 
 ### Body
 
@@ -125,6 +149,10 @@ D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logg
 | `ScanInbox` | `internal/session/dmail.go` | Read all .md files from inbox/ |
 | `ArchiveInboxDMail` | `internal/session/dmail.go` | Move inbox/ file to archive/ (idempotent if already archived) |
 | `triagePreFlightDMails` | `internal/session/preflight_triage.go` | Pre-flight action processing (escalate/resolve/retry) |
+| `InsightsDir` | `dmail.go` | Path to insights directory |
+| `RunDir` | `dmail.go` | Path to run directory (SQLite, locks, logs) |
+| `InsightWriter.Append` | `internal/session/insight_writer.go` | Append insight entry to ledger file (flock + atomic rename, idempotent) |
+| `InsightWriter.Read` | `internal/session/insight_writer.go` | Parse insight ledger file |
 
 ## HIGH Severity Gate
 
