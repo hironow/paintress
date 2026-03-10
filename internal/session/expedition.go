@@ -352,6 +352,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
 			invokeSpan.SetAttributes(ioAttrs...)
 		}
+		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
+			invokeSpan.SetAttributes(initAttrs...)
+		}
 	}()
 
 	<-done
