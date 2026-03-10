@@ -15,18 +15,18 @@ import (
 	"github.com/hironow/paintress/internal/platform"
 )
 
-// makeShellCmd creates an exec.Cmd via platform.NewShellCmd.
+// newShellCmd creates an exec.Cmd via platform.NewShellCmd.
 // Package-level variable for test injection. Used for --version and mcp list.
-var makeShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+var newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 	return platform.NewShellCmd(ctx, cmdLine, args...)
 }
 
 // OverrideShellCmd replaces the command constructor for testing and returns a
 // cleanup function.
 func OverrideShellCmd(fn func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd) func() {
-	old := makeShellCmd
-	makeShellCmd = fn
-	return func() { makeShellCmd = old }
+	old := newShellCmd
+	newShellCmd = fn
+	return func() { newShellCmd = old }
 }
 
 // lookPath resolves the binary path for a command. Defaults to
@@ -78,7 +78,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 		// Try to get version (best-effort, 500ms timeout)
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		out, err := makeShellCmd(ctx, cmd.name, "--version").Output()
+		out, err := newShellCmd(ctx, cmd.name, "--version").Output()
 		cancel()
 		if err == nil {
 			firstLine := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
@@ -120,7 +120,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			})
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			cmd := makeShellCmd(ctx, claudeCmd, "mcp", "list")
+			cmd := newShellCmd(ctx, claudeCmd, "mcp", "list")
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
@@ -136,7 +136,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				})
 			} else {
 				inferCtx, inferCancel := context.WithTimeout(context.Background(), 15*time.Second)
-				inferCmd := makeShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 				inferOut, inferErr := inferCmd.Output()
 				inferCancel()
 				checks = append(checks, checkClaudeInference(string(inferOut), inferErr))
