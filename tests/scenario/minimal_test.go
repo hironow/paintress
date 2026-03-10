@@ -4,7 +4,6 @@ package scenario_test
 
 import (
 	"context"
-	"os/exec"
 	"testing"
 	"time"
 )
@@ -14,7 +13,7 @@ import (
 //  1. specification D-Mail is injected into .expedition/inbox (upstream from sightjack via phonewave)
 //  2. paintress expedition processes the specification, produces report in .expedition/outbox
 //  3. phonewave routes the report to .gate/inbox, cleans .expedition/outbox
-//  4. amadeus check consumes report from .gate/inbox, produces feedback in .gate/outbox
+//  4. amadeus run consumes report from .gate/inbox, produces feedback in .gate/outbox
 //  5. phonewave routes feedback to .expedition/inbox + .siren/inbox
 //  6. all outboxes empty at the end
 //
@@ -61,20 +60,11 @@ func TestScenario_L1_Minimal(t *testing.T) {
 	// Verify report kind in frontmatter
 	obs.AssertDMailKind(reportPath, "report")
 
-	// 3. Run amadeus → feedback in .gate/outbox → phonewave → .expedition/inbox + .siren/inbox
-	err = ws.RunAmadeusCheck(t, ctx)
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 2 {
-			t.Logf("amadeus exit code 2 (drift) — expected")
-		} else {
-			t.Fatalf("amadeus check failed: %v", err)
-		}
-	}
+	// 3. Start amadeus run as daemon → feedback in .gate/outbox → phonewave → .expedition/inbox + .siren/inbox
+	am := ws.StartAmadeusRun(t, ctx)
+	defer ws.StopAmadeusRun(t, am)
 
 	// 4. Verify feedback arrived in .expedition/inbox and .siren/inbox
-	// .expedition/inbox: feedback only (spec was consumed/archived by paintress)
-	// .siren/inbox: feedback delivered by phonewave
-	// .gate/inbox: empty (amadeus consumed the report)
 	feedbackPath := ws.WaitForDMail(t, ".expedition", "inbox", 30*time.Second)
 	obs.AssertDMailKind(feedbackPath, "implementation-feedback")
 	ws.WaitForDMail(t, ".siren", "inbox", 30*time.Second)
