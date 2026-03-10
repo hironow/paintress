@@ -11,21 +11,24 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 )
 
-func TestInitCommand_RequiresRepoPath(t *testing.T) {
-	// given
+func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
+	// given — no repo-path arg; resolveRepoPath falls back to os.Getwd()
+	// The cwd may or may not have .expedition/, so we just verify no args-validation error.
 	cmd := NewRootCommand()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
 	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
 	cmd.SetArgs([]string{"init"})
 
 	// when
 	err := cmd.Execute()
 
-	// then
-	if err == nil {
-		t.Fatal("expected error for missing repo-path, got nil")
+	// then — should NOT fail with "accepts 1 arg(s), received 0"
+	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
+		t.Fatalf("init should accept 0 args (cwd fallback), got: %v", err)
 	}
+	// May fail with "already exists" (cwd has .expedition/) — that's fine.
 }
 
 func TestInitCommand_AlreadyInitialized(t *testing.T) {
@@ -177,6 +180,68 @@ func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
 	}
 }
 
+func TestInitCommand_Force_MergesExisting(t *testing.T) {
+	// given: existing config with user customization
+	dir := t.TempDir()
+	cfgDir := dir + "/.expedition"
+	if err := os.MkdirAll(cfgDir, 0755); err != nil {
+		t.Fatalf("create expedition dir: %v", err)
+	}
+	cfgPath := domain.ProjectConfigPath(dir)
+	if err := os.WriteFile(cfgPath, []byte("tracker:\n  team: OLD\nlang: en\n"), 0644); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--force", "--team", "NEW", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --force failed: %v", err)
+	}
+	data, _ := os.ReadFile(cfgPath)
+	content := string(data)
+	// CLI team should win
+	if !strings.Contains(content, "NEW") {
+		t.Errorf("expected CLI team 'NEW', got:\n%s", content)
+	}
+	// User's lang=en should be preserved
+	if !strings.Contains(content, "lang: en") {
+		t.Errorf("expected user's lang=en preserved, got:\n%s", content)
+	}
+}
+
+func TestInitCommand_ConfigHasDefaults(t *testing.T) {
+	// given: fresh init
+	dir := t.TempDir()
+	cmd := NewRootCommand()
+	buf := new(bytes.Buffer)
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	cmd.SetIn(strings.NewReader(""))
+	cmd.SetArgs([]string{"init", "--team", "MY", dir})
+
+	// when
+	err := cmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init failed: %v", err)
+	}
+	data, _ := os.ReadFile(domain.ProjectConfigPath(dir))
+	content := string(data)
+	if !strings.Contains(content, "lang: ja") {
+		t.Errorf("expected default lang=ja, got:\n%s", content)
+	}
+}
+
 func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	// given — provide deterministic stdin to avoid hanging
 	cmd := NewRootCommand()
@@ -193,7 +258,7 @@ func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	if err == nil {
 		return // success
 	}
-	if err.Error() == `accepts 1 arg(s), received 0` {
+	if strings.Contains(err.Error(), "accepts") && strings.Contains(err.Error(), "arg") {
 		t.Fatalf("init should accept repo-path arg: %v", err)
 	}
 }

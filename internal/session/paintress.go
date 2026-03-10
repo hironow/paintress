@@ -237,10 +237,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("gradient_info"), p.gradient.FormatForPrompt()))
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("timeout_info"), p.config.TimeoutSec))
 	claudeCmd := p.config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = platform.DefaultClaudeCmd
-	}
-	if claudeCmd != platform.DefaultClaudeCmd {
+	if claudeCmd != domain.DefaultClaudeCmd {
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("claude_cmd_info"), claudeCmd))
 	}
 	if p.config.DryRun {
@@ -264,6 +261,13 @@ func (p *Paintress) Run(ctx context.Context) int {
 	luminas := ScanJournalsForLumina(p.config.Continent)
 	if len(luminas) > 0 {
 		p.Logger.OK("%s", fmt.Sprintf(domain.Msg("lumina_extracted"), len(luminas)))
+
+		// Best-effort: write Lumina insights for cross-tool observability
+		insightWriter := NewInsightWriter(
+			domain.InsightsDir(p.config.Continent),
+			domain.RunDir(p.config.Continent),
+		)
+		WriteLuminaInsights(insightWriter, luminas)
 	}
 
 	// Pre-flight HIGH severity gate (once, before workers start).

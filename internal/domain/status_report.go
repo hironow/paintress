@@ -20,40 +20,34 @@ type StatusReport struct {
 	LastExpedition time.Time `json:"last_expedition"`
 }
 
-// FormatText returns a human-readable status report string suitable for stderr.
+// FormatText returns a human-readable status report string suitable for stdout.
 func (r StatusReport) FormatText() string {
 	var b strings.Builder
-	b.WriteString("paintress status:\n")
+	b.WriteString("paintress status\n\n")
 
-	// Continent
-	b.WriteString(fmt.Sprintf("  Continent:       %s\n", r.Continent))
+	fmt.Fprintf(&b, "  %-16s %s\n", "Continent:", r.Continent)
 
 	// Expeditions with breakdown
 	skipped := r.Expeditions - r.Successes - r.Failures
-	b.WriteString(fmt.Sprintf("  Expeditions:     %d (%d success, %d failed, %d skipped)\n",
-		r.Expeditions, r.Successes, r.Failures, skipped))
+	fmt.Fprintf(&b, "  %-16s %d (%d success, %d failed, %d skipped)\n",
+		"Expeditions:", r.Expeditions, r.Successes, r.Failures, skipped)
 
 	// Success rate
 	if r.Expeditions == 0 {
-		b.WriteString("  Success rate:    no events\n")
+		fmt.Fprintf(&b, "  %-16s %s\n", "Success rate:", "no events")
 	} else {
-		b.WriteString(fmt.Sprintf("  Success rate:    %.1f%%\n", r.SuccessRate*100))
+		fmt.Fprintf(&b, "  %-16s %.1f%%\n", "Success rate:", r.SuccessRate*100)
 	}
 
-	// Gradient
-	b.WriteString(fmt.Sprintf("  Gradient:        level %d\n", r.GradientLevel))
-
-	// Inbox
-	b.WriteString(fmt.Sprintf("  Inbox:           %d pending\n", r.InboxCount))
-
-	// Archive
-	b.WriteString(fmt.Sprintf("  Archive:         %d processed\n", r.ArchiveCount))
+	fmt.Fprintf(&b, "  %-16s level %d\n", "Gradient:", r.GradientLevel)
+	fmt.Fprintf(&b, "  %-16s %d pending\n", "Inbox:", r.InboxCount)
+	fmt.Fprintf(&b, "  %-16s %d processed\n", "Archive:", r.ArchiveCount)
 
 	// Last expedition
 	if r.LastExpedition.IsZero() {
-		b.WriteString("  Last expedition: no expeditions yet\n")
+		fmt.Fprintf(&b, "  %-16s %s\n", "Last expedition:", "no expeditions yet")
 	} else {
-		b.WriteString(fmt.Sprintf("  Last expedition: %s\n", r.LastExpedition.Format(time.RFC3339)))
+		fmt.Fprintf(&b, "  %-16s %s\n", "Last expedition:", r.LastExpedition.Format(time.RFC3339))
 	}
 
 	return b.String()

@@ -14,24 +14,28 @@ import (
 
 func newInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init <repo-path>",
+		Use:   "init [repo-path]",
 		Short: "Initialize project configuration",
 		Long: `Initialize a .expedition/ directory in the target repository.
 
+If repo-path is omitted, the current working directory is used.
 Use --team and --project flags for non-interactive mode, or omit
 flags for interactive prompts. This must be run once before
 'paintress run' can operate on the repository.`,
-		Example: `  # Non-interactive with flags
+		Example: `  # Initialize current directory
+  paintress init
+
+  # Non-interactive with flags
   paintress init --team MY --project Hades /path/to/repo
 
   # Re-initialize (overwrite config, keep state)
-  paintress init --force --team MY --project Hades /path/to/repo
-
-  # Defaults only (no prompts)
-  paintress init /path/to/repo`,
-		Args: cobra.ExactArgs(1),
+  paintress init --force --team MY --project Hades /path/to/repo`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoPath := args[0]
+			repoPath, err := resolveRepoPath(args)
+			if err != nil {
+				return fmt.Errorf("resolve repo path: %w", err)
+			}
 
 			force, _ := cmd.Flags().GetBool("force")
 			cfgPath := domain.ProjectConfigPath(repoPath)

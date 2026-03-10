@@ -2,7 +2,9 @@ package session_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -871,7 +873,7 @@ func TestArchiveInboxDMail_MovesToArchive(t *testing.T) {
 	}
 
 	// Gone from inbox
-	if _, err := os.Stat(inboxPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(inboxPath); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("inbox file still exists after archive")
 	}
 

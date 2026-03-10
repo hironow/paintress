@@ -29,7 +29,7 @@ func TestStatusCommand_NoArgs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	text := stdout.String()
-	if !strings.Contains(text, "paintress status:") {
+	if !strings.Contains(text, "paintress status") {
 		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
 }
@@ -70,7 +70,7 @@ func TestStatusCommand_TextOutput(t *testing.T) {
 	}
 	// Text goes to stdout (per S0027)
 	text := stdout.String()
-	if !strings.Contains(text, "paintress status:") {
+	if !strings.Contains(text, "paintress status") {
 		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
 	// stderr should be empty for text mode

@@ -6,25 +6,26 @@ Initialize project configuration
 
 Initialize a .expedition/ directory in the target repository.
 
+If repo-path is omitted, the current working directory is used.
 Use --team and --project flags for non-interactive mode, or omit
 flags for interactive prompts. This must be run once before
 'paintress run' can operate on the repository.
 
 ```
-paintress init <repo-path> [flags]
+paintress init [repo-path] [flags]
 ```
 
 ### Examples
 
 ```
+  # Initialize current directory
+  paintress init
+
   # Non-interactive with flags
   paintress init --team MY --project Hades /path/to/repo
 
   # Re-initialize (overwrite config, keep state)
   paintress init --force --team MY --project Hades /path/to/repo
-
-  # Defaults only (no prompts)
-  paintress init /path/to/repo
 ```
 
 ### Options
@@ -42,7 +43,7 @@ paintress init <repo-path> [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output

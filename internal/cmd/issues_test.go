@@ -4,11 +4,12 @@ package cmd
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
-func TestIssuesCommand_RequiresRepoPath(t *testing.T) {
-	// given
+func TestIssuesCommand_NoArgs_FallsBackToCwd(t *testing.T) {
+	// given: no args → falls back to cwd (may error on business logic, not on arg validation)
 	cmd := NewRootCommand()
 	buf := new(bytes.Buffer)
 	cmd.SetOut(buf)
@@ -18,9 +19,9 @@ func TestIssuesCommand_RequiresRepoPath(t *testing.T) {
 	// when
 	err := cmd.Execute()
 
-	// then
-	if err == nil {
-		t.Fatal("expected error for missing repo-path, got nil")
+	// then: should NOT fail with "accepts 1 arg" — cwd fallback is used
+	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
+		t.Errorf("issues should accept zero args with cwd fallback, got: %v", err)
 	}
 }
 

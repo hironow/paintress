@@ -1,9 +1,11 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDefaultConfig_AllFields(t *testing.T) {
@@ -72,6 +74,109 @@ func TestDefaultConfig_AllFields(t *testing.T) {
 	}
 }
 
+func TestValidLang(t *testing.T) {
+	// given/when/then
+	if !domain.ValidLang("ja") {
+		t.Error("ja should be valid")
+	}
+	if !domain.ValidLang("en") {
+		t.Error("en should be valid")
+	}
+	if domain.ValidLang("fr") {
+		t.Error("fr should be invalid")
+	}
+	if domain.ValidLang("") {
+		t.Error("empty should be invalid")
+	}
+}
+
+func TestValidateProjectConfig_Valid(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors, got %v", errs)
+	}
+}
+
+func TestValidateProjectConfig_InvalidLang(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+	cfg.Lang = "fr"
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error, got %d: %v", len(errs), errs)
+	}
+}
+
+func TestValidateProjectConfig_EmptyLangIsValid(t *testing.T) {
+	// given — empty lang is acceptable (defaults will fill it)
+	cfg := domain.DefaultProjectConfig()
+	cfg.Lang = ""
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for empty lang, got %v", errs)
+	}
+}
+
+func TestDefaultProjectConfig_MatchesDefaultConfig(t *testing.T) {
+	// given
+	pc := domain.DefaultProjectConfig()
+	rc := domain.DefaultConfig()
+
+	// then — shared fields must match
+	if pc.Model != rc.Model {
+		t.Errorf("Model mismatch: ProjectConfig=%q, Config=%q", pc.Model, rc.Model)
+	}
+	if pc.Workers != rc.Workers {
+		t.Errorf("Workers mismatch: ProjectConfig=%d, Config=%d", pc.Workers, rc.Workers)
+	}
+	if pc.MaxExpeditions != rc.MaxExpeditions {
+		t.Errorf("MaxExpeditions mismatch: ProjectConfig=%d, Config=%d", pc.MaxExpeditions, rc.MaxExpeditions)
+	}
+	if pc.TimeoutSec != rc.TimeoutSec {
+		t.Errorf("TimeoutSec mismatch: ProjectConfig=%d, Config=%d", pc.TimeoutSec, rc.TimeoutSec)
+	}
+	if pc.BaseBranch != rc.BaseBranch {
+		t.Errorf("BaseBranch mismatch: ProjectConfig=%q, Config=%q", pc.BaseBranch, rc.BaseBranch)
+	}
+	if pc.MaxRetries != rc.MaxRetries {
+		t.Errorf("MaxRetries mismatch: ProjectConfig=%d, Config=%d", pc.MaxRetries, rc.MaxRetries)
+	}
+}
+
+func TestValidateProjectConfig_NegativeFields(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  domain.ProjectConfig
+	}{
+		{"negative max_expeditions", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.MaxExpeditions = -1; return c }()},
+		{"negative timeout_sec", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.TimeoutSec = -1; return c }()},
+		{"negative workers", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.Workers = -1; return c }()},
+		{"negative max_retries", func() domain.ProjectConfig { c := domain.DefaultProjectConfig(); c.MaxRetries = -1; return c }()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			errs := domain.ValidateProjectConfig(tt.cfg)
+			if len(errs) == 0 {
+				t.Error("expected validation error")
+			}
+		})
+	}
+}
+
 func TestProjectConfig_TrackerMethods(t *testing.T) {
 	// given
 	empty := domain.ProjectConfig{}
@@ -102,5 +207,82 @@ func TestProjectConfig_TrackerMethods(t *testing.T) {
 	}
 	if full.TrackerProject() != "Test" {
 		t.Errorf("full: TrackerProject = %q", full.TrackerProject())
+	}
+}
+
+func TestValidateProjectConfig_EmptyDevCmd_NoDevFalse(t *testing.T) {
+	// given — dev_cmd empty with no_dev=false should be invalid
+	cfg := domain.DefaultProjectConfig()
+	cfg.DevCmd = ""
+	cfg.NoDev = false
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected validation error for empty dev_cmd when no_dev is false")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "dev_cmd") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected dev_cmd error, got: %v", errs)
+	}
+}
+
+func TestValidateProjectConfig_EmptyDevCmd_NoDevTrue_IsValid(t *testing.T) {
+	// given — dev_cmd empty is OK when no_dev=true
+	cfg := domain.DefaultProjectConfig()
+	cfg.DevCmd = ""
+	cfg.NoDev = true
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) != 0 {
+		t.Errorf("expected no errors when no_dev=true, got %v", errs)
+	}
+}
+
+func TestProjectConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
+	// given/when
+	cfg := domain.DefaultProjectConfig()
+
+	// then
+	if cfg.Computed != (domain.ComputedConfig{}) {
+		t.Error("Computed should be zero-value by default")
+	}
+}
+
+func TestProjectConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+
+	// when: marshal
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	yamlStr := string(data)
+
+	// then: no "computed" key in output
+	if strings.Contains(yamlStr, "computed") {
+		t.Errorf("YAML should not contain 'computed' key, got:\n%s", yamlStr)
+	}
+
+	// when: unmarshal back
+	var restored domain.ProjectConfig
+	if err := yaml.Unmarshal(data, &restored); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// then: Lang preserved
+	if restored.Lang != cfg.Lang {
+		t.Errorf("Lang: expected %q, got %q", cfg.Lang, restored.Lang)
 	}
 }

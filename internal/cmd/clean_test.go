@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,7 +59,7 @@ func TestCleanCmd_DeletesExpeditionDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := os.Stat(expDir); !os.IsNotExist(err) {
+	if _, err := os.Stat(expDir); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected .expedition/ dir to be deleted")
 	}
 }

@@ -94,6 +94,16 @@ func ArchiveDir(continent string) string {
 	return filepath.Join(continent, StateDir, "archive")
 }
 
+// InsightsDir returns the path to the insights directory.
+func InsightsDir(continent string) string {
+	return filepath.Join(continent, StateDir, "insights")
+}
+
+// RunDir returns the path to the run directory (SQLite, locks, logs).
+func RunDir(continent string) string {
+	return filepath.Join(continent, StateDir, ".run")
+}
+
 // DMailSchemaVersion is the current D-Mail protocol schema version.
 const DMailSchemaVersion = "1"
 
@@ -108,6 +118,7 @@ type DMail struct {
 	Priority      int               `yaml:"priority,omitempty"`
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 	Body          string            `yaml:"-"`
 }
 

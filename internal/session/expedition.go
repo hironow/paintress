@@ -2,8 +2,10 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -185,14 +187,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	)
 	defer invokeSpan.End()
 
+	claudeCmd := e.Config.ClaudeCmd
+
 	newCmd := e.makeCmd
 	if newCmd == nil {
-		newCmd = exec.CommandContext
-	}
-
-	claudeCmd := e.Config.ClaudeCmd
-	if claudeCmd == "" {
-		claudeCmd = platform.DefaultClaudeCmd
+		newCmd = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return platform.NewShellCmd(ctx, name, args...)
+		}
 	}
 
 	cmd := newCmd(expCtx, claudeCmd,
@@ -383,7 +384,7 @@ func ReadContextFiles(continent string) (string, error) {
 	dir := domain.ContextDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return "", nil
 		}
 		return "", fmt.Errorf("reading context directory: %w", err)

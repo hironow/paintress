@@ -78,6 +78,10 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	}
 
 	parts := strings.Fields(ds.cmd)
+	if len(parts) == 0 {
+		logFile.Close()
+		return fmt.Errorf("dev_cmd is empty; set dev_cmd or enable no_dev")
+	}
 	ds.process = exec.CommandContext(ctx, parts[0], parts[1:]...)
 	ds.process.Dir = ds.dir
 	ds.process.Stdout = logFile

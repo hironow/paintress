@@ -28,7 +28,7 @@ func TestStatusReport_FormatText(t *testing.T) {
 
 	// then — verify key lines are present
 	expected := []string{
-		"paintress status:",
+		"paintress status",
 		"Continent:",
 		"/path/to/repo",
 		"Expeditions:",

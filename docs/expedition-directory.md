@@ -26,10 +26,14 @@ This document describes what each directory/file does, who creates it, and how i
     *.md
   archive/              # processed d-mails (inbox moves here after expedition)
     *.md
+  insights/             # Insight Ledger — git-tracked semantic insights (ADR S0030)
+    lumina.md           # offensive insights (successful patterns)
+    gommage.md          # defensive insights (failure patterns)
   events/               # append-only event store (JSONL)
     YYYY-MM-DD.jsonl
   .run/                 # ephemeral runtime data
     flag.md             # consolidated checkpoint (written at exit from per-worker max)
+    insights.lock       # flock file for concurrent InsightWriter access
     logs/
       paintress-YYYYMMDD.log
       dev-server.log
@@ -59,6 +63,8 @@ outbox/
 events/
 ```
 
+Note: The root `.gitignore` decomposes `.expedition/` tracking into individual entries rather than a blanket ignore, allowing `insights/` to be git-tracked while other transient directories remain ignored.
+
 | Path | Git Status | Reason |
 |------|-----------|--------|
 | `journal/` | Tracked | Permanent knowledge; Lumina extraction source |
@@ -66,10 +72,26 @@ events/
 | `skills/` | Tracked | Agent Skills spec manifests for phonewave discovery (see [dmail-protocol.md](./dmail-protocol.md#agent-skills-skillmd)) |
 | `config.yaml` | Tracked | Project-level configuration |
 | `archive/` | Tracked | Audit trail of processed d-mails |
+| `insights/` | Tracked | Insight Ledger — semantic insights extracted from expedition feedback (ADR S0030) |
 | `events/` | Ignored | Append-only event store (JSONL, expedition events) |
 | `.run/` | Ignored | Ephemeral runtime state (logs, flag, worktrees) |
 | `inbox/` | Ignored | Transient; consumed and archived per expedition |
 | `outbox/` | Ignored | Transient; courier picks up and delivers |
+
+## Insight Ledger Files
+
+Insight files in `insights/` use YAML frontmatter + Markdown body format (same pattern as D-Mails). Each file is an append-only ledger of semantic insights extracted by `InsightWriter` from expedition feedback.
+
+| File | Kind | Content |
+|------|------|---------|
+| `lumina.md` | `lumina` | Offensive insights — proven patterns from successful expeditions |
+| `gommage.md` | `gommage` | Defensive insights — failure patterns and warnings (Why field enriched with actual failure reasons from recent journals) |
+
+Each entry has 6 required axes: **what**, **why**, **how**, **when**, **who**, **constraints**. Optional tool-specific fields go under extra keys.
+
+The gommage insight's **why** field is populated by scanning recent journal files for `**Reason**:` fields, deduplicating them, and joining them into a summary string. When no journal reasons are readable, it falls back to a generic message.
+
+Frontmatter includes `insight-schema-version` (currently `"1"`), `kind`, `tool`, `updated_at`, and `entries` count. The `InsightWriter` uses flock-based locking (`insights.lock` in `.run/`) for concurrent safety and temp-file-rename for atomicity. Appends are idempotent — entries with duplicate titles are skipped.
 
 ## Prompt Injection Map
 
@@ -147,6 +169,8 @@ For full protocol details (wire format, schema versioning, function map), see [d
 | `journal/NNN.md` | `WriteJournal` | After each expedition (success, skip, or fail) |
 | `context/*.md` | User | Manual placement |
 | `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates, updated when template changes) |
+| `insights/lumina.md` | `InsightWriter.Append` | After expedition feedback (offensive insights from successes) |
+| `insights/gommage.md` | `InsightWriter.Append` | After expedition feedback (defensive insights from failures) |
 | `events/YYYY-MM-DD.jsonl` | `ExpeditionEventEmitter` | During expedition lifecycle (append-only) |
 | `inbox/*.md` | External tool (courier/sightjack) | Before expedition |
 | `outbox/*.md` | `SendDMail` | After successful expedition |

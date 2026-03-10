@@ -41,7 +41,7 @@ This structure maps directly to AI agent loop design:
 
 1. **Always destroy the Canvas** — LLM context is reset every run. A fresh start beats a polluted context.
 2. **Plant the Flag well** — Loop quality depends on what you pass to the next Expedition. Checkpoints and Lumina are the lifeline.
-3. **Make the Gommage your ally** — Failure (erasure) isn't the end; it's a chance to accumulate Lumina. Consecutive failures trigger a halt.
+3. **Make the Gommage your ally** — Failure (erasure) isn't the end; it's a chance to accumulate Lumina. Consecutive failures trigger a halt and write a defensive insight to `gommage.md` with actual failure reasons extracted from recent journals.
 
 ---
 
@@ -142,6 +142,7 @@ Continent (Git repo)       <- Persistent world
          +-- inbox/        <- Incoming d-mails (gitignored, transient)
          +-- outbox/       <- Outgoing d-mails (gitignored, transient)
          +-- archive/      <- Processed d-mails (tracked, audit trail)
+         +-- insights/     <- Insight Ledger (tracked, lumina.md + gommage.md)
          +-- events/       <- Append-only event store (JSONL, gitignored)
          +-- .run/         <- Ephemeral (gitignored)
               +-- flag.md       <- Checkpoint (consolidated from per-worker flags at exit)
@@ -251,53 +252,58 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 
 ## Usage
 
-Flags and repo path can be placed in any order. Both short (`-m`) and long (`--model`) forms are supported (GNU/POSIX hybrid):
+All commands accept an optional `[repo-path]` argument. When omitted, the current working directory is used.
 
 ```bash
-paintress -l ja .              # short flags
-paintress -lja .               # short flag with inline value
-paintress --lang ja .          # long flags
-paintress --model=opus .       # --flag=value form
-paintress -- ./my-repo         # -- terminates flags
+# Run from the repo directory (cwd fallback)
+cd /path/to/repo
+paintress run
+
+# Or specify the path explicitly
+paintress run /path/to/repo
+
+# Flags support GNU/POSIX long (--flag) and short (-f) forms
+paintress run -m opus,sonnet       # short flag
+paintress run --model=opus         # --flag=value form
 ```
 
 ```bash
 # Basic (Opus only, English prompts)
-paintress /path/to/repo
+paintress run
 
 # Japanese prompts
-paintress -l ja /path/to/repo
+paintress run -l ja
 
 # With Reserve Party
-paintress -m opus,sonnet /path/to/repo
+paintress run -m opus,sonnet
 
 # Swarm Mode: 3 parallel workers with setup command
-paintress -m opus,sonnet -w 3 --setup-cmd "bun install" /path/to/repo
+paintress run -m opus,sonnet -w 3 --setup-cmd "bun install"
 
 # Skip dev server (CLI tools, backend-only repos)
-paintress --no-dev /path/to/repo
+paintress run --no-dev
 
 # Dry run (generate prompts only)
-paintress -n /path/to/repo
+paintress run -n
 
 # Prune archived d-mails (dry-run, then execute)
-paintress archive-prune /path/to/repo
-paintress archive-prune -d 14 -x /path/to/repo
+paintress archive-prune
+paintress archive-prune -d 14 -x
 
 # Skip code review gate
-paintress --review-cmd "" /path/to/repo
+paintress run --review-cmd ""
 
 # Notify via ntfy.sh when HIGH severity D-Mail arrives
-paintress --notify-cmd 'curl -d "{message}" ntfy.sh/paintress' /path/to/repo
+paintress run --notify-cmd 'curl -d "{message}" ntfy.sh/paintress'
 
 # Skip approval gate (CI/automated runs)
-paintress --auto-approve /path/to/repo
+paintress run --auto-approve
 
 # Custom approval script
-paintress --approve-cmd './scripts/approve.sh "{message}"' /path/to/repo
+paintress run --approve-cmd './scripts/approve.sh "{message}"'
 
 # All options
-paintress \
+paintress run \
   -m opus,sonnet,haiku \
   -l ja \
   --max-expeditions 20 \
@@ -307,8 +313,7 @@ paintress \
   --dev-cmd "pnpm dev" \
   --dev-dir /path/to/frontend \
   --dev-url "http://localhost:3000" \
-  --review-cmd "codex review --base main" \
-  /path/to/repo
+  --review-cmd "codex review --base main"
 ```
 
 ## Options
@@ -322,26 +327,11 @@ paintress \
 | `--lang` | `-l` | `en` | Prompt language: `en`, `ja`, or `fr` |
 | `--version` | | | Show version and exit |
 
-### Run Flags
+For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--model` | `-m` | `opus` | Model(s), comma-separated for Reserve Party |
-| `--timeout` | `-t` | `1980` | Timeout per expedition in seconds (33 min) |
-| `--base-branch` | `-b` | `main` | Base git branch |
-| `--workers` | `-w` | `1` | Parallel workers (`0` = direct, `1` = single worktree, `2+` = Swarm) |
-| `--dry-run` | `-n` | `false` | Generate prompts without executing |
-| `--max-expeditions` | | `50` | Maximum number of expeditions |
-| `--no-dev` | | `false` | Skip dev server startup entirely |
-| `--claude-cmd` | | `claude` | Claude Code CLI command name |
-| `--dev-cmd` | | `npm run dev` | Dev server command |
-| `--dev-dir` | | repo path | Dev server working directory |
-| `--dev-url` | | `http://localhost:3000` | Dev server URL |
-| `--review-cmd` | | `codex review --base <base-branch>` | Code review command after PR creation |
-| `--setup-cmd` | | `""` | Command to run after worktree creation (e.g. `bun install`) |
-| `--notify-cmd` | | `""` | Notification command for HIGH severity D-Mail (`{title}`, `{message}` placeholders) |
-| `--approve-cmd` | | `""` | Approval command for HIGH severity D-Mail (`{message}` placeholder, exit 0 = approve) |
-| `--auto-approve` | | `false` | Skip approval gate for HIGH severity D-Mail |
+## Configuration
+
+Paintress stores project configuration in `.expedition/config.yaml` (generated by `paintress init`). See [docs/expedition-directory.md](docs/expedition-directory.md) for the full directory structure.
 
 ## Tracing (OpenTelemetry)
 
@@ -352,7 +342,7 @@ Paintress instruments key operations (expedition, review loop, worktree pool, de
 docker compose -f docker/compose.yaml up -d
 
 # Run paintress with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress ./your-repo
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress run
 
 # View traces at http://localhost:16686
 ```
@@ -402,7 +392,9 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - [docs/policies.md](docs/policies.md) — Event → Policy mapping
 - [docs/otel-backends.md](docs/otel-backends.md) — OTel backend configuration
 - [docs/approval-contract.md](docs/approval-contract.md) — Three-way approval contract
+- [docs/testing.md](docs/testing.md) — Test strategy and conventions
 - [docs/adr/](docs/adr/README.md) — Architecture Decision Records
+- [docs/shared-adr/](docs/shared-adr/README.md) — Cross-tool shared ADRs
 
 ## Prerequisites
 

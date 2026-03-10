@@ -2,7 +2,9 @@ package session_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,12 +31,12 @@ func TestValidateContinent_CreatesExpeditionDir(t *testing.T) {
 	}
 
 	expDir := filepath.Join(dir, ".expedition")
-	if _, err := os.Stat(expDir); os.IsNotExist(err) {
+	if _, err := os.Stat(expDir); errors.Is(err, fs.ErrNotExist) {
 		t.Error(".expedition directory should be created")
 	}
 
 	journalDir := filepath.Join(expDir, "journal")
-	if _, err := os.Stat(journalDir); os.IsNotExist(err) {
+	if _, err := os.Stat(journalDir); errors.Is(err, fs.ErrNotExist) {
 		t.Error(".expedition/journal directory should be created")
 	}
 }
@@ -197,7 +199,7 @@ func TestValidateContinent_CreatesDMailDirs(t *testing.T) {
 
 	for _, sub := range []string{"inbox", "outbox", "archive"} {
 		path := filepath.Join(dir, ".expedition", sub)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 			t.Errorf(".expedition/%s directory should be created", sub)
 		}
 	}

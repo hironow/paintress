@@ -12,12 +12,33 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
-// makeMCPListCmd creates the exec.Cmd for `claude mcp list`.
-// Package-level variable for test injection.
-var makeMCPListCmd = func(ctx context.Context, claudeCmd string) *exec.Cmd {
-	return exec.CommandContext(ctx, claudeCmd, "mcp", "list")
+// makeShellCmd creates an exec.Cmd via platform.NewShellCmd.
+// Package-level variable for test injection. Used for --version and mcp list.
+var makeShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+	return platform.NewShellCmd(ctx, cmdLine, args...)
+}
+
+// OverrideShellCmd replaces the command constructor for testing and returns a
+// cleanup function.
+func OverrideShellCmd(fn func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd) func() {
+	old := makeShellCmd
+	makeShellCmd = fn
+	return func() { makeShellCmd = old }
+}
+
+// lookPath resolves the binary path for a command. Defaults to
+// platform.LookPathShell. Injectable for testing tool-not-found scenarios.
+var lookPath = platform.LookPathShell
+
+// OverrideLookPath replaces the path lookup function for testing and returns a
+// cleanup function.
+func OverrideLookPath(fn func(cmd string) (string, error)) func() {
+	old := lookPath
+	lookPath = fn
+	return func() { lookPath = old }
 }
 
 // RunDoctor checks all required external commands and returns the results.
@@ -43,7 +64,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			Required: cmd.required,
 		}
 
-		path, err := exec.LookPath(cmd.name)
+		path, err := lookPath(cmd.name)
 		if err != nil {
 			if cmd.required {
 				check.Hint = fmt.Sprintf("install %s and ensure it is in PATH", cmd.name)
@@ -57,7 +78,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 		// Try to get version (best-effort, 500ms timeout)
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		out, err := exec.CommandContext(ctx, path, "--version").Output()
+		out, err := makeShellCmd(ctx, cmd.name, "--version").Output()
 		cancel()
 		if err == nil {
 			firstLine := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
@@ -93,14 +114,33 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				Name: "linear-mcp", Required: false,
 				Version: "skipped (claude not available)",
 			})
+			checks = append(checks, domain.DoctorCheck{
+				Name: "claude-inference", Required: false,
+				Version: "skipped (claude not available)",
+			})
 		} else {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			cmd := makeMCPListCmd(ctx, claudeCmd)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			cmd := makeShellCmd(ctx, claudeCmd, "mcp", "list")
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
-			checks = append(checks, checkClaudeAuth(mcpOutput, err))
+			authCheck := checkClaudeAuth(mcpOutput, err)
+			checks = append(checks, authCheck)
 			checks = append(checks, checkLinearMCP(mcpOutput, err))
+
+			// claude-inference: skip if auth failed
+			if !authCheck.OK {
+				checks = append(checks, domain.DoctorCheck{
+					Name: "claude-inference", Required: false,
+					Version: "skipped (auth failed)",
+				})
+			} else {
+				inferCtx, inferCancel := context.WithTimeout(context.Background(), 15*time.Second)
+				inferCmd := makeShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferOut, inferErr := inferCmd.Output()
+				inferCancel()
+				checks = append(checks, checkClaudeInference(string(inferOut), inferErr))
+			}
 		}
 	}
 
@@ -314,6 +354,7 @@ func checkSkills(continent string) domain.DoctorCheck {
 		if strings.Contains(content, "kind: feedback") &&
 			!strings.Contains(content, "kind: design-feedback") &&
 			!strings.Contains(content, "kind: implementation-feedback") {
+			check.Required = true // deprecated kind is a blocking failure (aligned with amadeus/sightjack)
 			check.Version = fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", entry.Name())
 			check.Hint = `run "paintress init --force <repo-path>" to regenerate skills with updated kind (feedback → implementation-feedback)`
 			return check
@@ -431,5 +472,27 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	check.Version = "Linear MCP not found or not connected"
 	check.Hint = "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
 		"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)"
+	return check
+}
+
+// checkClaudeInference determines if the Claude CLI can perform inference
+// by interpreting the result of a minimal "1+1=" prompt.
+func checkClaudeInference(output string, err error) domain.DoctorCheck {
+	check := domain.DoctorCheck{
+		Name:     "claude-inference",
+		Required: false,
+	}
+	if err != nil {
+		check.Version = "inference failed: " + err.Error()
+		check.Hint = "check API key, quota, and model access"
+		return check
+	}
+	if strings.TrimSpace(output) != "2" {
+		check.Version = "unexpected response"
+		check.Hint = "check API key, quota, and model access"
+		return check
+	}
+	check.OK = true
+	check.Version = "inference OK"
 	return check
 }

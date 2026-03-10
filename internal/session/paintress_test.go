@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -151,7 +152,7 @@ func TestPaintressRun_DryRun_ResumeFromFlag(t *testing.T) {
 
 	// expedition-001-prompt.md should NOT exist
 	oldPrompt := filepath.Join(p.logDir, "expedition-001-prompt.md")
-	if _, err := os.Stat(oldPrompt); !os.IsNotExist(err) {
+	if _, err := os.Stat(oldPrompt); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("expedition-001-prompt.md should not exist on resume")
 	}
 }
@@ -280,12 +281,12 @@ func TestWriteJournal_ResumedNumbering(t *testing.T) {
 
 	// Should create 008.md, not 001.md
 	path008 := filepath.Join(dir, ".expedition", "journal", "008.md")
-	if _, err := os.Stat(path008); os.IsNotExist(err) {
+	if _, err := os.Stat(path008); errors.Is(err, fs.ErrNotExist) {
 		t.Fatal("expected 008.md to be created")
 	}
 
 	path001 := filepath.Join(dir, ".expedition", "journal", "001.md")
-	if _, err := os.Stat(path001); !os.IsNotExist(err) {
+	if _, err := os.Stat(path001); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("001.md should not exist — journal should use resumed number")
 	}
 
@@ -526,7 +527,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	// Should have prompts for expeditions 5, 6, 7 (not 1, 2, 3)
 	for _, expNum := range []int{5, 6, 7} {
 		promptFile := filepath.Join(logDir, fmt.Sprintf("expedition-%03d-prompt.md", expNum))
-		if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+		if _, err := os.Stat(promptFile); errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("expected prompt file for expedition %d, not found", expNum)
 		}
 	}
@@ -534,7 +535,7 @@ func TestSwarmMode_FlagResume_ParallelNumbering(t *testing.T) {
 	// Should NOT have prompts for expeditions 1-4
 	for _, expNum := range []int{1, 2, 3, 4} {
 		promptFile := filepath.Join(logDir, fmt.Sprintf("expedition-%03d-prompt.md", expNum))
-		if _, err := os.Stat(promptFile); !os.IsNotExist(err) {
+		if _, err := os.Stat(promptFile); !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("prompt file for expedition %d should not exist (resumed from 5)", expNum)
 		}
 	}
@@ -770,7 +771,7 @@ func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
 
 	// Journal entry should exist for expedition 1
 	journalPath := filepath.Join(dir, ".expedition", "journal", "001.md")
-	if _, err := os.Stat(journalPath); os.IsNotExist(err) {
+	if _, err := os.Stat(journalPath); errors.Is(err, fs.ErrNotExist) {
 		t.Error("StatusParseError did not write journal entry")
 	}
 
@@ -1031,7 +1032,7 @@ __EXPEDITION_END__`
 
 	// Archive should contain the D-Mail
 	archivePath := filepath.Join(dir, ".expedition", "archive", "shared-dmail.md")
-	if _, err := os.Stat(archivePath); os.IsNotExist(err) {
+	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
 		t.Error("expected shared-dmail.md in archive/")
 	}
 }

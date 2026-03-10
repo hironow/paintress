@@ -11,13 +11,18 @@ invokes Claude Code to implement the change, opens a pull request,
 and optionally runs a review cycle. The loop continues until
 max-expeditions is reached or the issue queue is empty.
 
+If repo-path is omitted, the current working directory is used.
+
 ```
-paintress run <repo-path> [flags]
+paintress run [repo-path] [flags]
 ```
 
 ### Examples
 
 ```
+  # Run with defaults from current directory
+  paintress run
+
   # Run with defaults (opus model, 50 expeditions, 33min timeout)
   paintress run /path/to/repo
 
@@ -56,7 +61,7 @@ paintress run <repo-path> [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output

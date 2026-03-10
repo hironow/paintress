@@ -144,6 +144,14 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
 			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
+
+			// Best-effort: write Gommage insight for cross-tool observability
+			gommageWriter := NewInsightWriter(
+				domain.InsightsDir(p.config.Continent),
+				domain.RunDir(p.config.Continent),
+			)
+			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent)
+
 			expSpan.AddEvent("gommage",
 				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
 			)

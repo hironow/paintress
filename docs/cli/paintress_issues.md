@@ -10,14 +10,19 @@ Reads the team/project from .expedition/config.yaml. Supports filtering
 by issue state (e.g. todo, in-progress). Hyphens in state names are
 converted to spaces automatically.
 
+If repo-path is omitted, the current working directory is used.
+
 ```
-paintress issues <repo-path> [flags]
+paintress issues [repo-path] [flags]
 ```
 
 ### Examples
 
 ```
-  # List all issues
+  # List all issues (current directory)
+  paintress issues
+
+  # List all issues (explicit path)
   paintress issues /path/to/repo
 
   # Filter by state
@@ -37,7 +42,7 @@ paintress issues <repo-path> [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output

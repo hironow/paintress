@@ -6,6 +6,8 @@ Rebuild projections from event store
 
 Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.
 
+If repo-path is omitted, the current working directory is used.
+
 ```
 paintress rebuild [repo-path] [flags]
 ```
@@ -19,7 +21,7 @@ paintress rebuild [repo-path] [flags]
 ### Options inherited from parent commands
 
 ```
-  -l, --lang string     Output language: en, ja, fr (default "en")
+  -l, --lang string     Output language: en, ja (default from config)
       --no-color        Disable colored output (respects NO_COLOR env)
   -o, --output string   Output format: text, json (default "text")
   -v, --verbose         Enable verbose output

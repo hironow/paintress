@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -266,7 +268,7 @@ func TestArchivePruneCommand_PrunesEventFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, statErr := os.Stat(oldFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected old event file to be deleted")
 	}
 	if _, statErr := os.Stat(recentFile); statErr != nil {
@@ -310,7 +312,7 @@ func TestArchivePruneCommand_EventOnlyPrune(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, statErr := os.Stat(oldEventFile); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(oldEventFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected event file to be pruned even with no archive candidates")
 	}
 }

@@ -3,6 +3,8 @@
 package e2e
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,7 +39,7 @@ func TestE2E_PaintressInit(t *testing.T) {
 		".expedition/.run",
 	} {
 		path := filepath.Join(dir, sub)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("expected directory %s to exist", sub)
 		}
 	}

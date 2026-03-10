@@ -7,7 +7,8 @@
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
 - [approval-contract.md](approval-contract.md) — Three-way approval contract design
-- [dmail-protocol.md](dmail-protocol.md) — D-Mail protocol conventions
+- [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
+- [dmail-protocol.md](dmail-protocol.md) — D-Mail protocol implementation details
 - [testing.md](testing.md) — Test strategy and conventions
 
 ## CLI Reference
@@ -28,4 +29,5 @@
 
 ## Architecture Decision Records
 
-See [adr/README.md](adr/README.md) for the full index.
+- [adr/](adr/README.md) — Tool-specific ADRs
+- [shared-adr/](shared-adr/README.md) — Cross-tool shared ADRs (S0001–S0031)

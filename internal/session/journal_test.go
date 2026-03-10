@@ -1,6 +1,8 @@
 package session_test
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,7 +39,7 @@ func TestWriteJournal_CreatesDirectoryIfMissing(t *testing.T) {
 	}
 
 	path := filepath.Join(dir, ".expedition", "journal", "001.md")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		t.Error("journal file should be created")
 	}
 }
@@ -190,7 +192,7 @@ func TestWriteJournal_FilenamePadding(t *testing.T) {
 		session.WriteJournal(dir, report)
 
 		path := filepath.Join(dir, ".expedition", "journal", tt.filename)
-		if _, err := os.Stat(path); os.IsNotExist(err) {
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("expected file %s for expedition %d", tt.filename, tt.expedition)
 		}
 	}
