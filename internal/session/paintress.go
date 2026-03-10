@@ -261,6 +261,13 @@ func (p *Paintress) Run(ctx context.Context) int {
 	luminas := ScanJournalsForLumina(p.config.Continent)
 	if len(luminas) > 0 {
 		p.Logger.OK("%s", fmt.Sprintf(domain.Msg("lumina_extracted"), len(luminas)))
+
+		// Best-effort: write Lumina insights for cross-tool observability
+		insightWriter := NewInsightWriter(
+			domain.InsightsDir(p.config.Continent),
+			domain.RunDir(p.config.Continent),
+		)
+		WriteLuminaInsights(insightWriter, luminas)
 	}
 
 	// Pre-flight HIGH severity gate (once, before workers start).
