@@ -136,7 +136,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				})
 			} else {
 				inferCtx, inferCancel := context.WithTimeout(context.Background(), 15*time.Second)
-				inferCmd := newShellCmd(inferCtx, claudeCmd, "--verbose", "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 				inferOut, inferErr := inferCmd.Output()
 				inferCancel()
 				checks = append(checks, checkClaudeInference(string(inferOut), inferErr))

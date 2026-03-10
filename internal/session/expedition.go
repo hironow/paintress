@@ -199,7 +199,6 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	cmd := newCmd(expCtx, claudeCmd,
 		"--model", model,
 		"--output-format", "stream-json",
-		"--verbose",
 		"--dangerously-skip-permissions",
 		"--print",
 		"-p", prompt,
