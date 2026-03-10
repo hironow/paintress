@@ -2,8 +2,10 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -382,7 +384,7 @@ func ReadContextFiles(continent string) (string, error) {
 	dir := domain.ContextDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return "", nil
 		}
 		return "", fmt.Errorf("reading context directory: %w", err)

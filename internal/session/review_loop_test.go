@@ -4,8 +4,10 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -257,7 +259,7 @@ func TestReviewLoop_ShortTimeoutStillRunsReview(t *testing.T) {
 	p.runReviewLoop(context.Background(), report, 30*time.Second, "")
 
 	// then — the review script should have actually executed
-	if _, err := os.Stat(marker); os.IsNotExist(err) {
+	if _, err := os.Stat(marker); errors.Is(err, fs.ErrNotExist) {
 		t.Error("review command was never executed; reviewTimeout clamp needed")
 	}
 }

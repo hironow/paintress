@@ -1,6 +1,8 @@
 package session_test
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -70,10 +72,10 @@ func TestArchivePrune_Execute_DeletesOldFiles(t *testing.T) {
 	}
 
 	// old files should be gone
-	if _, err := os.Stat(old1); !os.IsNotExist(err) {
+	if _, err := os.Stat(old1); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("old1 should be deleted")
 	}
-	if _, err := os.Stat(old2); !os.IsNotExist(err) {
+	if _, err := os.Stat(old2); !errors.Is(err, fs.ErrNotExist) {
 		t.Error("old2 should be deleted")
 	}
 	// recent file should remain

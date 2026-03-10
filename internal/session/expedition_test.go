@@ -5,8 +5,10 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -389,7 +391,7 @@ func TestExpedition_Run_WritesPromptFile(t *testing.T) {
 	exp.Run(ctx)
 
 	promptFile := filepath.Join(exp.LogDir, "expedition-001-prompt.md")
-	if _, err := os.Stat(promptFile); os.IsNotExist(err) {
+	if _, err := os.Stat(promptFile); errors.Is(err, fs.ErrNotExist) {
 		t.Error("prompt file should be created")
 	}
 
@@ -409,7 +411,7 @@ func TestExpedition_Run_WritesOutputFile(t *testing.T) {
 	exp.Run(ctx)
 
 	outputFile := filepath.Join(exp.LogDir, "expedition-001-output.txt")
-	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+	if _, err := os.Stat(outputFile); errors.Is(err, fs.ErrNotExist) {
 		t.Error("output file should be created")
 	}
 }

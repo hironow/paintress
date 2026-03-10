@@ -210,21 +210,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, shutdownSignals...)
-	defer signal.Stop(sigCh)
-
-	go func() {
-		select {
-		case sig := <-sigCh:
-			logger.Warn("%s", fmt.Sprintf(domain.Msg("signal_received"), sig))
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
+	ctx, stop := signal.NotifyContext(ctx, shutdownSignals...)
+	defer stop()
 
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
 	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)

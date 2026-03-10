@@ -1,8 +1,10 @@
 package session_test
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,7 +96,7 @@ func TestWriteJournal_HighExpeditionNumber(t *testing.T) {
 
 	// %03d with 1234 produces "1234" (4 digits, no padding needed)
 	path := filepath.Join(dir, ".expedition", "journal", "1234.md")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		t.Error("should create 1234.md for expedition 1234")
 	}
 }
