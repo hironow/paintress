@@ -9,7 +9,7 @@ import (
 )
 
 // WriteGommageInsight writes a gommage insight when consecutive failures trigger escalation.
-// Best-effort: logs warnings on failure but does not propagate errors.
+// Best-effort: silent on failure, does not propagate errors.
 // Idempotent: InsightWriter deduplicates by title.
 func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, continent string) {
 	why := "Consecutive failures indicate systematic issue requiring intervention"

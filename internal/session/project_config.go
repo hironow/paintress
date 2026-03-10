@@ -31,7 +31,9 @@ func LoadProjectConfig(continent string) (*domain.ProjectConfig, error) {
 }
 
 // UpdateProjectConfig reads the project config, updates a single key, validates, and writes back.
-// Supported keys: tracker.team, tracker.project, lang.
+// Supported keys: tracker.team, tracker.project, tracker.cycle, lang, max_expeditions,
+// timeout_sec, model, base_branch, claude_cmd, dev_cmd, dev_dir, dev_url, review_cmd,
+// workers, setup_cmd, no_dev, notify_cmd, approve_cmd, auto_approve, max_retries.
 func UpdateProjectConfig(continent string, key string, value string) error {
 	cfg, err := LoadProjectConfig(continent)
 	if err != nil {

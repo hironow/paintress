@@ -7,7 +7,7 @@ import (
 )
 
 // WriteLuminaInsights writes insight entries for each discovered Lumina pattern.
-// Best-effort: logs warnings on failure but does not propagate errors.
+// Best-effort: silent on failure, does not propagate errors.
 // Idempotent: InsightWriter deduplicates by title.
 func WriteLuminaInsights(w *InsightWriter, luminas []domain.Lumina) {
 	if len(luminas) == 0 {
