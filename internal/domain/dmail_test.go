@@ -247,6 +247,71 @@ func stringContains(s, substr string) bool {
 	return false
 }
 
+func TestDMailMarshal_ContextRoundTrip(t *testing.T) {
+	// given
+	dm := domain.DMail{
+		Name:          "report-ISSUE-55",
+		Kind:          "report",
+		Description:   "expedition with insight context",
+		SchemaVersion: domain.DMailSchemaVersion,
+		Context: &domain.InsightContext{
+			Insights: []domain.InsightSummary{
+				{Source: "paintress", Summary: "Lumina score improved after retry"},
+				{Source: "amadeus", Summary: "ADR compliance at 95%"},
+			},
+		},
+		Body: "Details here.\n",
+	}
+
+	// when
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	parsed, err := domain.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail: %v", err)
+	}
+
+	// then
+	if parsed.Context == nil {
+		t.Fatal("expected non-nil Context after round-trip")
+	}
+	if len(parsed.Context.Insights) != 2 {
+		t.Fatalf("expected 2 insights, got %d", len(parsed.Context.Insights))
+	}
+	if parsed.Context.Insights[0].Source != "paintress" {
+		t.Errorf("insight[0].Source = %q, want %q", parsed.Context.Insights[0].Source, "paintress")
+	}
+	if parsed.Context.Insights[0].Summary != "Lumina score improved after retry" {
+		t.Errorf("insight[0].Summary = %q, want %q", parsed.Context.Insights[0].Summary, "Lumina score improved after retry")
+	}
+	if parsed.Context.Insights[1].Source != "amadeus" {
+		t.Errorf("insight[1].Source = %q, want %q", parsed.Context.Insights[1].Source, "amadeus")
+	}
+}
+
+func TestDMailMarshal_NilContextOmitted(t *testing.T) {
+	// given — DMail with nil Context
+	dm := domain.DMail{
+		Name:          "report-ISSUE-56",
+		Kind:          "report",
+		Description:   "no context",
+		SchemaVersion: domain.DMailSchemaVersion,
+	}
+
+	// when
+	data, err := dm.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	// then — context should not appear in output
+	if contains(string(data), "context:") {
+		t.Error("nil Context should be omitted from marshalled output")
+	}
+}
+
 func TestDMailMarshal_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given
 	dm := domain.DMail{

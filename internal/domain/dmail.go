@@ -108,6 +108,7 @@ type DMail struct {
 	Priority      int               `yaml:"priority,omitempty"`
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
+	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 	Body          string            `yaml:"-"`
 }
 
