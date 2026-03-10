@@ -16,6 +16,13 @@
 - Minimize mock usage; prefer real code
 - Run: `go test ./internal/... -count=1`
 
+## Integration Tests
+
+- Located in `tests/integration/`
+- No build tags required
+- Test component interactions with real external services (e.g., W&B API)
+- Run: `go test ./tests/integration/... -count=1`
+
 ## Scenario Tests
 
 - Located in `tests/scenario/`
