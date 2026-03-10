@@ -6,7 +6,6 @@ metadata:
   dmail-schema-version: "1"
   produces:
     - kind: report
-    - kind: implementation-feedback
 ---
 
 D-Mail send capability for paintress.
