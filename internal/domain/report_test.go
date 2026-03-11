@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -759,5 +760,98 @@ func TestExtractPRURLs_NilReport(t *testing.T) {
 	entries := domain.ExtractPRURLs(reports)
 	if len(entries) != 0 {
 		t.Errorf("expected 0, got %d", len(entries))
+	}
+}
+
+func TestParseReport_AlternativeEndMarker(t *testing.T) {
+	// LLMs sometimes hallucinate __END_EXPEDITION_REPORT__ instead of __EXPEDITION_END__.
+	// The parser must accept both.
+	output := `Starting...
+__EXPEDITION_REPORT__
+expedition: 60
+issue_id: MY-418
+issue_title: リンク作成ワークフロー
+mission_type: verify
+branch: none
+pr_url: none
+status: success
+reason: 全DoD検証Pass
+remaining_issues: 4
+bugs_found: 0
+bug_issues: none
+insight: Playwright CLIでKonva Canvas検証が可能
+__END_EXPEDITION_REPORT__
+Done.`
+
+	report, status := domain.ParseReport(output, 60)
+	if status != domain.StatusSuccess {
+		t.Fatalf("got %v, want domain.StatusSuccess — alt end marker should be accepted", status)
+	}
+	if report.IssueID != "MY-418" {
+		t.Errorf("IssueID = %q", report.IssueID)
+	}
+	if report.MissionType != "verify" {
+		t.Errorf("MissionType = %q", report.MissionType)
+	}
+	if report.Insight != "Playwright CLIでKonva Canvas検証が可能" {
+		t.Errorf("Insight = %q", report.Insight)
+	}
+}
+
+func TestParseReport_CanonicalEndMarkerStillWorks(t *testing.T) {
+	// Ensure canonical __EXPEDITION_END__ still works after adding alt marker.
+	output := `__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: success
+__EXPEDITION_END__`
+
+	_, status := domain.ParseReport(output, 1)
+	if status != domain.StatusSuccess {
+		t.Fatalf("canonical end marker broken, got %v", status)
+	}
+}
+
+func TestParseReport_BothEndMarkersPresent_CanonicalWins(t *testing.T) {
+	// When both markers exist, the earlier one (canonical) is used.
+	output := `__EXPEDITION_REPORT__
+expedition: 1
+issue_id: AWE-1
+status: success
+__EXPEDITION_END__
+extra stuff
+__END_EXPEDITION_REPORT__`
+
+	report, status := domain.ParseReport(output, 1)
+	if status != domain.StatusSuccess {
+		t.Fatalf("got %v", status)
+	}
+	if report.IssueID != "AWE-1" {
+		t.Errorf("IssueID = %q", report.IssueID)
+	}
+}
+
+func TestParseReport_Golden_Expedition060(t *testing.T) {
+	// Golden file: real expedition output with __END_EXPEDITION_REPORT__ and
+	// YAML-like list syntax. Verifies parser handles messy real-world output.
+	data, err := os.ReadFile("testdata/golden/expedition-060-alt-end-marker.txt")
+	if err != nil {
+		t.Fatalf("read golden file: %v", err)
+	}
+
+	report, status := domain.ParseReport(string(data), 60)
+	if status != domain.StatusSuccess {
+		t.Fatalf("golden file should parse as success, got %v", status)
+	}
+	if report.IssueID != "" {
+		// Note: the YAML format uses "target_issue" not "issue_id",
+		// so issue_id won't be extracted — but status IS extracted.
+		t.Logf("IssueID extracted: %q (field mismatch expected)", report.IssueID)
+	}
+	if report.Status != "success" {
+		t.Errorf("Status = %q, want 'success'", report.Status)
+	}
+	if report.BugsFound != 0 {
+		t.Errorf("BugsFound = %d, want 0", report.BugsFound)
 	}
 }
