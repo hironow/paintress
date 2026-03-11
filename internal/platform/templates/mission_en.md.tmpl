@@ -80,12 +80,12 @@ For each defect:
 When inbox contains impl-feedback D-Mails describing PR chain convergence issues (stacked PRs, behind-by counts, conflicts), and no actionable issues exist in earlier statuses, choose `consolidate` to unify the chain into a single PR.
 
 1. **Analyze chain**: Read impl-feedback D-Mail(s) to understand the PR chain structure (PR numbers, dependency order, conflicts, behind-by)
-2. **Create branch**: `git checkout -b consolidate/<chain-id> <base-branch>` (e.g. `consolidate/chain-a main`)
+2. **Create branch**: `git checkout -b consolidate/<PR-numbers> <base-branch>` where `<PR-numbers>` lists original PR numbers in descending order (e.g. `consolidate/pr-35-34-33 main`). If the list is too long, truncate with the most recent PRs.
 3. **Apply changes root-first**: For each PR in the chain, starting from the root (closest to base branch):
    - Fetch the PR's changes: `gh pr diff <PR-number> | git apply` or cherry-pick the commits
    - If conflict occurs: resolve it by consulting the associated Linear issue's DoD and implementation intent
    - Commit after each PR's changes are applied: `git commit -m "consolidate: apply <PR-number> (<issue-id>)"`
-4. **Create new PR**: `gh pr create --base <base-branch>` with body listing all consolidated PRs
+4. **Create new PR**: `gh pr create --base <base-branch>` — both the **title** and **body** must include the consolidated PR numbers (e.g. title: `consolidate: unify #33, #34, #35`)
 5. **Close old PRs**: For each old PR whose changes are fully contained in the new PR:
    - Comment: `Consolidated into #<new-PR-number>`
    - Close: `gh pr close <PR-number>`

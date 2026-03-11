@@ -80,12 +80,12 @@ Pour chaque défaut :
 Lorsque la boîte de réception contient des D-Mails impl-feedback décrivant des problèmes de convergence de chaîne de PR (PRs empilées, compteurs behind-by, conflits), et qu'aucune issue actionnable n'existe dans les statuts antérieurs, choisir `consolidate` pour unifier la chaîne en une seule PR.
 
 1. **Analyser la chaîne** : Lire les D-Mails impl-feedback pour comprendre la structure de la chaîne de PR (numéros de PR, ordre de dépendance, conflits, behind-by)
-2. **Créer la branche** : `git checkout -b consolidate/<chain-id> <base-branch>` (ex. `consolidate/chain-a main`)
+2. **Créer la branche** : `git checkout -b consolidate/<numéros-PR> <base-branch>` — lister les numéros de PR en ordre décroissant (ex. `consolidate/pr-35-34-33 main`). Tronquer si la liste est trop longue.
 3. **Appliquer les changements depuis la racine** : Pour chaque PR dans la chaîne, en commençant par la racine (la plus proche de la branche de base) :
    - Récupérer les changements de la PR : `gh pr diff <numéro-PR> | git apply` ou cherry-pick des commits
    - En cas de conflit : résoudre en consultant le DoD et l'intention d'implémentation de l'issue Linear associée
    - Commiter après l'application de chaque PR : `git commit -m "consolidate: apply <numéro-PR> (<issue-id>)"`
-4. **Créer la nouvelle PR** : `gh pr create --base <base-branch>` avec un corps listant toutes les PRs consolidées
+4. **Créer la nouvelle PR** : `gh pr create --base <base-branch>` — le **titre** et le **corps** doivent tous deux inclure les numéros de PR consolidées (ex. titre : `consolidate: unify #33, #34, #35`)
 5. **Fermer les anciennes PRs** : Pour chaque ancienne PR dont les changements sont entièrement contenus dans la nouvelle PR :
    - Commenter : `Consolidé dans #<numéro-nouvelle-PR>`
    - Fermer : `gh pr close <numéro-PR>`
