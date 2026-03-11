@@ -76,8 +76,8 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.ExpeditionReport, budget time.Duration, workDir string) domain.ReviewGateStatus {
 	ctx, loopSpan := platform.Tracer.Start(ctx, "review.loop",
 		trace.WithAttributes(
-			attribute.String("pr_url", report.PRUrl),
-			attribute.String("branch", report.Branch),
+			attribute.String("pr_url", platform.SanitizeUTF8(report.PRUrl)),
+			attribute.String("branch", platform.SanitizeUTF8(report.Branch)),
 		),
 	)
 	defer loopSpan.End()

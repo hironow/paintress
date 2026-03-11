@@ -48,7 +48,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
 				attribute.Int("worker.id", workerID),
-				attribute.String("model", model),
+				attribute.String("model", platform.SanitizeUTF8(model)),
 			),
 		)
 
@@ -282,8 +282,8 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		expSpan.AddEvent("expedition.complete",
 			trace.WithAttributes(
 				attribute.String("status", "success"),
-				attribute.String("issue_id", report.IssueID),
-				attribute.String("mission_type", report.MissionType),
+				attribute.String("issue_id", platform.SanitizeUTF8(report.IssueID)),
+				attribute.String("mission_type", platform.SanitizeUTF8(report.MissionType)),
 			),
 		)
 		p.handleSuccess(report)

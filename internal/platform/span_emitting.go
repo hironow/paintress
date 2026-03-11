@@ -6,10 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// SanitizeUTF8 replaces invalid UTF-8 bytes with the Unicode replacement character.
+// Use this before passing strings from external sources (Claude output, file system,
+// error messages) to OTel span attributes, which require valid UTF-8.
+func SanitizeUTF8(s string) string {
+	return strings.ToValidUTF8(s, "\uFFFD")
+}
 
 // DefaultMaxValueLen is the default truncation limit for raw event values.
 const DefaultMaxValueLen = 512

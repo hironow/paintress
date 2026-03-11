@@ -60,13 +60,13 @@ func (s *SpanEmittingStreamReader) handleHookStarted(msg *StreamMessage) {
 		attribute.String("hook.name", hookName),
 	}
 	if msg.HookID != "" {
-		attrs = append(attrs, attribute.String("hook.id", msg.HookID))
+		attrs = append(attrs, attribute.String("hook.id", SanitizeUTF8(msg.HookID)))
 	}
 	if msg.HookEvent != "" {
-		attrs = append(attrs, attribute.String("hook.event", msg.HookEvent))
+		attrs = append(attrs, attribute.String("hook.event", SanitizeUTF8(msg.HookEvent)))
 	}
 	if msg.Command != "" {
-		attrs = append(attrs, attribute.String("hook.command", msg.Command))
+		attrs = append(attrs, attribute.String("hook.command", SanitizeUTF8(msg.Command)))
 	}
 	if s.sessionID != "" {
 		attrs = append(attrs, WeaveThreadNestedAttrs(s.sessionID)...)
@@ -89,7 +89,7 @@ func (s *SpanEmittingStreamReader) handleHookResponse(msg *StreamMessage) {
 		span.SetAttributes(attribute.Int("hook.exit_code", *msg.ExitCode))
 	}
 	if msg.Outcome != "" {
-		span.SetAttributes(attribute.String("hook.outcome", msg.Outcome))
+		span.SetAttributes(attribute.String("hook.outcome", SanitizeUTF8(msg.Outcome)))
 	}
 	span.End()
 	delete(s.openSpans, key)
@@ -110,12 +110,12 @@ func (s *SpanEmittingStreamReader) InitAttrs() []attribute.KeyValue {
 	var attrs []attribute.KeyValue
 
 	if msg.Model != "" {
-		attrs = append(attrs, attribute.String("claude.init.model", msg.Model))
+		attrs = append(attrs, attribute.String("claude.init.model", SanitizeUTF8(msg.Model)))
 	}
 	if len(msg.MCPServers) > 0 {
 		names := make([]string, len(msg.MCPServers))
 		for i, srv := range msg.MCPServers {
-			names[i] = srv.Name
+			names[i] = SanitizeUTF8(srv.Name)
 		}
 		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", names))
 	}
