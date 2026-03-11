@@ -1833,6 +1833,64 @@ func TestMissionText_FallbackToEnglish(t *testing.T) {
 	}
 }
 
+func TestMissionText_English_ContainsConsolidate(t *testing.T) {
+	text := platform.MissionText("en")
+	if !containsStr(text, "consolidate") {
+		t.Error("English mission should contain 'consolidate'")
+	}
+	if !containsStr(text, "consolidate Procedure") {
+		t.Error("English mission should contain 'consolidate Procedure' section")
+	}
+	if !containsStr(text, "Protected branches") {
+		t.Error("English mission should contain protected branches constraint")
+	}
+}
+
+func TestMissionText_Japanese_ContainsConsolidate(t *testing.T) {
+	text := platform.MissionText("ja")
+	if !containsStr(text, "consolidate") {
+		t.Error("Japanese mission should contain 'consolidate'")
+	}
+	if !containsStr(text, "consolidate の手順") {
+		t.Error("Japanese mission should contain 'consolidate の手順' section")
+	}
+}
+
+func TestMissionText_French_ContainsConsolidate(t *testing.T) {
+	text := platform.MissionText("fr")
+	if !containsStr(text, "consolidate") {
+		t.Error("French mission should contain 'consolidate'")
+	}
+	if !containsStr(text, "Procédure consolidate") {
+		t.Error("French mission should contain 'Procédure consolidate' section")
+	}
+}
+
+func TestExpeditionPrompt_ContainsConsolidateMissionType(t *testing.T) {
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			orig := domain.Lang
+			defer func() { domain.Lang = orig }()
+			domain.Lang = lang
+
+			data := domain.PromptData{
+				Number:         1,
+				Timestamp:      "2026-03-11",
+				Bt:             "`",
+				Cb:             "```",
+				BaseBranch:     "main",
+				ReserveSection: "Model: opus",
+				MissionSection: platform.MissionText(lang),
+			}
+
+			result := platform.RenderExpeditionPrompt(lang, data)
+			if !containsStr(result, "implement|verify|fix|consolidate") {
+				t.Errorf("expedition prompt (%s) should contain 'implement|verify|fix|consolidate'", lang)
+			}
+		})
+	}
+}
+
 func TestExpedition_Run_ShortTimeout(t *testing.T) {
 	exp := newTestExpedition(t, "output", 0)
 	exp.Config.TimeoutSec = 1 // very short timeout

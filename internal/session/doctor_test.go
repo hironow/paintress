@@ -823,3 +823,68 @@ func TestCheckClaudeInference_OKWithWhitespace(t *testing.T) {
 		t.Errorf("inference check should pass for trimmed '2', version: %s", check.Version)
 	}
 }
+
+func TestCheckGHScopes_AllScopesPresent(t *testing.T) {
+	// given: gh auth status output with all required scopes
+	output := "github.com\n  ✓ Logged in to github.com account user (keyring)\n  - Token scopes: 'admin:public_key', 'read:org', 'read:project', 'repo', 'workflow'\n"
+
+	// when
+	check := session.ExportCheckGHScopes(output, nil)
+
+	// then
+	if !check.OK {
+		t.Errorf("gh-scopes should pass when all required scopes present, version: %s", check.Version)
+	}
+	if check.Name != "gh-scopes" {
+		t.Errorf("expected name 'gh-scopes', got %q", check.Name)
+	}
+	if check.Required {
+		t.Error("gh-scopes should NOT be required (warning)")
+	}
+}
+
+func TestCheckGHScopes_MissingReadProject(t *testing.T) {
+	// given: gh auth status output missing read:project
+	output := "github.com\n  ✓ Logged in to github.com account user (keyring)\n  - Token scopes: 'admin:public_key', 'repo', 'workflow'\n"
+
+	// when
+	check := session.ExportCheckGHScopes(output, nil)
+
+	// then
+	if check.OK {
+		t.Error("gh-scopes should fail when read:project is missing")
+	}
+	if !strings.Contains(check.Version, "read:project") {
+		t.Errorf("version should mention missing scope, got %q", check.Version)
+	}
+	if !strings.Contains(check.Hint, "gh auth refresh") {
+		t.Errorf("hint should suggest gh auth refresh, got %q", check.Hint)
+	}
+}
+
+func TestCheckGHScopes_CommandFailed(t *testing.T) {
+	// given: gh auth status failed
+	// when
+	check := session.ExportCheckGHScopes("", fmt.Errorf("exit status 1"))
+
+	// then
+	if check.OK {
+		t.Error("gh-scopes should fail when command errors")
+	}
+	if !strings.Contains(check.Version, "not authenticated") {
+		t.Errorf("version should indicate not authenticated, got %q", check.Version)
+	}
+}
+
+func TestCheckGHScopes_NoScopesLine(t *testing.T) {
+	// given: gh auth status output without Token scopes line
+	output := "github.com\n  ✓ Logged in to github.com account user (keyring)\n"
+
+	// when
+	check := session.ExportCheckGHScopes(output, nil)
+
+	// then
+	if check.OK {
+		t.Error("gh-scopes should fail when scopes line not found")
+	}
+}

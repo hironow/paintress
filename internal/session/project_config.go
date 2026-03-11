@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"gopkg.in/yaml.v3"
@@ -33,7 +34,7 @@ func LoadProjectConfig(continent string) (*domain.ProjectConfig, error) {
 // UpdateProjectConfig reads the project config, updates a single key, validates, and writes back.
 // Supported keys: tracker.team, tracker.project, tracker.cycle, lang, max_expeditions,
 // timeout_sec, model, base_branch, claude_cmd, dev_cmd, dev_dir, dev_url, review_cmd,
-// workers, setup_cmd, no_dev, notify_cmd, approve_cmd, auto_approve, max_retries.
+// workers, setup_cmd, no_dev, notify_cmd, approve_cmd, auto_approve, max_retries, wait_timeout.
 func UpdateProjectConfig(continent string, key string, value string) error {
 	cfg, err := LoadProjectConfig(continent)
 	if err != nil {
@@ -121,6 +122,12 @@ func setProjectConfigField(cfg *domain.ProjectConfig, key string, value string) 
 			return fmt.Errorf("invalid max_retries %q: must be non-negative integer", value)
 		}
 		cfg.MaxRetries = n
+	case "wait_timeout":
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("invalid wait_timeout %q: %w", value, err)
+		}
+		cfg.WaitTimeout = d
 	default:
 		return fmt.Errorf("unknown config key %q", key)
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -57,11 +56,11 @@ func FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir st
 	}
 	span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
 
-	data, err := os.ReadFile(outputPath)
+	data, err := SanitizeJSONFile(outputPath)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.issues"))
-		return nil, fmt.Errorf("read issues output: %w", err)
+		return nil, fmt.Errorf("parse issues output: %w", err)
 	}
 
 	var issues []domain.Issue

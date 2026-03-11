@@ -63,7 +63,7 @@ rules:
       MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
       TracerProvider と同様に集中管理してください。
       Ref: Shared ADR 0003 — opentelemetry-noop-default
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: otel.SetMeterProvider(...)
       - pattern-not-inside: |
@@ -123,7 +123,7 @@ rules:
       OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
       マップキーや表示用ラベルの場合は nosemgrep を付与してください。
       Ref: Shared ADR 0005 — fsnotify-daemon-design
-    severity: WARNING
+    severity: ERROR
     pattern-regex: '\+\s*"/"\s*\+'
     paths:
       exclude:
@@ -179,7 +179,7 @@ rules:
       全ての依存は実サービスで構成してください。
       モックが必要なテストは integration テストに移動してください。
       Ref: phonewave docs/adr/0007-testcontainers-docker-e2e.md
-    severity: WARNING
+    severity: ERROR
     pattern-either:
       - pattern: gomock.NewController(...)
       - pattern: httptest.NewServer(...)
@@ -234,13 +234,47 @@ rules:
       状態ディレクトリは configBase(cmd) から取得してください。
       CWD 依存はテストの非決定性とパスのずれを引き起こします。
       Ref: phonewave docs/adr/0009-config-relative-state-directory.md
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: os.Getwd()
       - pattern-inside: |
           func($CMD *cobra.Command, $ARGS []string) error {
             ...
           }
+
+  # --- OTel UTF-8 safety ---
+
+  # Rule 14: attribute.String with unsanitized variable value
+  # Source: OTel protobuf requires valid UTF-8 in string fields.
+  # External data (Claude output, fsnotify events, error messages) may contain
+  # invalid UTF-8 bytes, causing "traces export: string field contains invalid UTF-8".
+  - id: otel-attribute-string-unsanitized
+    languages: [go]
+    message: |
+      attribute.String() に SanitizeUTF8 でラップされていない変数を渡しています。
+      外部データ（Claude 出力、ファイルシステムイベント、エラーメッセージ）には
+      無効な UTF-8 バイトが含まれる可能性があり、OTel export 時にエラーになります。
+      platform.SanitizeUTF8(val) または SanitizeUTF8(val) でラップしてください。
+      文字列リテラルの場合は nosemgrep を付与してください。
+    severity: ERROR
+    patterns:
+      - pattern: attribute.String($KEY, $VAL)
+      - pattern-not: attribute.String($KEY, "...")
+      - pattern-not: attribute.String($KEY, platform.SanitizeUTF8(...))
+      - pattern-not: attribute.String($KEY, SanitizeUTF8(...))
+
+  # Rule 15: attribute.StringSlice with unsanitized values
+  - id: otel-attribute-stringslice-unsanitized
+    languages: [go]
+    message: |
+      attribute.StringSlice() に渡すスライスの各要素を SanitizeUTF8 でラップしてください。
+      platform.SanitizeUTF8Slice(vals) または SanitizeUTF8Slice(vals) でラップしてください。
+      外部データには無効な UTF-8 バイトが含まれる可能性があります。
+    severity: ERROR
+    patterns:
+      - pattern: attribute.StringSlice($KEY, $VAL)
+      - pattern-not: attribute.StringSlice($KEY, platform.SanitizeUTF8Slice(...))
+      - pattern-not: attribute.StringSlice($KEY, SanitizeUTF8Slice(...))
 
   # --- D4: Resource leak detection ---
 

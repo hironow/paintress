@@ -76,8 +76,8 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.ExpeditionReport, budget time.Duration, workDir string) domain.ReviewGateStatus {
 	ctx, loopSpan := platform.Tracer.Start(ctx, "review.loop",
 		trace.WithAttributes(
-			attribute.String("pr_url", report.PRUrl),
-			attribute.String("branch", report.Branch),
+			attribute.String("pr_url", platform.SanitizeUTF8(report.PRUrl)),
+			attribute.String("branch", platform.SanitizeUTF8(report.Branch)),
 		),
 	)
 	defer loopSpan.End()
@@ -185,7 +185,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			trace.WithAttributes(
 				append([]attribute.KeyValue{
 					attribute.Int("cycle", cycle),
-					attribute.String("model", model),
+					attribute.String("model", platform.SanitizeUTF8(model)),
 				}, platform.GenAISpanAttrs(model)...)...,
 			),
 		)
@@ -245,7 +245,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("model", model),
+				attribute.String("model", platform.SanitizeUTF8(model)),
 				attribute.Int("matched_dmails", len(dmails)),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
@@ -280,7 +280,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	if err != nil {
 		p.Logger.Warn("Follow-up failed: %v", err)
 		followUpSpan.AddEvent("followup.error",
-			trace.WithAttributes(attribute.String("error", err.Error())),
+			trace.WithAttributes(attribute.String("error", platform.SanitizeUTF8(err.Error()))),
 		)
 		return
 	}

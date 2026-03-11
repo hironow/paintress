@@ -14,7 +14,7 @@ func RecordExpedition(ctx context.Context, status string) {
 	)
 	c.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String("status", status),
+			attribute.String("status", SanitizeUTF8(status)),
 		),
 	)
 }
@@ -26,7 +26,7 @@ func RecordEventEmitError(ctx context.Context, eventType string) {
 	)
 	c.Add(ctx, 1,
 		metric.WithAttributes(
-			attribute.String("event_type", eventType),
+			attribute.String("event_type", SanitizeUTF8(eventType)),
 		),
 	)
 }

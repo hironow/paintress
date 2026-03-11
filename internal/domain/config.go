@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 )
 
 // Default values for Config fields. Used by DefaultProjectConfig and post-load
@@ -12,6 +13,9 @@ const (
 	DefaultModel      = "opus"
 	DefaultTimeoutSec = 1980
 )
+
+// DefaultWaitTimeout is the default D-Mail waiting phase timeout.
+const DefaultWaitTimeout = 30 * time.Minute
 
 // Config holds the runtime configuration for a Paintress session.
 type Config struct {
@@ -32,8 +36,9 @@ type Config struct {
 	OutputFormat   string // "text" (default) or "json"
 	NotifyCmd      string // External notification command ({title}, {message} placeholders)
 	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
-	AutoApprove    bool   // Skip approval gate for HIGH severity D-Mail
-	MaxRetries     int    // Maximum retry attempts per unique issue set (default: 3)
+	AutoApprove    bool          // Skip approval gate for HIGH severity D-Mail
+	MaxRetries     int           // Maximum retry attempts per unique issue set (default: 3)
+	WaitTimeout    time.Duration `yaml:"wait_timeout,omitempty"` // D-Mail waiting phase timeout (0 = no timeout, <0 = disable waiting)
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
@@ -51,6 +56,7 @@ func DefaultConfig() Config {
 		Workers:        pc.Workers,
 		OutputFormat:   "text",
 		MaxRetries:     pc.MaxRetries,
+		WaitTimeout:    pc.WaitTimeout,
 	}
 }
 
@@ -78,6 +84,7 @@ type ProjectConfig struct {
 	ApproveCmd     string             `yaml:"approve_cmd,omitempty"`
 	AutoApprove    bool               `yaml:"auto_approve,omitempty"`
 	MaxRetries     int                `yaml:"max_retries,omitempty"`
+	WaitTimeout    time.Duration      `yaml:"wait_timeout,omitempty"`
 	Computed       ComputedConfig     `yaml:"computed,omitempty"`
 }
 
@@ -94,6 +101,7 @@ func DefaultProjectConfig() ProjectConfig {
 		DevURL:         "http://localhost:3000",
 		Workers:        1,
 		MaxRetries:     3,
+		WaitTimeout:    DefaultWaitTimeout,
 	}
 }
 

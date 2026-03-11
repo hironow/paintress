@@ -68,6 +68,7 @@ If repo-path is omitted, the current working directory is used.`,
 	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
 	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
 	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for HIGH severity D-Mail")
+	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting)")
 
 	return cmd
 }
@@ -92,6 +93,7 @@ func configFromProject(pc *domain.ProjectConfig) domain.Config {
 		ApproveCmd:     pc.ApproveCmd,
 		AutoApprove:    pc.AutoApprove,
 		MaxRetries:     pc.MaxRetries,
+		WaitTimeout:    pc.WaitTimeout,
 	}
 }
 
@@ -181,6 +183,9 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Changed("auto-approve") {
 		cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 	}
+	if cmd.Flags().Changed("wait-timeout") {
+		cfg.WaitTimeout, _ = cmd.Flags().GetDuration("wait-timeout")
+	}
 
 	// Derive review-cmd from base-branch if neither CLI nor config set it
 	if cfg.ReviewCmd == "" {
@@ -219,6 +224,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if rpErr != nil {
 		return rpErr
 	}
+	logger.Info("paintress run: starting initial expedition cycle...")
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
 		return ucErr
@@ -226,5 +232,38 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
 	}
-	return nil
+	logger.Info("paintress run: initial expedition cycle completed (exit code %d)", exitCode)
+
+	// Skip waiting in dry-run mode or when explicitly disabled
+	if cfg.DryRun || cfg.WaitTimeout < 0 {
+		return nil
+	}
+
+	// Start inbox monitor for waiting phase
+	inboxCh, monErr := session.MonitorInbox(ctx, continent, logger)
+	if monErr != nil {
+		return fmt.Errorf("inbox monitor: %w", monErr)
+	}
+
+	// Waiting loop: wait for D-Mail → re-run expeditions → repeat
+	for {
+		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
+		if waitErr != nil {
+			return waitErr
+		}
+		if !arrived {
+			return nil // timeout or cancel → clean exit
+		}
+
+		// Re-run expeditions on D-Mail arrival
+		logger.Info("paintress run: D-Mail received, re-running expedition cycle...")
+		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
+		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
+		if ucErr != nil {
+			return ucErr
+		}
+		if exitCode != 0 {
+			return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
+		}
+	}
 }

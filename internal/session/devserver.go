@@ -50,8 +50,8 @@ func (ds *DevServer) setRunning(v bool) {
 func (ds *DevServer) Start(ctx context.Context) error {
 	ctx, span := platform.Tracer.Start(ctx, "devserver.start",
 		trace.WithAttributes(
-			attribute.String("cmd", ds.cmd),
-			attribute.String("url", ds.url),
+			attribute.String("cmd", platform.SanitizeUTF8(ds.cmd)),
+			attribute.String("url", platform.SanitizeUTF8(ds.url)),
 		),
 	)
 	defer span.End()

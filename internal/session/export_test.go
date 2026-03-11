@@ -22,3 +22,4 @@ var ExportCheckWritability = checkWritability
 var ExportCheckSkills = checkSkills
 var ExportCheckEventStore = checkEventStore
 var ExportCheckClaudeInference = checkClaudeInference
+var ExportCheckGHScopes = checkGHScopes

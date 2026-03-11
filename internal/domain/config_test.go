@@ -3,6 +3,7 @@ package domain_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"gopkg.in/yaml.v3"
@@ -155,6 +156,9 @@ func TestDefaultProjectConfig_MatchesDefaultConfig(t *testing.T) {
 	if pc.MaxRetries != rc.MaxRetries {
 		t.Errorf("MaxRetries mismatch: ProjectConfig=%d, Config=%d", pc.MaxRetries, rc.MaxRetries)
 	}
+	if pc.WaitTimeout != rc.WaitTimeout {
+		t.Errorf("WaitTimeout mismatch: ProjectConfig=%v, Config=%v", pc.WaitTimeout, rc.WaitTimeout)
+	}
 }
 
 func TestValidateProjectConfig_NegativeFields(t *testing.T) {
@@ -256,6 +260,23 @@ func TestProjectConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
 	// then
 	if cfg.Computed != (domain.ComputedConfig{}) {
 		t.Error("Computed should be zero-value by default")
+	}
+}
+
+func TestDefaultConfig_WaitTimeout(t *testing.T) {
+	// when
+	cfg := domain.DefaultConfig()
+
+	// then
+	if cfg.WaitTimeout != domain.DefaultWaitTimeout {
+		t.Errorf("expected WaitTimeout=%v, got %v", domain.DefaultWaitTimeout, cfg.WaitTimeout)
+	}
+}
+
+func TestDefaultWaitTimeout_Is30Minutes(t *testing.T) {
+	// then
+	if domain.DefaultWaitTimeout != 30*time.Minute {
+		t.Errorf("expected 30m, got %v", domain.DefaultWaitTimeout)
 	}
 }
 

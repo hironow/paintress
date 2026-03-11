@@ -12,7 +12,7 @@ All Expeditioners must read this file and carry out their mission.
 
 ## Mission Assessment
 
-Analyze the issue content and classify it into one of three types:
+Analyze the issue content and inbox D-Mails, and classify into one of four types:
 
 ### implement
 
@@ -27,6 +27,10 @@ or includes a checklist (`- [ ]`).
 ### fix
 
 When defects are found during verify, you transition to fix within the same Expedition. This is not a separate selection — it follows naturally from verify results.
+
+### consolidate
+
+Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-Mails describe PR chain convergence issues and no actionable issues exist in earlier statuses.
 
 ---
 
@@ -70,6 +74,30 @@ For each defect:
 7. Create PR via GitHub (body includes `Closes <bug-issue-id>`)
 8. Update the bug issue to a review status in Linear (e.g. "In Review")
 9. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
+
+## consolidate Procedure
+
+When inbox contains impl-feedback D-Mails describing PR chain convergence issues (stacked PRs, behind-by counts, conflicts), and no actionable issues exist in earlier statuses, choose `consolidate` to unify the chain into a single PR.
+
+1. **Analyze chain**: Read impl-feedback D-Mail(s) to understand the PR chain structure (PR numbers, dependency order, conflicts, behind-by)
+2. **Create branch**: `git checkout -b consolidate/<PR-numbers> <base-branch>` where `<PR-numbers>` lists original PR numbers in descending order (e.g. `consolidate/pr-35-34-33 main`). If the list is too long, truncate with the most recent PRs.
+3. **Apply changes root-first**: For each PR in the chain, starting from the root (closest to base branch):
+   - Fetch the PR's changes: `gh pr diff <PR-number> | git apply` or cherry-pick the commits
+   - If conflict occurs: resolve it by consulting the associated Linear issue's DoD and implementation intent
+   - Commit after each PR's changes are applied: `git commit -m "consolidate: apply <PR-number> (<issue-id>)"`
+4. **Create new PR**: `gh pr create --base <base-branch>` — both the **title** and **body** must include the consolidated PR numbers (e.g. title: `consolidate: unify #33, #34, #35`)
+5. **Close old PRs**: For each old PR whose changes are fully contained in the new PR:
+   - Comment: `Consolidated into #<new-PR-number>`
+   - Close: `gh pr close <PR-number>`
+6. **Report**: Output expedition report with `mission_type: consolidate`
+
+### consolidate Constraints
+
+- **Protected branches**: Never directly modify or checkout from these branches as working branches: main, master, develop, staging, dev, stg, prod, production. Only use them as `--base` for the new PR.
+- **Do not merge**: Create the consolidated PR but do NOT merge it. Let the normal review flow handle merging.
+- **Do not close unless contained**: Only close old PRs if their changes are fully present in the new PR.
+- **Linear status unchanged**: Do not change issue status — the issue linkage changes with the new PR, but the status stays as-is.
+- **Partial completion**: If you cannot complete the full chain before timeout, include progress in the reason field (applied PRs, remaining PRs) so the next expedition can continue from the pushed branch.
 
 ---
 

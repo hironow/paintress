@@ -62,11 +62,17 @@ func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
 	}
 
 	startMarker := "__EXPEDITION_REPORT__"
-	endMarker := "__EXPEDITION_END__"
 	startIdx := strings.Index(output, startMarker)
-	endIdx := strings.Index(output, endMarker)
+	if startIdx == -1 {
+		return nil, StatusParseError
+	}
 
-	if startIdx == -1 || endIdx == -1 || endIdx <= startIdx {
+	// Accept both canonical and commonly hallucinated end markers.
+	endIdx := strings.Index(output, "__EXPEDITION_END__")
+	if alt := strings.Index(output, "__END_EXPEDITION_REPORT__"); alt != -1 && (endIdx == -1 || alt < endIdx) {
+		endIdx = alt
+	}
+	if endIdx == -1 || endIdx <= startIdx {
 		return nil, StatusParseError
 	}
 

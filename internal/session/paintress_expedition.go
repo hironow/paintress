@@ -48,7 +48,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			trace.WithAttributes(
 				attribute.Int("expedition.number", exp),
 				attribute.Int("worker.id", workerID),
-				attribute.String("model", model),
+				attribute.String("model", platform.SanitizeUTF8(model)),
 			),
 		)
 
@@ -107,6 +107,15 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			InboxDMails: inboxDMails,
 			Notifier:    p.notifier,
 		}
+		// archiveInbox moves all inbox D-Mails to archive. Called on error/gommage
+		// paths; the success path is covered by dispatchExpeditionResult's defer.
+		archiveInbox := func() {
+			for _, dm := range expedition.InboxDMails {
+				if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
+					p.Logger.Warn("dmail archive: %v", err)
+				}
+			}
+		}
 
 		if p.config.DryRun {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
@@ -129,11 +138,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		if err != nil {
 			if ctx.Err() != nil {
+				archiveInbox()
 				releaseWorkDir()
 				expSpan.End()
 				return nil
 			}
 			p.handleExpeditionError(expSpan, exp, expedition, flagDir, err)
+			archiveInbox()
 		} else {
 			if retErr := p.dispatchExpeditionResult(ctx, expCtx, expSpan, exp, expedition, flagDir, workDir, output, expStart); retErr != nil {
 				releaseWorkDir()
@@ -192,8 +203,8 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 		if newModel != prevModel {
 			expSpan.AddEvent("model.switched",
 				trace.WithAttributes(
-					attribute.String("from", prevModel),
-					attribute.String("to", newModel),
+					attribute.String("from", platform.SanitizeUTF8(prevModel)),
+					attribute.String("to", platform.SanitizeUTF8(newModel)),
 				),
 			)
 		}
@@ -234,6 +245,16 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 // status (complete/success/skipped/failed/parse-error), and updates counters.
 // Returns errComplete when all issues are done; nil otherwise.
 func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output string, expStart time.Time) error {
+	// Archive ALL inbox D-Mails when this function returns, regardless of status.
+	// Without this, D-Mails remain in inbox and re-trigger waiting mode infinitely.
+	defer func() {
+		for _, dm := range expedition.InboxDMails {
+			if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
+				p.Logger.Warn("dmail archive: %v", err)
+			}
+		}
+	}()
+
 	_, parseSpan := platform.Tracer.Start(expCtx, "report.parse") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called immediately after ParseReport [permanent]
 	report, status := domain.ParseReport(output, exp)
 	parseSpan.End()
@@ -282,8 +303,8 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		expSpan.AddEvent("expedition.complete",
 			trace.WithAttributes(
 				attribute.String("status", "success"),
-				attribute.String("issue_id", report.IssueID),
-				attribute.String("mission_type", report.MissionType),
+				attribute.String("issue_id", platform.SanitizeUTF8(report.IssueID)),
+				attribute.String("mission_type", platform.SanitizeUTF8(report.MissionType)),
 			),
 		)
 		p.handleSuccess(report)
@@ -326,11 +347,6 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
-			}
-		}
-		for _, dm := range expedition.InboxDMails {
-			if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
-				p.Logger.Warn("dmail archive: %v", err)
 			}
 		}
 		p.consecutiveFailures.Store(0)
