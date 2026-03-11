@@ -360,7 +360,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		budget := platform.CalculateContextBudget(messages)
 		invokeSpan.SetAttributes(budget.Attrs()...)
 		if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
-			_, _ = fmt.Fprintln(os.Stderr, "WARN: "+warning)
+			e.Logger.Warn("%s", warning)
 		}
 	}()
 

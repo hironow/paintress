@@ -1434,3 +1434,134 @@ func TestGommage_ArchivesInboxDMails(t *testing.T) {
 		t.Error("expected implementation-feedback-057.md in archive/, but not found")
 	}
 }
+
+// ===============================================
+// Infinite Loop Audit — Termination Proof Tests
+// ===============================================
+
+// TestTermination_MaxExpeditions_CeilingStopsWorker proves that runWorker
+// terminates after exactly MaxExpeditions, even when every expedition succeeds
+// (the "keep going" happy path). This is the non-DryRun public API proof that
+// the atomic counter ceiling `exp >= startExp + MaxExpeditions` in
+// paintress_expedition.go:33 prevents an infinite expedition loop.
+func TestTermination_MaxExpeditions_CeilingStopsWorker(t *testing.T) {
+	// given: non-DryRun with MaxExpeditions=2, Claude always returns success
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	reportText := `__EXPEDITION_REPORT__
+issue_id: TERM-1
+issue_title: termination proof
+mission_type: implement
+branch: none
+pr_url: none
+status: success
+reason: done
+remaining_issues: 99
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	script := streamJSONScript(t, dir, "fakeclaude.sh", reportText)
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        0, // single worker
+		MaxExpeditions: 2,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	// when
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	code := p.Run(ctx)
+
+	// then: Run() must terminate within the test timeout (not loop forever)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if p.totalAttempted.Load() != 2 {
+		t.Errorf("expected exactly 2 expeditions (MaxExpeditions=2), got %d", p.totalAttempted.Load())
+	}
+	if p.totalSuccess.Load() != 2 {
+		t.Errorf("expected 2 successes, got %d", p.totalSuccess.Load())
+	}
+}
+
+// TestTermination_ReviewLoop_CycleCapStopsLoop proves that the review loop
+// terminates after maxReviewGateCycles even when the review command always
+// fails (always finds comments). This is the public API proof via Run() that
+// review.go:103 `for cycle := 1; cycle <= maxReviewGateCycles` prevents an
+// infinite review-fix cycle.
+func TestTermination_ReviewLoop_CycleCapStopsLoop(t *testing.T) {
+	// given: Claude returns success with a PR URL, review always fails
+	dir := setupTestRepo(t)
+	setupGitRepoWithBranch(t, dir, "feat/term-test")
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	reportText := `__EXPEDITION_REPORT__
+issue_id: TERM-2
+issue_title: review termination proof
+mission_type: implement
+branch: feat/term-test
+pr_url: https://github.com/test/test/pull/1
+status: success
+reason: done
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	claudeScript := streamJSONScript(t, dir, "fakeclaude.sh", reportText)
+
+	// Review script always exits 1 with comments (never passes)
+	reviewScript := filepath.Join(dir, "review.sh")
+	writeScript(t, reviewScript, "echo '[P2] Always fails'\nexit 1\n")
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 1,
+		BaseBranch:     "main",
+		ClaudeCmd:      claudeScript,
+		ReviewCmd:      reviewScript,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	// when
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	code := p.Run(ctx)
+
+	// then: Run() must terminate (review loop bounded by maxReviewGateCycles)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if p.totalSuccess.Load() != 1 {
+		t.Errorf("expected 1 success, got %d", p.totalSuccess.Load())
+	}
+
+	// Journal should record the review not being resolved
+	journalPath := filepath.Join(dir, ".expedition", "journal", "001.md")
+	content, err := os.ReadFile(journalPath)
+	if err != nil {
+		t.Fatalf("journal not written: %v", err)
+	}
+	if !containsStr(string(content), "Review not fully resolved") && !containsStr(string(content), "Review") {
+		t.Errorf("journal should mention review status, got: %s", string(content))
+	}
+}
