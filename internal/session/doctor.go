@@ -485,7 +485,9 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 	}
 	if err != nil {
 		check.Version = "inference failed: " + err.Error()
-		check.Hint = `if "signal: killed", Claude CLI startup may be slow (timeout is 60s); otherwise check API key, quota, and model access`
+		check.Hint = `"signal: killed" = CLI startup too slow (timeout 60s); ` +
+			`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
+			`otherwise check API key, quota, and model access`
 		return check
 	}
 	if strings.TrimSpace(output) != "2" {
