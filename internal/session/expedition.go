@@ -355,6 +355,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
 			invokeSpan.SetAttributes(initAttrs...)
 		}
+
+		// Context budget measurement
+		budget := platform.CalculateContextBudget(messages)
+		invokeSpan.SetAttributes(budget.Attrs()...)
+		if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
+			_, _ = fmt.Fprintln(os.Stderr, "WARN: "+warning)
+		}
 	}()
 
 	<-done
