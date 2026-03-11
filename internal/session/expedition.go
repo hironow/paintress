@@ -179,7 +179,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	expCtx, invokeSpan := platform.Tracer.Start(expCtx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", model),
+				attribute.String("claude.model", platform.SanitizeUTF8(model)),
 				attribute.Int("expedition.number", e.Number),
 				attribute.Int("claude.timeout_sec", e.Config.TimeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
@@ -244,8 +244,8 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
-				attribute.String("issue_id", issue),
-				attribute.String("issue_title", title),
+				attribute.String("issue_id", platform.SanitizeUTF8(issue)),
+				attribute.String("issue_title", platform.SanitizeUTF8(title)),
 			),
 		)
 		e.Logger.Info("Expedition #%d: issue picked — %s (%s)", e.Number, issue, title)
@@ -339,11 +339,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 		// Attach raw events and session ID to the invoke span
 		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-			sanitized := make([]string, len(rawEvents))
-			for i, s := range rawEvents {
-				sanitized[i] = platform.SanitizeUTF8(s)
-			}
-			invokeSpan.SetAttributes(attribute.StringSlice("stream.raw_events", sanitized))
+			invokeSpan.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents))) // nosemgrep: otel-attribute-stringslice-unsanitized — elements sanitized via SanitizeUTF8Slice
 		}
 		if result != nil && result.SessionID != "" {
 			invokeSpan.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
@@ -380,7 +376,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",
-			trace.WithAttributes(attribute.String("timeout", timeout.String())),
+			trace.WithAttributes(attribute.String("timeout", timeout.String())), // nosemgrep: otel-attribute-string-unsanitized -- time.Duration.String() always produces valid UTF-8
 		)
 		return output.String(), fmt.Errorf("timeout after %v", timeout)
 	}

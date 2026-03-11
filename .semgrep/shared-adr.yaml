@@ -63,7 +63,7 @@ rules:
       MeterProvider の設定を分散させると noop デフォルトの保証が崩れます。
       TracerProvider と同様に集中管理してください。
       Ref: Shared ADR 0003 — opentelemetry-noop-default
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: otel.SetMeterProvider(...)
       - pattern-not-inside: |
@@ -123,7 +123,7 @@ rules:
       OS 間のパス区切り文字の違いを吸収し、重複スラッシュも正規化されます。
       マップキーや表示用ラベルの場合は nosemgrep を付与してください。
       Ref: Shared ADR 0005 — fsnotify-daemon-design
-    severity: WARNING
+    severity: ERROR
     pattern-regex: '\+\s*"/"\s*\+'
     paths:
       exclude:
@@ -179,7 +179,7 @@ rules:
       全ての依存は実サービスで構成してください。
       モックが必要なテストは integration テストに移動してください。
       Ref: phonewave docs/adr/0007-testcontainers-docker-e2e.md
-    severity: WARNING
+    severity: ERROR
     pattern-either:
       - pattern: gomock.NewController(...)
       - pattern: httptest.NewServer(...)
@@ -234,7 +234,7 @@ rules:
       状態ディレクトリは configBase(cmd) から取得してください。
       CWD 依存はテストの非決定性とパスのずれを引き起こします。
       Ref: phonewave docs/adr/0009-config-relative-state-directory.md
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: os.Getwd()
       - pattern-inside: |
@@ -256,7 +256,7 @@ rules:
       無効な UTF-8 バイトが含まれる可能性があり、OTel export 時にエラーになります。
       platform.SanitizeUTF8(val) または SanitizeUTF8(val) でラップしてください。
       文字列リテラルの場合は nosemgrep を付与してください。
-    severity: WARNING
+    severity: ERROR
     patterns:
       - pattern: attribute.String($KEY, $VAL)
       - pattern-not: attribute.String($KEY, "...")
@@ -269,7 +269,7 @@ rules:
     message: |
       attribute.StringSlice() に渡すスライスの各要素を SanitizeUTF8 でラップしてください。
       外部データには無効な UTF-8 バイトが含まれる可能性があります。
-    severity: WARNING
+    severity: ERROR
     pattern: attribute.StringSlice($KEY, $VAL)
 
   # --- D4: Resource leak detection ---

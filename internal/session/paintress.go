@@ -166,10 +166,10 @@ func (p *Paintress) SetEmitter(e port.ExpeditionEventEmitter) {
 func (p *Paintress) Run(ctx context.Context) int {
 	ctx, rootSpan := platform.Tracer.Start(ctx, "paintress.run",
 		trace.WithAttributes(
-			attribute.String("continent", p.config.Continent),
+			attribute.String("continent", platform.SanitizeUTF8(p.config.Continent)),
 			attribute.Int("max_expeditions", p.config.MaxExpeditions),
 			attribute.Int("workers", p.config.Workers),
-			attribute.String("model", p.config.Model),
+			attribute.String("model", platform.SanitizeUTF8(p.config.Model)),
 			attribute.Bool("dry_run", p.config.DryRun),
 		),
 	)

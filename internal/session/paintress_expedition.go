@@ -192,8 +192,8 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 		if newModel != prevModel {
 			expSpan.AddEvent("model.switched",
 				trace.WithAttributes(
-					attribute.String("from", prevModel),
-					attribute.String("to", newModel),
+					attribute.String("from", platform.SanitizeUTF8(prevModel)),
+					attribute.String("to", platform.SanitizeUTF8(newModel)),
 				),
 			)
 		}

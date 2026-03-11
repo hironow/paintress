@@ -57,7 +57,7 @@ func (s *SpanEmittingStreamReader) handleHookStarted(msg *StreamMessage) {
 	}
 	spanName := "hook " + hookName
 	attrs := []attribute.KeyValue{
-		attribute.String("hook.name", hookName),
+		attribute.String("hook.name", SanitizeUTF8(hookName)),
 	}
 	if msg.HookID != "" {
 		attrs = append(attrs, attribute.String("hook.id", SanitizeUTF8(msg.HookID)))
@@ -115,9 +115,9 @@ func (s *SpanEmittingStreamReader) InitAttrs() []attribute.KeyValue {
 	if len(msg.MCPServers) > 0 {
 		names := make([]string, len(msg.MCPServers))
 		for i, srv := range msg.MCPServers {
-			names[i] = SanitizeUTF8(srv.Name)
+			names[i] = srv.Name
 		}
-		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", names))
+		attrs = append(attrs, attribute.StringSlice("claude.init.mcp_servers", SanitizeUTF8Slice(names))) // nosemgrep: otel-attribute-stringslice-unsanitized — elements sanitized via SanitizeUTF8Slice
 	}
 	if len(msg.Tools) > 0 {
 		attrs = append(attrs, attribute.Int("claude.init.tools_count", len(msg.Tools)))
@@ -146,7 +146,7 @@ func (s *SpanEmittingStreamReader) handleThinkingBlocks(msg *StreamMessage) bool
 		if block.Type == "thinking" {
 			parentSpan.AddEvent("gen_ai.thinking",
 				trace.WithAttributes(
-					attribute.String("gen_ai.thinking.text", TruncateValue(block.Thinking, s.maxValueLen)),
+					attribute.String("gen_ai.thinking.text", SanitizeUTF8(TruncateValue(block.Thinking, s.maxValueLen))),
 				),
 			)
 			found = true
@@ -163,10 +163,10 @@ func (s *SpanEmittingStreamReader) handleRateLimit(msg *StreamMessage) {
 	if info := msg.RateLimitInfo; info != nil {
 		attrs := []attribute.KeyValue{}
 		if info.Status != "" {
-			attrs = append(attrs, attribute.String("rate_limit.status", info.Status))
+			attrs = append(attrs, attribute.String("rate_limit.status", SanitizeUTF8(info.Status)))
 		}
 		if info.RateLimitType != "" {
-			attrs = append(attrs, attribute.String("rate_limit.type", info.RateLimitType))
+			attrs = append(attrs, attribute.String("rate_limit.type", SanitizeUTF8(info.RateLimitType)))
 		}
 		if info.Utilization > 0 {
 			attrs = append(attrs, attribute.Float64("rate_limit.utilization", info.Utilization))
