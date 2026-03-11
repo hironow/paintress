@@ -39,23 +39,24 @@ paintress run [repo-path] [flags]
 ### Options
 
 ```
-      --approve-cmd string    Approval command ({message} placeholder, exit 0 = approve)
-      --auto-approve          Skip approval gate for HIGH severity D-Mail
-  -b, --base-branch string    Base branch (default "main")
-      --claude-cmd string     Claude Code CLI command name (default "claude")
-      --dev-cmd string        Dev server command (default "npm run dev")
-      --dev-dir string        Dev server working directory (defaults to repo path)
-      --dev-url string        Dev server URL (default "http://localhost:3000")
-  -n, --dry-run               Generate prompts only
-  -h, --help                  help for run
-      --max-expeditions int   Maximum number of expeditions (default 50)
-  -m, --model string          Model(s) comma-separated for reserve: opus,sonnet,haiku (default "opus")
-      --no-dev                Skip dev server startup
-      --notify-cmd string     Notification command ({title}, {message} placeholders)
-      --review-cmd string     Code review command after PR creation
-      --setup-cmd string      Command to run after worktree creation (e.g. 'bun install')
-  -t, --timeout int           Timeout per expedition in seconds (default: 33min) (default 1980)
-  -w, --workers int           Number of worktrees in pool (0 = direct execution) (default 1)
+      --approve-cmd string      Approval command ({message} placeholder, exit 0 = approve)
+      --auto-approve            Skip approval gate for HIGH severity D-Mail
+  -b, --base-branch string      Base branch (default "main")
+      --claude-cmd string       Claude Code CLI command name (default "claude")
+      --dev-cmd string          Dev server command (default "npm run dev")
+      --dev-dir string          Dev server working directory (defaults to repo path)
+      --dev-url string          Dev server URL (default "http://localhost:3000")
+  -n, --dry-run                 Generate prompts only
+  -h, --help                    help for run
+      --max-expeditions int     Maximum number of expeditions (default 50)
+  -m, --model string            Model(s) comma-separated for reserve: opus,sonnet,haiku (default "opus")
+      --no-dev                  Skip dev server startup
+      --notify-cmd string       Notification command ({title}, {message} placeholders)
+      --review-cmd string       Code review command after PR creation
+      --setup-cmd string        Command to run after worktree creation (e.g. 'bun install')
+  -t, --timeout int             Timeout per expedition in seconds (default: 33min) (default 1980)
+      --wait-timeout duration   D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting) (default 30m0s)
+  -w, --workers int             Number of worktrees in pool (0 = direct execution) (default 1)
 ```
 
 ### Options inherited from parent commands
