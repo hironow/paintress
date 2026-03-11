@@ -13,6 +13,7 @@ type RunConfig struct {
 	AllowedTools []string
 	WorkDir      string // sets cmd.Dir for the subprocess
 	Continue     bool   // passes --continue to resume a prior session
+	Model        string // overrides the default model for this invocation
 }
 
 // ApplyOptions applies RunOption functions to a RunConfig and returns it.
@@ -42,6 +43,13 @@ func WithWorkDir(dir string) RunOption {
 func WithContinue() RunOption {
 	return func(c *RunConfig) {
 		c.Continue = true
+	}
+}
+
+// WithModel overrides the default model for this invocation.
+func WithModel(model string) RunOption {
+	return func(c *RunConfig) {
+		c.Model = model
 	}
 }
 

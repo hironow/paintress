@@ -10,7 +10,7 @@ Referenced from [README.md](../README.md) and [docs/README.md](README.md).
 | **How** | Fetch issue via Claude MCP → Claude Code implements in git branch → review gate → PR → next issue → enter D-Mail waiting loop (fsnotify inbox/ watch, re-run expeditions on arrival, default 30m timeout) |
 | **Input** | Linear issues via Claude MCP tools, repository source code, inbox D-Mails (specification, implementation-feedback) |
 | **Output** | Git branches, pull requests, D-Mail reports to downstream tools |
-| **Telemetry** | OTel spans: `paintress.run`, `expedition`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`) |
+| **Telemetry** | OTel spans: `paintress.run`, `expedition`, `claude.invoke` (with `claude.model`, `claude.timeout_sec`, `gen_ai.*`), `context_budget.*` (`context_budget.tools`, `context_budget.skills`, `context_budget.plugins`, `context_budget.mcp_servers`, `context_budget.hook_bytes`, `context_budget.estimated_tokens`) |
 | **External Systems** | Linear (via Claude MCP), Claude Code subprocess, Git/GitHub, OTel exporter (Jaeger/Weave) |
 
 ## Layer Architecture

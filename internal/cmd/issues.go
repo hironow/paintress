@@ -63,7 +63,12 @@ func runIssues(cmd *cobra.Command, args []string) error {
 
 	projectOps := session.NewProjectOps()
 	claudeCmd := loadClaudeCmd(absPath)
-	issues, err := usecase.FetchIssues(cmd.Context(), absPath, claudeCmd, stateFilter, projectOps)
+	runner := &session.ClaudeAdapter{
+		ClaudeCmd:  claudeCmd,
+		TimeoutSec: 300,
+		Logger:     &domain.NopLogger{},
+	}
+	issues, err := usecase.FetchIssues(cmd.Context(), absPath, runner, stateFilter, projectOps)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,8 @@ package session_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +13,31 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
+
+// scriptRunner implements port.ClaudeRunner by executing a shell script.
+// It passes the prompt via -p flag so test scripts can extract it.
+type scriptRunner struct {
+	script string
+	err    error // if non-nil, Run returns this error
+}
+
+func (r *scriptRunner) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
+	if r.err != nil {
+		return "", r.err
+	}
+	rc := port.ApplyOptions(opts...)
+	cmd := exec.CommandContext(ctx, r.script, "-p", prompt)
+	if rc.WorkDir != "" {
+		cmd.Dir = rc.WorkDir
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("script: %w", err)
+	}
+	return string(out), nil
+}
 
 func TestFetchIssuesViaMCP_ParsesOutput(t *testing.T) {
 	// given — fake claude script that writes issues JSON to the output path
@@ -41,8 +67,10 @@ JSONEOF
 		t.Fatal(err)
 	}
 
+	runner := &scriptRunner{script: fakeScript}
+
 	// when
-	issues, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	issues, err := session.FetchIssuesViaMCP(context.Background(), runner, "MY", "", dir)
 
 	// then
 	if err != nil {
@@ -82,8 +110,10 @@ echo "[]" > "$output_path"
 `
 	os.WriteFile(fakeScript, []byte(script), 0755)
 
+	runner := &scriptRunner{script: fakeScript}
+
 	// when
-	issues, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	issues, err := session.FetchIssuesViaMCP(context.Background(), runner, "MY", "", dir)
 
 	// then
 	if err != nil {
@@ -100,8 +130,10 @@ func TestFetchIssuesViaMCP_ClaudeFailure(t *testing.T) {
 	fakeScript := filepath.Join(dir, "fake-claude.sh")
 	os.WriteFile(fakeScript, []byte("#!/bin/bash\nexit 1\n"), 0755)
 
+	runner := &scriptRunner{script: fakeScript}
+
 	// when
-	_, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	_, err := session.FetchIssuesViaMCP(context.Background(), runner, "MY", "", dir)
 
 	// then
 	if err == nil {
@@ -126,8 +158,10 @@ echo "{invalid json" > "$output_path"
 `
 	os.WriteFile(fakeScript, []byte(script), 0755)
 
+	runner := &scriptRunner{script: fakeScript}
+
 	// when
-	_, err := session.FetchIssuesViaMCP(context.Background(), fakeScript, "MY", "", dir)
+	_, err := session.FetchIssuesViaMCP(context.Background(), runner, "MY", "", dir)
 
 	// then
 	if err == nil {

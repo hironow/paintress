@@ -134,6 +134,10 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				Name: "claude-inference", Required: false,
 				Version: "skipped (claude not available)",
 			})
+			checks = append(checks, domain.DoctorCheck{
+				Name: "context-budget", Required: false,
+				Version: "skipped (claude not available)",
+			})
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			cmd := newShellCmd(ctx, claudeCmd, "mcp", "list")
@@ -144,19 +148,25 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			checks = append(checks, authCheck)
 			checks = append(checks, checkLinearMCP(mcpOutput, err))
 
-			// claude-inference: skip if auth failed
+			// claude-inference + context-budget: skip if auth failed
 			if !authCheck.OK {
 				checks = append(checks, domain.DoctorCheck{
 					Name: "claude-inference", Required: false,
 					Version: "skipped (auth failed)",
 				})
+				checks = append(checks, domain.DoctorCheck{
+					Name: "context-budget", Required: false,
+					Version: "skipped (auth failed)",
+				})
 			} else {
 				inferCtx, inferCancel := context.WithTimeout(context.Background(), 60*time.Second)
-				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
 				inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 				inferOut, inferErr := inferCmd.Output()
 				inferCancel()
-				checks = append(checks, checkClaudeInference(string(inferOut), inferErr))
+				inferOutput := string(inferOut)
+				checks = append(checks, checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr))
+				checks = append(checks, CheckContextBudget(inferOutput))
 			}
 		}
 	}
@@ -563,6 +573,57 @@ func checkGHScopes(output string, err error) domain.DoctorCheck {
 
 	check.OK = true
 	check.Version = "scopes OK"
+	return check
+}
+
+// ExtractStreamResult parses stream-json output and returns the "result" field
+// from the result message. Used to extract inference output from stream-json format.
+func ExtractStreamResult(streamJSON string) string {
+	for _, line := range strings.Split(streamJSON, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var msg struct {
+			Type   string `json:"type"`
+			Result string `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &msg); err == nil && msg.Type == "result" {
+			return msg.Result
+		}
+	}
+	return ""
+}
+
+// CheckContextBudget parses stream-json output from a Claude CLI invocation
+// and reports context budget health based on hooks, plugins, skills, and MCP servers.
+func CheckContextBudget(streamJSON string) domain.DoctorCheck {
+	var messages []*platform.StreamMessage
+	for _, line := range strings.Split(streamJSON, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		msg, err := platform.ParseStreamMessage([]byte(line))
+		if err != nil {
+			continue
+		}
+		messages = append(messages, msg)
+	}
+
+	report := platform.CalculateContextBudget(messages)
+
+	check := domain.DoctorCheck{
+		Name:     "context-budget",
+		Required: false,
+		OK:       true,
+		Version: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
+			report.EstimatedTokens, report.ToolCount, report.SkillCount,
+			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
+	}
+	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
+		check.Hint = "context consumption is high; consider reducing installed plugins/skills or using an allowlist"
+	}
 	return check
 }
 

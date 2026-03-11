@@ -246,7 +246,7 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 |---------|-------------|
 | `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively (`--force` to regenerate) |
-| `paintress doctor` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint |
+| `paintress doctor` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint, context-budget |
 | `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
 | `paintress config show [repo-path]` | Display project configuration |
 | `paintress config set <key> <value> [repo-path]` | Update a configuration value (e.g. `tracker.team`, `tracker.project`) |

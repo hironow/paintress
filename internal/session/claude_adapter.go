@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -15,20 +16,24 @@ import (
 )
 
 // ClaudeAdapter implements port.ClaudeRunner by executing the Claude CLI
-// as a subprocess with CombinedOutput (non-streaming).
-// For streaming use cases (Expedition.Run), use the existing inline logic.
+// as a subprocess with streaming (--output-format stream-json).
 type ClaudeAdapter struct {
-	ClaudeCmd string
-	Model     string
-	Logger    domain.Logger
+	ClaudeCmd  string
+	Model      string
+	TimeoutSec int
+	Logger     domain.Logger
 }
 
-// Run executes the Claude CLI once. It writes output to w and returns the
-// combined stdout+stderr as a string.
+// Run executes the Claude CLI once with streaming. It writes assistant text
+// to w incrementally and returns the result text (or concatenated assistant
+// text if no result message appears).
 func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
 	rc := port.ApplyOptions(opts...)
 
 	model := a.Model
+	if rc.Model != "" {
+		model = rc.Model
+	}
 	_, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
@@ -48,6 +53,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	if len(rc.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
+	args = append(args, "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 
 	cmd := platform.NewShellCmd(ctx, a.ClaudeCmd, args...)
@@ -56,17 +62,52 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 	cmd.WaitDelay = 3 * time.Second
 
-	out, err := cmd.CombinedOutput()
-	output := string(out)
-
-	if w != nil {
-		_, _ = w.Write(out)
-	}
-
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		span.RecordError(err)
-		return output, fmt.Errorf("claude exit: %w", err)
+		return "", fmt.Errorf("stdout pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("claude start: %w", err)
 	}
 
-	return output, nil
+	reader := platform.NewStreamReader(stdout)
+	reader.SetLogger(a.Logger)
+
+	var output strings.Builder
+	var streamErr error
+	for {
+		msg, err := reader.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			streamErr = fmt.Errorf("stream read: %w", err)
+			break
+		}
+		if msg == nil {
+			continue
+		}
+		if msg.Type == "assistant" {
+			text, extractErr := msg.ExtractText()
+			if extractErr == nil && text != "" {
+				output.WriteString(text)
+				if w != nil {
+					_, _ = w.Write([]byte(text))
+				}
+			}
+		}
+		if msg.Type == "result" {
+			output.Reset()
+			output.WriteString(msg.Result)
+		}
+	}
+
+	if waitErr := cmd.Wait(); waitErr != nil {
+		span.RecordError(waitErr)
+		return output.String(), fmt.Errorf("claude exit: %w", waitErr)
+	}
+	if streamErr != nil {
+		return output.String(), streamErr
+	}
+	return output.String(), nil
 }
