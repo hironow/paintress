@@ -88,6 +88,22 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 		checks = append(checks, check)
 	}
 
+	// gh auth scope check (requires gh binary to be found)
+	ghOK := false
+	for _, c := range checks {
+		if c.Name == "gh" && c.OK {
+			ghOK = true
+			break
+		}
+	}
+	if ghOK {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		cmd := exec.CommandContext(ctx, "gh", "auth", "status")
+		out, err := cmd.CombinedOutput()
+		cancel()
+		checks = append(checks, checkGHScopes(string(out), err))
+	}
+
 	if strings.TrimSpace(continent) != "" {
 		checks = append(checks, checkContinent(continent))
 		checks = append(checks, checkConfig(continent))
@@ -497,6 +513,56 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 	}
 	check.OK = true
 	check.Version = "inference OK"
+	return check
+}
+
+// requiredGHScopes lists OAuth scopes that paintress needs for full
+// functionality (e.g. gh pr edit requires read:project when PRs are linked
+// to GitHub Projects).
+var requiredGHScopes = []string{"repo", "read:project"}
+
+// checkGHScopes verifies that the gh CLI token has the required OAuth scopes.
+// Parses the output of `gh auth status` for the "Token scopes:" line.
+func checkGHScopes(output string, err error) domain.DoctorCheck {
+	check := domain.DoctorCheck{
+		Name:     "gh-scopes",
+		Required: false,
+	}
+	if err != nil {
+		check.Version = "not authenticated: " + err.Error()
+		check.Hint = `run "gh auth login" to authenticate`
+		return check
+	}
+
+	// Find "Token scopes:" line
+	var scopesLine string
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "Token scopes:") {
+			scopesLine = line
+			break
+		}
+	}
+	if scopesLine == "" {
+		check.Version = "could not determine token scopes"
+		check.Hint = `run "gh auth status" to check your token`
+		return check
+	}
+
+	var missing []string
+	for _, scope := range requiredGHScopes {
+		if !strings.Contains(scopesLine, scope) {
+			missing = append(missing, scope)
+		}
+	}
+
+	if len(missing) > 0 {
+		check.Version = "missing scopes: " + strings.Join(missing, ", ")
+		check.Hint = fmt.Sprintf(`run "gh auth refresh -s %s" to add missing scopes`, strings.Join(missing, " -s "))
+		return check
+	}
+
+	check.OK = true
+	check.Version = "scopes OK"
 	return check
 }
 
