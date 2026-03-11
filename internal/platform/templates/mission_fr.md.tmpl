@@ -12,7 +12,7 @@ Tous les Expéditionnaires doivent lire ce fichier et accomplir leur mission.
 
 ## Évaluation de la mission
 
-Analyser le contenu de l'issue et la classer dans l'un des trois types suivants :
+Analyser le contenu de l'issue et les D-Mails de la boîte de réception, et classer dans l'un des quatre types suivants :
 
 ### implement (implémentation)
 
@@ -27,6 +27,10 @@ ou inclut une checklist (`- [ ]`).
 ### fix (correction)
 
 Lorsque des défauts sont découverts pendant verify, vous passez à fix au sein de la même Expédition. Ce n'est pas une sélection séparée — cela découle naturellement des résultats de verify.
+
+### consolidate (consolidation)
+
+Unifier une chaîne de PRs empilées en une seule PR. Choisir cette option lorsque des D-Mails impl-feedback décrivent des problèmes de convergence de chaîne de PR et qu'aucune issue actionnable n'existe dans les statuts antérieurs.
 
 ---
 
@@ -70,6 +74,30 @@ Pour chaque défaut :
 7. Créer la PR via GitHub (corps incluant `Closes <bug-issue-id>`)
 8. Mettre à jour l'issue bug vers un statut de revue dans Linear (ex. « In Review »)
 9. La revue de code est gérée par l'orchestrateur (Paintress) après la création de la PR — ne pas exécuter de commandes de revue vous-même
+
+## Procédure consolidate
+
+Lorsque la boîte de réception contient des D-Mails impl-feedback décrivant des problèmes de convergence de chaîne de PR (PRs empilées, compteurs behind-by, conflits), et qu'aucune issue actionnable n'existe dans les statuts antérieurs, choisir `consolidate` pour unifier la chaîne en une seule PR.
+
+1. **Analyser la chaîne** : Lire les D-Mails impl-feedback pour comprendre la structure de la chaîne de PR (numéros de PR, ordre de dépendance, conflits, behind-by)
+2. **Créer la branche** : `git checkout -b consolidate/<chain-id> <base-branch>` (ex. `consolidate/chain-a main`)
+3. **Appliquer les changements depuis la racine** : Pour chaque PR dans la chaîne, en commençant par la racine (la plus proche de la branche de base) :
+   - Récupérer les changements de la PR : `gh pr diff <numéro-PR> | git apply` ou cherry-pick des commits
+   - En cas de conflit : résoudre en consultant le DoD et l'intention d'implémentation de l'issue Linear associée
+   - Commiter après l'application de chaque PR : `git commit -m "consolidate: apply <numéro-PR> (<issue-id>)"`
+4. **Créer la nouvelle PR** : `gh pr create --base <base-branch>` avec un corps listant toutes les PRs consolidées
+5. **Fermer les anciennes PRs** : Pour chaque ancienne PR dont les changements sont entièrement contenus dans la nouvelle PR :
+   - Commenter : `Consolidé dans #<numéro-nouvelle-PR>`
+   - Fermer : `gh pr close <numéro-PR>`
+6. **Rapport** : Afficher le rapport d'expédition avec `mission_type: consolidate`
+
+### Contraintes consolidate
+
+- **Branches protégées** : Ne jamais modifier directement ou utiliser comme branches de travail : main, master, develop, staging, dev, stg, prod, production. Les utiliser uniquement comme `--base` pour la nouvelle PR.
+- **Ne pas fusionner** : Créer la PR consolidée mais ne PAS la fusionner. Laisser le flux de revue normal gérer la fusion.
+- **Ne fermer que si contenu** : Ne fermer les anciennes PRs que si leurs changements sont entièrement présents dans la nouvelle PR.
+- **Statut Linear inchangé** : Ne pas changer le statut de l'issue — le lien PR change avec la nouvelle PR, mais le statut reste tel quel.
+- **Complétion partielle** : Si la chaîne complète ne peut être terminée avant le timeout, inclure la progression dans le champ reason (PRs appliquées, PRs restantes) pour que la prochaine expédition puisse continuer depuis la branche poussée.
 
 ---
 
