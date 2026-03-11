@@ -234,6 +234,16 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 // status (complete/success/skipped/failed/parse-error), and updates counters.
 // Returns errComplete when all issues are done; nil otherwise.
 func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output string, expStart time.Time) error {
+	// Archive ALL inbox D-Mails when this function returns, regardless of status.
+	// Without this, D-Mails remain in inbox and re-trigger waiting mode infinitely.
+	defer func() {
+		for _, dm := range expedition.InboxDMails {
+			if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
+				p.Logger.Warn("dmail archive: %v", err)
+			}
+		}
+	}()
+
 	_, parseSpan := platform.Tracer.Start(expCtx, "report.parse") // nosemgrep: adr0003-otel-span-without-defer-end -- End() called immediately after ParseReport [permanent]
 	report, status := domain.ParseReport(output, exp)
 	parseSpan.End()
@@ -326,11 +336,6 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
-			}
-		}
-		for _, dm := range expedition.InboxDMails {
-			if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
-				p.Logger.Warn("dmail archive: %v", err)
 			}
 		}
 		p.consecutiveFailures.Store(0)

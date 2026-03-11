@@ -1257,3 +1257,68 @@ __EXPEDITION_END__`
 		t.Errorf("expected LastIssue=MY-2, got %q", flag.LastIssue)
 	}
 }
+
+// TestStatusComplete_ArchivesInboxDMails verifies that inbox D-Mails are
+// archived even when the expedition returns StatusComplete (all issues done).
+// Regression test: previously archive only happened in StatusSuccess, causing
+// an infinite loop in waiting mode where the same D-Mails were re-read.
+//
+// Golden test data: testdata/implementation-feedback-057.md (real D-Mail from
+// a production vsano expedition that triggered the infinite loop).
+func TestStatusComplete_ArchivesInboxDMails(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Place golden D-Mail in inbox
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	golden, err := os.ReadFile("testdata/implementation-feedback-057.md")
+	if err != nil {
+		t.Fatalf("read golden testdata: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(inboxDir, "implementation-feedback-057.md"), golden, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// fakeClaude outputs __EXPEDITION_COMPLETE__ (no remaining issues)
+	script := streamJSONScript(t, dir, "fakeclaude.sh", "__EXPEDITION_COMPLETE__")
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 1,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	code := p.Run(context.Background())
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+
+	// Inbox must be empty: D-Mail should be archived after StatusComplete
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".md" {
+			t.Errorf("inbox should be empty after StatusComplete, found: %s", e.Name())
+		}
+	}
+
+	// Archive must contain the D-Mail
+	archivePath := filepath.Join(dir, ".expedition", "archive", "implementation-feedback-057.md")
+	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
+		t.Error("expected implementation-feedback-057.md in archive/, but not found")
+	}
+}
