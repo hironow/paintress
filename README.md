@@ -15,7 +15,9 @@ This single command makes Paintress repeat the following cycle:
 3. Claude Code creates a branch, implements, tests, opens a PR
 4. Run code review gate — review comments trigger automatic fixes (up to 3 cycles)
 5. Record results, move to the next issue
-6. Stop when all issues are complete
+6. Stop when all issues are complete or max expeditions reached
+7. Enter D-Mail waiting mode — monitor inbox/ via fsnotify for incoming D-Mails
+8. On D-Mail arrival, re-run the expedition loop; on timeout (default 30m), exit
 
 ## Why "Paintress"?
 
@@ -130,6 +132,10 @@ Expedition (Claude Code)   <- One session per issue
 Review Gate (exec)         <- Code review tool + Claude Code --continue (up to 3 cycles)
     |
     v
+D-Mail Waiting Loop        <- fsnotify inbox/ watch (--wait-timeout, default 30m)
+    |                         On D-Mail arrival: re-run expedition loop
+    |                         On timeout/signal: clean exit
+    v
 Continent (Git repo)       <- Persistent world
     +-- src/
     +-- CLAUDE.md
@@ -197,6 +203,7 @@ The review command is customizable via `--review-cmd`. Set to empty string (`--r
 - Create branches, run tests, open PRs, and iterate through code review cycles
 - Manage parallel expeditions in isolated git worktrees (Swarm Mode)
 - Send report D-Mails to downstream tools after successful expeditions
+- Enter D-Mail waiting mode after expeditions complete, re-running on incoming D-Mails
 
 **What Paintress does NOT do:**
 
@@ -299,6 +306,12 @@ paintress run --notify-cmd 'curl -d "{message}" ntfy.sh/paintress'
 # Skip approval gate (CI/automated runs)
 paintress run --auto-approve
 
+# Custom waiting timeout (0 = no timeout, negative = disable waiting)
+paintress run --wait-timeout 1h
+
+# Disable D-Mail waiting (exit immediately after expeditions)
+paintress run --wait-timeout -1s
+
 # Custom approval script
 paintress run --approve-cmd './scripts/approve.sh "{message}"'
 
@@ -313,7 +326,8 @@ paintress run \
   --dev-cmd "pnpm dev" \
   --dev-dir /path/to/frontend \
   --dev-url "http://localhost:3000" \
-  --review-cmd "codex review --base main"
+  --review-cmd "codex review --base main" \
+  --wait-timeout 30m
 ```
 
 ## Options
