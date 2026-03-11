@@ -42,6 +42,15 @@ paintress doctor [repo-path] [flags]
   -v, --verbose         Enable verbose output
 ```
 
+### Context Budget Check
+
+When a repo-path is available, `doctor` estimates the token overhead that Claude Code's
+context window incurs from tools, skills, plugins, MCP servers, and hook stdout.
+The check aggregates byte sizes across these categories, converts to an estimated
+token count, and warns when the total exceeds a configurable threshold (default 20 000 tokens).
+This helps detect bloated configurations that silently consume context budget
+before any user prompt is processed.
+
 ### SEE ALSO
 
 * [paintress](paintress.md)	 - Claude Code expedition orchestrator
