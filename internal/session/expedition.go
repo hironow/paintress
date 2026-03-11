@@ -376,7 +376,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	if expCtx.Err() == context.DeadlineExceeded {
 		invokeSpan.AddEvent("expedition.timeout",
-			trace.WithAttributes(attribute.String("timeout", timeout.String())), // nosemgrep: otel-attribute-string-unsanitized -- time.Duration.String() always produces valid UTF-8
+			trace.WithAttributes(attribute.String("timeout", timeout.String())), // nosemgrep: otel-attribute-string-unsanitized -- time.Duration.String() always produces valid UTF-8 [permanent]
 		)
 		return output.String(), fmt.Errorf("timeout after %v", timeout)
 	}
