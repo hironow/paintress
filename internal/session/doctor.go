@@ -135,7 +135,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 					Version: "skipped (auth failed)",
 				})
 			} else {
-				inferCtx, inferCancel := context.WithTimeout(context.Background(), 15*time.Second)
+				inferCtx, inferCancel := context.WithTimeout(context.Background(), 60*time.Second)
 				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
 				inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 				inferOut, inferErr := inferCmd.Output()
