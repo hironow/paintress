@@ -198,6 +198,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	cmd := newCmd(expCtx, claudeCmd,
 		"--model", model,
+		"--verbose",
 		"--output-format", "stream-json",
 		"--dangerously-skip-permissions",
 		"--print",
@@ -301,6 +302,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		}
 
 		emitter := platform.NewSpanEmittingStreamReader(sr, expCtx, platform.Tracer)
+		emitter.SetInput(prompt)
 		result, messages, readErr := emitter.CollectAll()
 		if readErr != nil {
 			streamErr <- readErr
@@ -341,6 +343,17 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		}
 		if result != nil && result.SessionID != "" {
 			invokeSpan.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
+		}
+
+		// Weave thread attributes for trace organization
+		if weaveAttrs := emitter.WeaveThreadAttrs(); len(weaveAttrs) > 0 {
+			invokeSpan.SetAttributes(weaveAttrs...)
+		}
+		if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
+			invokeSpan.SetAttributes(ioAttrs...)
+		}
+		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
+			invokeSpan.SetAttributes(initAttrs...)
 		}
 	}()
 

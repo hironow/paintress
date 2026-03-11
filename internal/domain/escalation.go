@@ -8,7 +8,7 @@ import "fmt"
 func NewEscalationDMail(expedition, failureCount int) DMail {
 	return DMail{
 		Name:          fmt.Sprintf("feedback-escalation-exp%d", expedition),
-		Kind:          "implementation-feedback",
+		Kind:          "report",
 		Description:   fmt.Sprintf("Escalation: %d consecutive expedition failures at expedition #%d", failureCount, expedition),
 		Severity:      "high",
 		SchemaVersion: DMailSchemaVersion,

@@ -15,18 +15,18 @@ import (
 	"github.com/hironow/paintress/internal/platform"
 )
 
-// makeShellCmd creates an exec.Cmd via platform.NewShellCmd.
+// newShellCmd creates an exec.Cmd via platform.NewShellCmd.
 // Package-level variable for test injection. Used for --version and mcp list.
-var makeShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
+var newShellCmd = func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd {
 	return platform.NewShellCmd(ctx, cmdLine, args...)
 }
 
 // OverrideShellCmd replaces the command constructor for testing and returns a
 // cleanup function.
 func OverrideShellCmd(fn func(ctx context.Context, cmdLine string, args ...string) *exec.Cmd) func() {
-	old := makeShellCmd
-	makeShellCmd = fn
-	return func() { makeShellCmd = old }
+	old := newShellCmd
+	newShellCmd = fn
+	return func() { newShellCmd = old }
 }
 
 // lookPath resolves the binary path for a command. Defaults to
@@ -78,7 +78,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 		// Try to get version (best-effort, 500ms timeout)
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		out, err := makeShellCmd(ctx, cmd.name, "--version").Output()
+		out, err := newShellCmd(ctx, cmd.name, "--version").Output()
 		cancel()
 		if err == nil {
 			firstLine := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
@@ -120,7 +120,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			})
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			cmd := makeShellCmd(ctx, claudeCmd, "mcp", "list")
+			cmd := newShellCmd(ctx, claudeCmd, "mcp", "list")
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
@@ -135,8 +135,9 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 					Version: "skipped (auth failed)",
 				})
 			} else {
-				inferCtx, inferCancel := context.WithTimeout(context.Background(), 15*time.Second)
-				inferCmd := makeShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferCtx, inferCancel := context.WithTimeout(context.Background(), 60*time.Second)
+				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "text", "--max-turns", "1", "1+1=")
+				inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 				inferOut, inferErr := inferCmd.Output()
 				inferCancel()
 				checks = append(checks, checkClaudeInference(string(inferOut), inferErr))
@@ -356,7 +357,7 @@ func checkSkills(continent string) domain.DoctorCheck {
 			!strings.Contains(content, "kind: implementation-feedback") {
 			check.Required = true // deprecated kind is a blocking failure (aligned with amadeus/sightjack)
 			check.Version = fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", entry.Name())
-			check.Hint = `run "paintress init --force <repo-path>" to regenerate skills with updated kind (feedback → implementation-feedback)`
+			check.Hint = "deprecated kind 'feedback'; migrate to 'implementation-feedback' (run 'paintress init --force' to regenerate SKILL.md)"
 			return check
 		}
 	}
@@ -484,15 +485,31 @@ func checkClaudeInference(output string, err error) domain.DoctorCheck {
 	}
 	if err != nil {
 		check.Version = "inference failed: " + err.Error()
-		check.Hint = "check API key, quota, and model access"
+		check.Hint = `"signal: killed" = CLI startup too slow (timeout 60s); ` +
+			`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
+			`otherwise check API key, quota, and model access`
 		return check
 	}
 	if strings.TrimSpace(output) != "2" {
-		check.Version = "unexpected response"
-		check.Hint = "check API key, quota, and model access"
+		check.Version = "unexpected response: " + strings.TrimSpace(output)
+		check.Hint = "model returned unexpected output; check model access and API quota"
 		return check
 	}
 	check.OK = true
 	check.Version = "inference OK"
 	return check
+}
+
+// filterEnv returns a copy of env with the named variable removed.
+// Used to unset CLAUDECODE so that doctor's inference check does not
+// trigger the nested-session guard in Claude Code.
+func filterEnv(env []string, name string) []string {
+	prefix := name + "="
+	out := make([]string, 0, len(env))
+	for _, e := range env {
+		if !strings.HasPrefix(e, prefix) {
+			out = append(out, e)
+		}
+	}
+	return out
 }
