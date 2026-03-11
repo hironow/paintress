@@ -794,8 +794,8 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	if check.OK {
 		t.Error("inference check should fail for unexpected response")
 	}
-	if check.Version != "unexpected response" {
-		t.Errorf("expected version 'unexpected response', got %q", check.Version)
+	if !strings.HasPrefix(check.Version, "unexpected response: ") {
+		t.Errorf("expected version starting with 'unexpected response: ', got %q", check.Version)
 	}
 }
 
@@ -808,8 +808,8 @@ func TestCheckClaudeInference_FalsePositiveContaining2(t *testing.T) {
 	if check.OK {
 		t.Error("inference check should fail for '12' (false positive from Contains)")
 	}
-	if check.Version != "unexpected response" {
-		t.Errorf("expected version 'unexpected response', got %q", check.Version)
+	if !strings.HasPrefix(check.Version, "unexpected response: ") {
+		t.Errorf("expected version starting with 'unexpected response: ', got %q", check.Version)
 	}
 }
 
