@@ -139,7 +139,7 @@ type ExpeditionRunner interface {
 // ProjectOps handles project configuration and issue fetching.
 type ProjectOps interface {
 	LoadProjectConfig(absPath string) (*domain.ProjectConfig, error)
-	FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir string) ([]domain.Issue, error)
+	FetchIssuesViaMCP(ctx context.Context, runner ClaudeRunner, team, project, workDir string) ([]domain.Issue, error)
 }
 
 // DoctorOps runs diagnostic checks.

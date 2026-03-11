@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,7 +17,28 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
+
+// shellRunner implements port.ClaudeRunner by executing a shell script directly.
+// Used in white-box tests as a replacement for ClaudeAdapter to avoid stream-json parsing.
+type shellRunner struct {
+	script string
+}
+
+func (r *shellRunner) Run(ctx context.Context, prompt string, _ io.Writer, opts ...port.RunOption) (string, error) {
+	rc := port.ApplyOptions(opts...)
+	cmd := exec.CommandContext(ctx, r.script, "-p", prompt)
+	if rc.WorkDir != "" {
+		cmd.Dir = rc.WorkDir
+	}
+	cmd.WaitDelay = 3 * time.Second
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), err
+	}
+	return string(out), nil
+}
 
 // newTestPaintress creates a minimal Paintress for review loop tests.
 func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string, claudeCmd string) *Paintress {
@@ -32,7 +54,12 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 		BaseBranch: "main",
 		Model:      "opus",
 	}
-	return NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	// Replace ClaudeAdapter with a simple shell runner for test scripts
+	if claudeCmd != "" {
+		p.claude = &shellRunner{script: claudeCmd}
+	}
+	return p
 }
 
 // TestReviewLoop_ReviewTimeDoesNotConsumeBudget verifies that slow review
@@ -284,17 +311,17 @@ exit 0
 	// when — generous budget
 	p.runFollowUp(context.Background(), dmails, dir, 30*time.Second)
 
-	// then — the follow-up command should have been executed
+	// then — the follow-up command should have been executed with the prompt
 	args, err := os.ReadFile(filepath.Join(dir, ".followup-args"))
 	if err != nil {
 		t.Fatalf("follow-up command was not executed: %v", err)
 	}
 	argsStr := string(args)
-	if !strings.Contains(argsStr, "--continue") {
-		t.Errorf("expected --continue in args, got: %q", argsStr)
+	if !strings.Contains(argsStr, "spec-my-42") {
+		t.Errorf("expected D-Mail name in prompt, got: %q", argsStr)
 	}
-	if !strings.Contains(argsStr, "--print") {
-		t.Errorf("expected --print in args, got: %q", argsStr)
+	if !strings.Contains(argsStr, "Rate limiting") {
+		t.Errorf("expected D-Mail description in prompt, got: %q", argsStr)
 	}
 }
 

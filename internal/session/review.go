@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -178,10 +180,8 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 		prompt := domain.BuildReviewFixPrompt(branch, result.Comments)
 
-		claudeCmd := p.config.ClaudeCmd
-
 		model := p.reserve.ActiveModel()
-		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after CombinedOutput [permanent]
+		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after Run [permanent]
 			trace.WithAttributes(
 				append([]attribute.KeyValue{
 					attribute.Int("cycle", cycle),
@@ -190,20 +190,14 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			),
 		)
 
-		cmd := platform.NewShellCmd(fixCtx, claudeCmd,
-			"--model", model,
-			"--continue",
-			"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
-			"--dangerously-skip-permissions",
-			"--print",
-			"-p", prompt,
-		)
-		cmd.Dir = reviewDir
-		cmd.WaitDelay = 3 * time.Second
-
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("reviewfix_running"), model))
 		start := time.Now()
-		out, err := cmd.CombinedOutput()
+		out, err := p.claude.Run(fixCtx, prompt, io.Discard,
+			port.WithContinue(),
+			port.WithWorkDir(reviewDir),
+			port.WithAllowedTools(ReviewFixAllowedTools...),
+			port.WithModel(model),
+		)
 		consumed += time.Since(start)
 		fixSpan.End()
 		fixCancel()
@@ -213,7 +207,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(string(out))
+			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(out)
 			return notResolved(cycle, lastComments)
 		}
 	}
@@ -239,7 +233,6 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	}
 
 	prompt := domain.BuildFollowUpPrompt(dmails)
-	claudeCmd := p.config.ClaudeCmd
 
 	model := p.reserve.ActiveModel()
 	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",
@@ -261,22 +254,17 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	followCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := platform.NewShellCmd(followCtx, claudeCmd,
-		"--model", model,
-		"--continue",
-		"--allowedTools", strings.Join(ReviewFixAllowedTools, ","),
-		"--dangerously-skip-permissions",
-		"--print",
-		"-p", prompt,
-	)
-	if workDir != "" {
-		cmd.Dir = workDir
-	} else {
-		cmd.Dir = p.config.Continent
+	dir := workDir
+	if dir == "" {
+		dir = p.config.Continent
 	}
-	cmd.WaitDelay = 3 * time.Second
 
-	out, err := cmd.CombinedOutput()
+	out, err := p.claude.Run(followCtx, prompt, io.Discard,
+		port.WithContinue(),
+		port.WithWorkDir(dir),
+		port.WithAllowedTools(ReviewFixAllowedTools...),
+		port.WithModel(model),
+	)
 	if err != nil {
 		p.Logger.Warn("Follow-up failed: %v", err)
 		followUpSpan.AddEvent("followup.error",

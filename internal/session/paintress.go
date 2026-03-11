@@ -42,6 +42,7 @@ type Paintress struct {
 	notifier    port.Notifier
 	approver    port.Approver
 	outboxStore port.OutboxStore // transactional outbox for D-Mail delivery
+	claude      port.ClaudeRunner
 
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryTracker *domain.RetryTracker
@@ -143,6 +144,12 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		notifier:     notifier,
 		approver:     approver,
 		retryTracker: domain.NewRetryTracker(),
+		claude: &ClaudeAdapter{
+			ClaudeCmd:  cfgCopy.ClaudeCmd,
+			Model:      primary,
+			TimeoutSec: cfgCopy.TimeoutSec,
+			Logger:     logger,
+		},
 	}
 
 	if !cfg.NoDev {

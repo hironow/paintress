@@ -1,7 +1,6 @@
 package session
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,11 +12,12 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // FetchIssuesViaMCP invokes Claude CLI with Linear MCP tools to fetch issues.
 // Claude writes the result as a JSON array to a temp file in workDir.
-func FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir string) ([]domain.Issue, error) {
+func FetchIssuesViaMCP(ctx context.Context, runner port.ClaudeRunner, team, project, workDir string) ([]domain.Issue, error) {
 	ctx, span := platform.Tracer.Start(ctx, "paintress.issues")
 	defer span.End()
 
@@ -35,20 +35,12 @@ func FetchIssuesViaMCP(ctx context.Context, claudeCmd, team, project, workDir st
 		team, projectClause, outputPath,
 	)
 
-	args := []string{
-		"--print",
-		"--dangerously-skip-permissions",
-		"--allowedTools", "mcp__linear__list_issues,Write",
-		"-p", prompt,
-	}
-
-	cmd := platform.NewShellCmd(ctx, claudeCmd, args...)
-	var stderr bytes.Buffer
-	cmd.Stdout = io.Discard
-	cmd.Stderr = &stderr
-
 	start := time.Now()
-	if err := cmd.Run(); err != nil {
+	_, err := runner.Run(ctx, prompt, io.Discard,
+		port.WithWorkDir(workDir),
+		port.WithAllowedTools("mcp__linear__list_issues", "Write"),
+	)
+	if err != nil {
 		span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.issues"))

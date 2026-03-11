@@ -31,6 +31,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	rc := port.ApplyOptions(opts...)
 
 	model := a.Model
+	if rc.Model != "" {
+		model = rc.Model
+	}
 	_, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
