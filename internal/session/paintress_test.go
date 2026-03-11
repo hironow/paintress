@@ -1322,3 +1322,115 @@ func TestStatusComplete_ArchivesInboxDMails(t *testing.T) {
 		t.Error("expected implementation-feedback-057.md in archive/, but not found")
 	}
 }
+
+// TestExpeditionError_ArchivesInboxDMails verifies that inbox D-Mails are
+// archived even when the expedition process fails (handleExpeditionError path).
+// Regression: early return from handleExpeditionError bypassed archive logic.
+func TestExpeditionError_ArchivesInboxDMails(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Place golden D-Mail in inbox
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	golden, err := os.ReadFile("testdata/implementation-feedback-057.md")
+	if err != nil {
+		t.Fatalf("read golden testdata: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(inboxDir, "implementation-feedback-057.md"), golden, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 1,
+		BaseBranch:     "main",
+		ClaudeCmd:      "/bin/false", // always fails → handleExpeditionError path
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	_ = p.Run(context.Background())
+
+	// Inbox must be empty: D-Mail should be archived even on error path
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".md" {
+			t.Errorf("inbox should be empty after expedition error, found: %s", e.Name())
+		}
+	}
+
+	// Archive must contain the D-Mail
+	archivePath := filepath.Join(dir, ".expedition", "archive", "implementation-feedback-057.md")
+	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
+		t.Error("expected implementation-feedback-057.md in archive/, but not found")
+	}
+}
+
+// TestGommage_ArchivesInboxDMails verifies that inbox D-Mails are archived
+// even when the worker exits via errGommage (consecutive failure limit).
+// Regression: return errGommage bypassed archive logic in dispatchExpeditionResult.
+func TestGommage_ArchivesInboxDMails(t *testing.T) {
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Place golden D-Mail in inbox
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	golden, err := os.ReadFile("testdata/implementation-feedback-057.md")
+	if err != nil {
+		t.Fatalf("read golden testdata: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(inboxDir, "implementation-feedback-057.md"), golden, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        1,
+		MaxExpeditions: 20, // enough to trigger gommage
+		BaseBranch:     "main",
+		ClaudeCmd:      "/bin/false", // always fails → consecutive failures → gommage
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	code := p.Run(context.Background())
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 (gommage), got %d", code)
+	}
+
+	// Inbox must be empty: D-Mail should be archived even on gommage path
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".md" {
+			t.Errorf("inbox should be empty after gommage, found: %s", e.Name())
+		}
+	}
+
+	// Archive must contain the D-Mail
+	archivePath := filepath.Join(dir, ".expedition", "archive", "implementation-feedback-057.md")
+	if _, err := os.Stat(archivePath); errors.Is(err, fs.ErrNotExist) {
+		t.Error("expected implementation-feedback-057.md in archive/, but not found")
+	}
+}

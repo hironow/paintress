@@ -107,6 +107,15 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			InboxDMails: inboxDMails,
 			Notifier:    p.notifier,
 		}
+		// archiveInbox moves all inbox D-Mails to archive. Called on error/gommage
+		// paths; the success path is covered by dispatchExpeditionResult's defer.
+		archiveInbox := func() {
+			for _, dm := range expedition.InboxDMails {
+				if err := ArchiveInboxDMail(ctx, p.config.Continent, dm.Name, p.Emitter); err != nil {
+					p.Logger.Warn("dmail archive: %v", err)
+				}
+			}
+		}
 
 		if p.config.DryRun {
 			promptFile := filepath.Join(p.logDir, fmt.Sprintf("expedition-%03d-prompt.md", exp))
@@ -129,11 +138,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		if err != nil {
 			if ctx.Err() != nil {
+				archiveInbox()
 				releaseWorkDir()
 				expSpan.End()
 				return nil
 			}
 			p.handleExpeditionError(expSpan, exp, expedition, flagDir, err)
+			archiveInbox()
 		} else {
 			if retErr := p.dispatchExpeditionResult(ctx, expCtx, expSpan, exp, expedition, flagDir, workDir, output, expStart); retErr != nil {
 				releaseWorkDir()
