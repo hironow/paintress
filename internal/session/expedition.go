@@ -339,7 +339,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 		// Attach raw events and session ID to the invoke span
 		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-			invokeSpan.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents))) // nosemgrep: otel-attribute-stringslice-unsanitized — elements sanitized via SanitizeUTF8Slice
+			invokeSpan.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents)))
 		}
 		if result != nil && result.SessionID != "" {
 			invokeSpan.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
