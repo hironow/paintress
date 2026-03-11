@@ -855,3 +855,73 @@ func TestParseReport_Golden_Expedition060(t *testing.T) {
 		t.Errorf("BugsFound = %d, want 0", report.BugsFound)
 	}
 }
+
+func TestParseReport_ConsolidateMissionType(t *testing.T) {
+	output := `Starting consolidation...
+__EXPEDITION_REPORT__
+expedition: 70
+issue_id: none
+issue_title: PR chain consolidation
+mission_type: consolidate
+branch: consolidate/chain-a
+pr_url: https://github.com/org/repo/pull/99
+status: success
+reason: Applied #1, #2, #3. New PR #99. Closed #1, #2, #3.
+failure_type: none
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+insight: Cherry-pick ordering matters for stacked PRs - always apply root-first
+__EXPEDITION_END__
+Done.`
+
+	report, status := domain.ParseReport(output, 70)
+	if status != domain.StatusSuccess {
+		t.Fatalf("got %v, want domain.StatusSuccess", status)
+	}
+	if report.MissionType != "consolidate" {
+		t.Errorf("MissionType = %q, want 'consolidate'", report.MissionType)
+	}
+	if report.Branch != "consolidate/chain-a" {
+		t.Errorf("Branch = %q", report.Branch)
+	}
+	if report.PRUrl != "https://github.com/org/repo/pull/99" {
+		t.Errorf("PRUrl = %q", report.PRUrl)
+	}
+	if !containsStr(report.Reason, "Applied #1, #2, #3") {
+		t.Errorf("Reason should contain applied PRs: %q", report.Reason)
+	}
+}
+
+func TestParseReport_ConsolidatePartialCompletion(t *testing.T) {
+	output := `
+__EXPEDITION_REPORT__
+expedition: 71
+issue_id: none
+issue_title: PR chain consolidation (partial)
+mission_type: consolidate
+branch: consolidate/chain-a
+pr_url: none
+status: skipped
+reason: Applied #1, #2, #3. Remaining: #4, #5. Timed out before completion.
+failure_type: performance
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+insight: Large chains need multiple expeditions
+__EXPEDITION_END__`
+
+	report, status := domain.ParseReport(output, 71)
+	if status != domain.StatusSkipped {
+		t.Fatalf("got %v, want domain.StatusSkipped for partial consolidation", status)
+	}
+	if report.MissionType != "consolidate" {
+		t.Errorf("MissionType = %q, want 'consolidate'", report.MissionType)
+	}
+	if !containsStr(report.Reason, "Remaining: #4, #5") {
+		t.Errorf("Reason should contain remaining PRs: %q", report.Reason)
+	}
+	if report.FailureType != "performance" {
+		t.Errorf("FailureType = %q, want 'performance' for timeout", report.FailureType)
+	}
+}
