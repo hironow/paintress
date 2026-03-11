@@ -62,7 +62,22 @@ func main() {
 	// Handle --print flag WITHOUT -p (used by doctor's inference check).
 	// When -p is also present, fall through to protocol detection (sightjack/paintress).
 	if hasFlag(os.Args[1:], "--print") && extractPrompt(os.Args[1:]) == "" {
-		fmt.Print("2")
+		prompt := ""
+		for i := len(os.Args) - 1; i >= 1; i-- {
+			if !strings.HasPrefix(os.Args[i], "-") && os.Args[i-1] != "--output-format" && os.Args[i-1] != "--max-turns" {
+				prompt = os.Args[i]
+				break
+			}
+		}
+		body := "unknown"
+		if strings.Contains(prompt, "1+1") {
+			body = "2"
+		}
+		if extractOutputFormat(os.Args[1:]) == "stream-json" {
+			fmt.Print(wrapStreamJSON(body))
+		} else {
+			fmt.Print(body)
+		}
 		return
 	}
 

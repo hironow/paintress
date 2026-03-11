@@ -544,8 +544,8 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	// when
 	checks := session.RunDoctor("nonexistent-claude-xyz-12345", dir)
 
-	// then — claude-auth, linear-mcp, and claude-inference should exist with skip message
-	var authFound, mcpFound, inferFound bool
+	// then — claude-auth, linear-mcp, claude-inference, and context-budget should exist with skip message
+	var authFound, mcpFound, inferFound, budgetFound bool
 	for _, c := range checks {
 		switch c.Name {
 		case "claude-auth":
@@ -572,6 +572,14 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 			if !strings.Contains(c.Version, "skipped") {
 				t.Errorf("expected 'skipped' in version, got %q", c.Version)
 			}
+		case "context-budget":
+			budgetFound = true
+			if c.OK {
+				t.Error("context-budget should not be OK when claude unavailable")
+			}
+			if !strings.Contains(c.Version, "skipped") {
+				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			}
 		}
 	}
 	if !authFound {
@@ -582,6 +590,9 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	}
 	if !inferFound {
 		t.Error("expected claude-inference check in doctor output")
+	}
+	if !budgetFound {
+		t.Error("expected context-budget check in doctor output")
 	}
 }
 
@@ -696,7 +707,7 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	checks := session.RunDoctor(fakeClaude, dir)
 
 	// then — claude binary check should pass (fake-claude supports --version)
-	var claudeFound, authFound, mcpFound, inferFound bool
+	var claudeFound, authFound, mcpFound, inferFound, budgetFound bool
 	for _, c := range checks {
 		switch c.Name {
 		case fakeClaude:
@@ -719,6 +730,11 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 			if !c.OK {
 				t.Errorf("claude-inference should be OK with fake-claude, version: %s", c.Version)
 			}
+		case "context-budget":
+			budgetFound = true
+			if !c.OK {
+				t.Errorf("context-budget should be OK with fake-claude, version: %s", c.Version)
+			}
 		}
 	}
 	if !claudeFound {
@@ -733,6 +749,9 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	if !inferFound {
 		t.Error("expected claude-inference check in doctor output")
 	}
+	if !budgetFound {
+		t.Error("expected context-budget check in doctor output")
+	}
 }
 
 func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
@@ -740,9 +759,9 @@ func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
 	// when
 	checks := session.RunDoctor("claude", "")
 
-	// then — MCP/inference checks should not appear
+	// then — MCP/inference/budget checks should not appear
 	for _, c := range checks {
-		if c.Name == "claude-auth" || c.Name == "linear-mcp" || c.Name == "claude-inference" {
+		if c.Name == "claude-auth" || c.Name == "linear-mcp" || c.Name == "claude-inference" || c.Name == "context-budget" {
 			t.Errorf("check %q should not appear without continent", c.Name)
 		}
 	}
@@ -886,5 +905,123 @@ func TestCheckGHScopes_NoScopesLine(t *testing.T) {
 	// then
 	if check.OK {
 		t.Error("gh-scopes should fail when scopes line not found")
+	}
+}
+
+func TestExtractStreamResult_WithResult(t *testing.T) {
+	// given
+	stream := `{"type":"system","subtype":"init","session_id":"s1"}
+{"type":"assistant","session_id":"s1","message":{"content":[{"type":"text","text":"2"}]}}
+{"type":"result","subtype":"success","session_id":"s1","result":"2","is_error":false}
+`
+	// when
+	got := session.ExportExtractStreamResult(stream)
+
+	// then
+	if got != "2" {
+		t.Errorf("expected '2', got %q", got)
+	}
+}
+
+func TestExtractStreamResult_Empty(t *testing.T) {
+	// given
+	stream := ""
+
+	// when
+	got := session.ExportExtractStreamResult(stream)
+
+	// then
+	if got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+func TestExtractStreamResult_NoResult(t *testing.T) {
+	// given: stream without result line
+	stream := `{"type":"system","subtype":"init","session_id":"s1"}
+{"type":"assistant","session_id":"s1","message":{"content":[{"type":"text","text":"hello"}]}}
+`
+	// when
+	got := session.ExportExtractStreamResult(stream)
+
+	// then
+	if got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
+func TestCheckContextBudget_LowUsage(t *testing.T) {
+	// given: stream-json with small init metadata
+	stream := `{"type":"system","subtype":"init","session_id":"s1","tools":[{"name":"Read"},{"name":"Write"}],"mcp_servers":[{"name":"linear","status":"connected"}]}
+{"type":"result","subtype":"success","session_id":"s1","result":"2","is_error":false}
+`
+	// when
+	check := session.ExportCheckContextBudget(stream)
+
+	// then
+	if !check.OK {
+		t.Errorf("context-budget should be OK for low usage, version: %s", check.Version)
+	}
+	if check.Name != "context-budget" {
+		t.Errorf("expected name 'context-budget', got %q", check.Name)
+	}
+	if check.Hint != "" {
+		t.Errorf("should not have hint for low usage, got %q", check.Hint)
+	}
+	if !strings.Contains(check.Version, "estimated") {
+		t.Errorf("version should contain 'estimated', got %q", check.Version)
+	}
+}
+
+func TestCheckContextBudget_HighUsage(t *testing.T) {
+	// given: stream-json with hook output exceeding threshold
+	// 100000 bytes / 4 = 25000 tokens > 20000 threshold
+	hookOutput := strings.Repeat("x", 100000)
+	stream := fmt.Sprintf(`{"type":"system","subtype":"init","session_id":"s1","tools":[],"mcp_servers":[{"name":"linear","status":"connected"}]}
+{"type":"system","subtype":"hook_response","session_id":"s1","stdout":%q}
+{"type":"result","subtype":"success","session_id":"s1","result":"2","is_error":false}
+`, hookOutput)
+
+	// when
+	check := session.ExportCheckContextBudget(stream)
+
+	// then
+	if !check.OK {
+		t.Errorf("context-budget should still be OK (informational), version: %s", check.Version)
+	}
+	if check.Hint == "" {
+		t.Error("should have hint for high usage")
+	}
+	if !strings.Contains(check.Hint, "allowlist") {
+		t.Errorf("hint should mention allowlist, got %q", check.Hint)
+	}
+}
+
+func TestCheckContextBudget_EmptyStream(t *testing.T) {
+	// given
+	stream := ""
+
+	// when
+	check := session.ExportCheckContextBudget(stream)
+
+	// then
+	if !check.OK {
+		t.Error("context-budget should be OK for empty stream (0 tokens)")
+	}
+	if !strings.Contains(check.Version, "estimated 0 tokens") {
+		t.Errorf("expected '0 tokens' in version, got %q", check.Version)
+	}
+}
+
+func TestCheckContextBudget_NoInitMessage(t *testing.T) {
+	// given: stream without init message
+	stream := `{"type":"result","subtype":"success","session_id":"s1","result":"2","is_error":false}
+`
+	// when
+	check := session.ExportCheckContextBudget(stream)
+
+	// then
+	if !check.OK {
+		t.Error("context-budget should be OK (0 tokens) without init")
 	}
 }
