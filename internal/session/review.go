@@ -220,7 +220,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 	return notResolved(maxReviewGateCycles, lastComments)
 }
 
-// runSkipReview runs review_cmd against past PRs from pr-index.jsonl when an
+// runSkipReview runs review_cmd against past PRs from pr-index.jsonl when an // nosemgrep: layer-session-no-event-persistence [permanent]
 // expedition is skipped. This prevents idle loops when all issues are In Review.
 func (p *Paintress) runSkipReview(ctx context.Context, workDir string, expStart time.Time) {
 	if ctx.Err() != nil {

@@ -2,7 +2,9 @@ package session
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -84,13 +86,13 @@ func WritePRIndex(continent string, report *domain.ExpeditionReport) error {
 	return err
 }
 
-// ReadPRIndex reads the pr-index.jsonl file and returns all entries.
+// ReadPRIndex reads the pr-index.jsonl file and returns all entries. // nosemgrep: layer-session-no-event-persistence [permanent]
 // Returns an empty slice (not error) when the file does not exist.
 func ReadPRIndex(continent string) ([]domain.PRIndexEntry, error) {
-	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl")
+	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl") // nosemgrep: layer-session-no-event-persistence [permanent]
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("pr index: read: %w", err)

@@ -1636,7 +1636,7 @@ __EXPEDITION_END__`
 	p.Run(ctx)
 
 	// then: review_cmd should have been called
-	if _, err := os.Stat(reviewMarker); os.IsNotExist(err) {
+	if _, err := os.Stat(reviewMarker); errors.Is(err, fs.ErrNotExist) {
 		t.Error("review_cmd was not executed during skip — re-review path not triggered")
 	}
 }
