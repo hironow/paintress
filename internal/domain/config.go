@@ -38,7 +38,7 @@ type Config struct {
 	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
 	AutoApprove    bool          // Skip approval gate for HIGH severity D-Mail
 	MaxRetries     int           // Maximum retry attempts per unique issue set (default: 3)
-	WaitTimeout    time.Duration `yaml:"wait_timeout,omitempty"` // D-Mail waiting phase timeout (0 = no timeout, <0 = disable waiting)
+	WaitTimeout    time.Duration `yaml:"wait_timeout,omitempty"` // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)
 }
 
 // DefaultConfig returns a Config populated with sensible defaults.
