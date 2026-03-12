@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/hironow/paintress/internal/cmd"
+	cmd "github.com/hironow/paintress/internal/cmd"
 	"github.com/hironow/paintress/internal/domain"
 )
 
@@ -16,15 +16,10 @@ func main() {
 }
 
 func run() int {
-	ctx, stop := signal.NotifyContext(context.Background(),
-		shutdownSignals...)
+	ctx, stop := signal.NotifyContext(context.Background(), shutdownSignals...)
 	defer stop()
 
 	rootCmd := cmd.NewRootCommand()
-	// NOTE: RewriteBoolFlags was intentionally removed (MY-334).
-	// Space-separated bool values (e.g. `--dry-run false`) are no longer
-	// normalised. Use `--dry-run=false` instead. This aligns with
-	// POSIX/GNU conventions and matches kubectl/gh/docker behaviour.
 	args := os.Args[1:]
 	if cmd.NeedsDefaultRun(rootCmd, args) {
 		args = append([]string{"run"}, args...)
