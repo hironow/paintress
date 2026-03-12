@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -81,6 +82,32 @@ func WritePRIndex(continent string, report *domain.ExpeditionReport) error {
 	defer f.Close()
 	_, err = f.Write(data)
 	return err
+}
+
+// ReadPRIndex reads the pr-index.jsonl file and returns all entries.
+// Returns an empty slice (not error) when the file does not exist.
+func ReadPRIndex(continent string) ([]domain.PRIndexEntry, error) {
+	path := filepath.Join(domain.JournalDir(continent), "pr-index.jsonl")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("pr index: read: %w", err)
+	}
+	var entries []domain.PRIndexEntry
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var entry domain.PRIndexEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			continue // skip malformed lines
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
 }
 
 // ListJournalFiles returns journal file paths sorted by name (ascending).

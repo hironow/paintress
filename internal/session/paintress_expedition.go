@@ -182,6 +182,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			return errGommage
 		}
 
+		if p.consecutiveSkips.Load() >= int64(maxConsecutiveSkips) {
+			expSpan.AddEvent("all_skipped",
+				trace.WithAttributes(attribute.Int("consecutive_skips", maxConsecutiveSkips)),
+			)
+			releaseWorkDir()
+			expSpan.End()
+			p.Logger.Warn("all expeditions skipped %d times consecutively — no actionable work available", maxConsecutiveSkips)
+			return errAllSkipped
+		}
+
 		releaseWorkDir()
 		expSpan.End()
 		if p.pool == nil {
@@ -347,6 +357,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
+		if err := WritePRIndex(p.config.Continent, report); err != nil {
+			p.Logger.Warn("pr index: %v", err)
+		}
 		if err := p.emitExpeditionCompleted(exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound)); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
@@ -357,6 +370,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			}
 		}
 		p.consecutiveFailures.Store(0)
+		p.consecutiveSkips.Store(0)
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))
@@ -369,6 +383,11 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := p.emitExpeditionCompleted(exp, "skipped", report.IssueID, ""); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
+		// Re-review past PRs when skipped and review_cmd is configured.
+		if p.config.ReviewCmd != "" {
+			p.runSkipReview(ctx, workDir, expStart)
+		}
+		p.consecutiveSkips.Add(1)
 		p.totalSkipped.Add(1)
 	case domain.StatusFailed:
 		p.Logger.Error("%s", fmt.Sprintf(domain.Msg("issue_failed"), report.IssueID, report.Reason))

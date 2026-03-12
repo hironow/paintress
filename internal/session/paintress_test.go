@@ -1572,3 +1572,124 @@ __EXPEDITION_END__`
 		t.Errorf("journal should mention review status, got: %s", string(content))
 	}
 }
+
+// TestTermination_ConsecutiveSkips_StopsWorker proves that the expedition loop
+// terminates when all expeditions are consecutively skipped (e.g. all issues
+// are In Review). Without this guard, the loop burns Claude API + Linear API
+// tokens indefinitely on each 10-second cycle. This is the public API proof
+// via Run() that consecutive skips trigger early exit, analogous to the
+// gommage pattern for consecutive failures.
+func TestSkipReview_RunsReviewOnPastPRs(t *testing.T) {
+	// given: a repo with a past PR in pr-index.jsonl
+	dir := setupTestRepo(t)
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Plant a past PR in the index
+	pastReport := &domain.ExpeditionReport{
+		Expedition: 1,
+		IssueID:    "AWE-10",
+		PRUrl:      "https://github.com/org/repo/pull/10",
+	}
+	if err := WritePRIndex(dir, pastReport); err != nil {
+		t.Fatalf("WritePRIndex: %v", err)
+	}
+
+	// review_cmd: script that creates a marker file and exits 0 (pass)
+	reviewMarker := filepath.Join(dir, "review-was-called.marker")
+	reviewScript := filepath.Join(dir, "review.sh")
+	writeScript(t, reviewScript, fmt.Sprintf("touch %q\nexit 0\n", reviewMarker))
+
+	// Claude returns "skipped" — all issues In Review
+	reportText := `__EXPEDITION_REPORT__
+issue_id: SKIP-1
+issue_title: all blocked on review
+mission_type: implement
+branch: none
+pr_url: none
+status: skipped
+reason: All issues are In Review with open PRs. No actionable work available.
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	script := streamJSONScript(t, dir, "fakeclaude.sh", reportText)
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 1,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+		ReviewCmd:      reviewScript,
+	}
+
+	// when
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p.Run(ctx)
+
+	// then: review_cmd should have been called
+	if _, err := os.Stat(reviewMarker); os.IsNotExist(err) {
+		t.Error("review_cmd was not executed during skip — re-review path not triggered")
+	}
+}
+
+func TestTermination_ConsecutiveSkips_StopsWorker(t *testing.T) {
+	// given: Claude always returns status=skipped (simulating all issues In Review)
+	dir := setupTestRepo(t)
+
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	reportText := `__EXPEDITION_REPORT__
+issue_id: SKIP-1
+issue_title: all blocked on review
+mission_type: implement
+branch: none
+pr_url: none
+status: skipped
+reason: All issues are In Review with open PRs. No actionable work available.
+remaining_issues: 5
+bugs_found: 0
+bug_issues: none
+__EXPEDITION_END__`
+	script := streamJSONScript(t, dir, "fakeclaude.sh", reportText)
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 20, // high ceiling — should NOT reach this
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	// when
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	code := p.Run(ctx)
+
+	// then: Run() must terminate via consecutive skip detection, not MaxExpeditions
+	if p.totalSkipped.Load() >= 20 {
+		t.Fatalf("loop ran all 20 expeditions — consecutive skip termination did not fire")
+	}
+	if p.totalSkipped.Load() < 3 {
+		t.Errorf("expected at least 3 skips before termination, got %d", p.totalSkipped.Load())
+	}
+	// exit code 1 indicates abnormal termination (like gommage)
+	if code != 1 {
+		t.Errorf("expected exit code 1 (consecutive skips), got %d", code)
+	}
+}

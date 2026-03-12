@@ -2,6 +2,7 @@ package session_test
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -398,5 +399,53 @@ func TestWritePRIndex_AppendsMultiple(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if len(lines) != 3 {
 		t.Errorf("expected 3 lines, got %d: %s", len(lines), string(data))
+	}
+}
+
+func TestReadPRIndex_ReadsEntries(t *testing.T) {
+	// given
+	continent := t.TempDir()
+	for i := 1; i <= 3; i++ {
+		report := &domain.ExpeditionReport{
+			Expedition: i,
+			IssueID:    fmt.Sprintf("AWE-%d", i),
+			PRUrl:      fmt.Sprintf("https://github.com/org/repo/pull/%d", i),
+		}
+		if err := session.WritePRIndex(continent, report); err != nil {
+			t.Fatalf("WritePRIndex #%d: %v", i, err)
+		}
+	}
+
+	// when
+	entries, err := session.ReadPRIndex(continent)
+
+	// then
+	if err != nil {
+		t.Fatalf("ReadPRIndex: %v", err)
+	}
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	if entries[0].IssueID != "AWE-1" {
+		t.Errorf("entries[0].IssueID = %q, want AWE-1", entries[0].IssueID)
+	}
+	if entries[2].PRUrl != "https://github.com/org/repo/pull/3" {
+		t.Errorf("entries[2].PRUrl = %q, want .../pull/3", entries[2].PRUrl)
+	}
+}
+
+func TestReadPRIndex_EmptyWhenNoFile(t *testing.T) {
+	// given
+	continent := t.TempDir()
+
+	// when
+	entries, err := session.ReadPRIndex(continent)
+
+	// then
+	if err != nil {
+		t.Fatalf("ReadPRIndex on missing file: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(entries))
 	}
 }
