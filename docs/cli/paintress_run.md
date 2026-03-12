@@ -55,7 +55,7 @@ paintress run [repo-path] [flags]
       --review-cmd string       Code review command after PR creation
       --setup-cmd string        Command to run after worktree creation (e.g. 'bun install')
   -t, --timeout int             Timeout per expedition in seconds (default: 33min) (default 1980)
-      --wait-timeout duration   D-Mail waiting phase timeout (0 = no timeout, negative = disable waiting) (default 30m0s)
+      --wait-timeout duration   D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting) (default 30m0s)
   -w, --workers int             Number of worktrees in pool (0 = direct execution) (default 1)
 ```
 
