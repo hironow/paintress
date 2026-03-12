@@ -179,7 +179,7 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 				inferCancel()
 				inferOutput := string(inferOut)
 				checks = append(checks, checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr))
-				checks = append(checks, CheckContextBudget(inferOutput))
+				checks = append(checks, CheckContextBudget(inferOutput, ""))
 			}
 		}
 	}
@@ -630,66 +630,3 @@ func checkGHScopes(output string, err error) domain.DoctorCheck {
 	}
 }
 
-// ExtractStreamResult parses stream-json output and returns the "result" field
-// from the result message. Used to extract inference output from stream-json format.
-func ExtractStreamResult(streamJSON string) string {
-	for _, line := range strings.Split(streamJSON, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		var msg struct {
-			Type   string `json:"type"`
-			Result string `json:"result"`
-		}
-		if err := json.Unmarshal([]byte(line), &msg); err == nil && msg.Type == "result" {
-			return msg.Result
-		}
-	}
-	return ""
-}
-
-// CheckContextBudget parses stream-json output from a Claude CLI invocation
-// and reports context budget health based on hooks, plugins, skills, and MCP servers.
-func CheckContextBudget(streamJSON string) domain.DoctorCheck {
-	var messages []*platform.StreamMessage
-	for _, line := range strings.Split(streamJSON, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		msg, err := platform.ParseStreamMessage([]byte(line))
-		if err != nil {
-			continue
-		}
-		messages = append(messages, msg)
-	}
-
-	report := platform.CalculateContextBudget(messages)
-
-	check := domain.DoctorCheck{
-		Name:   "context-budget",
-		Status: domain.CheckOK,
-		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
-			report.EstimatedTokens, report.ToolCount, report.SkillCount,
-			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
-	}
-	if report.Exceeds(platform.DefaultContextBudgetThreshold) {
-		check.Hint = "context consumption is high; consider reducing installed plugins/skills or using an allowlist"
-	}
-	return check
-}
-
-// filterEnv returns a copy of env with the named variable removed.
-// Used to unset CLAUDECODE so that doctor's inference check does not
-// trigger the nested-session guard in Claude Code.
-func filterEnv(env []string, name string) []string {
-	prefix := name + "="
-	out := make([]string, 0, len(env))
-	for _, e := range env {
-		if !strings.HasPrefix(e, prefix) {
-			out = append(out, e)
-		}
-	}
-	return out
-}

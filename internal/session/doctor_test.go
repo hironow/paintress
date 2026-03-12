@@ -940,7 +940,7 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 {"type":"result","subtype":"success","session_id":"s1","result":"2","is_error":false}
 `
 	// when
-	check := session.ExportCheckContextBudget(stream)
+	check := session.ExportCheckContextBudget(stream, "")
 
 	// then
 	if check.Status != domain.CheckOK {
@@ -967,17 +967,14 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 `, hookOutput)
 
 	// when
-	check := session.ExportCheckContextBudget(stream)
+	check := session.ExportCheckContextBudget(stream, "")
 
 	// then
-	if check.Status != domain.CheckOK {
-		t.Errorf("context-budget should still be OK (informational), message: %s", check.Message)
+	if check.Status != domain.CheckWarn {
+		t.Errorf("context-budget should be WARN for high usage, message: %s", check.Message)
 	}
 	if check.Hint == "" {
 		t.Error("should have hint for high usage")
-	}
-	if !strings.Contains(check.Hint, "allowlist") {
-		t.Errorf("hint should mention allowlist, got %q", check.Hint)
 	}
 }
 
@@ -986,7 +983,7 @@ func TestCheckContextBudget_EmptyStream(t *testing.T) {
 	stream := ""
 
 	// when
-	check := session.ExportCheckContextBudget(stream)
+	check := session.ExportCheckContextBudget(stream, "")
 
 	// then
 	if check.Status != domain.CheckOK {
@@ -1002,10 +999,51 @@ func TestCheckContextBudget_NoInitMessage(t *testing.T) {
 	stream := `{"type":"result","subtype":"success","session_id":"s1","result":"2","is_error":false}
 `
 	// when
-	check := session.ExportCheckContextBudget(stream)
+	check := session.ExportCheckContextBudget(stream, "")
 
 	// then
 	if check.Status != domain.CheckOK {
 		t.Error("context-budget should be OK (0 tokens) without init")
+	}
+}
+
+func TestCheckContextBudget_WarnWithBreakdown(t *testing.T) {
+	// given: stream with many skills (exceeds threshold)
+	initMsg := `{"type":"system","subtype":"init","tools":["Read","Write"],"skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an"],"plugins":["p1","p2","p3","p4","p5"],"mcp_servers":[{"name":"linear","status":"connected"}]}`
+	stream := initMsg + "\n"
+
+	// when
+	check := session.ExportCheckContextBudget(stream, "")
+
+	// then
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v", check.Status.StatusLabel())
+	}
+	if !strings.Contains(check.Message, "skills") {
+		t.Errorf("message should contain breakdown with 'skills', got: %s", check.Message)
+	}
+	if check.Hint == "" {
+		t.Error("expected hint for threshold exceeded")
+	}
+}
+
+func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
+	// given: project with .claude/settings.json
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".claude", "settings.json"), []byte(`{}`), 0o644)
+
+	initMsg := `{"type":"system","subtype":"init","skills":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z","aa","ab","ac","ad","ae","af","ag","ah","ai","aj","ak","al","am","an","ao","ap"]}`
+	stream := initMsg + "\n"
+
+	// when
+	check := session.ExportCheckContextBudget(stream, dir)
+
+	// then
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected WARN, got %v", check.Status.StatusLabel())
+	}
+	if !strings.Contains(check.Hint, "見直して") {
+		t.Errorf("hint should say review settings, got: %s", check.Hint)
 	}
 }
