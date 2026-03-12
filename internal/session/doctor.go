@@ -59,13 +59,17 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 	checks := make([]domain.DoctorCheck, 0, len(commands)+8)
 	for _, cmd := range commands {
-		check := domain.DoctorCheck{
-			Name:     cmd.name,
-			Required: cmd.required,
-		}
-
 		path, err := lookPath(cmd.name)
 		if err != nil {
+			status := domain.CheckWarn
+			if cmd.required {
+				status = domain.CheckFail
+			}
+			check := domain.DoctorCheck{
+				Name:    cmd.name,
+				Status:  status,
+				Message: "command not found",
+			}
 			if cmd.required {
 				check.Hint = fmt.Sprintf("install %s and ensure it is in PATH", cmd.name)
 			}
@@ -73,25 +77,28 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			continue
 		}
 
-		check.Path = path
-		check.OK = true
-
 		// Try to get version (best-effort, 500ms timeout)
 		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		out, err := newShellCmd(ctx, cmd.name, "--version").Output()
 		cancel()
+
+		var versionStr string
 		if err == nil {
-			firstLine := strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
-			check.Version = firstLine
+			versionStr = strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
 		}
 
+		check := domain.DoctorCheck{
+			Name:    cmd.name,
+			Status:  domain.CheckOK,
+			Message: fmt.Sprintf("%s (%s)", path, versionStr),
+		}
 		checks = append(checks, check)
 	}
 
 	// gh auth scope check (requires gh binary to be found)
 	ghOK := false
 	for _, c := range checks {
-		if c.Name == "gh" && c.OK {
+		if c.Name == "gh" && c.Status == domain.CheckOK {
 			ghOK = true
 			break
 		}
@@ -116,27 +123,31 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 		// External connectivity checks (skip if claude binary not found)
 		claudeOK := false
 		for _, c := range checks {
-			if c.Name == claudeCmd && c.OK {
+			if c.Name == claudeCmd && c.Status == domain.CheckOK {
 				claudeOK = true
 				break
 			}
 		}
 		if !claudeOK {
 			checks = append(checks, domain.DoctorCheck{
-				Name: "claude-auth", Required: false,
-				Version: "skipped (claude not available)",
+				Name:    "claude-auth",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not available)",
 			})
 			checks = append(checks, domain.DoctorCheck{
-				Name: "linear-mcp", Required: false,
-				Version: "skipped (claude not available)",
+				Name:    "linear-mcp",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not available)",
 			})
 			checks = append(checks, domain.DoctorCheck{
-				Name: "claude-inference", Required: false,
-				Version: "skipped (claude not available)",
+				Name:    "claude-inference",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not available)",
 			})
 			checks = append(checks, domain.DoctorCheck{
-				Name: "context-budget", Required: false,
-				Version: "skipped (claude not available)",
+				Name:    "context-budget",
+				Status:  domain.CheckSkip,
+				Message: "skipped (claude not available)",
 			})
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -149,14 +160,16 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 			checks = append(checks, checkLinearMCP(mcpOutput, err))
 
 			// claude-inference + context-budget: skip if auth failed
-			if !authCheck.OK {
+			if authCheck.Status != domain.CheckOK {
 				checks = append(checks, domain.DoctorCheck{
-					Name: "claude-inference", Required: false,
-					Version: "skipped (auth failed)",
+					Name:    "claude-inference",
+					Status:  domain.CheckSkip,
+					Message: "skipped (auth failed)",
 				})
 				checks = append(checks, domain.DoctorCheck{
-					Name: "context-budget", Required: false,
-					Version: "skipped (auth failed)",
+					Name:    "context-budget",
+					Status:  domain.CheckSkip,
+					Message: "skipped (auth failed)",
 				})
 			} else {
 				inferCtx, inferCancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -175,19 +188,17 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 }
 
 // checkContinent verifies the .expedition/ directory structure exists.
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkContinent(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "continent",
-		Required: false,
-	}
-
 	expeditionDir := filepath.Join(continent, domain.StateDir)
 	info, err := os.Stat(expeditionDir)
 	if err != nil || !info.IsDir() {
-		check.Version = domain.StateDir + "/ not found"
-		check.Hint = `run "paintress init <repo-path>" to set up expedition`
-		return check
+		return domain.DoctorCheck{
+			Name:    "continent",
+			Status:  domain.CheckWarn,
+			Message: domain.StateDir + "/ not found",
+			Hint:    `run "paintress init <repo-path>" to set up expedition`,
+		}
 	}
 
 	requiredDirs := []string{"journal", ".run", "inbox", "outbox", "archive"}
@@ -200,143 +211,150 @@ func checkContinent(continent string) domain.DoctorCheck {
 	}
 
 	if len(missing) > 0 {
-		check.Version = "missing: " + strings.Join(missing, ", ")
-		check.Hint = `run "paintress init <repo-path>" to recreate the expedition structure`
-		return check
+		return domain.DoctorCheck{
+			Name:    "continent",
+			Status:  domain.CheckWarn,
+			Message: "missing: " + strings.Join(missing, ", "),
+			Hint:    `run "paintress init <repo-path>" to recreate the expedition structure`,
+		}
 	}
 
-	check.OK = true
-	check.Path = expeditionDir
-	check.Version = "structure OK"
-	return check
+	return domain.DoctorCheck{
+		Name:    "continent",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%s (structure OK)", expeditionDir),
+	}
 }
 
 // checkGitRepo verifies that the continent directory is inside a git repository.
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkGitRepo(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "git-repo",
-		Required: false,
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	cmd := exec.CommandContext(ctx, "git", "-C", continent, "rev-parse", "--git-dir")
 	out, err := cmd.Output()
 	cancel()
 	if err != nil {
-		check.Version = "not a git repository"
-		check.Hint = `run "git init" or navigate to a git repository`
-		return check
+		return domain.DoctorCheck{
+			Name:    "git-repo",
+			Status:  domain.CheckWarn,
+			Message: "not a git repository",
+			Hint:    `run "git init" or navigate to a git repository`,
+		}
 	}
 
-	check.OK = true
-	check.Path = strings.TrimSpace(string(out))
-	check.Version = "git repo OK"
-	return check
+	return domain.DoctorCheck{
+		Name:    "git-repo",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%s (git repo OK)", strings.TrimSpace(string(out))),
+	}
 }
 
 // checkGitRemote verifies that the git repository has at least one remote configured.
 // Paintress creates Pull Requests for Linear issues, so a remote is required.
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkGitRemote(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "git-remote",
-		Required: false,
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	cmd := exec.CommandContext(ctx, "git", "-C", continent, "remote")
 	out, err := cmd.Output()
 	cancel()
 	if err != nil {
-		check.Version = "failed to check git remote"
-		check.Hint = `ensure the directory is a git repository`
-		return check
+		return domain.DoctorCheck{
+			Name:    "git-remote",
+			Status:  domain.CheckWarn,
+			Message: "failed to check git remote",
+			Hint:    `ensure the directory is a git repository`,
+		}
 	}
 
 	if strings.TrimSpace(string(out)) == "" {
-		check.Version = "no remote configured"
-		check.Hint = `paintress creates Pull Requests for Linear issues — run "git remote add origin <url>" to connect to GitHub`
-		return check
+		return domain.DoctorCheck{
+			Name:    "git-remote",
+			Status:  domain.CheckWarn,
+			Message: "no remote configured",
+			Hint:    `paintress creates Pull Requests for Linear issues — run "git remote add origin <url>" to connect to GitHub`,
+		}
 	}
 
 	remotes := strings.Fields(strings.TrimSpace(string(out)))
-	check.OK = true
-	check.Version = fmt.Sprintf("%d remote(s): %s", len(remotes), strings.Join(remotes, ", "))
-	return check
+	return domain.DoctorCheck{
+		Name:    "git-remote",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%d remote(s): %s", len(remotes), strings.Join(remotes, ", ")),
+	}
 }
 
 // checkWritability verifies that the .expedition/ directory is writable.
 // Creates and removes a probe file to test write access.
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkWritability(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "writable",
-		Required: false,
-	}
-
 	expeditionDir := filepath.Join(continent, domain.StateDir)
 	probe := filepath.Join(expeditionDir, ".doctor-probe")
 	if err := os.WriteFile(probe, []byte("probe"), 0644); err != nil {
-		check.Version = "not writable: " + err.Error()
-		check.Hint = "check file permissions on the .expedition/ directory"
-		return check
+		return domain.DoctorCheck{
+			Name:    "writable",
+			Status:  domain.CheckWarn,
+			Message: "not writable: " + err.Error(),
+			Hint:    "check file permissions on the .expedition/ directory",
+		}
 	}
 	os.Remove(probe)
 
-	check.OK = true
-	check.Path = expeditionDir
-	check.Version = "writable OK"
-	return check
+	return domain.DoctorCheck{
+		Name:    "writable",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%s (writable OK)", expeditionDir),
+	}
 }
 
 // checkConfig verifies that config.yaml exists and can be loaded.
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkConfig(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "config",
-		Required: false,
-	}
-
 	configPath := domain.ProjectConfigPath(continent)
 	if _, err := os.Stat(configPath); err != nil {
-		check.Version = "config.yaml not found"
-		check.Hint = `run "paintress init <repo-path>" to create config`
-		return check
+		return domain.DoctorCheck{
+			Name:    "config",
+			Status:  domain.CheckWarn,
+			Message: "config.yaml not found",
+			Hint:    `run "paintress init <repo-path>" to create config`,
+		}
 	}
 
 	cfg, err := LoadProjectConfig(continent)
 	if err != nil {
-		check.Version = "load error: " + err.Error()
-		check.Hint = "check YAML syntax in .expedition/config.yaml"
-		return check
+		return domain.DoctorCheck{
+			Name:    "config",
+			Status:  domain.CheckWarn,
+			Message: "load error: " + err.Error(),
+			Hint:    "check YAML syntax in .expedition/config.yaml",
+		}
 	}
 
-	check.OK = true
-	check.Path = configPath
+	var msg string
 	if cfg.HasTrackerTeam() {
-		check.Version = "team=" + cfg.TrackerTeam()
+		msg = fmt.Sprintf("%s (team=%s)", configPath, cfg.TrackerTeam())
 	} else {
-		check.Version = "loaded OK"
+		msg = fmt.Sprintf("%s (loaded OK)", configPath)
 	}
-	return check
+	return domain.DoctorCheck{
+		Name:    "config",
+		Status:  domain.CheckOK,
+		Message: msg,
+	}
 }
 
 // checkSkills verifies that SKILL.md files exist and contain dmail-schema-version.
 // Searches .expedition/skills/*/SKILL.md for valid skill definitions.
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkSkills(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "skills",
-		Required: false,
-	}
-
 	skillsDir := filepath.Join(continent, domain.StateDir, "skills")
 	entries, err := os.ReadDir(skillsDir)
 	if err != nil {
-		check.Version = "skills/ not found"
-		check.Hint = `run "paintress init <repo-path>" to set up skills`
-		return check
+		return domain.DoctorCheck{
+			Name:    "skills",
+			Status:  domain.CheckWarn,
+			Message: "skills/ not found",
+			Hint:    `run "paintress init <repo-path>" to set up skills`,
+		}
 	}
 
 	var found, valid int
@@ -356,15 +374,21 @@ func checkSkills(continent string) domain.DoctorCheck {
 	}
 
 	if found == 0 {
-		check.Version = "no SKILL.md files found"
-		check.Hint = `run "paintress init <repo-path>" to create skill files`
-		return check
+		return domain.DoctorCheck{
+			Name:    "skills",
+			Status:  domain.CheckWarn,
+			Message: "no SKILL.md files found",
+			Hint:    `run "paintress init <repo-path>" to create skill files`,
+		}
 	}
 
 	if valid < found {
-		check.Version = fmt.Sprintf("%d/%d skills missing dmail-schema-version", found-valid, found)
-		check.Hint = `add "dmail-schema-version" to SKILL.md metadata`
-		return check
+		return domain.DoctorCheck{
+			Name:    "skills",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d/%d skills missing dmail-schema-version", found-valid, found),
+			Hint:    `add "dmail-schema-version" to SKILL.md metadata`,
+		}
 	}
 
 	// Check for deprecated "kind: feedback" (split into design-feedback / implementation-feedback)
@@ -381,34 +405,35 @@ func checkSkills(continent string) domain.DoctorCheck {
 		if strings.Contains(content, "kind: feedback") &&
 			!strings.Contains(content, "kind: design-feedback") &&
 			!strings.Contains(content, "kind: implementation-feedback") {
-			check.Required = true // deprecated kind is a blocking failure (aligned with amadeus/sightjack)
-			check.Version = fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", entry.Name())
-			check.Hint = "deprecated kind 'feedback'; migrate to 'implementation-feedback' (run 'paintress init --force' to regenerate SKILL.md)"
-			return check
+			return domain.DoctorCheck{
+				Name:    "skills",
+				Status:  domain.CheckFail,
+				Message: fmt.Sprintf("%s/SKILL.md uses deprecated kind 'feedback'", entry.Name()),
+				Hint:    "deprecated kind 'feedback'; migrate to 'implementation-feedback' (run 'paintress init --force' to regenerate SKILL.md)",
+			}
 		}
 	}
 
-	check.OK = true
-	check.Path = skillsDir
-	check.Version = fmt.Sprintf("%d skills OK", found)
-	return check
+	return domain.DoctorCheck{
+		Name:    "skills",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%s (%d skills OK)", skillsDir, found),
+	}
 }
 
 // checkEventStore verifies that event JSONL files are parseable.
 // Scans .expedition/events/*.jsonl and validates each line is valid JSON. // nosemgrep: layer-session-no-event-persistence [permanent]
-// Returns a Warning-level check (Required=false).
+// Returns a Warning-level check.
 func checkEventStore(continent string) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "events",
-		Required: false,
-	}
-
 	eventsDir := filepath.Join(continent, domain.StateDir, "events")
 	entries, err := os.ReadDir(eventsDir)
 	if err != nil {
-		check.Version = "events/ not found"
-		check.Hint = `run "paintress init <repo-path>" to create events directory`
-		return check
+		return domain.DoctorCheck{
+			Name:    "events",
+			Status:  domain.CheckWarn,
+			Message: "events/ not found",
+			Hint:    `run "paintress init <repo-path>" to create events directory`,
+		}
 	}
 
 	var files, lines int
@@ -418,9 +443,12 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		}
 		f, err := os.Open(filepath.Join(eventsDir, entry.Name()))
 		if err != nil {
-			check.Version = "read error: " + err.Error()
-			check.Hint = "check file permissions on .expedition/events/"
-			return check
+			return domain.DoctorCheck{
+				Name:    "events",
+				Status:  domain.CheckWarn,
+				Message: "read error: " + err.Error(),
+				Hint:    "check file permissions on .expedition/events/",
+			}
 		}
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
@@ -430,100 +458,119 @@ func checkEventStore(continent string) domain.DoctorCheck {
 			}
 			if !json.Valid([]byte(line)) {
 				f.Close()
-				check.Version = fmt.Sprintf("corrupt JSON in %s", entry.Name())
-				check.Hint = "check event files for corruption in .expedition/events/"
-				return check
+				return domain.DoctorCheck{
+					Name:    "events",
+					Status:  domain.CheckWarn,
+					Message: fmt.Sprintf("corrupt JSON in %s", entry.Name()),
+					Hint:    "check event files for corruption in .expedition/events/",
+				}
 			}
 			lines++
 		}
 		f.Close()
 		if err := scanner.Err(); err != nil {
-			check.Version = "scan error: " + err.Error()
-			check.Hint = "check file permissions on .expedition/events/"
-			return check
+			return domain.DoctorCheck{
+				Name:    "events",
+				Status:  domain.CheckWarn,
+				Message: "scan error: " + err.Error(),
+				Hint:    "check file permissions on .expedition/events/",
+			}
 		}
 		files++
 	}
 
 	if files == 0 {
-		check.Version = "no .jsonl files found" // nosemgrep: layer-session-no-event-persistence [permanent]
-		return check
+		return domain.DoctorCheck{
+			Name:    "events",
+			Status:  domain.CheckWarn,
+			Message: "no .jsonl files found", // nosemgrep: layer-session-no-event-persistence [permanent]
+		}
 	}
 
-	check.OK = true
-	check.Path = eventsDir
-	check.Version = fmt.Sprintf("%d files, %d events OK", files, lines)
-	return check
+	return domain.DoctorCheck{
+		Name:    "events",
+		Status:  domain.CheckOK,
+		Message: fmt.Sprintf("%s (%d files, %d events OK)", eventsDir, files, lines),
+	}
 }
 
 // checkClaudeAuth determines if the Claude CLI is authenticated by
 // interpreting the result of running `claude mcp list`. A successful
 // command execution (no error) indicates the CLI is authenticated.
 func checkClaudeAuth(mcpOutput string, mcpErr error) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "claude-auth",
-		Required: false,
-	}
 	if mcpErr != nil {
-		check.Version = "not authenticated: " + mcpErr.Error()
-		check.Hint = `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`
-		return check
+		return domain.DoctorCheck{
+			Name:    "claude-auth",
+			Status:  domain.CheckWarn,
+			Message: "not authenticated: " + mcpErr.Error(),
+			Hint:    `run "claude login" to authenticate (in Docker: set CLAUDE_CONFIG_DIR=~/.claude to use host credentials)`,
+		}
 	}
-	check.OK = true
-	check.Version = "authenticated"
-	return check
+	return domain.DoctorCheck{
+		Name:    "claude-auth",
+		Status:  domain.CheckOK,
+		Message: "authenticated",
+	}
 }
 
 // checkLinearMCP parses `claude mcp list` output for Linear MCP connection.
 // Looks for a line containing "linear", "✓", and "connected" (case-insensitive).
 // Requires "✓" to avoid false positives from "disconnected" or "not connected".
 func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "linear-mcp",
-		Required: false,
-	}
 	if mcpErr != nil {
-		check.Version = "skipped (claude not available)"
-		return check
+		return domain.DoctorCheck{
+			Name:    "linear-mcp",
+			Status:  domain.CheckSkip,
+			Message: "skipped (claude not available)",
+		}
 	}
 	output := strings.ToLower(mcpOutput)
 	for _, line := range strings.Split(output, "\n") {
 		if strings.Contains(line, "linear") &&
 			strings.Contains(line, "✓") &&
 			strings.Contains(line, "connected") {
-			check.OK = true
-			check.Version = "Linear MCP connected"
-			return check
+			return domain.DoctorCheck{
+				Name:    "linear-mcp",
+				Status:  domain.CheckOK,
+				Message: "Linear MCP connected",
+			}
 		}
 	}
-	check.Version = "Linear MCP not found or not connected"
-	check.Hint = "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
-		"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)"
-	return check
+	return domain.DoctorCheck{
+		Name:    "linear-mcp",
+		Status:  domain.CheckWarn,
+		Message: "Linear MCP not found or not connected",
+		Hint: "run \"claude mcp add --transport http --scope project linear https://mcp.linear.app/mcp\" in your project root\n" +
+			"  (a fully compatible local-only Linear MCP alternative is planned — check the project README for updates)",
+	}
 }
 
 // checkClaudeInference determines if the Claude CLI can perform inference
 // by interpreting the result of a minimal "1+1=" prompt.
 func checkClaudeInference(output string, err error) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "claude-inference",
-		Required: false,
-	}
 	if err != nil {
-		check.Version = "inference failed: " + err.Error()
-		check.Hint = `"signal: killed" = CLI startup too slow (timeout 60s); ` +
-			`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
-			`otherwise check API key, quota, and model access`
-		return check
+		return domain.DoctorCheck{
+			Name:    "claude-inference",
+			Status:  domain.CheckWarn,
+			Message: "inference failed: " + err.Error(),
+			Hint: `"signal: killed" = CLI startup too slow (timeout 60s); ` +
+				`"nested session" = CLAUDECODE env var leaked (doctor should filter it); ` +
+				`otherwise check API key, quota, and model access`,
+		}
 	}
 	if strings.TrimSpace(output) != "2" {
-		check.Version = "unexpected response: " + strings.TrimSpace(output)
-		check.Hint = "model returned unexpected output; check model access and API quota"
-		return check
+		return domain.DoctorCheck{
+			Name:    "claude-inference",
+			Status:  domain.CheckWarn,
+			Message: "unexpected response: " + strings.TrimSpace(output),
+			Hint:    "model returned unexpected output; check model access and API quota",
+		}
 	}
-	check.OK = true
-	check.Version = "inference OK"
-	return check
+	return domain.DoctorCheck{
+		Name:    "claude-inference",
+		Status:  domain.CheckOK,
+		Message: "inference OK",
+	}
 }
 
 // requiredGHScopes lists OAuth scopes that paintress needs for full
@@ -534,14 +581,13 @@ var requiredGHScopes = []string{"repo", "read:project"}
 // checkGHScopes verifies that the gh CLI token has the required OAuth scopes.
 // Parses the output of `gh auth status` for the "Token scopes:" line.
 func checkGHScopes(output string, err error) domain.DoctorCheck {
-	check := domain.DoctorCheck{
-		Name:     "gh-scopes",
-		Required: false,
-	}
 	if err != nil {
-		check.Version = "not authenticated: " + err.Error()
-		check.Hint = `run "gh auth login" to authenticate`
-		return check
+		return domain.DoctorCheck{
+			Name:    "gh-scopes",
+			Status:  domain.CheckWarn,
+			Message: "not authenticated: " + err.Error(),
+			Hint:    `run "gh auth login" to authenticate`,
+		}
 	}
 
 	// Find "Token scopes:" line
@@ -553,9 +599,12 @@ func checkGHScopes(output string, err error) domain.DoctorCheck {
 		}
 	}
 	if scopesLine == "" {
-		check.Version = "could not determine token scopes"
-		check.Hint = `run "gh auth status" to check your token`
-		return check
+		return domain.DoctorCheck{
+			Name:    "gh-scopes",
+			Status:  domain.CheckWarn,
+			Message: "could not determine token scopes",
+			Hint:    `run "gh auth status" to check your token`,
+		}
 	}
 
 	var missing []string
@@ -566,14 +615,19 @@ func checkGHScopes(output string, err error) domain.DoctorCheck {
 	}
 
 	if len(missing) > 0 {
-		check.Version = "missing scopes: " + strings.Join(missing, ", ")
-		check.Hint = fmt.Sprintf(`run "gh auth refresh -s %s" to add missing scopes`, strings.Join(missing, " -s "))
-		return check
+		return domain.DoctorCheck{
+			Name:    "gh-scopes",
+			Status:  domain.CheckWarn,
+			Message: "missing scopes: " + strings.Join(missing, ", "),
+			Hint:    fmt.Sprintf(`run "gh auth refresh -s %s" to add missing scopes`, strings.Join(missing, " -s ")),
+		}
 	}
 
-	check.OK = true
-	check.Version = "scopes OK"
-	return check
+	return domain.DoctorCheck{
+		Name:    "gh-scopes",
+		Status:  domain.CheckOK,
+		Message: "scopes OK",
+	}
 }
 
 // ExtractStreamResult parses stream-json output and returns the "result" field
@@ -614,10 +668,9 @@ func CheckContextBudget(streamJSON string) domain.DoctorCheck {
 	report := platform.CalculateContextBudget(messages)
 
 	check := domain.DoctorCheck{
-		Name:     "context-budget",
-		Required: false,
-		OK:       true,
-		Version: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
+		Name:   "context-budget",
+		Status: domain.CheckOK,
+		Message: fmt.Sprintf("estimated %d tokens (tools=%d, skills=%d, plugins=%d, mcp=%d, hook_bytes=%d)",
 			report.EstimatedTokens, report.ToolCount, report.SkillCount,
 			report.PluginCount, report.MCPServerCount, report.HookContextBytes),
 	}

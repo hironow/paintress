@@ -46,7 +46,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	hasFail := false
 	for _, c := range checks {
-		if c.Required && !c.OK {
+		if c.Status == domain.CheckFail {
 			hasFail = true
 			break
 		}
@@ -80,26 +80,24 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	var fails, skips int
 	for _, c := range checks {
-		status := "OK  "
-		if !c.OK {
-			if c.Required {
-				status = "FAIL"
-				fails++
-			} else {
-				status = "SKIP"
-				skips++
-			}
+		label := c.Status.StatusLabel()
+		switch c.Status {
+		case domain.CheckFail:
+			fails++
+		case domain.CheckSkip:
+			skips++
+		case domain.CheckWarn:
+			skips++
+		case domain.CheckOK:
+			// no-op
 		}
 
-		msg := c.Version
-		if msg == "" && c.OK {
+		msg := c.Message
+		if msg == "" && c.Status == domain.CheckOK {
 			msg = "OK"
 		}
-		if c.Path != "" {
-			msg += " (" + c.Path + ")"
-		}
 
-		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", status, c.Name, msg)
+		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", label, c.Name, msg)
 		if c.Hint != "" {
 			fmt.Fprintf(w, "         %-16s hint: %s\n", "", c.Hint)
 		}

@@ -63,12 +63,10 @@ type PruneResult struct {
 
 // DoctorCheck represents the result of checking a single external command.
 type DoctorCheck struct {
-	Name     string `json:"name"`
-	Required bool   `json:"required"`
-	Path     string `json:"path"`
-	Version  string `json:"version"`
-	OK       bool   `json:"ok"`
-	Hint     string `json:"hint,omitempty"`
+	Name    string      `json:"name"`
+	Status  CheckStatus `json:"status"`
+	Message string      `json:"message"`
+	Hint    string      `json:"hint,omitempty"`
 }
 
 // FormatDoctorJSON returns the checks as a JSON array string.

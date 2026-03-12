@@ -40,20 +40,10 @@ func buildFakeClaude(t *testing.T) string {
 func TestRunDoctor_GitFound(t *testing.T) {
 	// given/when
 	checks := session.RunDoctor("claude", "")
-	var gitCheck *struct {
-		Name    string
-		OK      bool
-		Path    string
-		Version string
-	}
+	var gitCheck *domain.DoctorCheck
 	for i := range checks {
 		if checks[i].Name == "git" {
-			gitCheck = &struct {
-				Name    string
-				OK      bool
-				Path    string
-				Version string
-			}{checks[i].Name, checks[i].OK, checks[i].Path, checks[i].Version}
+			gitCheck = &checks[i]
 			break
 		}
 	}
@@ -62,14 +52,11 @@ func TestRunDoctor_GitFound(t *testing.T) {
 	if gitCheck == nil {
 		t.Fatal("expected git check in results")
 	}
-	if !gitCheck.OK {
+	if gitCheck.Status != domain.CheckOK {
 		t.Error("git should be found in test environment")
 	}
-	if gitCheck.Path == "" {
-		t.Error("git path should not be empty")
-	}
-	if gitCheck.Version == "" {
-		t.Error("git version should not be empty")
+	if gitCheck.Message == "" {
+		t.Error("git message should not be empty")
 	}
 }
 
@@ -80,8 +67,8 @@ func TestRunDoctor_DockerIsOptional(t *testing.T) {
 	// then
 	for i := range checks {
 		if checks[i].Name == "docker" {
-			if checks[i].Required {
-				t.Error("docker should be optional (Required=false), used only for tracing and container tests")
+			if checks[i].Status == domain.CheckFail {
+				t.Error("docker should be optional (not CheckFail), used only for tracing and container tests")
 			}
 			return
 		}
@@ -96,11 +83,8 @@ func TestRunDoctor_MissingCommand(t *testing.T) {
 	// then
 	for i := range checks {
 		if checks[i].Name == "nonexistent-paintress-cmd-12345" {
-			if checks[i].OK {
+			if checks[i].Status == domain.CheckOK {
 				t.Error("nonexistent command should not be OK")
-			}
-			if checks[i].Path != "" {
-				t.Errorf("path should be empty for missing command, got %q", checks[i].Path)
 			}
 			return
 		}
@@ -121,11 +105,11 @@ func TestRunDoctor_CheckContinent_ValidStructure(t *testing.T) {
 	// then — continent check should be OK
 	for _, c := range checks {
 		if c.Name == "continent" {
-			if !c.OK {
+			if c.Status != domain.CheckOK {
 				t.Error("continent check should pass for valid structure")
 			}
-			if c.Required {
-				t.Error("continent check should NOT be required (warning only)")
+			if c.Status == domain.CheckFail {
+				t.Error("continent check should NOT be a failure (warning only)")
 			}
 			return
 		}
@@ -143,11 +127,11 @@ func TestRunDoctor_CheckContinent_MissingDir(t *testing.T) {
 	// then — continent check should be NOT OK but NOT required (warning)
 	for _, c := range checks {
 		if c.Name == "continent" {
-			if c.OK {
+			if c.Status == domain.CheckOK {
 				t.Error("continent check should fail when .expedition/ is missing")
 			}
-			if c.Required {
-				t.Error("continent check should NOT be required")
+			if c.Status == domain.CheckFail {
+				t.Error("continent check should NOT be a failure")
 			}
 			return
 		}
@@ -180,11 +164,11 @@ func TestRunDoctor_CheckConfig_ValidConfig(t *testing.T) {
 	// then — config check should be OK
 	for _, c := range checks {
 		if c.Name == "config" {
-			if !c.OK {
-				t.Errorf("config check should pass for valid config, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("config check should pass for valid config, message: %s", c.Message)
 			}
-			if c.Required {
-				t.Error("config check should NOT be required")
+			if c.Status == domain.CheckFail {
+				t.Error("config check should NOT be a failure")
 			}
 			return
 		}
@@ -203,11 +187,11 @@ func TestRunDoctor_CheckConfig_MissingConfig(t *testing.T) {
 	// then — config check should NOT be OK but NOT required (warning)
 	for _, c := range checks {
 		if c.Name == "config" {
-			if c.OK {
+			if c.Status == domain.CheckOK {
 				t.Error("config check should fail when config.yaml is missing")
 			}
-			if c.Required {
-				t.Error("config check should NOT be required")
+			if c.Status == domain.CheckFail {
+				t.Error("config check should NOT be a failure")
 			}
 			return
 		}
@@ -229,11 +213,11 @@ func TestCheckGitRepo_InRepo(t *testing.T) {
 	check := session.ExportCheckGitRepo(dir)
 
 	// then
-	if !check.OK {
+	if check.Status != domain.CheckOK {
 		t.Error("git-repo check should pass inside a git repo")
 	}
-	if check.Required {
-		t.Error("git-repo check should NOT be required (warning)")
+	if check.Status == domain.CheckFail {
+		t.Error("git-repo check should NOT be a failure (warning)")
 	}
 	if check.Name != "git-repo" {
 		t.Errorf("expected name 'git-repo', got %q", check.Name)
@@ -248,11 +232,11 @@ func TestCheckGitRepo_NotRepo(t *testing.T) {
 	check := session.ExportCheckGitRepo(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("git-repo check should fail outside a git repo")
 	}
-	if check.Required {
-		t.Error("git-repo check should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("git-repo check should NOT be a failure")
 	}
 }
 
@@ -265,11 +249,11 @@ func TestCheckWritability_OK(t *testing.T) {
 	check := session.ExportCheckWritability(dir)
 
 	// then
-	if !check.OK {
-		t.Errorf("writable check should pass, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("writable check should pass, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("writable check should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("writable check should NOT be a failure")
 	}
 	if check.Name != "writable" {
 		t.Errorf("expected name 'writable', got %q", check.Name)
@@ -287,11 +271,11 @@ func TestCheckWritability_ReadOnly(t *testing.T) {
 	check := session.ExportCheckWritability(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("writable check should fail for read-only .expedition/")
 	}
-	if check.Required {
-		t.Error("writable check should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("writable check should NOT be a failure")
 	}
 }
 
@@ -306,11 +290,11 @@ func TestCheckSkills_Valid(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if !check.OK {
-		t.Errorf("skills check should pass, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("skills check should pass, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("skills check should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("skills check should NOT be a failure")
 	}
 	if check.Name != "skills" {
 		t.Errorf("expected name 'skills', got %q", check.Name)
@@ -326,7 +310,7 @@ func TestCheckSkills_MissingFile(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("skills check should fail when no SKILL.md files exist")
 	}
 }
@@ -342,7 +326,7 @@ func TestCheckSkills_MissingVersion(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("skills check should fail when dmail-schema-version is missing")
 	}
 }
@@ -358,11 +342,11 @@ func TestCheckSkills_DeprecatedFeedbackKind(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("skills check should fail when deprecated 'kind: feedback' is found")
 	}
-	if !check.Required {
-		t.Error("deprecated feedback kind should be a blocking failure (Required=true), aligned with amadeus/sightjack")
+	if check.Status != domain.CheckFail {
+		t.Error("deprecated feedback kind should be a blocking failure (CheckFail), aligned with amadeus/sightjack")
 	}
 	if !strings.Contains(check.Hint, "init --force") {
 		t.Errorf("hint should suggest init --force, got %q", check.Hint)
@@ -380,8 +364,8 @@ func TestCheckSkills_UpdatedFeedbackKind(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if !check.OK {
-		t.Errorf("skills check should pass for updated kind, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("skills check should pass for updated kind, message: %s", check.Message)
 	}
 }
 
@@ -397,11 +381,11 @@ func TestCheckEventStore_Valid(t *testing.T) {
 	check := session.ExportCheckEventStore(dir)
 
 	// then
-	if !check.OK {
-		t.Errorf("events check should pass, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("events check should pass, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("events check should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("events check should NOT be a failure")
 	}
 	if check.Name != "events" {
 		t.Errorf("expected name 'events', got %q", check.Name)
@@ -419,7 +403,7 @@ func TestCheckEventStore_Corrupt(t *testing.T) {
 	check := session.ExportCheckEventStore(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("events check should fail for corrupt JSONL")
 	}
 }
@@ -433,7 +417,7 @@ func TestCheckEventStore_NoDir(t *testing.T) {
 	check := session.ExportCheckEventStore(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("events check should fail when events directory missing")
 	}
 }
@@ -446,11 +430,11 @@ func TestCheckClaudeAuth_Authenticated(t *testing.T) {
 	check := session.ExportCheckClaudeAuth(mcpOutput, nil)
 
 	// then
-	if !check.OK {
-		t.Errorf("claude-auth should be OK when mcp list succeeds, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("claude-auth should be OK when mcp list succeeds, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("claude-auth should NOT be required (warning)")
+	if check.Status == domain.CheckFail {
+		t.Error("claude-auth should NOT be a failure (warning)")
 	}
 	if check.Name != "claude-auth" {
 		t.Errorf("expected name 'claude-auth', got %q", check.Name)
@@ -465,11 +449,11 @@ func TestCheckClaudeAuth_Failed(t *testing.T) {
 	check := session.ExportCheckClaudeAuth("", mcpErr)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("claude-auth should fail when mcp list errors")
 	}
-	if check.Version == "" {
-		t.Error("version should contain diagnostic message")
+	if check.Message == "" {
+		t.Error("message should contain diagnostic message")
 	}
 }
 
@@ -481,11 +465,11 @@ func TestCheckLinearMCP_Connected(t *testing.T) {
 	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
-	if !check.OK {
-		t.Errorf("linear-mcp should be OK when connected, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("linear-mcp should be OK when connected, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("linear-mcp should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("linear-mcp should NOT be a failure")
 	}
 	if check.Name != "linear-mcp" {
 		t.Errorf("expected name 'linear-mcp', got %q", check.Name)
@@ -500,7 +484,7 @@ func TestCheckLinearMCP_NotFound(t *testing.T) {
 	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("linear-mcp should fail when linear not in output")
 	}
 }
@@ -513,7 +497,7 @@ func TestCheckLinearMCP_Disconnected(t *testing.T) {
 	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("linear-mcp should fail when linear is disconnected")
 	}
 }
@@ -526,11 +510,11 @@ func TestCheckLinearMCP_MCPListFailed(t *testing.T) {
 	check := session.ExportCheckLinearMCP("", mcpErr)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("linear-mcp should fail when mcp list errors")
 	}
-	if !strings.Contains(check.Version, "skipped") {
-		t.Errorf("version should indicate skipped, got %q", check.Version)
+	if !strings.Contains(check.Message, "skipped") {
+		t.Errorf("message should indicate skipped, got %q", check.Message)
 	}
 }
 
@@ -550,35 +534,35 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 		switch c.Name {
 		case "claude-auth":
 			authFound = true
-			if c.OK {
+			if c.Status == domain.CheckOK {
 				t.Error("claude-auth should not be OK when claude unavailable")
 			}
-			if !strings.Contains(c.Version, "skipped") {
-				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			if !strings.Contains(c.Message, "skipped") {
+				t.Errorf("expected 'skipped' in message, got %q", c.Message)
 			}
 		case "linear-mcp":
 			mcpFound = true
-			if c.OK {
+			if c.Status == domain.CheckOK {
 				t.Error("linear-mcp should not be OK when claude unavailable")
 			}
-			if !strings.Contains(c.Version, "skipped") {
-				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			if !strings.Contains(c.Message, "skipped") {
+				t.Errorf("expected 'skipped' in message, got %q", c.Message)
 			}
 		case "claude-inference":
 			inferFound = true
-			if c.OK {
+			if c.Status == domain.CheckOK {
 				t.Error("claude-inference should not be OK when claude unavailable")
 			}
-			if !strings.Contains(c.Version, "skipped") {
-				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			if !strings.Contains(c.Message, "skipped") {
+				t.Errorf("expected 'skipped' in message, got %q", c.Message)
 			}
 		case "context-budget":
 			budgetFound = true
-			if c.OK {
+			if c.Status == domain.CheckOK {
 				t.Error("context-budget should not be OK when claude unavailable")
 			}
-			if !strings.Contains(c.Version, "skipped") {
-				t.Errorf("expected 'skipped' in version, got %q", c.Version)
+			if !strings.Contains(c.Message, "skipped") {
+				t.Errorf("expected 'skipped' in message, got %q", c.Message)
 			}
 		}
 	}
@@ -614,11 +598,11 @@ func TestCheckGitRemote_HasRemote(t *testing.T) {
 	check := session.ExportCheckGitRemote(dir)
 
 	// then
-	if !check.OK {
-		t.Errorf("git-remote check should pass when remote exists, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("git-remote check should pass when remote exists, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("git-remote check should NOT be required (warning)")
+	if check.Status == domain.CheckFail {
+		t.Error("git-remote check should NOT be a failure (warning)")
 	}
 	if check.Name != "git-remote" {
 		t.Errorf("expected name 'git-remote', got %q", check.Name)
@@ -639,7 +623,7 @@ func TestCheckGitRemote_NoRemote(t *testing.T) {
 	check := session.ExportCheckGitRemote(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("git-remote check should fail when no remote configured")
 	}
 	if check.Hint == "" {
@@ -658,7 +642,7 @@ func TestCheckGitRemote_NotGitRepo(t *testing.T) {
 	check := session.ExportCheckGitRemote(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("git-remote check should fail for non-git directory")
 	}
 }
@@ -686,8 +670,8 @@ func TestCheckGitRemote_IncludedInDoctorWithContinent(t *testing.T) {
 	// then — git-remote check should be present
 	for _, c := range checks {
 		if c.Name == "git-remote" {
-			if !c.OK {
-				t.Errorf("git-remote should pass, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("git-remote should pass, message: %s", c.Message)
 			}
 			return
 		}
@@ -712,28 +696,28 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 		switch c.Name {
 		case fakeClaude:
 			claudeFound = true
-			if !c.OK {
-				t.Errorf("claude check should pass with fake-claude, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("claude check should pass with fake-claude, message: %s", c.Message)
 			}
 		case "claude-auth":
 			authFound = true
-			if !c.OK {
-				t.Errorf("claude-auth should be OK with fake-claude, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("claude-auth should be OK with fake-claude, message: %s", c.Message)
 			}
 		case "linear-mcp":
 			mcpFound = true
-			if !c.OK {
-				t.Errorf("linear-mcp should be OK with fake-claude, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("linear-mcp should be OK with fake-claude, message: %s", c.Message)
 			}
 		case "claude-inference":
 			inferFound = true
-			if !c.OK {
-				t.Errorf("claude-inference should be OK with fake-claude, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("claude-inference should be OK with fake-claude, message: %s", c.Message)
 			}
 		case "context-budget":
 			budgetFound = true
-			if !c.OK {
-				t.Errorf("context-budget should be OK with fake-claude, version: %s", c.Version)
+			if c.Status != domain.CheckOK {
+				t.Errorf("context-budget should be OK with fake-claude, message: %s", c.Message)
 			}
 		}
 	}
@@ -773,17 +757,17 @@ func TestCheckClaudeInference_OK(t *testing.T) {
 	check := session.ExportCheckClaudeInference("2", nil)
 
 	// then
-	if !check.OK {
-		t.Errorf("inference check should pass, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("inference check should pass, message: %s", check.Message)
 	}
-	if check.Required {
-		t.Error("inference check should NOT be required")
+	if check.Status == domain.CheckFail {
+		t.Error("inference check should NOT be a failure")
 	}
 	if check.Name != "claude-inference" {
 		t.Errorf("expected name 'claude-inference', got %q", check.Name)
 	}
-	if check.Version != "inference OK" {
-		t.Errorf("expected version 'inference OK', got %q", check.Version)
+	if check.Message != "inference OK" {
+		t.Errorf("expected message 'inference OK', got %q", check.Message)
 	}
 }
 
@@ -793,11 +777,11 @@ func TestCheckClaudeInference_Error(t *testing.T) {
 	check := session.ExportCheckClaudeInference("", fmt.Errorf("exit status 1"))
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("inference check should fail on error")
 	}
-	if !strings.Contains(check.Version, "inference failed") {
-		t.Errorf("version should contain 'inference failed', got %q", check.Version)
+	if !strings.Contains(check.Message, "inference failed") {
+		t.Errorf("message should contain 'inference failed', got %q", check.Message)
 	}
 	if check.Hint == "" {
 		t.Error("hint should not be empty on failure")
@@ -810,11 +794,11 @@ func TestCheckClaudeInference_UnexpectedResponse(t *testing.T) {
 	check := session.ExportCheckClaudeInference("hello world", nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("inference check should fail for unexpected response")
 	}
-	if !strings.HasPrefix(check.Version, "unexpected response: ") {
-		t.Errorf("expected version starting with 'unexpected response: ', got %q", check.Version)
+	if !strings.HasPrefix(check.Message, "unexpected response: ") {
+		t.Errorf("expected message starting with 'unexpected response: ', got %q", check.Message)
 	}
 }
 
@@ -824,11 +808,11 @@ func TestCheckClaudeInference_FalsePositiveContaining2(t *testing.T) {
 	check := session.ExportCheckClaudeInference("12", nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("inference check should fail for '12' (false positive from Contains)")
 	}
-	if !strings.HasPrefix(check.Version, "unexpected response: ") {
-		t.Errorf("expected version starting with 'unexpected response: ', got %q", check.Version)
+	if !strings.HasPrefix(check.Message, "unexpected response: ") {
+		t.Errorf("expected message starting with 'unexpected response: ', got %q", check.Message)
 	}
 }
 
@@ -838,8 +822,8 @@ func TestCheckClaudeInference_OKWithWhitespace(t *testing.T) {
 	check := session.ExportCheckClaudeInference("  2\n", nil)
 
 	// then
-	if !check.OK {
-		t.Errorf("inference check should pass for trimmed '2', version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("inference check should pass for trimmed '2', message: %s", check.Message)
 	}
 }
 
@@ -851,14 +835,14 @@ func TestCheckGHScopes_AllScopesPresent(t *testing.T) {
 	check := session.ExportCheckGHScopes(output, nil)
 
 	// then
-	if !check.OK {
-		t.Errorf("gh-scopes should pass when all required scopes present, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("gh-scopes should pass when all required scopes present, message: %s", check.Message)
 	}
 	if check.Name != "gh-scopes" {
 		t.Errorf("expected name 'gh-scopes', got %q", check.Name)
 	}
-	if check.Required {
-		t.Error("gh-scopes should NOT be required (warning)")
+	if check.Status == domain.CheckFail {
+		t.Error("gh-scopes should NOT be a failure (warning)")
 	}
 }
 
@@ -870,11 +854,11 @@ func TestCheckGHScopes_MissingReadProject(t *testing.T) {
 	check := session.ExportCheckGHScopes(output, nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("gh-scopes should fail when read:project is missing")
 	}
-	if !strings.Contains(check.Version, "read:project") {
-		t.Errorf("version should mention missing scope, got %q", check.Version)
+	if !strings.Contains(check.Message, "read:project") {
+		t.Errorf("message should mention missing scope, got %q", check.Message)
 	}
 	if !strings.Contains(check.Hint, "gh auth refresh") {
 		t.Errorf("hint should suggest gh auth refresh, got %q", check.Hint)
@@ -887,11 +871,11 @@ func TestCheckGHScopes_CommandFailed(t *testing.T) {
 	check := session.ExportCheckGHScopes("", fmt.Errorf("exit status 1"))
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("gh-scopes should fail when command errors")
 	}
-	if !strings.Contains(check.Version, "not authenticated") {
-		t.Errorf("version should indicate not authenticated, got %q", check.Version)
+	if !strings.Contains(check.Message, "not authenticated") {
+		t.Errorf("message should indicate not authenticated, got %q", check.Message)
 	}
 }
 
@@ -903,7 +887,7 @@ func TestCheckGHScopes_NoScopesLine(t *testing.T) {
 	check := session.ExportCheckGHScopes(output, nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Error("gh-scopes should fail when scopes line not found")
 	}
 }
@@ -959,8 +943,8 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 	check := session.ExportCheckContextBudget(stream)
 
 	// then
-	if !check.OK {
-		t.Errorf("context-budget should be OK for low usage, version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("context-budget should be OK for low usage, message: %s", check.Message)
 	}
 	if check.Name != "context-budget" {
 		t.Errorf("expected name 'context-budget', got %q", check.Name)
@@ -968,8 +952,8 @@ func TestCheckContextBudget_LowUsage(t *testing.T) {
 	if check.Hint != "" {
 		t.Errorf("should not have hint for low usage, got %q", check.Hint)
 	}
-	if !strings.Contains(check.Version, "estimated") {
-		t.Errorf("version should contain 'estimated', got %q", check.Version)
+	if !strings.Contains(check.Message, "estimated") {
+		t.Errorf("message should contain 'estimated', got %q", check.Message)
 	}
 }
 
@@ -986,8 +970,8 @@ func TestCheckContextBudget_HighUsage(t *testing.T) {
 	check := session.ExportCheckContextBudget(stream)
 
 	// then
-	if !check.OK {
-		t.Errorf("context-budget should still be OK (informational), version: %s", check.Version)
+	if check.Status != domain.CheckOK {
+		t.Errorf("context-budget should still be OK (informational), message: %s", check.Message)
 	}
 	if check.Hint == "" {
 		t.Error("should have hint for high usage")
@@ -1005,11 +989,11 @@ func TestCheckContextBudget_EmptyStream(t *testing.T) {
 	check := session.ExportCheckContextBudget(stream)
 
 	// then
-	if !check.OK {
+	if check.Status != domain.CheckOK {
 		t.Error("context-budget should be OK for empty stream (0 tokens)")
 	}
-	if !strings.Contains(check.Version, "estimated 0 tokens") {
-		t.Errorf("expected '0 tokens' in version, got %q", check.Version)
+	if !strings.Contains(check.Message, "estimated 0 tokens") {
+		t.Errorf("expected '0 tokens' in message, got %q", check.Message)
 	}
 }
 
@@ -1021,7 +1005,7 @@ func TestCheckContextBudget_NoInitMessage(t *testing.T) {
 	check := session.ExportCheckContextBudget(stream)
 
 	// then
-	if !check.OK {
+	if check.Status != domain.CheckOK {
 		t.Error("context-budget should be OK (0 tokens) without init")
 	}
 }

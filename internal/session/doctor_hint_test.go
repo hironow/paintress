@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -15,7 +16,7 @@ func TestCheckClaudeAuth_Failed_HasHint(t *testing.T) {
 	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"))
 
 	// when/then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -34,7 +35,7 @@ func TestCheckLinearMCP_NotConnected_HasHint(t *testing.T) {
 	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -53,7 +54,7 @@ func TestCheckContinent_Missing_HasHint(t *testing.T) {
 	check := session.ExportCheckContinent(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -73,7 +74,7 @@ func TestCheckConfig_Missing_HasHint(t *testing.T) {
 	check := session.ExportCheckConfig(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -92,7 +93,7 @@ func TestCheckGitRepo_NotRepo_HasHint(t *testing.T) {
 	check := session.ExportCheckGitRepo(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -111,7 +112,7 @@ func TestCheckWritability_NotWritable_HasHint(t *testing.T) {
 	check := session.ExportCheckWritability(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -128,7 +129,7 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -145,7 +146,7 @@ func TestRunDoctor_BinaryNotFound_HasHint(t *testing.T) {
 
 	// then: the claude check should have a hint
 	for _, c := range checks {
-		if c.Name == "nonexistent-claude-xyz-99999" && !c.OK && c.Required {
+		if c.Name == "nonexistent-claude-xyz-99999" && c.Status == domain.CheckFail {
 			if c.Hint == "" {
 				t.Error("expected hint for missing required binary")
 			}
