@@ -44,9 +44,28 @@ func (e *DeviationError) Error() string {
 //	nil             → 0 (success)
 //	DeviationError  → 2 (deviation detected)
 //	other           → 1 (runtime error)
+// SilentError wraps an error whose message has already been printed to stderr
+// by the command itself. main.go should suppress output for this error
+// while still honouring the exit code via ExitCode.
+type SilentError struct{ Err error }
+
+func (e *SilentError) Error() string { return e.Err.Error() }
+func (e *SilentError) Unwrap() error { return e.Err }
+
+// exitCoder is an interface for errors that carry a specific exit code.
+// cmd.ExitError implements this without importing domain (avoids cycles).
+type exitCoder interface {
+	ExitCode() int
+}
+
 func ExitCode(err error) int {
 	if err == nil {
 		return 0
+	}
+	// Check for errors with explicit exit codes (e.g. cmd.ExitError)
+	var ec exitCoder
+	if errors.As(err, &ec) {
+		return ec.ExitCode()
 	}
 	var de *DeviationError
 	if errors.As(err, &de) {

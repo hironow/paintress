@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
@@ -75,7 +76,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintln(cmd.OutOrStdout(), out)
 		if hasFail {
-			return fmt.Errorf("some checks failed")
+			return &domain.SilentError{Err: fmt.Errorf("some checks failed")}
 		}
 		return nil
 	}
@@ -85,28 +86,19 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Fprintln(w, "paintress doctor — environment health check")
 	fmt.Fprintln(w)
 
-	var fails, skips int
+	var fails, skips, warns int
 	for _, c := range checks {
-		label := c.Status.StatusLabel()
+		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", c.Status.StatusLabel(), c.Name, c.Message)
+		if c.Hint != "" {
+			fmt.Fprintf(w, "         %-16s hint: %s\n", "", c.Hint)
+		}
 		switch c.Status {
 		case domain.CheckFail:
 			fails++
 		case domain.CheckSkip:
 			skips++
 		case domain.CheckWarn:
-			skips++
-		case domain.CheckOK:
-			// no-op
-		}
-
-		msg := c.Message
-		if msg == "" && c.Status == domain.CheckOK {
-			msg = "OK"
-		}
-
-		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", label, c.Name, msg)
-		if c.Hint != "" {
-			fmt.Fprintf(w, "         %-16s hint: %s\n", "", c.Hint)
+			warns++
 		}
 	}
 
@@ -116,23 +108,23 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Fprintln(w)
-	if fails == 0 && skips == 0 {
+	if fails == 0 && skips == 0 && warns == 0 {
 		fmt.Fprintln(w, "All checks passed.")
 		return nil
 	}
-	var msg string
+	var parts []string
 	if fails > 0 {
-		msg = fmt.Sprintf("%d check(s) failed", fails)
+		parts = append(parts, fmt.Sprintf("%d check(s) failed", fails))
+	}
+	if warns > 0 {
+		parts = append(parts, fmt.Sprintf("%d warning(s)", warns))
 	}
 	if skips > 0 {
-		if msg != "" {
-			msg += ", "
-		}
-		msg += fmt.Sprintf("%d skipped", skips)
+		parts = append(parts, fmt.Sprintf("%d skipped", skips))
 	}
-	fmt.Fprintln(w, msg+".")
+	fmt.Fprintln(w, strings.Join(parts, ", ")+".")
 	if fails > 0 {
-		return fmt.Errorf("%d check(s) failed", fails)
+		return &domain.SilentError{Err: fmt.Errorf("%d check(s) failed", fails)}
 	}
 	return nil
 }
