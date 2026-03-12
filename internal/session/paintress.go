@@ -20,11 +20,13 @@ import (
 )
 
 const maxConsecutiveFailures = 3
+const maxConsecutiveSkips = 3
 const gradientMax = 5
 
 var (
-	errGommage  = errors.New("gommage: consecutive failures exceeded threshold")
-	errComplete = errors.New("expedition complete: no remaining issues")
+	errGommage    = errors.New("gommage: consecutive failures exceeded threshold")
+	errAllSkipped = errors.New("all skipped: consecutive skips exceeded threshold")
+	errComplete   = errors.New("expedition complete: no remaining issues")
 )
 
 type Paintress struct {
@@ -56,6 +58,7 @@ type Paintress struct {
 	totalBugs            atomic.Int64
 	totalMidHighSeverity atomic.Int64
 	consecutiveFailures  atomic.Int64
+	consecutiveSkips     atomic.Int64
 }
 
 // errWriter returns ErrOut or io.Discard if nil (nil-safe accessor for tests).
@@ -332,6 +335,8 @@ func (p *Paintress) Run(ctx context.Context) int {
 	case errors.Is(err, errComplete):
 		return 0
 	case errors.Is(err, errGommage):
+		return 1
+	case errors.Is(err, errAllSkipped):
 		return 1
 	case ctx.Err() != nil:
 		return 130
