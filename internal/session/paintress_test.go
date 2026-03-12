@@ -31,6 +31,13 @@ func TestMain(m *testing.M) {
 	os.Unsetenv("GIT_DIR")
 	os.Unsetenv("GIT_WORK_TREE")
 	os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+
+	// Shorten cooldowns so SwarmMode tests don't accumulate minutes of idle waits.
+	expeditionCooldown = 10 * time.Millisecond
+	worktreeReleaseTimeout = 2 * time.Second
+	devServerReadyTimeout = 5 * time.Second
+	devServerStopTimeout = 1 * time.Second
+
 	os.Exit(m.Run())
 }
 
