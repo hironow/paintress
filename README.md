@@ -242,6 +242,8 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 
 ## Subcommands
 
+Running `paintress` without a subcommand defaults to `run` (expedition loop). This is the primary operation — picking Linear issues, implementing code, and opening PRs autonomously.
+
 | Command | Description |
 |---------|-------------|
 | `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
