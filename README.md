@@ -306,7 +306,7 @@ paintress run --notify-cmd 'curl -d "{message}" ntfy.sh/paintress'
 # Skip approval gate (CI/automated runs)
 paintress run --auto-approve
 
-# Custom waiting timeout (0 = no timeout, negative = disable waiting)
+# Custom waiting timeout (0 = 24h safety cap, negative = disable waiting)
 paintress run --wait-timeout 1h
 
 # Disable D-Mail waiting (exit immediately after expeditions)

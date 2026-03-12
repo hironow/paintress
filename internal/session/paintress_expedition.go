@@ -15,6 +15,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// expeditionCooldown is the pause between expedition cycles.
+// Declared as var (not const) so tests can shorten it.
+var expeditionCooldown = 10 * time.Second
+
+// worktreeReleaseTimeout is the per-call timeout for worktree release operations.
+var worktreeReleaseTimeout = 10 * time.Second
+
 // emitExpeditionCompleted emits an expedition.completed event via the emitter.
 // OTel metric is recorded directly.
 // Returns an error if event persistence fails — expedition completion is critical.
@@ -61,7 +68,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
 				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release() [permanent]
-				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				rCtx, rCancel := context.WithTimeout(context.Background(), worktreeReleaseTimeout)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
 					p.Logger.Warn("worktree release: %v", err)
@@ -175,6 +182,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			return errGommage
 		}
 
+		if p.consecutiveSkips.Load() >= int64(maxConsecutiveSkips) {
+			expSpan.AddEvent("all_skipped",
+				trace.WithAttributes(attribute.Int("consecutive_skips", maxConsecutiveSkips)),
+			)
+			releaseWorkDir()
+			expSpan.End()
+			p.Logger.Warn("all expeditions skipped %d times consecutively — no actionable work available", maxConsecutiveSkips)
+			return errAllSkipped
+		}
+
 		releaseWorkDir()
 		expSpan.End()
 		if p.pool == nil {
@@ -185,7 +202,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		p.Logger.Info("%s", domain.Msg("cooldown"))
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(expeditionCooldown):
 		case <-ctx.Done():
 			return nil
 		}
@@ -340,6 +357,9 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
+		if err := WritePRIndex(p.config.Continent, report); err != nil {
+			p.Logger.Warn("pr index: %v", err)
+		}
 		if err := p.emitExpeditionCompleted(exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound)); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
@@ -350,6 +370,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			}
 		}
 		p.consecutiveFailures.Store(0)
+		p.consecutiveSkips.Store(0)
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))
@@ -362,6 +383,11 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := p.emitExpeditionCompleted(exp, "skipped", report.IssueID, ""); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
+		// Re-review past PRs when skipped and review_cmd is configured.
+		if p.config.ReviewCmd != "" {
+			p.runSkipReview(ctx, workDir, expStart)
+		}
+		p.consecutiveSkips.Add(1)
 		p.totalSkipped.Add(1)
 	case domain.StatusFailed:
 		p.Logger.Error("%s", fmt.Sprintf(domain.Msg("issue_failed"), report.IssueID, report.Reason))

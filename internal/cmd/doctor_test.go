@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -10,18 +8,20 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestDoctorCommand_NoArgs(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"doctor"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"doctor"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should succeed or report failed checks (CI has no claude)
 	if err != nil && !strings.Contains(err.Error(), "check(s) failed") && !strings.Contains(err.Error(), "checks failed") {
@@ -31,14 +31,14 @@ func TestDoctorCommand_NoArgs(t *testing.T) {
 
 func TestDoctorCommand_RejectsTwoArgs(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"doctor", "arg1", "arg2"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"doctor", "arg1", "arg2"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should reject two positional args (max 1)
 	if err == nil {
@@ -48,19 +48,19 @@ func TestDoctorCommand_RejectsTwoArgs(t *testing.T) {
 
 func TestDoctorCommand_OutputFlagDefault(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
-	cmd.SetOut(new(bytes.Buffer))
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"doctor"})
+	root := cmd.NewRootCommand()
+	root.SetOut(new(bytes.Buffer))
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"doctor"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil && !strings.Contains(err.Error(), "check(s) failed") && !strings.Contains(err.Error(), "checks failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	outputFlag, err := cmd.PersistentFlags().GetString("output")
+	outputFlag, err := root.PersistentFlags().GetString("output")
 	if err != nil {
 		t.Fatalf("get output flag: %v", err)
 	}
@@ -71,20 +71,20 @@ func TestDoctorCommand_OutputFlagDefault(t *testing.T) {
 
 func TestDoctorCommand_OutputFlagJSON(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"doctor", "--output", "json"})
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"doctor", "--output", "json"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil && !strings.Contains(err.Error(), "check(s) failed") && !strings.Contains(err.Error(), "checks failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	outputFlag, err := cmd.PersistentFlags().GetString("output")
+	outputFlag, err := root.PersistentFlags().GetString("output")
 	if err != nil {
 		t.Fatalf("get output flag: %v", err)
 	}
@@ -112,19 +112,19 @@ func TestDoctorCommand_JSONWithRepoPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"doctor", "-o", "json", repoDir})
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"doctor", "-o", "json", repoDir})
 
 	// when
-	_ = cmd.Execute()
+	_ = root.Execute()
 
 	// then
 	var output struct {
 		Checks  []json.RawMessage      `json:"checks"`
-		Metrics map[string]interface{} `json:"metrics"`
+		Metrics map[string]any `json:"metrics"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
@@ -143,19 +143,19 @@ func TestDoctorCommand_JSONWithRepoPath(t *testing.T) {
 
 func TestDoctorCommand_JSONWithoutRepoPath(t *testing.T) {
 	// given: no args → falls back to cwd, metrics are computed from cwd
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"doctor", "-o", "json"})
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"doctor", "-o", "json"})
 
 	// when
-	_ = cmd.Execute()
+	_ = root.Execute()
 
 	// then: should produce valid JSON (metrics may or may not be present depending on cwd)
 	var output struct {
 		Checks  []json.RawMessage      `json:"checks"`
-		Metrics map[string]interface{} `json:"metrics"`
+		Metrics map[string]any `json:"metrics"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
@@ -170,19 +170,19 @@ func TestDoctorCommand_JSONWithEmptyRepoPath(t *testing.T) {
 	// given: a temp repo with no events
 	repoDir := t.TempDir()
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"doctor", "-o", "json", repoDir})
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"doctor", "-o", "json", repoDir})
 
 	// when
-	_ = cmd.Execute()
+	_ = root.Execute()
 
 	// then
 	var output struct {
 		Checks  []json.RawMessage      `json:"checks"`
-		Metrics map[string]interface{} `json:"metrics"`
+		Metrics map[string]any `json:"metrics"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
@@ -202,14 +202,14 @@ func TestDoctorCommand_JSONWithEmptyRepoPath(t *testing.T) {
 func TestDoctorCommand_AcceptsOneArg(t *testing.T) {
 	// given: doctor now accepts 0 or 1 args
 	repoDir := t.TempDir()
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"doctor", repoDir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"doctor", repoDir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should not error on one arg (failed checks are acceptable in CI (claude may not be available))
 	if err != nil && !strings.Contains(err.Error(), "check(s) failed") && !strings.Contains(err.Error(), "checks failed") {

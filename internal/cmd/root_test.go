@@ -1,29 +1,29 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestNewRootCommand_Use(t *testing.T) {
 	// given / when
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// then
-	if cmd.Use != "paintress" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "paintress")
+	if root.Use != "paintress" {
+		t.Errorf("Use = %q, want %q", root.Use, "paintress")
 	}
 }
 
 func TestNewRootCommand_PersistentFlags_Output(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// when
-	f := cmd.PersistentFlags().Lookup("output")
+	f := root.PersistentFlags().Lookup("output")
 
 	// then
 	if f == nil {
@@ -39,10 +39,10 @@ func TestNewRootCommand_PersistentFlags_Output(t *testing.T) {
 
 func TestNewRootCommand_PersistentFlags_Lang(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// when
-	f := cmd.PersistentFlags().Lookup("lang")
+	f := root.PersistentFlags().Lookup("lang")
 
 	// then
 	if f == nil {
@@ -58,10 +58,10 @@ func TestNewRootCommand_PersistentFlags_Lang(t *testing.T) {
 
 func TestNewRootCommand_PersistentFlags_Verbose(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// when
-	f := cmd.PersistentFlags().Lookup("verbose")
+	f := root.PersistentFlags().Lookup("verbose")
 
 	// then
 	if f == nil {
@@ -77,10 +77,10 @@ func TestNewRootCommand_PersistentFlags_Verbose(t *testing.T) {
 
 func TestNewRootCommand_HasSubcommands(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 
 	// when
-	subs := cmd.Commands()
+	subs := root.Commands()
 
 	// then: expect 6 subcommands
 	names := make(map[string]bool)
@@ -98,12 +98,12 @@ func TestNewRootCommand_HasSubcommands(t *testing.T) {
 func TestNewRootCommand_BarePathDelegatesToRun(t *testing.T) {
 	// given — a bare repo path (no "run" subcommand), using NeedsDefaultRun
 	args := []string{"/nonexistent/repo"}
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
 	root.SetErr(buf)
 
-	if NeedsDefaultRun(root, args) {
+	if cmd.NeedsDefaultRun(root, args) {
 		root.SetArgs(append([]string{"run"}, args...))
 	} else {
 		root.SetArgs(args)
@@ -124,12 +124,12 @@ func TestNewRootCommand_BarePathDelegatesToRun(t *testing.T) {
 func TestNewRootCommand_RunFlagsWithoutSubcommand(t *testing.T) {
 	// given — run-specific flags without "run" subcommand
 	args := []string{"--model", "opus", "/nonexistent/repo"}
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
 	root.SetErr(buf)
 
-	if NeedsDefaultRun(root, args) {
+	if cmd.NeedsDefaultRun(root, args) {
 		root.SetArgs(append([]string{"run"}, args...))
 	} else {
 		root.SetArgs(args)
@@ -149,13 +149,13 @@ func TestNewRootCommand_RunFlagsWithoutSubcommand(t *testing.T) {
 
 func TestNewRootCommand_NoArgShowsHelp(t *testing.T) {
 	// given — no args at all
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetArgs([]string{})
+	root.SetOut(buf)
+	root.SetArgs([]string{})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then — should show help (no error)
 	if err != nil {
@@ -169,13 +169,13 @@ func TestNewRootCommand_NoArgShowsHelp(t *testing.T) {
 
 func TestNewRootCommand_Version(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetArgs([]string{"--version"})
+	root.SetOut(buf)
+	root.SetArgs([]string{"--version"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {

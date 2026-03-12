@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -11,19 +9,21 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestArchivePruneCommand_NoArgs(t *testing.T) {
 	// given: no args → falls back to cwd (dry-run by default)
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"archive-prune"})
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.SetArgs([]string{"archive-prune"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should succeed using cwd as repo path
 	if err != nil {
@@ -33,7 +33,7 @@ func TestArchivePruneCommand_NoArgs(t *testing.T) {
 
 func TestArchivePruneCommand_DaysFlagDefault(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	pruneCmd, _, err := root.Find([]string{"archive-prune"})
 	if err != nil {
 		t.Fatalf("find archive-prune command: %v", err)
@@ -53,7 +53,7 @@ func TestArchivePruneCommand_DaysFlagDefault(t *testing.T) {
 
 func TestArchivePruneCommand_ExecuteFlagDefault(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	pruneCmd, _, err := root.Find([]string{"archive-prune"})
 	if err != nil {
 		t.Fatalf("find archive-prune command: %v", err)
@@ -73,7 +73,7 @@ func TestArchivePruneCommand_ExecuteFlagDefault(t *testing.T) {
 
 func TestArchivePruneCommand_ShortAliases(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	pruneCmd, _, err := root.Find([]string{"archive-prune"})
 	if err != nil {
 		t.Fatalf("find archive-prune command: %v", err)
@@ -102,14 +102,14 @@ func TestArchivePruneCommand_ShortAliases(t *testing.T) {
 
 func TestArchivePruneCommand_NegativeDays(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"archive-prune", t.TempDir(), "--days", "-5"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"archive-prune", t.TempDir(), "--days", "-5"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err == nil {
@@ -119,14 +119,14 @@ func TestArchivePruneCommand_NegativeDays(t *testing.T) {
 
 func TestArchivePruneCommand_ZeroDays(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"archive-prune", t.TempDir(), "--days", "0"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"archive-prune", t.TempDir(), "--days", "0"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err == nil {
@@ -136,14 +136,14 @@ func TestArchivePruneCommand_ZeroDays(t *testing.T) {
 
 func TestArchivePruneCommand_DryRunText(t *testing.T) {
 	// given: temp dir with no archive → no candidates
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"archive-prune", t.TempDir()})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"archive-prune", t.TempDir()})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -153,7 +153,7 @@ func TestArchivePruneCommand_DryRunText(t *testing.T) {
 
 func TestArchivePruneCommand_TextOutput_StdoutClean(t *testing.T) {
 	// given: temp dir with no candidates — "No files older" message
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
@@ -189,7 +189,7 @@ func TestArchivePruneCommand_TextOutput_WithCandidates_StdoutClean(t *testing.T)
 	oldTime := time.Now().Add(-40 * 24 * time.Hour)
 	os.Chtimes(oldFile, oldTime, oldTime)
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
@@ -213,14 +213,14 @@ func TestArchivePruneCommand_TextOutput_WithCandidates_StdoutClean(t *testing.T)
 
 func TestArchivePruneCommand_DryRunJSON(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"archive-prune", t.TempDir(), "--output", "json"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"archive-prune", t.TempDir(), "--output", "json"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -254,7 +254,7 @@ func TestArchivePruneCommand_PrunesEventFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)
@@ -298,7 +298,7 @@ func TestArchivePruneCommand_EventOnlyPrune(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	outBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
 	root.SetOut(outBuf)

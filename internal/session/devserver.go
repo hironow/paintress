@@ -16,6 +16,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// devServerReadyTimeout is the maximum wait for the dev server health check.
+var devServerReadyTimeout = 60 * time.Second
+
+// devServerStopTimeout is the grace period before SIGKILL after SIGINT.
+var devServerStopTimeout = 5 * time.Second
+
 type DevServer struct {
 	cmd     string
 	url     string
@@ -113,7 +119,7 @@ func (ds *DevServer) waitReady(ctx context.Context) error {
 	client := &http.Client{Timeout: 2 * time.Second}
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
-	deadline := time.After(60 * time.Second)
+	deadline := time.After(devServerReadyTimeout)
 	for {
 		select {
 		case <-ctx.Done():
@@ -143,7 +149,7 @@ func (ds *DevServer) Stop() {
 		}()
 		select {
 		case <-done:
-		case <-time.After(5 * time.Second):
+		case <-time.After(devServerStopTimeout):
 			_ = ds.process.Process.Kill() // nosemgrep: lod-excessive-dot-chain [permanent]
 		}
 		ds.running = false

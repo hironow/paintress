@@ -220,6 +220,56 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 	return notResolved(maxReviewGateCycles, lastComments)
 }
 
+// runSkipReview runs review_cmd against past PRs from pr-index.jsonl when an // nosemgrep: layer-session-no-event-persistence [permanent]
+// expedition is skipped. This prevents idle loops when all issues are In Review.
+func (p *Paintress) runSkipReview(ctx context.Context, workDir string, expStart time.Time) {
+	if ctx.Err() != nil {
+		return
+	}
+	entries, err := ReadPRIndex(p.config.Continent)
+	if err != nil {
+		p.Logger.Warn("skip review: read pr index: %v", err)
+		return
+	}
+	if len(entries) == 0 {
+		return
+	}
+
+	reviewDir := workDir
+	if reviewDir == "" {
+		reviewDir = p.config.Continent
+	}
+
+	totalTimeout := time.Duration(p.config.TimeoutSec) * time.Second
+	remaining := totalTimeout - time.Since(expStart)
+	if remaining <= 0 {
+		return
+	}
+
+	// Review the most recent PR (last entry in append-only index).
+	latest := entries[len(entries)-1]
+	p.Logger.Info("Skip re-review: checking past PR %s (%s)", latest.PRUrl, latest.IssueID)
+
+	// Build a synthetic report for the review loop.
+	syntheticReport := &domain.ExpeditionReport{
+		IssueID: latest.IssueID,
+		PRUrl:   latest.PRUrl,
+		Branch:  "", // branch unknown from index; review runs in current dir
+	}
+
+	reviewStatus := p.runReviewLoop(ctx, syntheticReport, remaining, reviewDir)
+	if reviewStatus.Cycle > 0 {
+		// Review was executed (pass or comments found) — productive work, not idle.
+		// Reset consecutive skip counter to prevent premature termination.
+		p.consecutiveSkips.Store(0)
+		if reviewStatus.Passed {
+			p.Logger.OK("Skip re-review: past PR %s passed review", latest.PRUrl)
+		} else {
+			p.Logger.Info("Skip re-review: past PR %s has unresolved comments", latest.PRUrl)
+		}
+	}
+}
+
 func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration) {
 	if len(dmails) == 0 {
 		return

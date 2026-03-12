@@ -115,8 +115,8 @@ func TestRunDoctor_CheckContinent_ValidStructure(t *testing.T) {
 		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
 	}
 
-	// when
-	checks := session.RunDoctor("claude", dir)
+	// when — use nonexistent cmd to skip slow external checks (continent is the SUT)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir)
 
 	// then — continent check should be OK
 	for _, c := range checks {
@@ -137,8 +137,8 @@ func TestRunDoctor_CheckContinent_MissingDir(t *testing.T) {
 	// given — empty continent (no .expedition/)
 	dir := t.TempDir()
 
-	// when
-	checks := session.RunDoctor("claude", dir)
+	// when — use nonexistent cmd to skip slow external checks
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir)
 
 	// then — continent check should be NOT OK but NOT required (warning)
 	for _, c := range checks {
@@ -174,8 +174,8 @@ func TestRunDoctor_CheckConfig_ValidConfig(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 	os.WriteFile(domain.ProjectConfigPath(dir), []byte("tracker:\n  team: TEST\n"), 0644)
 
-	// when
-	checks := session.RunDoctor("claude", dir)
+	// when — use nonexistent cmd to skip slow external checks
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir)
 
 	// then — config check should be OK
 	for _, c := range checks {
@@ -197,8 +197,8 @@ func TestRunDoctor_CheckConfig_MissingConfig(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
-	// when
-	checks := session.RunDoctor("claude", dir)
+	// when — use nonexistent cmd to skip slow external checks
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir)
 
 	// then — config check should NOT be OK but NOT required (warning)
 	for _, c := range checks {
@@ -680,8 +680,8 @@ func TestCheckGitRemote_IncludedInDoctorWithContinent(t *testing.T) {
 		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
 	}
 
-	// when
-	checks := session.RunDoctor("claude", dir)
+	// when — use nonexistent cmd to skip slow external checks (git-remote is the SUT)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir)
 
 	// then — git-remote check should be present
 	for _, c := range checks {

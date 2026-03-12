@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -10,19 +8,21 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestStatusCommand_NoArgs(t *testing.T) {
 	// given: no args → falls back to cwd
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status"})
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.SetArgs([]string{"status"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should succeed using cwd as repo path
 	if err != nil {
@@ -36,14 +36,14 @@ func TestStatusCommand_NoArgs(t *testing.T) {
 
 func TestStatusCommand_RejectsTwoArgs(t *testing.T) {
 	// given
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"status", "arg1", "arg2"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"status", "arg1", "arg2"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should reject two positional args (max 1)
 	if err == nil {
@@ -54,15 +54,15 @@ func TestStatusCommand_RejectsTwoArgs(t *testing.T) {
 func TestStatusCommand_TextOutput(t *testing.T) {
 	// given: empty repo
 	repoDir := t.TempDir()
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status", repoDir})
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.SetArgs([]string{"status", repoDir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -97,15 +97,15 @@ func TestStatusCommand_JSONOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status", "-o", "json", repoDir})
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.SetArgs([]string{"status", "-o", "json", repoDir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -130,15 +130,15 @@ func TestStatusCommand_JSONOutput(t *testing.T) {
 func TestStatusCommand_EmptyRepo(t *testing.T) {
 	// given: empty repo directory
 	repoDir := t.TempDir()
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
-	cmd.SetArgs([]string{"status", "-o", "json", repoDir})
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.SetArgs([]string{"status", "-o", "json", repoDir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {

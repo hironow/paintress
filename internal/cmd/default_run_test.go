@@ -1,8 +1,10 @@
-package cmd
+package cmd_test
 
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+import (
+	"testing"
 
-import "testing"
+	"github.com/hironow/paintress/internal/cmd"
+)
 
 func TestNeedsDefaultRun(t *testing.T) {
 	tests := []struct {
@@ -42,8 +44,8 @@ func TestNeedsDefaultRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rootCmd := NewRootCommand()
-			got := NeedsDefaultRun(rootCmd, tt.args)
+			rootCmd := cmd.NewRootCommand()
+			got := cmd.NeedsDefaultRun(rootCmd, tt.args)
 			if got != tt.want {
 				t.Errorf("NeedsDefaultRun(%v) = %v, want %v", tt.args, got, tt.want)
 			}
