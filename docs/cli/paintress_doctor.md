@@ -6,21 +6,16 @@ Run health checks
 
 Check environment health and tool availability.
 
-Each check reports one of four statuses:
-- **OK** — Check passed
-- **FAIL** — Check failed (exit code 1)
-- **SKIP** — Check not applicable
-- **WARN** — Advisory warning (exit code 0, not a failure)
-
 Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and docker.
 When repo-path is provided (or defaults to current directory), also checks
 .expedition/ structure, skills, config, and computes success rate metrics.
+Each check reports one of four statuses: OK (passed), FAIL (exit 1),
+SKIP (dependency missing), WARN (advisory, exit 0).
 
-The context-budget check estimates total token usage and reports WARN when
-the threshold (20,000 tokens) is exceeded. Per-category breakdown shows
-token counts for tools, skills, plugins, mcp, and hooks, with the heaviest
-category marked. Category-specific hints point to `.claude/settings.json`
-for optimization.
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.
 
 ```
 paintress doctor [repo-path] [flags]

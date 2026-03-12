@@ -18,7 +18,14 @@ func newDoctorCommand() *cobra.Command {
 
 Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and docker.
 When repo-path is provided (or defaults to current directory), also checks
-.expedition/ structure, skills, config, and computes success rate metrics.`,
+.expedition/ structure, skills, config, and computes success rate metrics.
+Each check reports one of four statuses: OK (passed), FAIL (exit 1),
+SKIP (dependency missing), WARN (advisory, exit 0).
+
+The context-budget check estimates token consumption per category
+(tools, skills, plugins, mcp, hooks) and marks the heaviest.
+When the threshold (20,000 tokens) is exceeded, a category-specific
+hint recommends adjusting .claude/settings.json.`,
 		Example: `  # Check current directory
   paintress doctor
 
