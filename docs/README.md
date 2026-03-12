@@ -14,18 +14,19 @@
 ## CLI Reference
 
 - [paintress](cli/paintress.md) — Root command
-- [paintress init](cli/paintress_init.md) — Initialize a project (`--force` to regenerate)
-- [paintress run](cli/paintress_run.md) — Run the autonomous expedition loop
-- [paintress issues](cli/paintress_issues.md) — Query Linear issues via Claude MCP
-- [paintress status](cli/paintress_status.md) — Show expedition status
-- [paintress config show](cli/paintress_config.md) — Display project configuration
-- [paintress config set](cli/paintress_config.md) — Update a project configuration value
-- [paintress doctor](cli/paintress_doctor.md) — Diagnose configuration issues (context-budget per-item diagnostics, WARN status)
-- [paintress clean](cli/paintress_clean.md) — Clean state files
-- [paintress rebuild](cli/paintress_rebuild.md) — Rebuild state from events
-- [paintress archive-prune](cli/paintress_archive-prune.md) — Prune archived data
-- [paintress version](cli/paintress_version.md) — Show version
-- [paintress update](cli/paintress_update.md) — Self-update
+- [paintress init](cli/paintress_init.md) — Initialize project configuration
+- [paintress run](cli/paintress_run.md) — Run the expedition loop
+- [paintress issues](cli/paintress_issues.md) — List Linear issues via Claude MCP
+- [paintress status](cli/paintress_status.md) — Show operational status
+- [paintress config](cli/paintress_config.md) — View or update project configuration
+- [paintress config show](cli/paintress_config_show.md) — Show current configuration
+- [paintress config set](cli/paintress_config_set.md) — Update a configuration value
+- [paintress doctor](cli/paintress_doctor.md) — Run health checks
+- [paintress clean](cli/paintress_clean.md) — Remove state directory (.expedition/)
+- [paintress rebuild](cli/paintress_rebuild.md) — Rebuild projections from event store
+- [paintress archive-prune](cli/paintress_archive-prune.md) — Prune old archived d-mails
+- [paintress version](cli/paintress_version.md) — Print version, commit, and build information
+- [paintress update](cli/paintress_update.md) — Self-update paintress to the latest release
 
 ## Architecture Decision Records
 
