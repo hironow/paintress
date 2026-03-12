@@ -20,7 +20,7 @@
 - [paintress status](cli/paintress_status.md) — Show expedition status
 - [paintress config show](cli/paintress_config.md) — Display project configuration
 - [paintress config set](cli/paintress_config.md) — Update a project configuration value
-- [paintress doctor](cli/paintress_doctor.md) — Diagnose configuration issues (git-remote, deprecated kind detection)
+- [paintress doctor](cli/paintress_doctor.md) — Diagnose configuration issues (context-budget per-item diagnostics, WARN status)
 - [paintress clean](cli/paintress_clean.md) — Clean state files
 - [paintress rebuild](cli/paintress_rebuild.md) — Rebuild state from events
 - [paintress archive-prune](cli/paintress_archive-prune.md) — Prune archived data

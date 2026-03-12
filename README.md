@@ -227,7 +227,7 @@ paintress init /path/to/your/repo
 # Upgrade existing project (regenerate SKILL.md, etc.)
 paintress init --force /path/to/your/repo
 
-# Check external command availability, git remote, deprecated kinds
+# Check external command availability, git remote, deprecated kinds, context-budget per-item diagnostics
 paintress doctor
 
 # Run — .expedition/ is created automatically
@@ -246,7 +246,7 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 |---------|-------------|
 | `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
 | `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively (`--force` to regenerate) |
-| `paintress doctor` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint, context-budget |
+| `paintress doctor` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint, context-budget (per-item diagnostics) |
 | `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
 | `paintress config show [repo-path]` | Display project configuration |
 | `paintress config set <key> <value> [repo-path]` | Update a configuration value (e.g. `tracker.team`, `tracker.project`) |
