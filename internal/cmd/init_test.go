@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -8,21 +6,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/paintress/internal/cmd"
 	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given — no repo-path arg; resolveRepoPath falls back to os.Getwd()
 	// The cwd may or may not have .expedition/, so we just verify no args-validation error.
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then — should NOT fail with "accepts 1 arg(s), received 0"
 	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
@@ -43,14 +42,14 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"init", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"init", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should fail with "already exists" or "already initialized"
 	if err == nil {
@@ -66,15 +65,15 @@ func TestInitCommand_AlreadyInitialized(t *testing.T) {
 func TestInitCmd_FlagsOnly(t *testing.T) {
 	// given — init via cobra command with flags, no stdin
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader("")) // empty stdin — must NOT hang
-	cmd.SetArgs([]string{"init", "--team", "MY", "--project", "Hades", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader("")) // empty stdin — must NOT hang
+	root.SetArgs([]string{"init", "--team", "MY", "--project", "Hades", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -97,15 +96,15 @@ func TestInitCmd_FlagsOnly(t *testing.T) {
 func TestInitCmd_MissingFlags_UsesDefaults(t *testing.T) {
 	// given — init with no flags, should use defaults (no hang)
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader("")) // empty stdin
-	cmd.SetArgs([]string{"init", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader("")) // empty stdin
+	root.SetArgs([]string{"init", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then — should succeed with empty defaults
 	if err != nil {
@@ -129,14 +128,14 @@ func TestInitCommand_AlreadyExists_SuggestsForce(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"init", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"init", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err == nil {
@@ -159,15 +158,15 @@ func TestInitCommand_Force_OverwritesExisting(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--force", "--team", "NEW", "--project", "NewProject", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init", "--force", "--team", "NEW", "--project", "NewProject", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -192,15 +191,15 @@ func TestInitCommand_Force_MergesExisting(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--force", "--team", "NEW", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init", "--force", "--team", "NEW", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -221,15 +220,15 @@ func TestInitCommand_Force_MergesExisting(t *testing.T) {
 func TestInitCommand_ConfigHasDefaults(t *testing.T) {
 	// given: fresh init
 	dir := t.TempDir()
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader(""))
-	cmd.SetArgs([]string{"init", "--team", "MY", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init", "--team", "MY", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then
 	if err != nil {
@@ -244,15 +243,15 @@ func TestInitCommand_ConfigHasDefaults(t *testing.T) {
 
 func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	// given — provide deterministic stdin to avoid hanging
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetIn(strings.NewReader("MY\nmy-project\n"))
-	cmd.SetArgs([]string{"init", t.TempDir()})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader("MY\nmy-project\n"))
+	root.SetArgs([]string{"init", t.TempDir()})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: args validation should pass; business logic may fail
 	if err == nil {

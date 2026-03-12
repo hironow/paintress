@@ -1,23 +1,23 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestIssuesCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given: no args → falls back to cwd (may error on business logic, not on arg validation)
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"issues"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"issues"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should NOT fail with "accepts 1 arg" — cwd fallback is used
 	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
@@ -27,7 +27,7 @@ func TestIssuesCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 
 func TestIssuesCommand_StateFlagDefault(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	issuesCmd, _, err := root.Find([]string{"issues"})
 	if err != nil {
 		t.Fatalf("find issues command: %v", err)
@@ -47,7 +47,7 @@ func TestIssuesCommand_StateFlagDefault(t *testing.T) {
 
 func TestIssuesCommand_StateShortAlias(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	issuesCmd, _, err := root.Find([]string{"issues"})
 	if err != nil {
 		t.Fatalf("find issues command: %v", err)
@@ -65,7 +65,7 @@ func TestIssuesCommand_StateShortAlias(t *testing.T) {
 
 func TestIssuesCommand_OutputFlagInherited(t *testing.T) {
 	// given: --output is a PersistentFlag on root, issues should inherit it
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
 	root.SetErr(buf)

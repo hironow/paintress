@@ -1,16 +1,16 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestExitError_Code(t *testing.T) {
 	// given
-	err := &ExitError{Code: 130, Err: fmt.Errorf("interrupted")}
+	err := &cmd.ExitError{Code: 130}
 
 	// then
 	if err.Code != 130 {
@@ -20,7 +20,7 @@ func TestExitError_Code(t *testing.T) {
 
 func TestExitError_Error(t *testing.T) {
 	// given
-	err := &ExitError{Code: 1, Err: fmt.Errorf("something failed")}
+	err := &cmd.ExitError{Code: 1, Err: fmt.Errorf("something failed")}
 
 	// then
 	if err.Error() != "something failed" {
@@ -31,7 +31,7 @@ func TestExitError_Error(t *testing.T) {
 func TestExitError_Unwrap(t *testing.T) {
 	// given
 	inner := fmt.Errorf("inner cause")
-	err := &ExitError{Code: 2, Err: inner}
+	err := &cmd.ExitError{Code: 2, Err: inner}
 
 	// then
 	if !errors.Is(err, inner) {
@@ -41,11 +41,11 @@ func TestExitError_Unwrap(t *testing.T) {
 
 func TestExitError_ExtractFromChain(t *testing.T) {
 	// given
-	inner := &ExitError{Code: 130, Err: fmt.Errorf("interrupted")}
+	inner := &cmd.ExitError{Code: 130, Err: fmt.Errorf("interrupted")}
 	wrapped := fmt.Errorf("run failed: %w", inner)
 
 	// when
-	var exitErr *ExitError
+	var exitErr *cmd.ExitError
 	found := errors.As(wrapped, &exitErr)
 
 	// then

@@ -1,23 +1,23 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestRunCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given: no args → falls back to cwd (may error on business logic, not on arg validation)
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"run"})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"run"})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should NOT fail with "accepts 1 arg" — cwd fallback is used
 	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
@@ -27,7 +27,7 @@ func TestRunCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 
 func TestRunCommand_AllFlagsExist(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	runCmd, _, err := root.Find([]string{"run"})
 	if err != nil {
 		t.Fatalf("find run command: %v", err)
@@ -70,7 +70,7 @@ func TestRunCommand_AllFlagsExist(t *testing.T) {
 
 func TestRunCommand_ShortAliases(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	runCmd, _, err := root.Find([]string{"run"})
 	if err != nil {
 		t.Fatalf("find run command: %v", err)
@@ -102,7 +102,7 @@ func TestRunCommand_ShortAliases(t *testing.T) {
 
 func TestRunCommand_NotifyApproveFlagsLongOnly(t *testing.T) {
 	// given
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	runCmd, _, err := root.Find([]string{"run"})
 	if err != nil {
 		t.Fatalf("find run command: %v", err)
@@ -125,14 +125,14 @@ func TestRunCmd_FailsWithoutInit(t *testing.T) {
 	// given: empty directory with no .expedition/
 	dir := t.TempDir()
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"run", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"run", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should fail with init guidance
 	if err == nil {
@@ -146,7 +146,7 @@ func TestRunCmd_FailsWithoutInit(t *testing.T) {
 
 func TestRunCommand_DynamicReviewCmd(t *testing.T) {
 	// given: --base-branch set but --review-cmd not set
-	root := NewRootCommand()
+	root := cmd.NewRootCommand()
 	runCmd, _, err := root.Find([]string{"run"})
 	if err != nil {
 		t.Fatalf("find run command: %v", err)

@@ -1,6 +1,4 @@
-package cmd
-
-// white-box-reason: cobra command construction: NewRootCommand and CLI routing are unexported
+package cmd_test
 
 import (
 	"bytes"
@@ -10,20 +8,22 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/hironow/paintress/internal/cmd"
 )
 
 func TestCleanCmd_NothingToClean(t *testing.T) {
 	// given: empty directory with no .expedition/
 	dir := t.TempDir()
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"clean", "--yes", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"clean", "--yes", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should succeed with "nothing to clean" message
 	if err != nil {
@@ -46,14 +46,14 @@ func TestCleanCmd_DeletesExpeditionDir(t *testing.T) {
 		t.Fatalf("create config: %v", err)
 	}
 
-	cmd := NewRootCommand()
+	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs([]string{"clean", "--yes", dir})
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"clean", "--yes", dir})
 
 	// when
-	err := cmd.Execute()
+	err := root.Execute()
 
 	// then: should succeed and delete .expedition/
 	if err != nil {
