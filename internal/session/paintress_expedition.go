@@ -15,6 +15,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// expeditionCooldown is the pause between expedition cycles.
+// Declared as var (not const) so tests can shorten it.
+var expeditionCooldown = 10 * time.Second
+
+// worktreeReleaseTimeout is the per-call timeout for worktree release operations.
+var worktreeReleaseTimeout = 10 * time.Second
+
 // emitExpeditionCompleted emits an expedition.completed event via the emitter.
 // OTel metric is recorded directly.
 // Returns an error if event persistence fails — expedition completion is critical.
@@ -61,7 +68,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
 				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release() [permanent]
-				rCtx, rCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				rCtx, rCancel := context.WithTimeout(context.Background(), worktreeReleaseTimeout)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
 					p.Logger.Warn("worktree release: %v", err)
@@ -185,7 +192,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		p.Logger.Info("%s", domain.Msg("cooldown"))
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(expeditionCooldown):
 		case <-ctx.Done():
 			return nil
 		}
