@@ -25,3 +25,4 @@ var ExportCheckClaudeInference = checkClaudeInference
 var ExportCheckGHScopes = checkGHScopes
 var ExportCheckContextBudget = CheckContextBudget
 var ExportExtractStreamResult = ExtractStreamResult
+var ExportCheckSkillsRefToolchain = checkSkillsRefToolchain

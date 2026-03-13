@@ -8,12 +8,62 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 )
+
+// installSkillsRefFn runs "uv tool install skills-ref". Injectable for testing.
+var installSkillsRefFn = func() error {
+	cmd := exec.Command("uv", "tool", "install", "skills-ref")
+	return cmd.Run()
+}
+
+// findSkillsRefDirFn searches for skills-ref submodule directory.
+var findSkillsRefDirFn = findSkillsRefDir
+
+// generateSkillsFn regenerates SKILL.md files via ValidateContinent.
+var generateSkillsFn = func(continent string) error {
+	return ValidateContinent(continent, nil)
+}
+
+func findSkillsRefDir() string {
+	candidates := []string{
+		filepath.Join("..", "skills-ref"),
+		filepath.Join("..", "..", "skills-ref"),
+	}
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			return c
+		}
+	}
+	return ""
+}
+
+// OverrideInstallSkillsRef replaces the skills-ref installer for testing.
+func OverrideInstallSkillsRef(fn func() error) func() {
+	old := installSkillsRefFn
+	installSkillsRefFn = fn
+	return func() { installSkillsRefFn = old }
+}
+
+// OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing.
+func OverrideFindSkillsRefDir(fn func() string) func() {
+	old := findSkillsRefDirFn
+	findSkillsRefDirFn = fn
+	return func() { findSkillsRefDirFn = old }
+}
+
+// OverrideGenerateSkills replaces the skills generator for testing.
+func OverrideGenerateSkills(fn func(string) error) func() {
+	old := generateSkillsFn
+	generateSkillsFn = fn
+	return func() { generateSkillsFn = old }
+}
 
 // newShellCmd creates an exec.Cmd via platform.NewShellCmd.
 // Package-level variable for test injection. Used for --version and mcp list.
@@ -46,7 +96,8 @@ func OverrideLookPath(fn func(cmd string) (string, error)) func() {
 // continent is the optional .expedition/ root directory. When non-empty,
 // additional checks for .expedition/ structure and config.yaml are included
 // as warnings (not required).
-func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
+// When repair is true, auto-fixable issues are repaired in-place.
+func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorCheck {
 	commands := []struct {
 		name     string
 		required bool
@@ -117,7 +168,24 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 		checks = append(checks, checkGitRepo(continent))
 		checks = append(checks, checkGitRemote(continent))
 		checks = append(checks, checkWritability(continent))
-		checks = append(checks, checkSkills(continent))
+		skillResult := checkSkills(continent)
+		if repair && skillResult.Status == domain.CheckFail {
+			if err := generateSkillsFn(continent); err == nil {
+				recheck := checkSkills(continent)
+				if recheck.Status == domain.CheckOK {
+					checks = append(checks, domain.DoctorCheck{
+						Name: "skills", Status: domain.CheckFixed,
+						Message: "regenerated SKILL.md files",
+					})
+				} else {
+					checks = append(checks, skillResult)
+				}
+			} else {
+				checks = append(checks, skillResult)
+			}
+		} else {
+			checks = append(checks, skillResult)
+		}
 		checks = append(checks, checkEventStore(continent))
 
 		// External connectivity checks (skip if claude binary not found)
@@ -199,7 +267,71 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 		}
 	}
 
+	// --- skills-ref toolchain ---
+	checks = append(checks, checkSkillsRefToolchain(repair)...)
+
+	// --- Repair: stale PID cleanup ---
+	if repair && continent != "" {
+		pidPath := filepath.Join(continent, domain.StateDir, "watch.pid")
+		if data, err := os.ReadFile(pidPath); err == nil {
+			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			if pid > 0 {
+				proc, _ := os.FindProcess(pid)
+				if proc == nil || proc.Signal(syscall.Signal(0)) != nil {
+					_ = os.Remove(pidPath)
+					checks = append(checks, domain.DoctorCheck{
+						Name: "stale-pid", Status: domain.CheckFixed,
+						Message: "removed stale PID file",
+					})
+				}
+			}
+		}
+	}
+
 	return checks
+}
+
+// checkSkillsRefToolchain verifies that skills-ref tooling is available.
+func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
+	if _, err := lookPath("skills-ref"); err == nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "skills-ref found on PATH",
+		}}
+	}
+	_, uvErr := lookPath("uv")
+	if uvErr != nil {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckWarn,
+			Message: "uv not found on PATH: SKILL.md spec validation is unavailable",
+			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
+		}}
+	}
+	subDir := findSkillsRefDirFn()
+	if subDir != "" {
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckOK,
+			Message: "uv + submodule ready",
+		}}
+	}
+	if repair {
+		if err := installSkillsRefFn(); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: fmt.Sprintf("uv tool install skills-ref failed: %v", err),
+				Hint:    `try manually: "uv tool install skills-ref"`,
+			}}
+		}
+		return []domain.DoctorCheck{{
+			Name: "skills-ref", Status: domain.CheckFixed,
+			Message: "installed skills-ref via uv tool install",
+		}}
+	}
+	return []domain.DoctorCheck{{
+		Name: "skills-ref", Status: domain.CheckWarn,
+		Message: "uv found but skills-ref not installed",
+		Hint:    `run "paintress doctor --repair" or "uv tool install skills-ref"`,
+	}}
 }
 
 // checkContinent verifies the .expedition/ directory structure exists.

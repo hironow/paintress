@@ -13,7 +13,7 @@ import (
 )
 
 func newDoctorCommand() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "doctor [repo-path]",
 		Short: "Run health checks",
 		Long: `Check environment health and tool availability.
@@ -27,7 +27,9 @@ SKIP (dependency missing), WARN (advisory, exit 0).
 The context-budget check estimates token consumption per category
 (tools, skills, plugins, mcp, hooks) and marks the heaviest.
 When the threshold (20,000 tokens) is exceeded, a category-specific
-hint recommends adjusting .claude/settings.json.`,
+hint recommends adjusting .claude/settings.json.
+
+Use --repair to auto-fix repairable issues (stale PID, missing SKILL.md, etc.).`,
 		Example: `  # Check current directory
   paintress doctor
 
@@ -35,10 +37,15 @@ hint recommends adjusting .claude/settings.json.`,
   paintress doctor /path/to/project
 
   # Machine-readable output
-  paintress doctor -o json`,
+  paintress doctor -o json
+
+  # Auto-fix repairable issues
+  paintress doctor --repair`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runDoctor,
 	}
+	cmd.Flags().Bool("repair", false, "Auto-fix repairable issues")
+	return cmd
 }
 
 func runDoctor(cmd *cobra.Command, args []string) error {
@@ -51,7 +58,8 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	claudeCmd := loadClaudeCmd(continent)
-	checks := session.RunDoctor(claudeCmd, continent)
+	repair, _ := cmd.Flags().GetBool("repair")
+	checks := session.RunDoctor(claudeCmd, continent, repair)
 
 	hasFail := false
 	for _, c := range checks {

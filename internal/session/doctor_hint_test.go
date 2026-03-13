@@ -142,7 +142,7 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 
 func TestRunDoctor_BinaryNotFound_HasHint(t *testing.T) {
 	// given: use a nonexistent claude command
-	checks := session.RunDoctor("nonexistent-claude-xyz-99999", "")
+	checks := session.RunDoctor("nonexistent-claude-xyz-99999", "", false)
 
 	// then: the claude check should have a hint
 	for _, c := range checks {
