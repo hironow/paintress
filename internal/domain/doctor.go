@@ -8,6 +8,7 @@ const (
 	CheckFail
 	CheckSkip
 	CheckWarn
+	CheckFixed
 )
 
 // StatusLabel returns a display string for the check status.
@@ -21,6 +22,8 @@ func (s CheckStatus) StatusLabel() string {
 		return "SKIP"
 	case CheckWarn:
 		return "WARN"
+	case CheckFixed:
+		return "FIX"
 	default:
 		return "????"
 	}
