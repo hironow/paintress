@@ -163,7 +163,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 	}
 
 	if strings.TrimSpace(continent) != "" {
-		checks = append(checks, checkContinent(continent))
+		checks = append(checks, checkContinent(continent, repair))
 		checks = append(checks, checkConfig(continent))
 		checks = append(checks, checkGitRepo(continent))
 		checks = append(checks, checkGitRemote(continent))
@@ -335,16 +335,26 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 }
 
 // checkContinent verifies the .expedition/ directory structure exists.
-// Returns a Warning-level check.
-func checkContinent(continent string) domain.DoctorCheck {
+// When repair is true, missing directories are created and CheckFixed is returned.
+func checkContinent(continent string, repair bool) domain.DoctorCheck {
 	expeditionDir := filepath.Join(continent, domain.StateDir)
 	info, err := os.Stat(expeditionDir)
 	if err != nil || !info.IsDir() {
-		return domain.DoctorCheck{
-			Name:    "continent",
-			Status:  domain.CheckWarn,
-			Message: domain.StateDir + "/ not found",
-			Hint:    `run "paintress init <repo-path>" to set up expedition`,
+		if !repair {
+			return domain.DoctorCheck{
+				Name:    "continent",
+				Status:  domain.CheckWarn,
+				Message: domain.StateDir + "/ not found",
+				Hint:    `run "paintress init <repo-path>" or "paintress doctor --repair"`,
+			}
+		}
+		if mkErr := os.MkdirAll(expeditionDir, 0755); mkErr != nil {
+			return domain.DoctorCheck{
+				Name:    "continent",
+				Status:  domain.CheckWarn,
+				Message: fmt.Sprintf("cannot create %s: %v", expeditionDir, mkErr),
+				Hint:    `check directory permissions or run "paintress init <repo-path>"`,
+			}
 		}
 	}
 
@@ -352,17 +362,34 @@ func checkContinent(continent string) domain.DoctorCheck {
 	var missing []string
 	for _, sub := range requiredDirs {
 		d := filepath.Join(expeditionDir, sub)
-		if fi, err := os.Stat(d); err != nil || !fi.IsDir() {
+		if fi, statErr := os.Stat(d); statErr != nil || !fi.IsDir() {
 			missing = append(missing, sub)
 		}
 	}
 
 	if len(missing) > 0 {
+		if !repair {
+			return domain.DoctorCheck{
+				Name:    "continent",
+				Status:  domain.CheckWarn,
+				Message: "missing: " + strings.Join(missing, ", "),
+				Hint:    `run "paintress init <repo-path>" or "paintress doctor --repair"`,
+			}
+		}
+		for _, sub := range missing {
+			if mkErr := os.MkdirAll(filepath.Join(expeditionDir, sub), 0755); mkErr != nil {
+				return domain.DoctorCheck{
+					Name:    "continent",
+					Status:  domain.CheckWarn,
+					Message: fmt.Sprintf("cannot create %s: %v", sub, mkErr),
+					Hint:    `check directory permissions or run "paintress init <repo-path>"`,
+				}
+			}
+		}
 		return domain.DoctorCheck{
 			Name:    "continent",
-			Status:  domain.CheckWarn,
-			Message: "missing: " + strings.Join(missing, ", "),
-			Hint:    `run "paintress init <repo-path>" to recreate the expedition structure`,
+			Status:  domain.CheckFixed,
+			Message: fmt.Sprintf("created %s and subdirectories", expeditionDir),
 		}
 	}
 
@@ -667,8 +694,9 @@ func checkLinearMCP(mcpOutput string, mcpErr error) domain.DoctorCheck {
 	if mcpErr != nil {
 		return domain.DoctorCheck{
 			Name:    "linear-mcp",
-			Status:  domain.CheckSkip,
-			Message: "skipped (claude not available)",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("claude mcp list failed: %v", mcpErr),
+			Hint:    `run "claude login" to authenticate`,
 		}
 	}
 	output := strings.ToLower(mcpOutput)

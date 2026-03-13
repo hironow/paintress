@@ -51,7 +51,7 @@ func TestCheckContinent_Missing_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	check := session.ExportCheckContinent(dir)
+	check := session.ExportCheckContinent(dir, false)
 
 	// then
 	if check.Status == domain.CheckOK {

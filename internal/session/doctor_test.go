@@ -510,11 +510,11 @@ func TestCheckLinearMCP_MCPListFailed(t *testing.T) {
 	check := session.ExportCheckLinearMCP("", mcpErr)
 
 	// then
-	if check.Status == domain.CheckOK {
-		t.Error("linear-mcp should fail when mcp list errors")
+	if check.Status != domain.CheckWarn {
+		t.Errorf("linear-mcp should be WARN when mcp list errors, got %v", check.Status)
 	}
-	if !strings.Contains(check.Message, "skipped") {
-		t.Errorf("message should indicate skipped, got %q", check.Message)
+	if !strings.Contains(check.Message, "claude mcp list failed") {
+		t.Errorf("message should indicate mcp list failure, got %q", check.Message)
 	}
 }
 
