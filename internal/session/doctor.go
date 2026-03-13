@@ -306,8 +306,9 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 	subDir := findSkillsRefDirFn()
 	if subDir != "" {
 		return []domain.DoctorCheck{{
-			Name: "skills-ref", Status: domain.CheckOK,
-			Message: "uv + submodule ready",
+			Name: "skills-ref", Status: domain.CheckWarn,
+			Message: fmt.Sprintf("skills-ref checkout found at %s but not on PATH", subDir),
+			Hint:    `run "uv tool install skills-ref" or add skills-ref to PATH`,
 		}}
 	}
 	if repair {
@@ -316,6 +317,13 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 				Name: "skills-ref", Status: domain.CheckWarn,
 				Message: fmt.Sprintf("uv tool install skills-ref failed: %v", err),
 				Hint:    `try manually: "uv tool install skills-ref"`,
+			}}
+		}
+		if _, err := lookPath("skills-ref"); err != nil {
+			return []domain.DoctorCheck{{
+				Name: "skills-ref", Status: domain.CheckWarn,
+				Message: "installed skills-ref but executable not found on PATH",
+				Hint:    `ensure uv tool bin directory is in PATH (e.g. ~/.local/bin)`,
 			}}
 		}
 		return []domain.DoctorCheck{{
@@ -354,7 +362,7 @@ func checkContinent(continent string, repair bool) domain.DoctorCheck {
 		}
 	}
 
-	requiredDirs := []string{"journal", ".run", "inbox", "outbox", "archive"}
+	requiredDirs := []string{"journal", ".run", "inbox", "outbox", "archive", "insights"}
 	var missing []string
 	for _, sub := range requiredDirs {
 		d := filepath.Join(expeditionDir, sub)

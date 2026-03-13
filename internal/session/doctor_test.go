@@ -95,7 +95,7 @@ func TestRunDoctor_MissingCommand(t *testing.T) {
 func TestRunDoctor_CheckContinent_ValidStructure(t *testing.T) {
 	// given — valid .expedition/ structure
 	dir := t.TempDir()
-	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive", "insights"} {
 		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
 	}
 
@@ -521,7 +521,7 @@ func TestCheckLinearMCP_MCPListFailed(t *testing.T) {
 func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	// given — nonexistent claude command, valid continent
 	dir := t.TempDir()
-	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive", "insights"} {
 		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
 	}
 
@@ -660,7 +660,7 @@ func TestCheckGitRemote_IncludedInDoctorWithContinent(t *testing.T) {
 	if err := addRemote.Run(); err != nil {
 		t.Fatalf("git remote add failed: %v", err)
 	}
-	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive", "insights"} {
 		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
 	}
 
@@ -683,7 +683,7 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	// given — fake-claude binary, valid continent with expedition structure
 	fakeClaude := buildFakeClaude(t)
 	dir := t.TempDir()
-	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive", "insights"} {
 		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
 	}
 
@@ -1045,5 +1045,113 @@ func TestCheckContextBudget_WarnHintWithSettingsFile(t *testing.T) {
 	}
 	if !strings.Contains(check.Hint, "見直して") {
 		t.Errorf("hint should say review settings, got: %s", check.Hint)
+	}
+}
+
+// --- Fix 1: repair creates insights/ directory ---
+
+func TestCheckContinent_RepairCreatesInsightsDir(t *testing.T) {
+	// given — .expedition/ exists but insights/ is missing
+	dir := t.TempDir()
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
+	}
+
+	// when — repair=true
+	check := session.ExportCheckContinent(dir, true)
+
+	// then — should be FIXED and insights/ should exist
+	if check.Status != domain.CheckFixed {
+		t.Errorf("expected CheckFixed, got %v, message: %s", check.Status.StatusLabel(), check.Message)
+	}
+	insightsPath := filepath.Join(dir, ".expedition", "insights")
+	if fi, err := os.Stat(insightsPath); err != nil || !fi.IsDir() {
+		t.Errorf("insights/ directory should exist after repair")
+	}
+}
+
+func TestCheckContinent_InsightsMissingReportsWarn(t *testing.T) {
+	// given — all dirs except insights/
+	dir := t.TempDir()
+	for _, sub := range []string{"journal", ".run", "inbox", "outbox", "archive"} {
+		os.MkdirAll(filepath.Join(dir, ".expedition", sub), 0755)
+	}
+
+	// when — repair=false
+	check := session.ExportCheckContinent(dir, false)
+
+	// then — should be WARN mentioning insights
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected CheckWarn, got %v, message: %s", check.Status.StatusLabel(), check.Message)
+	}
+	if !strings.Contains(check.Message, "insights") {
+		t.Errorf("message should mention missing insights, got: %s", check.Message)
+	}
+}
+
+// --- Fix 2: skills-ref subDir existence alone doesn't produce OK ---
+
+func TestCheckSkillsRefToolchain_SubDirExistsButNotOnPath(t *testing.T) {
+	// given — skills-ref NOT on PATH, uv IS on PATH, subDir exists
+	restoreLookPath := session.OverrideLookPath(func(cmd string) (string, error) {
+		if cmd == "uv" {
+			return "/usr/local/bin/uv", nil
+		}
+		return "", fmt.Errorf("not found: %s", cmd)
+	})
+	defer restoreLookPath()
+	restoreFindDir := session.OverrideFindSkillsRefDir(func() string {
+		return "/some/path/skills-ref"
+	})
+	defer restoreFindDir()
+
+	// when
+	checks := session.ExportCheckSkillsRefToolchain(false)
+
+	// then — should be WARN, not OK
+	if len(checks) == 0 {
+		t.Fatal("expected at least one check")
+	}
+	if checks[0].Status == domain.CheckOK {
+		t.Errorf("subDir existence alone should NOT produce OK, got: %s", checks[0].Message)
+	}
+	if checks[0].Status != domain.CheckWarn {
+		t.Errorf("expected CheckWarn, got %v", checks[0].Status.StatusLabel())
+	}
+}
+
+func TestCheckSkillsRefToolchain_InstallSuccessButNotOnPath(t *testing.T) {
+	// given — skills-ref NOT on PATH, uv IS on PATH, no subDir, install succeeds but still not on PATH
+	restoreLookPath := session.OverrideLookPath(func(cmd string) (string, error) {
+		if cmd == "uv" {
+			return "/usr/local/bin/uv", nil
+		}
+		return "", fmt.Errorf("not found: %s", cmd)
+	})
+	defer restoreLookPath()
+	restoreFindDir := session.OverrideFindSkillsRefDir(func() string {
+		return ""
+	})
+	defer restoreFindDir()
+	restoreInstall := session.OverrideInstallSkillsRef(func() error {
+		return nil // install succeeds
+	})
+	defer restoreInstall()
+
+	// when — repair=true
+	checks := session.ExportCheckSkillsRefToolchain(true)
+
+	// then — should be WARN (install succeeded but not on PATH)
+	if len(checks) == 0 {
+		t.Fatal("expected at least one check")
+	}
+	if checks[0].Status == domain.CheckFixed {
+		t.Error("should NOT report FIXED when executable not found on PATH after install")
+	}
+	if checks[0].Status != domain.CheckWarn {
+		t.Errorf("expected CheckWarn, got %v, message: %s", checks[0].Status.StatusLabel(), checks[0].Message)
+	}
+	if !strings.Contains(checks[0].Hint, "PATH") {
+		t.Errorf("hint should mention PATH, got: %s", checks[0].Hint)
 	}
 }
