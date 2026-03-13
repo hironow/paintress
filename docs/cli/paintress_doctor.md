@@ -17,6 +17,8 @@ The context-budget check estimates token consumption per category
 When the threshold (20,000 tokens) is exceeded, a category-specific
 hint recommends adjusting .claude/settings.json.
 
+Use --repair to auto-fix repairable issues (stale PID, missing SKILL.md, etc.).
+
 ```
 paintress doctor [repo-path] [flags]
 ```
@@ -32,12 +34,16 @@ paintress doctor [repo-path] [flags]
 
   # Machine-readable output
   paintress doctor -o json
+
+  # Auto-fix repairable issues
+  paintress doctor --repair
 ```
 
 ### Options
 
 ```
-  -h, --help   help for doctor
+  -h, --help     help for doctor
+      --repair   Auto-fix repairable issues
 ```
 
 ### Options inherited from parent commands
