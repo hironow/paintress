@@ -222,7 +222,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
-			authCheck := checkClaudeAuth(mcpOutput, err)
+			authCheck := checkClaudeAuth(mcpOutput, err, claudeCmd)
 			checks = append(checks, authCheck)
 
 			// Linear MCP: skip if auth failed (mcp list output unreliable)

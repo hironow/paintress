@@ -13,7 +13,7 @@ import (
 
 func TestCheckClaudeAuth_Failed_HasHint(t *testing.T) {
 	// given
-	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"))
+	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"), "claude")
 
 	// when/then
 	if check.Status == domain.CheckOK {
@@ -24,6 +24,22 @@ func TestCheckClaudeAuth_Failed_HasHint(t *testing.T) {
 	}
 	if !strings.Contains(check.Hint, "claude login") {
 		t.Errorf("hint should mention 'claude login', got: %s", check.Hint)
+	}
+}
+
+func TestCheckClaudeAuth_WithEnvPrefix_HasHint(t *testing.T) {
+	// given: env-prefixed command
+	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"), "CLAUDE_CONFIG_DIR=/foo claude")
+
+	// when/then
+	if check.Status == domain.CheckOK {
+		t.Fatal("expected fail")
+	}
+	if !strings.Contains(check.Hint, "CLAUDE_CONFIG_DIR=/foo") {
+		t.Errorf("hint should include env prefix, got: %s", check.Hint)
+	}
+	if !strings.Contains(check.Hint, "login") {
+		t.Errorf("hint should mention login, got: %s", check.Hint)
 	}
 }
 

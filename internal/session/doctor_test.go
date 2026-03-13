@@ -427,7 +427,7 @@ func TestCheckClaudeAuth_Authenticated(t *testing.T) {
 	mcpOutput := "plugin:filesystem:filesystem: /path (stdio) - ✓ Connected\n"
 
 	// when
-	check := session.ExportCheckClaudeAuth(mcpOutput, nil)
+	check := session.ExportCheckClaudeAuth(mcpOutput, nil, "claude")
 
 	// then
 	if check.Status != domain.CheckOK {
@@ -446,7 +446,7 @@ func TestCheckClaudeAuth_Failed(t *testing.T) {
 	mcpErr := fmt.Errorf("exit status 1")
 
 	// when
-	check := session.ExportCheckClaudeAuth("", mcpErr)
+	check := session.ExportCheckClaudeAuth("", mcpErr, "claude")
 
 	// then
 	if check.Status == domain.CheckOK {
