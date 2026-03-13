@@ -1,5 +1,7 @@
 package platform
 
+// white-box-reason: tests internal isProcessAlive logic across platforms (EPERM, invalid PID)
+
 import (
 	"os"
 	"testing"
