@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
@@ -83,12 +84,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// text output — aligned with amadeus/sightjack format
 	w := cmd.ErrOrStderr()
+	logger := platform.NewLogger(w, false)
 	fmt.Fprintln(w, "paintress doctor — environment health check")
 	fmt.Fprintln(w)
 
 	var fails, skips, warns int
 	for _, c := range checks {
-		fmt.Fprintf(w, "  [%-4s] %-16s %s\n", c.Status.StatusLabel(), c.Name, c.Message)
+		label := logger.Colorize(fmt.Sprintf("%-4s", c.Status.StatusLabel()), platform.StatusColor(c.Status))
+		fmt.Fprintf(w, "  [%s] %-16s %s\n", label, c.Name, c.Message)
 		if c.Hint != "" {
 			fmt.Fprintf(w, "         %-16s hint: %s\n", "", c.Hint)
 		}

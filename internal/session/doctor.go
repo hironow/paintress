@@ -179,7 +179,6 @@ func RunDoctor(claudeCmd string, continent string) []domain.DoctorCheck {
 
 				inferCtx, inferCancel := context.WithTimeout(context.Background(), 3*time.Minute)
 				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-				inferCmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 				inferOut, inferErr := inferCmd.Output()
 				inferCancel()
 				inferOutput := string(inferOut)
