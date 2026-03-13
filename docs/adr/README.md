@@ -61,3 +61,5 @@
 | [0010](0010-event-sourcing-with-projections.md) | Event Sourcing with Projections |
 | [0011](0011-usecase-adapter-dependency-inversion.md) | Usecase-Adapter Dependency Inversion |
 | [0012](0012-parse-dont-validate-commands.md) | Parse-Don't-Validate Commands |
+| [0013](0013-preflight-dmail-triage.md) | Preflight D-Mail Triage |
+| [0015](0015-claude-cli-stream-json-requires-verbose.md) | Claude CLI stream-json Requires --verbose |
