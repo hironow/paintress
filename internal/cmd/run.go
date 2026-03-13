@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -210,13 +209,13 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Use command's context (set by ExecuteContext in main)
+	// Use command's context (set by ExecuteContext in main).
+	// Signal handling is done in main.go's two-context pattern;
+	// do NOT register signals here to avoid double-handling.
 	ctx := cmd.Context()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, stop := signal.NotifyContext(ctx, shutdownSignals...)
-	defer stop()
 
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
 	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
