@@ -4,14 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -262,7 +260,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 						Message: "skipped (inference failed)",
 					})
 				} else {
-					checks = append(checks, CheckContextBudget(inferOutput, ""))
+					checks = append(checks, CheckContextBudget(inferOutput, continent))
 				}
 			}
 		}
@@ -276,22 +274,12 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 		pidPath := filepath.Join(continent, domain.StateDir, "watch.pid")
 		if data, err := os.ReadFile(pidPath); err == nil {
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-			if pid > 0 {
-				proc, _ := os.FindProcess(pid)
-				if proc != nil {
-					err := proc.Signal(syscall.Signal(0))
-					if err == nil {
-						// Process is alive and we can signal it — not stale
-					} else if errors.Is(err, syscall.EPERM) {
-						// Process alive, owned by another user — not stale
-					} else {
-						_ = os.Remove(pidPath)
-						checks = append(checks, domain.DoctorCheck{
-							Name: "stale-pid", Status: domain.CheckFixed,
-							Message: "removed stale PID file",
-						})
-					}
-				}
+			if pid > 0 && !platform.IsProcessAlive(pid) {
+				_ = os.Remove(pidPath)
+				checks = append(checks, domain.DoctorCheck{
+					Name: "stale-pid", Status: domain.CheckFixed,
+					Message: "removed stale PID file",
+				})
 			}
 		}
 	}

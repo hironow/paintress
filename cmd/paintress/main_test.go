@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
 	cmd "github.com/hironow/paintress/internal/cmd"
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -140,6 +142,92 @@ func TestVersionCommand_JSONFlag(t *testing.T) {
 				t.Error("JSON output should contain 'commit' key")
 			}
 		})
+	}
+}
+
+func TestHandleError_ExitErrorIsSilent(t *testing.T) {
+	// given: an ExitError wrapping a message
+	exitErr := &cmd.ExitError{Code: 130, Err: fmt.Errorf("interrupted")}
+	buf := new(bytes.Buffer)
+
+	// when: handleError is called
+	code := handleError(exitErr, buf)
+
+	// then: exit code should be preserved but no message printed
+	if code != 130 {
+		t.Errorf("exit code = %d, want 130", code)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no stderr output for ExitError, got %q", buf.String())
+	}
+}
+
+func TestHandleError_SilentErrorIsSilent(t *testing.T) {
+	// given: a SilentError
+	inner := fmt.Errorf("already printed")
+	silentErr := &domain.SilentError{Err: inner}
+	buf := new(bytes.Buffer)
+
+	// when
+	code := handleError(silentErr, buf)
+
+	// then
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no stderr output for SilentError, got %q", buf.String())
+	}
+}
+
+func TestHandleError_RegularErrorPrintsMessage(t *testing.T) {
+	// given: a regular error
+	regularErr := fmt.Errorf("something went wrong")
+	buf := new(bytes.Buffer)
+
+	// when
+	code := handleError(regularErr, buf)
+
+	// then
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if !strings.Contains(buf.String(), "something went wrong") {
+		t.Errorf("expected error message in output, got %q", buf.String())
+	}
+}
+
+func TestHandleError_NilReturnsZero(t *testing.T) {
+	// given
+	buf := new(bytes.Buffer)
+
+	// when
+	code := handleError(nil, buf)
+
+	// then
+	if code != 0 {
+		t.Errorf("exit code = %d, want 0", code)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no output for nil error, got %q", buf.String())
+	}
+}
+
+func TestHandleError_WrappedExitErrorIsSilent(t *testing.T) {
+	// given: ExitError wrapped in another error
+	inner := &cmd.ExitError{Code: 2, Err: fmt.Errorf("deviation")}
+	wrapped := fmt.Errorf("run failed: %w", inner)
+	buf := new(bytes.Buffer)
+
+	// when
+	code := handleError(wrapped, buf)
+
+	// then
+	if code != 2 {
+		t.Errorf("exit code = %d, want 2", code)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("expected no stderr output for wrapped ExitError, got %q", buf.String())
 	}
 }
 
