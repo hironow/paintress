@@ -225,43 +225,43 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 			authCheck := checkClaudeAuth(mcpOutput, err)
 			checks = append(checks, authCheck)
 
+			// Linear MCP: skip if auth failed (mcp list output unreliable)
 			if authCheck.Status != domain.CheckOK {
 				checks = append(checks, domain.DoctorCheck{
 					Name:    "linear-mcp",
 					Status:  domain.CheckSkip,
 					Message: "skipped (auth failed)",
 				})
-				checks = append(checks, domain.DoctorCheck{
-					Name:    "claude-inference",
-					Status:  domain.CheckSkip,
-					Message: "skipped (auth failed)",
-				})
+			} else {
+				checks = append(checks, checkLinearMCP(mcpOutput, err))
+			}
+
+			// Inference: runs independently of mcp list result.
+			// MCP config issues don't affect core inference capability.
+			inferCtx, inferCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
+			// Filter CLAUDECODE only for the doctor inference probe to prevent
+			// nested-session errors. Other subprocesses must preserve CLAUDECODE.
+			if inferCmd.Env != nil {
+				inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
+			} else {
+				inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
+			}
+			inferOut, inferErr := inferCmd.Output()
+			inferCancel()
+			inferOutput := string(inferOut)
+			inferResult := checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
+			checks = append(checks, inferResult)
+
+			// Context budget check: skip if inference failed
+			if inferResult.Status != domain.CheckOK {
 				checks = append(checks, domain.DoctorCheck{
 					Name:    "context-budget",
 					Status:  domain.CheckSkip,
-					Message: "skipped (auth failed)",
+					Message: "skipped (inference failed)",
 				})
 			} else {
-				checks = append(checks, checkLinearMCP(mcpOutput, err))
-
-				inferCtx, inferCancel := context.WithTimeout(context.Background(), 3*time.Minute)
-				inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-				inferOut, inferErr := inferCmd.Output()
-				inferCancel()
-				inferOutput := string(inferOut)
-				inferResult := checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
-				checks = append(checks, inferResult)
-
-				// Context budget check: skip if inference failed
-				if inferResult.Status != domain.CheckOK {
-					checks = append(checks, domain.DoctorCheck{
-						Name:    "context-budget",
-						Status:  domain.CheckSkip,
-						Message: "skipped (inference failed)",
-					})
-				} else {
-					checks = append(checks, CheckContextBudget(inferOutput, continent))
-				}
+				checks = append(checks, CheckContextBudget(inferOutput, continent))
 			}
 		}
 	}
@@ -671,5 +671,3 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		Message: fmt.Sprintf("%s (%d files, %d events OK)", eventsDir, files, lines),
 	}
 }
-
-
