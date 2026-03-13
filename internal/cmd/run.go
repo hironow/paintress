@@ -226,7 +226,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	logger.Info("paintress run: starting initial expedition cycle...")
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
-		return ucErr
+		return tryWriteHandover(ctx, ucErr, continent, "expedition cycle (initial)", logger)
 	}
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
@@ -248,7 +248,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	for {
 		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
 		if waitErr != nil {
-			return waitErr
+			return tryWriteHandover(ctx, waitErr, continent, "D-Mail waiting phase", logger)
 		}
 		if !arrived {
 			return nil // timeout or cancel → clean exit
@@ -259,7 +259,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
 		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 		if ucErr != nil {
-			return ucErr
+			return tryWriteHandover(ctx, ucErr, continent, "expedition cycle (D-Mail re-run)", logger)
 		}
 		if exitCode != 0 {
 			return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
