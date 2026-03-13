@@ -46,7 +46,7 @@ func TestContextBudget_InitOnly(t *testing.T) {
 			Subtype: "init",
 			Tools:   []string{"Read", "Write", "Bash", "mcp__deepwiki__ask"},
 			Skills:  []string{"commit", "review-pr", "debug"},
-			Plugins: []string{"superpowers", "linear"},
+			Plugins: []PluginInfo{{Name: "superpowers"}, {Name: "linear"}},
 			MCPServers: []MCPServerInfo{
 				{Name: "deepwiki", Status: "connected"},
 				{Name: "linear", Status: "connected"},
@@ -118,7 +118,7 @@ func TestContextBudget_InitPlusHooks(t *testing.T) {
 			Subtype: "init",
 			Tools:   []string{"Read", "Write"},
 			Skills:  []string{"commit"},
-			Plugins: []string{"superpowers"},
+			Plugins: []PluginInfo{{Name: "superpowers"}},
 			MCPServers: []MCPServerInfo{
 				{Name: "deepwiki", Status: "connected"},
 			},
