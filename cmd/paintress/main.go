@@ -3,38 +3,71 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/signal"
 
-	"github.com/hironow/paintress/internal/cmd"
+	cmd "github.com/hironow/paintress/internal/cmd"
 	"github.com/hironow/paintress/internal/domain"
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(),
-		shutdownSignals...)
-	defer stop()
+	os.Exit(run())
+}
+
+func run() int {
+	// Two-context pattern for graceful shutdown with handover.
+	// 1st signal: cancel workCtx → interrupt active work, write handover.
+	// 2nd signal: cancel outerCtx → abort handover, let defers run.
+	outerCtx, outerCancel := context.WithCancel(context.Background())
+	defer outerCancel()
+
+	workCtx, workCancel := context.WithCancel(outerCtx)
+	defer workCancel()
+
+	sigCh := make(chan os.Signal, 2)
+	signal.Notify(sigCh, shutdownSignals...)
+	defer signal.Stop(sigCh)
+
+	go func() {
+		<-sigCh        // 1st signal: cancel work
+		workCancel()
+		<-sigCh        // 2nd signal: cancel outer (NO os.Exit!)
+		outerCancel()
+	}()
+
+	// Embed outerCtx in workCtx so commands can retrieve it for handover writing.
+	workCtx = context.WithValue(workCtx, domain.ShutdownKey, outerCtx)
 
 	rootCmd := cmd.NewRootCommand()
-
-	// NOTE: RewriteBoolFlags was intentionally removed (MY-334).
-	// Space-separated bool values (e.g. `--dry-run false`) are no longer
-	// normalised. Use `--dry-run=false` instead. This aligns with
-	// POSIX/GNU conventions and matches kubectl/gh/docker behaviour.
-
-	// Preserve old `paintress [flags] <repo>` shorthand:
-	// prepend "run" when no subcommand is specified.
 	args := os.Args[1:]
 	if cmd.NeedsDefaultRun(rootCmd, args) {
 		args = append([]string{"run"}, args...)
 	}
 	rootCmd.SetArgs(args)
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		var exitErr *cmd.ExitError
-		if errors.As(err, &exitErr) {
-			os.Exit(exitErr.Code)
-		}
-		os.Exit(domain.ExitCode(err))
+	err := rootCmd.ExecuteContext(workCtx)
+
+	// Signal-induced context cancellation is not an application error.
+	// Exit with 128+SIGINT=130 per UNIX convention instead of printing
+	// "error: context canceled" and exiting with code 1.
+	if err != nil && errors.Is(err, context.Canceled) && workCtx.Err() != nil {
+		return 130
 	}
+
+	return handleError(err, os.Stderr)
+}
+
+// handleError processes an error from command execution, printing to w only
+// when the error is not silent. Returns the appropriate exit code.
+func handleError(err error, w io.Writer) int {
+	if err != nil {
+		var exitErr *cmd.ExitError
+		var silent *domain.SilentError
+		if !errors.As(err, &exitErr) && !errors.As(err, &silent) {
+			fmt.Fprintf(w, "error: %v\n", err)
+		}
+	}
+	return domain.ExitCode(err)
 }

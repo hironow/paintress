@@ -7,15 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 )
 
 func TestCheckClaudeAuth_Failed_HasHint(t *testing.T) {
 	// given
-	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"))
+	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"), "claude")
 
 	// when/then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -23,6 +24,22 @@ func TestCheckClaudeAuth_Failed_HasHint(t *testing.T) {
 	}
 	if !strings.Contains(check.Hint, "claude login") {
 		t.Errorf("hint should mention 'claude login', got: %s", check.Hint)
+	}
+}
+
+func TestCheckClaudeAuth_WithEnvPrefix_HasHint(t *testing.T) {
+	// given: env-prefixed command
+	check := session.ExportCheckClaudeAuth("", fmt.Errorf("exit status 1"), "CLAUDE_CONFIG_DIR=/foo claude")
+
+	// when/then
+	if check.Status == domain.CheckOK {
+		t.Fatal("expected fail")
+	}
+	if !strings.Contains(check.Hint, "CLAUDE_CONFIG_DIR=/foo") {
+		t.Errorf("hint should include env prefix, got: %s", check.Hint)
+	}
+	if !strings.Contains(check.Hint, "login") {
+		t.Errorf("hint should mention login, got: %s", check.Hint)
 	}
 }
 
@@ -34,7 +51,7 @@ func TestCheckLinearMCP_NotConnected_HasHint(t *testing.T) {
 	check := session.ExportCheckLinearMCP(mcpOutput, nil)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -50,10 +67,10 @@ func TestCheckContinent_Missing_HasHint(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	check := session.ExportCheckContinent(dir)
+	check := session.ExportCheckContinent(dir, false)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -73,7 +90,7 @@ func TestCheckConfig_Missing_HasHint(t *testing.T) {
 	check := session.ExportCheckConfig(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -92,7 +109,7 @@ func TestCheckGitRepo_NotRepo_HasHint(t *testing.T) {
 	check := session.ExportCheckGitRepo(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -111,7 +128,7 @@ func TestCheckWritability_NotWritable_HasHint(t *testing.T) {
 	check := session.ExportCheckWritability(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -128,7 +145,7 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 	check := session.ExportCheckSkills(dir)
 
 	// then
-	if check.OK {
+	if check.Status == domain.CheckOK {
 		t.Fatal("expected fail")
 	}
 	if check.Hint == "" {
@@ -141,11 +158,11 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 
 func TestRunDoctor_BinaryNotFound_HasHint(t *testing.T) {
 	// given: use a nonexistent claude command
-	checks := session.RunDoctor("nonexistent-claude-xyz-99999", "")
+	checks := session.RunDoctor("nonexistent-claude-xyz-99999", "", false)
 
 	// then: the claude check should have a hint
 	for _, c := range checks {
-		if c.Name == "nonexistent-claude-xyz-99999" && !c.OK && c.Required {
+		if c.Name == "nonexistent-claude-xyz-99999" && c.Status == domain.CheckFail {
 			if c.Hint == "" {
 				t.Error("expected hint for missing required binary")
 			}

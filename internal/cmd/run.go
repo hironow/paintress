@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -210,13 +209,13 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Use command's context (set by ExecuteContext in main)
+	// Use command's context (set by ExecuteContext in main).
+	// Signal handling is done in main.go's two-context pattern;
+	// do NOT register signals here to avoid double-handling.
 	ctx := cmd.Context()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, stop := signal.NotifyContext(ctx, shutdownSignals...)
-	defer stop()
 
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
 	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
@@ -227,7 +226,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	logger.Info("paintress run: starting initial expedition cycle...")
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
-		return ucErr
+		return tryWriteHandover(ctx, ucErr, continent, "expedition cycle (initial)", logger)
 	}
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
@@ -249,7 +248,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	for {
 		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
 		if waitErr != nil {
-			return waitErr
+			return tryWriteHandover(ctx, waitErr, continent, "D-Mail waiting phase", logger)
 		}
 		if !arrived {
 			return nil // timeout or cancel → clean exit
@@ -260,7 +259,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
 		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 		if ucErr != nil {
-			return ucErr
+			return tryWriteHandover(ctx, ucErr, continent, "expedition cycle (D-Mail re-run)", logger)
 		}
 		if exitCode != 0 {
 			return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}

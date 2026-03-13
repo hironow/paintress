@@ -53,7 +53,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	if len(rc.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
-	args = append(args, "--output-format", "stream-json")
+	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 
 	cmd := platform.NewShellCmd(ctx, a.ClaudeCmd, args...)
@@ -61,6 +61,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		cmd.Dir = rc.WorkDir
 	}
 	cmd.WaitDelay = 3 * time.Second
+
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -102,8 +105,20 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		}
 	}
 
+	// Log captured stderr at debug level; suppress raw NDJSON from errors.
+	if stderrBuf.Len() > 0 && a.Logger != nil {
+		a.Logger.Debug("claude stderr:\n%s", stderrBuf.String())
+	}
+
 	if waitErr := cmd.Wait(); waitErr != nil {
 		span.RecordError(waitErr)
+		diagnostic := stderrBuf.String()
+		if diagnostic != "" {
+			if platform.IsNDJSON(diagnostic) {
+				diagnostic = platform.SummarizeNDJSON(diagnostic)
+			}
+			return output.String(), fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
+		}
 		return output.String(), fmt.Errorf("claude exit: %w", waitErr)
 	}
 	if streamErr != nil {

@@ -45,7 +45,8 @@ func NewRootCommand() *cobra.Command {
 		Long:    "The Paintress — drives the Expedition loop for Claude Code.",
 		Version: Version,
 		// Silence usage on RunE errors (cobra prints usage by default on error)
-		SilenceUsage: true,
+		SilenceUsage:  true,
+		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output [permanent]
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(domain.StateDir)
 			noColor, _ := cmd.Flags().GetBool("no-color")
