@@ -38,7 +38,7 @@ func initPaintressProject(t *testing.T, dir string) {
 
 func runDoctorJSON(t *testing.T, dir string, repair bool) doctorJSONOutput {
 	t.Helper()
-	args := []string{"doctor", "--json"}
+	args := []string{"doctor", "--output", "json"}
 	if repair {
 		args = append(args, "--repair")
 	}

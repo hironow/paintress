@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -169,7 +170,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 		checks = append(checks, checkGitRemote(continent))
 		checks = append(checks, checkWritability(continent))
 		skillResult := checkSkills(continent)
-		if repair && skillResult.Status == domain.CheckFail {
+		if repair && (skillResult.Status == domain.CheckFail || skillResult.Status == domain.CheckWarn) {
 			if err := generateSkillsFn(continent); err == nil {
 				recheck := checkSkills(continent)
 				if recheck.Status == domain.CheckOK {
@@ -277,12 +278,19 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
 			if pid > 0 {
 				proc, _ := os.FindProcess(pid)
-				if proc == nil || proc.Signal(syscall.Signal(0)) != nil {
-					_ = os.Remove(pidPath)
-					checks = append(checks, domain.DoctorCheck{
-						Name: "stale-pid", Status: domain.CheckFixed,
-						Message: "removed stale PID file",
-					})
+				if proc != nil {
+					err := proc.Signal(syscall.Signal(0))
+					if err == nil {
+						// Process is alive and we can signal it — not stale
+					} else if errors.Is(err, syscall.EPERM) {
+						// Process alive, owned by another user — not stale
+					} else {
+						_ = os.Remove(pidPath)
+						checks = append(checks, domain.DoctorCheck{
+							Name: "stale-pid", Status: domain.CheckFixed,
+							Message: "removed stale PID file",
+						})
+					}
 				}
 			}
 		}
