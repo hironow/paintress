@@ -153,6 +153,27 @@ func TestRunCmd_FailsWithoutInit(t *testing.T) {
 	}
 }
 
+func TestRunCommand_WaitTimeoutFlag(t *testing.T) {
+	// given
+	root := cmd.NewRootCommand()
+	runCmd, _, err := root.Find([]string{"run"})
+	if err != nil {
+		t.Fatalf("find run command: %v", err)
+	}
+
+	// when
+	f := runCmd.Flags().Lookup("wait-timeout")
+
+	// then
+	if f == nil {
+		t.Fatal("--wait-timeout flag not found on run command")
+	}
+	// Default is domain.DefaultWaitTimeout = 30m0s
+	if f.DefValue != "30m0s" {
+		t.Errorf("--wait-timeout default = %q, want %q", f.DefValue, "30m0s")
+	}
+}
+
 func TestRunCommand_DynamicReviewCmd(t *testing.T) {
 	// given: --base-branch set but --review-cmd not set
 	root := cmd.NewRootCommand()
