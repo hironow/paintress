@@ -16,6 +16,11 @@ func newRebuildCommand() *cobra.Command {
 		Long: `Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.
 
 If path is omitted, the current working directory is used.`,
+		Example: `  # Rebuild projections for the current directory
+  paintress rebuild
+
+  # Rebuild projections for a specific project
+  paintress rebuild /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot, err := resolveRepoPath(args)

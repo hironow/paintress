@@ -10,6 +10,19 @@ Delete the .expedition/ directory to reset to a clean state. Use 'paintress init
 paintress clean [path] [flags]
 ```
 
+### Examples
+
+```
+  # Clean the current directory
+  paintress clean
+
+  # Clean a specific project
+  paintress clean /path/to/repo
+
+  # Skip confirmation prompt
+  paintress clean --yes
+```
+
 ### Options
 
 ```
@@ -28,5 +41,4 @@ paintress clean [path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
-
+* [paintress](paintress.md)  - Claude Code expedition orchestrator

@@ -28,6 +28,9 @@ paintress archive-prune [path] [flags]
 
   # JSON output for scripting
   paintress archive-prune -o json /path/to/repo
+
+  # Rebuild archive index from existing files
+  paintress archive-prune --rebuild-index
 ```
 
 ### Options
@@ -52,5 +55,4 @@ paintress archive-prune [path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
-
+* [paintress](paintress.md)  - Claude Code expedition orchestrator

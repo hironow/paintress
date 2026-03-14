@@ -242,109 +242,32 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 
 ## Subcommands
 
-Running `paintress` without a subcommand defaults to `run` (expedition loop). This is the primary operation — picking Linear issues, implementing code, and opening PRs autonomously.
+Running `paintress` without a subcommand defaults to `run` (expedition loop).
 
 | Command | Description |
 |---------|-------------|
-| `paintress [path]` | Run expedition loop (default, `run` subcommand implied) |
-| `paintress init [path]` | Initialize `.expedition/config.yaml` interactively (`--force` to regenerate) |
-| `paintress doctor [path]` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint, context-budget (per-item diagnostics) |
-| `paintress issues [path]` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
-| `paintress config show [path]` | Display project configuration |
-| `paintress config set <key> <value> [path]` | Update a configuration value (e.g. `tracker.team`, `tracker.project`) |
-| `paintress status [path]` | Show paintress operational status |
-| `paintress clean [path]` | Remove state directory (`.expedition/`) |
-| `paintress rebuild [path]` | Rebuild projections from event store |
-| `paintress archive-prune [path]` | Prune old archived d-mails (`-d 14` for days, `-x` to execute, `--rebuild-index` to rebuild JSONL index) |
-| `paintress version` | Show version, commit, date, and Go version (`-j` for JSON) |
-| `paintress update` | Self-update to the latest GitHub release (`-C` to check only) |
+| `run` | Run expedition loop (default) |
+| `init` | Initialize `.expedition/config.yaml` |
+| `doctor` | Check environment health |
+| `issues` | Query Linear issues via Claude MCP |
+| `config show` / `config set` | View or update configuration |
+| `status` | Show operational status |
+| `clean` | Remove state directory |
+| `rebuild` | Rebuild projections from event store |
+| `archive-prune` | Prune old archived D-Mail files |
+| `version` | Print version info |
+| `update` | Self-update to the latest release |
 
-## Usage
+All commands accept an optional `[path]` argument (defaults to cwd). For flags, examples, and full reference per subcommand, see [docs/cli/](docs/cli/).
 
-All commands accept an optional `[path]` argument. When omitted, the current working directory is used.
-
-```bash
-# Run from the repo directory (cwd fallback)
-cd /path/to/repo
-paintress run
-
-# Or specify the path explicitly
-paintress run /path/to/repo
-
-# Flags support GNU/POSIX long (--flag) and short (-f) forms
-paintress run -m opus,sonnet       # short flag
-paintress run --model=opus         # --flag=value form
-```
+## Quick Start
 
 ```bash
-# Basic (Opus only, English prompts)
-paintress run
-
-# Japanese prompts
-paintress run -l ja
-
-# With Reserve Party
-paintress run -m opus,sonnet
-
-# Swarm Mode: 3 parallel workers with setup command
-paintress run -m opus,sonnet -w 3 --setup-cmd "bun install"
-
-# Skip dev server (CLI tools, backend-only repos)
-paintress run --no-dev
-
-# Dry run (generate prompts only)
-paintress run -n
-
-# Prune archived d-mails (dry-run, then execute)
-paintress archive-prune
-paintress archive-prune -d 14 -x
-paintress archive-prune --rebuild-index  # rebuild archive index
-
-# Skip code review gate
-paintress run --review-cmd ""
-
-# Notify via ntfy.sh when HIGH severity D-Mail arrives
-paintress run --notify-cmd 'curl -d "{message}" ntfy.sh/paintress'
-
-# Skip approval gate (CI/automated runs)
-paintress run --auto-approve
-
-# Custom waiting timeout (0 = 24h safety cap, negative = disable waiting)
-paintress run --wait-timeout 1h
-
-# Disable D-Mail waiting (exit immediately after expeditions)
-paintress run --wait-timeout -1s
-
-# Custom approval script
-paintress run --approve-cmd './scripts/approve.sh "{message}"'
-
-# All options
-paintress run \
-  -m opus,sonnet,haiku \
-  -l ja \
-  --max-expeditions 20 \
-  -t 1200 \
-  -w 3 \
-  --setup-cmd "bun install" \
-  --dev-cmd "pnpm dev" \
-  --dev-dir /path/to/frontend \
-  --dev-url "http://localhost:3000" \
-  --review-cmd "codex review --base main" \
-  --wait-timeout 30m
+paintress init                          # set up .expedition/
+paintress run                           # expedition loop
+paintress run -n                        # dry run
+paintress run -m opus,sonnet -w 3       # swarm mode
 ```
-
-## Options
-
-### Global Flags
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--verbose` | `-v` | `false` | Enable verbose output |
-| `--output` | `-o` | `text` | Output format: `text` or `json` |
-| `--lang` | `-l` | `en` | Prompt language: `en`, `ja`, or `fr` |
-| `--version` | | | Show version and exit |
-
-For full flag reference per subcommand, see [docs/cli/](docs/cli/).
 
 ## Configuration
 

@@ -12,6 +12,16 @@ If path is omitted, the current working directory is used.
 paintress rebuild [path] [flags]
 ```
 
+### Examples
+
+```
+  # Rebuild projections for the current directory
+  paintress rebuild
+
+  # Rebuild projections for a specific project
+  paintress rebuild /path/to/repo
+```
+
 ### Options
 
 ```
@@ -29,5 +39,4 @@ paintress rebuild [path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
-
+* [paintress](paintress.md)  - Claude Code expedition orchestrator

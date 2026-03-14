@@ -33,7 +33,10 @@ git-tracked, so deletions should be reviewed and committed.`,
   paintress archive-prune --days 14 --execute /path/to/repo
 
   # JSON output for scripting
-  paintress archive-prune -o json /path/to/repo`,
+  paintress archive-prune -o json /path/to/repo
+
+  # Rebuild archive index from existing files
+  paintress archive-prune --rebuild-index`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			days, _ := cmd.Flags().GetInt("days")
