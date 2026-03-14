@@ -26,7 +26,7 @@ func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, contine
 		Who:         fmt.Sprintf("paintress Gommage policy, expedition #%d", expedition),
 		Constraints: "Counter resets on next success",
 		Extra: map[string]string{
-			"failure-type":  "gommage",
+			"failure-type":   "gommage",
 			"gradient-level": "0",
 		},
 	}

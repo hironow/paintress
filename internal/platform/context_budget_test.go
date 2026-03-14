@@ -156,8 +156,8 @@ func TestContextBudget_IgnoresNonSystemMessages(t *testing.T) {
 			Type: "assistant",
 		},
 		{
-			Type:    "result",
-			Result:  "some result",
+			Type:   "result",
+			Result: "some result",
 		},
 	}
 

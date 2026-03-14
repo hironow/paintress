@@ -33,9 +33,9 @@ type Config struct {
 	SetupCmd       string // Command to run after worktree creation (e.g. "bun install")
 	NoDev          bool   // Skip dev server startup entirely
 	DryRun         bool
-	OutputFormat   string // "text" (default) or "json"
-	NotifyCmd      string // External notification command ({title}, {message} placeholders)
-	ApproveCmd     string // External approval command ({message} placeholder, exit 0 = approve)
+	OutputFormat   string        // "text" (default) or "json"
+	NotifyCmd      string        // External notification command ({title}, {message} placeholders)
+	ApproveCmd     string        // External approval command ({message} placeholder, exit 0 = approve)
 	AutoApprove    bool          // Skip approval gate for HIGH severity D-Mail
 	MaxRetries     int           // Maximum retry attempts per unique issue set (default: 3)
 	WaitTimeout    time.Duration `yaml:"wait_timeout,omitempty"` // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)

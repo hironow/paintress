@@ -266,19 +266,19 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
 		if waitErr != nil {
 			return tryWriteHandover(ctx, waitErr, continent, domain.HandoverState{
-				Tool:       "paintress",
-				Operation:  "expedition",
-				InProgress: "D-Mail waiting phase",
-				Completed:  []string{"Initial expedition cycle completed"},
+				Tool:         "paintress",
+				Operation:    "expedition",
+				InProgress:   "D-Mail waiting phase",
+				Completed:    []string{"Initial expedition cycle completed"},
 				PartialState: map[string]string{"Phase": "waiting"},
 			}, logger)
 		}
 		if !arrived {
 			writeHandoverOnCancel(ctx, continent, domain.HandoverState{
-				Tool:       "paintress",
-				Operation:  "expedition",
-				InProgress: "D-Mail waiting phase (clean exit on Ctrl+C)",
-				Completed:  []string{"Initial expedition cycle completed"},
+				Tool:         "paintress",
+				Operation:    "expedition",
+				InProgress:   "D-Mail waiting phase (clean exit on Ctrl+C)",
+				Completed:    []string{"Initial expedition cycle completed"},
 				PartialState: map[string]string{"Phase": "waiting-cancelled"},
 			}, logger)
 			return nil
