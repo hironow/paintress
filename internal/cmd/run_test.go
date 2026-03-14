@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -10,6 +11,13 @@ import (
 
 func TestRunCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given: no args → falls back to cwd (may error on business logic, not on arg validation)
+	// Use an empty tempdir as cwd so the command hits "not initialized" quickly
+	// instead of running actual business logic when .expedition/ exists in the real cwd.
+	origDir, _ := os.Getwd()
+	dir := t.TempDir()
+	os.Chdir(dir)
+	t.Cleanup(func() { os.Chdir(origDir) })
+
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
@@ -19,7 +27,8 @@ func TestRunCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// when
 	err := root.Execute()
 
-	// then: should NOT fail with "accepts 1 arg" — cwd fallback is used
+	// then: should NOT fail with "accepts 1 arg" — cwd fallback is used.
+	// It will fail with "not initialized" which is expected (business logic, not arg validation).
 	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
 		t.Errorf("run should accept zero args with cwd fallback, got: %v", err)
 	}

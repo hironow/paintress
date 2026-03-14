@@ -8,11 +8,18 @@ import (
 
 	"github.com/hironow/paintress/internal/cmd"
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/spf13/cobra"
 )
 
 func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given — no repo-path arg; resolveRepoPath falls back to os.Getwd()
-	// The cwd may or may not have .expedition/, so we just verify no args-validation error.
+	// Use a tempdir as cwd so init hits "already exists" (if seeded) or succeeds
+	// without polluting the real working directory with .expedition/.
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	t.Cleanup(func() { os.Chdir(origDir) })
+
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
@@ -27,7 +34,6 @@ func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
 		t.Fatalf("init should accept 0 args (cwd fallback), got: %v", err)
 	}
-	// May fail with "already exists" (cwd has .expedition/) — that's fine.
 }
 
 func TestInitCommand_AlreadyInitialized(t *testing.T) {
@@ -259,5 +265,29 @@ func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "accepts") && strings.Contains(err.Error(), "arg") {
 		t.Fatalf("init should accept repo-path arg: %v", err)
+	}
+}
+
+func TestInitCommand_OtelFlags_Exist(t *testing.T) {
+	// given
+	root := cmd.NewRootCommand()
+
+	// when — find init subcommand
+	var initCmd *cobra.Command
+	for _, sub := range root.Commands() {
+		if sub.Name() == "init" {
+			initCmd = sub
+			break
+		}
+	}
+	if initCmd == nil {
+		t.Fatal("init subcommand not found")
+	}
+
+	// then — otel flags exist
+	for _, flag := range []string{"otel-backend", "otel-entity", "otel-project"} {
+		if initCmd.Flags().Lookup(flag) == nil {
+			t.Errorf("init flag --%s not found", flag)
+		}
 	}
 }
