@@ -207,7 +207,7 @@ func initGitRepo(t *testing.T) string {
 		{"git", "commit", "--allow-empty", "-m", "init"},
 		{"git", "remote", "add", "origin", "https://example.com/repo.git"},
 	} {
-		c := exec.Command(args[0], args[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command — static test fixture args only
+		c := exec.Command(args[0], args[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command — static test fixture args only [permanent]
 		c.Dir = dir
 		if out, err := c.CombinedOutput(); err != nil {
 			t.Fatalf("git setup %v failed: %v\n%s", args, err, out)
