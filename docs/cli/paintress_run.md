@@ -11,10 +11,10 @@ invokes Claude Code to implement the change, opens a pull request,
 and optionally runs a review cycle. The loop continues until
 max-expeditions is reached or the issue queue is empty.
 
-If repo-path is omitted, the current working directory is used.
+If path is omitted, the current working directory is used.
 
 ```
-paintress run [repo-path] [flags]
+paintress run [path] [flags]
 ```
 
 ### Examples
@@ -70,4 +70,5 @@ paintress run [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+

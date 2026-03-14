@@ -6,13 +6,13 @@ Initialize project configuration
 
 Initialize a .expedition/ directory in the target repository.
 
-If repo-path is omitted, the current working directory is used.
+If path is omitted, the current working directory is used.
 Use --team and --project flags for non-interactive mode, or omit
 flags for interactive prompts. This must be run once before
 'paintress run' can operate on the repository.
 
 ```
-paintress init [repo-path] [flags]
+paintress init [path] [flags]
 ```
 
 ### Examples
@@ -51,4 +51,5 @@ paintress init [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+

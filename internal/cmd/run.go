@@ -15,7 +15,7 @@ import (
 
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run [repo-path]",
+		Use:   "run [path]",
 		Short: "Run the expedition loop",
 		Long: `Run the expedition loop against a target repository.
 
@@ -24,7 +24,7 @@ invokes Claude Code to implement the change, opens a pull request,
 and optionally runs a review cycle. The loop continues until
 max-expeditions is reached or the issue queue is empty.
 
-If repo-path is omitted, the current working directory is used.`,
+If path is omitted, the current working directory is used.`,
 		Example: `  # Run with defaults from current directory
   paintress run
 

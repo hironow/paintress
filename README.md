@@ -100,7 +100,7 @@ Paintress communicates with external tools (phonewave, sightjack, amadeus) via t
 - **HIGH Severity Gate**: HIGH severity d-mails trigger desktop notification + human approval before the expedition starts. See [docs/approval-contract.md](docs/approval-contract.md).
 - **Skills**: Agent skill manifests (`SKILL.md`) in `.expedition/skills/` follow the [Agent Skills](https://agentskills.io) specification, declaring D-Mail capabilities under `metadata`.
 
-**BREAKING**: The `feedback` kind has been split into `design-feedback` and `implementation-feedback`. Paintress consumes `implementation-feedback` (not the old `feedback`). Run `paintress doctor` to detect deprecated kinds and `paintress init --force <repo-path>` to regenerate SKILL.md files.
+**BREAKING**: The `feedback` kind has been split into `design-feedback` and `implementation-feedback`. Paintress consumes `implementation-feedback` (not the old `feedback`). Run `paintress doctor` to detect deprecated kinds and `paintress init --force [path]` to regenerate SKILL.md files.
 
 Full protocol details: **[docs/dmail-protocol.md](docs/dmail-protocol.md)** | Directory structure: **[docs/expedition-directory.md](docs/expedition-directory.md)**
 
@@ -246,22 +246,22 @@ Running `paintress` without a subcommand defaults to `run` (expedition loop). Th
 
 | Command | Description |
 |---------|-------------|
-| `paintress <repo-path>` | Run expedition loop (default, `run` subcommand implied) |
-| `paintress init <repo-path>` | Initialize `.expedition/config.yaml` interactively (`--force` to regenerate) |
-| `paintress doctor` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint, context-budget (per-item diagnostics) |
-| `paintress issues <repo-path>` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
-| `paintress config show [repo-path]` | Display project configuration |
-| `paintress config set <key> <value> [repo-path]` | Update a configuration value (e.g. `tracker.team`, `tracker.project`) |
-| `paintress status [repo-path]` | Show paintress operational status |
-| `paintress clean <repo-path>` | Remove state directory (`.expedition/`) |
-| `paintress rebuild <repo-path>` | Rebuild projections from event store |
-| `paintress archive-prune [repo-path]` | Prune old archived d-mails (`-d 14` for days, `-x` to execute, `--rebuild-index` to rebuild JSONL index) |
+| `paintress [path]` | Run expedition loop (default, `run` subcommand implied) |
+| `paintress init [path]` | Initialize `.expedition/config.yaml` interactively (`--force` to regenerate) |
+| `paintress doctor [path]` | Check commands, git-remote, deprecated kind detection, Docker CLAUDE_CONFIG_DIR hint, context-budget (per-item diagnostics) |
+| `paintress issues [path]` | Query Linear issues via Claude MCP (`-o json` for JSON, `-s` to filter by state) |
+| `paintress config show [path]` | Display project configuration |
+| `paintress config set <key> <value> [path]` | Update a configuration value (e.g. `tracker.team`, `tracker.project`) |
+| `paintress status [path]` | Show paintress operational status |
+| `paintress clean [path]` | Remove state directory (`.expedition/`) |
+| `paintress rebuild [path]` | Rebuild projections from event store |
+| `paintress archive-prune [path]` | Prune old archived d-mails (`-d 14` for days, `-x` to execute, `--rebuild-index` to rebuild JSONL index) |
 | `paintress version` | Show version, commit, date, and Go version (`-j` for JSON) |
 | `paintress update` | Self-update to the latest GitHub release (`-C` to check only) |
 
 ## Usage
 
-All commands accept an optional `[repo-path]` argument. When omitted, the current working directory is used.
+All commands accept an optional `[path]` argument. When omitted, the current working directory is used.
 
 ```bash
 # Run from the repo directory (cwd fallback)

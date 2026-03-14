@@ -11,11 +11,11 @@ import (
 
 func newRebuildCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "rebuild [repo-path]",
+		Use:   "rebuild [path]",
 		Short: "Rebuild projections from event store",
 		Long: `Replays all events from .expedition/events/ to regenerate materialized projection state from scratch.
 
-If repo-path is omitted, the current working directory is used.`,
+If path is omitted, the current working directory is used.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot, err := resolveRepoPath(args)

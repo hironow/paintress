@@ -7,7 +7,7 @@ Run health checks
 Check environment health and tool availability.
 
 Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and docker.
-When repo-path is provided (or defaults to current directory), also checks
+When path is provided (or defaults to current directory), also checks
 .expedition/ structure, skills, config, and computes success rate metrics.
 Each check reports one of four statuses: OK (passed), FAIL (exit 1),
 SKIP (dependency missing), WARN (advisory, exit 0).
@@ -20,7 +20,7 @@ hint recommends adjusting .claude/settings.json.
 Use --repair to auto-fix repairable issues (stale PID, missing SKILL.md, etc.).
 
 ```
-paintress doctor [repo-path] [flags]
+paintress doctor [path] [flags]
 ```
 
 ### Examples
@@ -57,4 +57,5 @@ paintress doctor [repo-path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+
