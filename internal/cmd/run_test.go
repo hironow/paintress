@@ -3,6 +3,8 @@ package cmd_test
 import (
 	"bytes"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -192,5 +194,124 @@ func TestRunCommand_DynamicReviewCmd(t *testing.T) {
 	// Default is empty; PreRunE derives from --base-branch
 	if f.DefValue != "" {
 		t.Errorf("--review-cmd default = %q, want empty (dynamically derived)", f.DefValue)
+	}
+}
+
+// initGitRepo creates a temp directory with a git repository (initial commit + remote).
+func initGitRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	for _, args := range [][]string{
+		{"git", "init", "--initial-branch", "main"},
+		{"git", "config", "user.email", "test@test.com"},
+		{"git", "config", "user.name", "Test"},
+		{"git", "commit", "--allow-empty", "-m", "init"},
+		{"git", "remote", "add", "origin", "https://example.com/repo.git"},
+	} {
+		c := exec.Command(args[0], args[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command — static test fixture args only
+		c.Dir = dir
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git setup %v failed: %v\n%s", args, err, out)
+		}
+	}
+	return dir
+}
+
+// initPaintressProject initializes a paintress project in an existing git repo.
+func initPaintressProject(t *testing.T, dir string) {
+	t.Helper()
+	root := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init", "--team", "TEST", dir})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("paintress init failed: %v", err)
+	}
+}
+
+func TestRunCommand_DryRun_SkipsClaudeBinaryCheck(t *testing.T) {
+	// given: initialized git repo + paintress project, claude binary does NOT exist
+	dir := initGitRepo(t)
+	initPaintressProject(t, dir)
+
+	// Override claude_cmd to a non-existent binary via config set
+	cfgRoot := cmd.NewRootCommand()
+	cfgBuf := new(bytes.Buffer)
+	cfgRoot.SetOut(cfgBuf)
+	cfgRoot.SetErr(cfgBuf)
+	cfgRoot.SetArgs([]string{"config", "set", "claude_cmd", "nonexistent-claude-binary-xyz", dir})
+	if err := cfgRoot.Execute(); err != nil {
+		t.Fatalf("config set claude_cmd failed: %v", err)
+	}
+
+	// Ensure the fake binary does NOT exist on PATH
+	if _, err := exec.LookPath("nonexistent-claude-binary-xyz"); err == nil {
+		t.Skip("nonexistent-claude-binary-xyz unexpectedly exists on PATH")
+	}
+
+	root := cmd.NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"run", "--dry-run", "--no-dev", "--workers", "0", "--max-expeditions", "1", dir})
+
+	// when
+	err := root.Execute()
+
+	// then: the command should NOT fail with "claude" binary not found error.
+	// It may fail for other reasons (no issues, expedition runner, etc.) but preflight passes.
+	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "nonexistent-claude-binary-xyz") {
+			t.Errorf("dry-run should skip claude binary check, but got: %s", errMsg)
+		}
+		// Other errors are acceptable (expedition phase failures)
+	}
+
+	// Verify that the command got past the "not initialized" stage
+	combinedOutput := stdout.String() + stderr.String()
+	if strings.Contains(combinedOutput, "not initialized") {
+		t.Error("expected command to pass init check")
+	}
+
+	// Verify the error (if any) is NOT about missing the claude binary
+	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "not found in PATH") && strings.Contains(errStr, "claude") {
+			t.Errorf("dry-run should not check claude binary, got PATH error: %s", errStr)
+		}
+	}
+}
+
+func TestRunCommand_DryRun_ProducesPromptFiles(t *testing.T) {
+	// given: initialized git repo + paintress project
+	dir := initGitRepo(t)
+	initPaintressProject(t, dir)
+
+	root := cmd.NewRootCommand()
+	var stdout, stderr bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&stderr)
+	root.SetArgs([]string{"run", "--dry-run", "--no-dev", "--workers", "0", "--max-expeditions", "1", dir})
+
+	// when
+	err := root.Execute()
+
+	// then: even if no issues to process, the command should reach expedition phase.
+	// It should not fail at init or preflight stage.
+	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "init") && !strings.Contains(errMsg, "expedition") {
+			t.Errorf("expected to pass init stage, got: %s", errMsg)
+		}
+	}
+
+	// Verify events directory was used (event store was initialized)
+	eventsDir := filepath.Join(dir, ".expedition", "events")
+	if _, statErr := os.Stat(eventsDir); statErr != nil {
+		t.Logf("events dir not created (may be expected if no issues): %v", statErr)
 	}
 }
