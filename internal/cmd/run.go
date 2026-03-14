@@ -226,10 +226,17 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	logger.Info("paintress run: starting initial expedition cycle...")
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
+		summary := p.HandoverSummary()
 		return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
 			Tool:       "paintress",
 			Operation:  "expedition",
 			InProgress: "expedition cycle (initial)",
+			Completed: []string{
+				fmt.Sprintf("%d expeditions attempted, %d succeeded", summary.Total, summary.Success),
+			},
+			Remaining: []string{
+				fmt.Sprintf("%d of %d max expeditions remaining", int64(cfg.MaxExpeditions)-summary.Total, cfg.MaxExpeditions),
+			},
 			PartialState: map[string]string{
 				"BaseBranch": cfg.BaseBranch,
 				"Model":      cfg.Model,
@@ -282,11 +289,18 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
 		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 		if ucErr != nil {
+			summary := p.HandoverSummary()
 			return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
 				Tool:       "paintress",
 				Operation:  "expedition",
 				InProgress: "expedition cycle (D-Mail re-run)",
-				Completed:  []string{"D-Mail received and re-run started"},
+				Completed: []string{
+					"D-Mail received and re-run started",
+					fmt.Sprintf("%d expeditions attempted, %d succeeded", summary.Total, summary.Success),
+				},
+				Remaining: []string{
+					fmt.Sprintf("%d of %d max expeditions remaining", int64(cfg.MaxExpeditions)-summary.Total, cfg.MaxExpeditions),
+				},
 				PartialState: map[string]string{
 					"BaseBranch": cfg.BaseBranch,
 					"Model":      cfg.Model,
