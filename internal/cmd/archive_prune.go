@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 
@@ -48,6 +49,7 @@ git-tracked, so deletions should be reviewed and committed.`,
 	cmd.Flags().BoolP("execute", "x", false, "Execute pruning (default: dry-run)")
 	cmd.Flags().BoolP("dry-run", "n", false, "Dry-run mode (default behavior, explicit for scripting)")
 	cmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().Bool("rebuild-index", false, "Rebuild archive index from existing files")
 
 	return cmd
 }
@@ -64,6 +66,25 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	days, _ := cmd.Flags().GetInt("days")
 	outputFmt, _ := cmd.Flags().GetString("output")
 	stateDir := filepath.Join(repoPath, domain.StateDir)
+
+	rebuildIndex, _ := cmd.Flags().GetBool("rebuild-index")
+	if rebuildIndex {
+		if execute {
+			return fmt.Errorf("--rebuild-index cannot be combined with --execute")
+		}
+		if cmd.Flags().Changed("dry-run") {
+			return fmt.Errorf("--rebuild-index cannot be combined with --dry-run")
+		}
+		indexPath := filepath.Join(stateDir, "archive", "index.jsonl")
+		iw := &session.IndexWriter{}
+		n, rbErr := iw.Rebuild(indexPath, stateDir, "paintress")
+		if rbErr != nil {
+			return fmt.Errorf("rebuild index: %w", rbErr)
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "Rebuilt index: %d entries → %s\n", n, indexPath)
+		return nil
+	}
+
 	archiveOps := session.NewArchiveOps()
 
 	rp, rpErr := domain.NewRepoPath(repoPath)
@@ -106,6 +127,8 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 			EventFiles:      eventFiles,
 		}
 		if execute {
+			indexPaintressArchive(archiveResult.Candidates, stateDir, ew)
+
 			execResult, execErr := archiveOps.ArchivePrune(repoPath, days, true)
 			if execErr != nil {
 				return execErr
@@ -171,6 +194,9 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Index archive candidates before deletion.
+	indexPaintressArchive(archiveResult.Candidates, stateDir, ew)
+
 	// Execute: archive deletion
 	if len(archiveResult.Candidates) > 0 {
 		execResult, execErr := archiveOps.ArchivePrune(repoPath, days, true)
@@ -199,4 +225,26 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func indexPaintressArchive(candidates []string, stateDir string, w io.Writer) {
+	archiveDir := filepath.Join(stateDir, "archive")
+	var indexEntries []domain.IndexEntry
+	for _, f := range candidates {
+		if filepath.Ext(f) != ".md" {
+			continue
+		}
+		fullPath := filepath.Join(archiveDir, f)
+		indexEntries = append(indexEntries, session.ExtractMeta(fullPath, stateDir, "paintress"))
+	}
+	if len(indexEntries) == 0 {
+		return
+	}
+	indexPath := filepath.Join(stateDir, "archive", "index.jsonl")
+	iw := &session.IndexWriter{}
+	if err := iw.Append(indexPath, indexEntries); err != nil {
+		fmt.Fprintf(w, "Warning: index append: %v\n", err)
+	} else {
+		fmt.Fprintf(w, "Indexed %d entries → %s\n", len(indexEntries), indexPath)
+	}
 }
