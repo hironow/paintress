@@ -226,7 +226,17 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	logger.Info("paintress run: starting initial expedition cycle...")
 	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 	if ucErr != nil {
-		return tryWriteHandover(ctx, ucErr, continent, "expedition cycle (initial)", logger)
+		return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
+			Tool:       "paintress",
+			Operation:  "expedition",
+			InProgress: "expedition cycle (initial)",
+			PartialState: map[string]string{
+				"BaseBranch": cfg.BaseBranch,
+				"Model":      cfg.Model,
+				"Workers":    fmt.Sprintf("%d", cfg.Workers),
+				"MaxExp":     fmt.Sprintf("%d", cfg.MaxExpeditions),
+			},
+		}, logger)
 	}
 	if exitCode != 0 {
 		return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
@@ -248,10 +258,23 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	for {
 		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
 		if waitErr != nil {
-			return tryWriteHandover(ctx, waitErr, continent, "D-Mail waiting phase", logger)
+			return tryWriteHandover(ctx, waitErr, continent, domain.HandoverState{
+				Tool:       "paintress",
+				Operation:  "expedition",
+				InProgress: "D-Mail waiting phase",
+				Completed:  []string{"Initial expedition cycle completed"},
+				PartialState: map[string]string{"Phase": "waiting"},
+			}, logger)
 		}
 		if !arrived {
-			return nil // timeout or cancel → clean exit
+			writeHandoverOnCancel(ctx, continent, domain.HandoverState{
+				Tool:       "paintress",
+				Operation:  "expedition",
+				InProgress: "D-Mail waiting phase (clean exit on Ctrl+C)",
+				Completed:  []string{"Initial expedition cycle completed"},
+				PartialState: map[string]string{"Phase": "waiting-cancelled"},
+			}, logger)
+			return nil
 		}
 
 		// Re-run expeditions on D-Mail arrival
@@ -259,7 +282,17 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
 		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 		if ucErr != nil {
-			return tryWriteHandover(ctx, ucErr, continent, "expedition cycle (D-Mail re-run)", logger)
+			return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
+				Tool:       "paintress",
+				Operation:  "expedition",
+				InProgress: "expedition cycle (D-Mail re-run)",
+				Completed:  []string{"D-Mail received and re-run started"},
+				PartialState: map[string]string{
+					"BaseBranch": cfg.BaseBranch,
+					"Model":      cfg.Model,
+					"Workers":    fmt.Sprintf("%d", cfg.Workers),
+				},
+			}, logger)
 		}
 		if exitCode != 0 {
 			return &ExitError{Code: exitCode, Err: fmt.Errorf("expedition exited with code %d", exitCode)}
