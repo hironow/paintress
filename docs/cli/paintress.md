@@ -18,14 +18,15 @@ The Paintress — drives the Expedition loop for Claude Code.
 
 ### SEE ALSO
 
-* [paintress archive-prune](paintress_archive-prune.md)  - Prune old archived d-mails
-* [paintress clean](paintress_clean.md)  - Remove state directory (.expedition/)
-* [paintress config](paintress_config.md)  - View or update paintress project configuration
-* [paintress doctor](paintress_doctor.md)  - Run health checks
-* [paintress init](paintress_init.md)  - Initialize project configuration
-* [paintress issues](paintress_issues.md)  - List Linear issues via Claude MCP
-* [paintress rebuild](paintress_rebuild.md)  - Rebuild projections from event store
-* [paintress run](paintress_run.md)  - Run the expedition loop
-* [paintress status](paintress_status.md)  - Show paintress operational status
-* [paintress update](paintress_update.md)  - Self-update paintress to the latest release
-* [paintress version](paintress_version.md)  - Print version, commit, and build information
+* [paintress archive-prune](paintress_archive-prune.md)	 - Prune old archived d-mails
+* [paintress clean](paintress_clean.md)	 - Remove state directory (.expedition/)
+* [paintress config](paintress_config.md)	 - View or update paintress project configuration
+* [paintress doctor](paintress_doctor.md)	 - Run health checks
+* [paintress init](paintress_init.md)	 - Initialize project configuration
+* [paintress issues](paintress_issues.md)	 - List Linear issues via Claude MCP
+* [paintress rebuild](paintress_rebuild.md)	 - Rebuild projections from event store
+* [paintress run](paintress_run.md)	 - Run the expedition loop
+* [paintress status](paintress_status.md)	 - Show paintress operational status
+* [paintress update](paintress_update.md)	 - Self-update paintress to the latest release
+* [paintress version](paintress_version.md)	 - Print version, commit, and build information
+

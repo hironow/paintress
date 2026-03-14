@@ -70,4 +70,5 @@ paintress run [path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+
