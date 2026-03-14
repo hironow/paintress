@@ -15,10 +15,8 @@ func TestRunCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given: no args → falls back to cwd (may error on business logic, not on arg validation)
 	// Use an empty tempdir as cwd so the command hits "not initialized" quickly
 	// instead of running actual business logic when .expedition/ exists in the real cwd.
-	origDir, _ := os.Getwd()
 	dir := t.TempDir()
-	os.Chdir(dir)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Chdir(dir)
 
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)

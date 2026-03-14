@@ -17,9 +17,7 @@ func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// Use a tempdir as cwd so init hits "already exists" (if seeded) or succeeds
 	// without polluting the real working directory with .expedition/.
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	t.Chdir(dir)
 
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
