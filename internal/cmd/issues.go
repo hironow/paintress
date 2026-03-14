@@ -12,7 +12,7 @@ import (
 
 func newIssuesCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "issues [repo-path]",
+		Use:   "issues [path]",
 		Short: "List Linear issues via Claude MCP",
 		Long: `Query Linear issues via Claude MCP tools for the configured team and project.
 
@@ -20,7 +20,7 @@ Reads the team/project from .expedition/config.yaml. Supports filtering
 by issue state (e.g. todo, in-progress). Hyphens in state names are
 converted to spaces automatically.
 
-If repo-path is omitted, the current working directory is used.`,
+If path is omitted, the current working directory is used.`,
 		Example: `  # List all issues (current directory)
   paintress issues
 

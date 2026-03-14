@@ -14,7 +14,15 @@ func newCleanCommand() *cobra.Command {
 		Use:   "clean [path]",
 		Short: "Remove state directory (.expedition/)",
 		Long:  "Delete the .expedition/ directory to reset to a clean state. Use 'paintress init' to reinitialize.",
-		Args:  cobra.MaximumNArgs(1),
+		Example: `  # Clean the current directory
+  paintress clean
+
+  # Clean a specific project
+  paintress clean /path/to/repo
+
+  # Skip confirmation prompt
+  paintress clean --yes`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoPath, err := resolveRepoPath(args)
 			if err != nil {

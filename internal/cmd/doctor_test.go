@@ -123,8 +123,8 @@ func TestDoctorCommand_JSONWithRepoPath(t *testing.T) {
 
 	// then
 	var output struct {
-		Checks  []json.RawMessage      `json:"checks"`
-		Metrics map[string]any `json:"metrics"`
+		Checks  []json.RawMessage `json:"checks"`
+		Metrics map[string]any    `json:"metrics"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
@@ -154,8 +154,8 @@ func TestDoctorCommand_JSONWithoutRepoPath(t *testing.T) {
 
 	// then: should produce valid JSON (metrics may or may not be present depending on cwd)
 	var output struct {
-		Checks  []json.RawMessage      `json:"checks"`
-		Metrics map[string]any `json:"metrics"`
+		Checks  []json.RawMessage `json:"checks"`
+		Metrics map[string]any    `json:"metrics"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
@@ -181,8 +181,8 @@ func TestDoctorCommand_JSONWithEmptyRepoPath(t *testing.T) {
 
 	// then
 	var output struct {
-		Checks  []json.RawMessage      `json:"checks"`
-		Metrics map[string]any `json:"metrics"`
+		Checks  []json.RawMessage `json:"checks"`
+		Metrics map[string]any    `json:"metrics"`
 	}
 	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
 		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())

@@ -14,12 +14,12 @@ import (
 
 func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "doctor [repo-path]",
+		Use:   "doctor [path]",
 		Short: "Run health checks",
 		Long: `Check environment health and tool availability.
 
 Verifies: git, claude (Claude Code CLI), gh (GitHub CLI), and docker.
-When repo-path is provided (or defaults to current directory), also checks
+When path is provided (or defaults to current directory), also checks
 .expedition/ structure, skills, config, and computes success rate metrics.
 Each check reports one of four statuses: OK (passed), FAIL (exit 1),
 SKIP (dependency missing), WARN (advisory, exit 0).

@@ -6,7 +6,7 @@ import "encoding/json"
 type CheckStatus int
 
 const (
-	CheckOK   CheckStatus = iota
+	CheckOK CheckStatus = iota
 	CheckFail
 	CheckSkip
 	CheckWarn

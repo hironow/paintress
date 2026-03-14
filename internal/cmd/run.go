@@ -15,7 +15,7 @@ import (
 
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run [repo-path]",
+		Use:   "run [path]",
 		Short: "Run the expedition loop",
 		Long: `Run the expedition loop against a target repository.
 
@@ -24,7 +24,7 @@ invokes Claude Code to implement the change, opens a pull request,
 and optionally runs a review cycle. The loop continues until
 max-expeditions is reached or the issue queue is empty.
 
-If repo-path is omitted, the current working directory is used.`,
+If path is omitted, the current working directory is used.`,
 		Example: `  # Run with defaults from current directory
   paintress run
 
@@ -266,19 +266,19 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
 		if waitErr != nil {
 			return tryWriteHandover(ctx, waitErr, continent, domain.HandoverState{
-				Tool:       "paintress",
-				Operation:  "expedition",
-				InProgress: "D-Mail waiting phase",
-				Completed:  []string{"Initial expedition cycle completed"},
+				Tool:         "paintress",
+				Operation:    "expedition",
+				InProgress:   "D-Mail waiting phase",
+				Completed:    []string{"Initial expedition cycle completed"},
 				PartialState: map[string]string{"Phase": "waiting"},
 			}, logger)
 		}
 		if !arrived {
 			writeHandoverOnCancel(ctx, continent, domain.HandoverState{
-				Tool:       "paintress",
-				Operation:  "expedition",
-				InProgress: "D-Mail waiting phase (clean exit on Ctrl+C)",
-				Completed:  []string{"Initial expedition cycle completed"},
+				Tool:         "paintress",
+				Operation:    "expedition",
+				InProgress:   "D-Mail waiting phase (clean exit on Ctrl+C)",
+				Completed:    []string{"Initial expedition cycle completed"},
 				PartialState: map[string]string{"Phase": "waiting-cancelled"},
 			}, logger)
 			return nil

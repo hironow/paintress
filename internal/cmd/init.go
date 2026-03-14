@@ -14,11 +14,11 @@ import (
 
 func newInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init [repo-path]",
+		Use:   "init [path]",
 		Short: "Initialize project configuration",
 		Long: `Initialize a .expedition/ directory in the target repository.
 
-If repo-path is omitted, the current working directory is used.
+If path is omitted, the current working directory is used.
 Use --team and --project flags for non-interactive mode, or omit
 flags for interactive prompts. This must be run once before
 'paintress run' can operate on the repository.`,
