@@ -3,6 +3,7 @@ package cmd_test
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -265,6 +266,33 @@ func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "accepts") && strings.Contains(err.Error(), "arg") {
 		t.Fatalf("init should accept repo-path arg: %v", err)
+	}
+}
+
+func TestInitCmd_OtelBackend_CreatesOtelEnv(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init", "--team", "TEST", "--otel-backend", "jaeger", dir})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --otel-backend jaeger failed: %v", err)
+	}
+	otelPath := filepath.Join(dir, ".expedition", ".otel.env")
+	data, readErr := os.ReadFile(otelPath)
+	if readErr != nil {
+		t.Fatalf(".otel.env not created: %v", readErr)
+	}
+	if !strings.Contains(string(data), "OTEL_EXPORTER_OTLP_ENDPOINT") {
+		t.Errorf("expected OTEL_EXPORTER_OTLP_ENDPOINT in .otel.env, got:\n%s", data)
 	}
 }
 
