@@ -4,15 +4,13 @@
 /dist/
 # test
 coverage.out
-# paintress runtime state — ignore contents individually (insights/ is git-tracked per S0030)
+# paintress runtime state — ignore contents individually
+# git-tracked: insights/, archive/, journal/, config.yaml (per S0030)
 .expedition/.run/
 .expedition/events/
 .expedition/inbox/
 .expedition/outbox/
-.expedition/archive/
-.expedition/journal/
 .expedition/skills/
-.expedition/config.yaml
 .expedition/.otel.env
 .expedition/.gitignore
 # nested .expedition/ dirs from test/dev runs (state dirs created outside repo root)

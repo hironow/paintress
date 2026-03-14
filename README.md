@@ -255,7 +255,7 @@ Running `paintress` without a subcommand defaults to `run` (expedition loop). Th
 | `paintress status [repo-path]` | Show paintress operational status |
 | `paintress clean <repo-path>` | Remove state directory (`.expedition/`) |
 | `paintress rebuild <repo-path>` | Rebuild projections from event store |
-| `paintress archive-prune [repo-path]` | Prune old archived d-mails (`-d 14` for days, `-x` to execute) |
+| `paintress archive-prune [repo-path]` | Prune old archived d-mails (`-d 14` for days, `-x` to execute, `--rebuild-index` to rebuild JSONL index) |
 | `paintress version` | Show version, commit, date, and Go version (`-j` for JSON) |
 | `paintress update` | Self-update to the latest GitHub release (`-C` to check only) |
 
@@ -298,6 +298,7 @@ paintress run -n
 # Prune archived d-mails (dry-run, then execute)
 paintress archive-prune
 paintress archive-prune -d 14 -x
+paintress archive-prune --rebuild-index  # rebuild archive index
 
 # Skip code review gate
 paintress run --review-cmd ""
