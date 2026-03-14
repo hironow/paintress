@@ -41,6 +41,16 @@ func (p *Paintress) writeFlag(dir string, expNum int, issueID, status, remaining
 	WriteFlag(dir, expNum, issueID, status, remaining, midHighSeverity)
 }
 
+// HandoverSummary returns the current expedition counts for handover documents.
+func (p *Paintress) HandoverSummary() domain.RunSummary {
+	return domain.RunSummary{
+		Total:   p.totalAttempted.Load(),
+		Success: p.totalSuccess.Load(),
+		Skipped: p.totalSkipped.Load(),
+		Failed:  p.totalFailed.Load(),
+	}
+}
+
 func (p *Paintress) printSummary() {
 	total := p.totalAttempted.Load()
 

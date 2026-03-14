@@ -907,6 +907,45 @@ func TestFormatSummaryJSON_MidHighSeverity(t *testing.T) {
 	}
 }
 
+func TestPaintress_HandoverSummary(t *testing.T) {
+	// given: Paintress with known counter values
+	p := &Paintress{}
+	p.totalAttempted.Store(10)
+	p.totalSuccess.Store(7)
+	p.totalSkipped.Store(1)
+	p.totalFailed.Store(2)
+
+	// when
+	s := p.HandoverSummary()
+
+	// then
+	if s.Total != 10 {
+		t.Errorf("Total = %d, want 10", s.Total)
+	}
+	if s.Success != 7 {
+		t.Errorf("Success = %d, want 7", s.Success)
+	}
+	if s.Skipped != 1 {
+		t.Errorf("Skipped = %d, want 1", s.Skipped)
+	}
+	if s.Failed != 2 {
+		t.Errorf("Failed = %d, want 2", s.Failed)
+	}
+}
+
+func TestPaintress_HandoverSummary_ZeroValues(t *testing.T) {
+	// given: fresh Paintress (all zero)
+	p := &Paintress{}
+
+	// when
+	s := p.HandoverSummary()
+
+	// then
+	if s.Total != 0 || s.Success != 0 || s.Skipped != 0 || s.Failed != 0 {
+		t.Errorf("expected all zeros, got %+v", s)
+	}
+}
+
 // ===============================================
 // Workers>1 Integration Tests (MY-362 gap fill)
 // ===============================================
