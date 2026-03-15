@@ -3,16 +3,22 @@ package cmd_test
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/hironow/paintress/internal/cmd"
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/spf13/cobra"
 )
 
 func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	// given — no repo-path arg; resolveRepoPath falls back to os.Getwd()
-	// The cwd may or may not have .expedition/, so we just verify no args-validation error.
+	// Use a tempdir as cwd so init hits "already exists" (if seeded) or succeeds
+	// without polluting the real working directory with .expedition/.
+	dir := t.TempDir()
+	t.Chdir(dir)
+
 	root := cmd.NewRootCommand()
 	buf := new(bytes.Buffer)
 	root.SetOut(buf)
@@ -27,7 +33,6 @@ func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "accepts 1 arg") {
 		t.Fatalf("init should accept 0 args (cwd fallback), got: %v", err)
 	}
-	// May fail with "already exists" (cwd has .expedition/) — that's fine.
 }
 
 func TestInitCommand_AlreadyInitialized(t *testing.T) {
@@ -259,5 +264,56 @@ func TestInitCommand_AcceptsRepoPath(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "accepts") && strings.Contains(err.Error(), "arg") {
 		t.Fatalf("init should accept repo-path arg: %v", err)
+	}
+}
+
+func TestInitCmd_OtelBackend_CreatesOtelEnv(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetIn(strings.NewReader(""))
+	root.SetArgs([]string{"init", "--team", "TEST", "--otel-backend", "jaeger", dir})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("init --otel-backend jaeger failed: %v", err)
+	}
+	otelPath := filepath.Join(dir, ".expedition", ".otel.env")
+	data, readErr := os.ReadFile(otelPath)
+	if readErr != nil {
+		t.Fatalf(".otel.env not created: %v", readErr)
+	}
+	if !strings.Contains(string(data), "OTEL_EXPORTER_OTLP_ENDPOINT") {
+		t.Errorf("expected OTEL_EXPORTER_OTLP_ENDPOINT in .otel.env, got:\n%s", data)
+	}
+}
+
+func TestInitCommand_OtelFlags_Exist(t *testing.T) {
+	// given
+	root := cmd.NewRootCommand()
+
+	// when — find init subcommand
+	var initCmd *cobra.Command
+	for _, sub := range root.Commands() {
+		if sub.Name() == "init" {
+			initCmd = sub
+			break
+		}
+	}
+	if initCmd == nil {
+		t.Fatal("init subcommand not found")
+	}
+
+	// then — otel flags exist
+	for _, flag := range []string{"otel-backend", "otel-entity", "otel-project"} {
+		if initCmd.Flags().Lookup(flag) == nil {
+			t.Errorf("init flag --%s not found", flag)
+		}
 	}
 }

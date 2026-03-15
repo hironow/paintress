@@ -2,6 +2,7 @@ package cmd_test
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -184,5 +185,81 @@ func TestNewRootCommand_Version(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "paintress") {
 		t.Errorf("version output = %q, want to contain 'paintress'", out)
+	}
+}
+
+func TestNewRootCommand_NoColorFlag(t *testing.T) {
+	// given
+	root := cmd.NewRootCommand()
+
+	// when
+	f := root.PersistentFlags().Lookup("no-color")
+
+	// then
+	if f == nil {
+		t.Fatal("--no-color PersistentFlag not found")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--no-color default = %q, want %q", f.DefValue, "false")
+	}
+}
+
+func TestRootCmd_VerboseIncreasesStderrOutput(t *testing.T) {
+	// given: initialized project (uses initProject from config_test.go)
+	dir := initProject(t)
+
+	// when: run status without verbose
+	root1 := cmd.NewRootCommand()
+	var stdout1, stderr1 bytes.Buffer
+	root1.SetOut(&stdout1)
+	root1.SetErr(&stderr1)
+	root1.SetArgs([]string{"status", dir})
+	root1.Execute()
+
+	// when: run status WITH verbose
+	root2 := cmd.NewRootCommand()
+	var stdout2, stderr2 bytes.Buffer
+	root2.SetOut(&stdout2)
+	root2.SetErr(&stderr2)
+	root2.SetArgs([]string{"-v", "status", dir})
+	root2.Execute()
+
+	// then: verbose should produce at least as much stderr
+	if stderr2.Len() < stderr1.Len() {
+		t.Errorf("verbose stderr (%d bytes) should be >= non-verbose stderr (%d bytes)",
+			stderr2.Len(), stderr1.Len())
+	}
+}
+
+func TestRootCmd_NoColorSetsEnv(t *testing.T) {
+	// given
+	origVal := os.Getenv("NO_COLOR")
+	os.Unsetenv("NO_COLOR")
+	t.Cleanup(func() {
+		if origVal != "" {
+			os.Setenv("NO_COLOR", origVal)
+		} else {
+			os.Unsetenv("NO_COLOR")
+		}
+	})
+
+	dir := initProject(t)
+
+	root := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs([]string{"--no-color", "status", dir})
+
+	// when
+	root.Execute()
+
+	// then
+	if got := os.Getenv("NO_COLOR"); got == "" {
+		t.Error("expected NO_COLOR env to be set after --no-color flag")
+	}
+	output := buf.String()
+	if strings.Contains(output, "\033[") {
+		t.Errorf("--no-color output should not contain ANSI codes, got: %q", output)
 	}
 }

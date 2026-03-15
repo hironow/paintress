@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/cmd"
+	"github.com/spf13/cobra"
 )
 
 func TestArchivePruneCommand_NoArgs(t *testing.T) {
@@ -314,5 +315,78 @@ func TestArchivePruneCommand_EventOnlyPrune(t *testing.T) {
 	}
 	if _, statErr := os.Stat(oldEventFile); !errors.Is(statErr, fs.ErrNotExist) {
 		t.Error("expected event file to be pruned even with no archive candidates")
+	}
+}
+
+func TestArchivePruneCommand_RebuildIndexFlag_Exists(t *testing.T) {
+	// given
+	root := cmd.NewRootCommand()
+
+	// when — find archive-prune subcommand
+	var apCmd *cobra.Command
+	for _, sub := range root.Commands() {
+		if sub.Name() == "archive-prune" {
+			apCmd = sub
+			break
+		}
+	}
+	if apCmd == nil {
+		t.Fatal("archive-prune subcommand not found")
+	}
+
+	// then
+	f := apCmd.Flags().Lookup("rebuild-index")
+	if f == nil {
+		t.Fatal("--rebuild-index flag not found on archive-prune")
+	}
+}
+
+func TestArchivePruneCommand_RebuildIndex_ConflictsWithExecute(t *testing.T) {
+	// given
+	dir := t.TempDir()
+	root := cmd.NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", dir, "--rebuild-index", "--execute"})
+
+	// when
+	err := root.Execute()
+
+	// then — should fail with conflict error
+	if err == nil {
+		t.Fatal("expected error when combining --rebuild-index with --execute")
+	}
+	if !strings.Contains(err.Error(), "rebuild-index") {
+		t.Errorf("error should mention rebuild-index, got: %v", err)
+	}
+}
+
+func TestArchivePruneCommand_RebuildIndex_CreatesIndex(t *testing.T) {
+	// given — state directory with archive subdirectory
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".expedition")
+	archiveDir := filepath.Join(stateDir, "archive")
+	os.MkdirAll(archiveDir, 0o755)
+	os.WriteFile(filepath.Join(archiveDir, "2025-01-01.jsonl"), []byte(`{"id":"1","tool":"paintress"}`+"\n"), 0o644)
+
+	root := cmd.NewRootCommand()
+	outBuf := new(bytes.Buffer)
+	errBuf := new(bytes.Buffer)
+	root.SetOut(outBuf)
+	root.SetErr(errBuf)
+	root.SetArgs([]string{"archive-prune", dir, "--rebuild-index"})
+
+	// when
+	err := root.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("--rebuild-index failed: %v", err)
+	}
+	indexPath := filepath.Join(archiveDir, "index.jsonl")
+	if _, statErr := os.Stat(indexPath); errors.Is(statErr, fs.ErrNotExist) {
+		t.Error("expected index.jsonl to be created by --rebuild-index")
 	}
 }
