@@ -5,17 +5,42 @@ package session
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/hironow/paintress/internal/usecase/port"
-	"github.com/testcontainers/testcontainers-go"
-	tcexec "github.com/testcontainers/testcontainers-go/exec"
-	"github.com/testcontainers/testcontainers-go/wait"
 )
+
+// initGitRepoForWorktree creates a temporary git repo initialized with --initial-branch main
+// and configured with test user identity. Returns the repo directory path.
+func initGitRepoForWorktree(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	executor := &localGitExecutor{}
+	ctx := context.Background()
+	if _, err := executor.Git(ctx, dir, "init", "--initial-branch", "main"); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+	if _, err := executor.Git(ctx, dir, "config", "user.email", "test@test.com"); err != nil {
+		t.Fatalf("git config email: %v", err)
+	}
+	if _, err := executor.Git(ctx, dir, "config", "user.name", "Test User"); err != nil {
+		t.Fatalf("git config name: %v", err)
+	}
+	return dir
+}
+
+// initGitRepoForWorktreeWithCommit creates a temporary git repo with an initial empty commit.
+func initGitRepoForWorktreeWithCommit(t *testing.T) string {
+	t.Helper()
+	dir := initGitRepoForWorktree(t)
+	executor := &localGitExecutor{}
+	ctx := context.Background()
+	if _, err := executor.Git(ctx, dir, "commit", "--allow-empty", "-m", "init"); err != nil {
+		t.Fatalf("git commit: %v", err)
+	}
+	return dir
+}
 
 // === localGitExecutor tests ===
 
@@ -62,108 +87,13 @@ func TestLocalGitExecutor_Shell_EchoCommand(t *testing.T) {
 	}
 }
 
-// === containerGitExecutor (test-only) ===
+// === localGitExecutor-based tests (formerly container tests) ===
 
-// containerGitExecutor runs git commands inside a Docker container via testcontainers-go.
-type containerGitExecutor struct {
-	ctr testcontainers.Container
-}
-
-func (e *containerGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
-	// Ensure the directory exists before running git commands.
-	mkdirCmd := []string{"mkdir", "-p", dir}
-	if exitCode, _, err := e.ctr.Exec(ctx, mkdirCmd, tcexec.Multiplexed()); err != nil || exitCode != 0 {
-		return nil, fmt.Errorf("mkdir -p %s failed (exit %d): %w", dir, exitCode, err)
-	}
-
-	cmd := append([]string{"git", "-C", dir}, args...)
-	exitCode, reader, err := e.ctr.Exec(ctx, cmd, tcexec.Multiplexed())
-	if err != nil {
-		return nil, fmt.Errorf("exec failed: %w", err)
-	}
-	out, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("read output failed: %w", err)
-	}
-	if exitCode != 0 {
-		return out, fmt.Errorf("git exited with code %d: %s", exitCode, string(out))
-	}
-	return out, nil
-}
-
-func (e *containerGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
-	cmd := []string{"sh", "-c", fmt.Sprintf("cd %q && %s", dir, command)}
-	exitCode, reader, err := e.ctr.Exec(ctx, cmd, tcexec.Multiplexed())
-	if err != nil {
-		return nil, fmt.Errorf("exec failed: %w", err)
-	}
-	out, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("read output failed: %w", err)
-	}
-	if exitCode != 0 {
-		return out, fmt.Errorf("shell exited with code %d: %s", exitCode, string(out))
-	}
-	return out, nil
-}
-
-// setupGitContainer creates a running alpine/git container configured for git operations.
-func setupGitContainer(t *testing.T, ctx context.Context) testcontainers.Container {
-	t.Helper()
-
-	req := testcontainers.GenericContainerRequest{
-		ContainerRequest: testcontainers.ContainerRequest{
-			Image:      "alpine/git:latest",
-			Entrypoint: []string{"/bin/sh", "-c"},
-			Cmd:        []string{"trap 'exit 0' TERM; while :; do sleep 1; done"},
-			WaitingFor: wait.ForExec([]string{"git", "--version"}).
-				WithExitCodeMatcher(func(exitCode int) bool {
-					return exitCode == 0
-				}),
-		},
-		Started: true,
-	}
-
-	ctr, err := testcontainers.GenericContainer(ctx, req) // nosemgrep: adr0007-testcontainers-generic-without-terminate -- CleanupContainer handles Terminate [permanent]
-	testcontainers.CleanupContainer(t, ctr)
-	if err != nil {
-		t.Fatalf("failed to start git container: %v", err)
-	}
-
-	// Configure git user and default branch inside the container.
-	for _, cmd := range [][]string{
-		{"git", "config", "--global", "user.email", "test@example.com"},
-		{"git", "config", "--global", "user.name", "Test User"},
-		{"git", "config", "--global", "init.defaultBranch", "main"},
-	} {
-		exitCode, _, err := ctr.Exec(ctx, cmd, tcexec.Multiplexed())
-		if err != nil {
-			t.Fatalf("git config failed: %v", err)
-		}
-		if exitCode != 0 {
-			t.Fatalf("git config exited with code %d", exitCode)
-		}
-	}
-
-	return ctr
-}
-
-func TestContainerGitExecutor_Git_StatusOnNewRepo(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
+func TestLocalGitExecutor_Git_StatusOnNewRepoWithMainBranch(t *testing.T) {
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	workDir := "/tmp/test-repo"
-
-	// init a repo inside the container
-	_, err := executor.Git(ctx, workDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	workDir := initGitRepoForWorktree(t)
 
 	// when
 	out, err := executor.Git(ctx, workDir, "status")
@@ -177,18 +107,14 @@ func TestContainerGitExecutor_Git_StatusOnNewRepo(t *testing.T) {
 	}
 }
 
-func TestContainerGitExecutor_Shell_EchoCommand(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
+func TestLocalGitExecutor_Shell_EchoCommand_InTempDir(t *testing.T) {
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
+	executor := &localGitExecutor{}
+	dir := t.TempDir()
 
 	// when
-	out, err := executor.Shell(ctx, "/tmp", "echo hello")
+	out, err := executor.Shell(ctx, dir, "echo hello")
 
 	// then
 	if err != nil {
@@ -200,34 +126,16 @@ func TestContainerGitExecutor_Shell_EchoCommand(t *testing.T) {
 	}
 }
 
-// Verify that containerGitExecutor satisfies the port.GitExecutor interface at compile time.
-var _ port.GitExecutor = (*containerGitExecutor)(nil)
-
 func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-pool-repo"
-
-	// init a repo with an initial commit so the branch exists
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 3)
 
 	// when
-	err = pool.Init(ctx)
+	err := pool.Init(ctx)
 
 	// then
 	if err != nil {
@@ -248,7 +156,7 @@ func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
 	if len(pool.workers) != 3 {
 		t.Fatalf("expected 3 workers in channel, got %d", len(pool.workers))
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		path := <-pool.workers
 		expectedName := fmt.Sprintf("worker-%03d", i+1)
 		if !strings.HasSuffix(path, expectedName) {
@@ -259,29 +167,14 @@ func TestWorktreePool_Init_CreatesWorktrees(t *testing.T) {
 }
 
 func TestWorktreePool_Init_PrunesStale(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-prune-repo"
-
-	// init a repo with an initial commit
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	// create a worktree manually, then remove its directory to simulate a crash
 	staleWorktreePath := repoDir + "/stale-wt"
-	_, err = executor.Git(ctx, repoDir, "worktree", "add", "--detach", staleWorktreePath, "main")
+	_, err := executor.Git(ctx, repoDir, "worktree", "add", "--detach", staleWorktreePath, "main")
 	if err != nil {
 		t.Fatalf("git worktree add failed: %v", err)
 	}
@@ -311,30 +204,15 @@ func TestWorktreePool_Init_PrunesStale(t *testing.T) {
 }
 
 func TestWorktreePool_Init_RunsSetupCmd(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-setup-repo"
-
-	// init a repo with an initial commit
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "touch .setup-done", 2)
 
 	// when
-	err = pool.Init(ctx)
+	err := pool.Init(ctx)
 
 	// then
 	if err != nil {
@@ -342,35 +220,21 @@ func TestWorktreePool_Init_RunsSetupCmd(t *testing.T) {
 	}
 
 	// verify marker file .setup-done exists in each worktree
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		path := <-pool.workers
 		_, err := executor.Shell(ctx, path, "test -f .setup-done")
 		if err != nil {
-			t.Errorf("expected .setup-done in %s, but file does not exist", path)
+			t.Errorf("expected .setup-done in worker %d %s, but file does not exist", i, path)
 		}
 		pool.workers <- path // put back
 	}
 }
 
 func TestWorktreePool_Acquire_ReturnsValidPath(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-acquire-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
 	if err := pool.Init(ctx); err != nil {
@@ -399,24 +263,10 @@ func TestWorktreePool_Acquire_ReturnsValidPath(t *testing.T) {
 }
 
 func TestWorktreePool_Release_ResetsState(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-release-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
 	if err := pool.Init(ctx); err != nil {
@@ -426,7 +276,7 @@ func TestWorktreePool_Release_ResetsState(t *testing.T) {
 	path := pool.Acquire()
 
 	// dirty the worktree: create a file and a branch
-	_, err = executor.Shell(ctx, path, "touch dirty-file.txt")
+	_, err := executor.Shell(ctx, path, "touch dirty-file.txt")
 	if err != nil {
 		t.Fatalf("touch failed: %v", err)
 	}
@@ -460,24 +310,10 @@ func TestWorktreePool_Release_ResetsState(t *testing.T) {
 }
 
 func TestWorktreePool_Release_ReturnsToPool(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-reuse-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
 	if err := pool.Init(ctx); err != nil {
@@ -486,7 +322,7 @@ func TestWorktreePool_Release_ReturnsToPool(t *testing.T) {
 
 	// when
 	path1 := pool.Acquire()
-	err = pool.Release(ctx, path1)
+	err := pool.Release(ctx, path1)
 	if err != nil {
 		t.Fatalf("Release failed: %v", err)
 	}
@@ -499,24 +335,10 @@ func TestWorktreePool_Release_ReturnsToPool(t *testing.T) {
 }
 
 func TestWorktreePool_Shutdown_RemovesAll(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-shutdown-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 3)
 	if err := pool.Init(ctx); err != nil {
@@ -535,7 +357,7 @@ func TestWorktreePool_Shutdown_RemovesAll(t *testing.T) {
 	}
 
 	// when
-	err = pool.Shutdown(ctx)
+	err := pool.Shutdown(ctx)
 
 	// then
 	if err != nil {
@@ -556,24 +378,10 @@ func TestWorktreePool_Shutdown_RemovesAll(t *testing.T) {
 // === Edge case tests (P0-P3) ===
 
 func TestWorktreePool_Release_ResetsCommittedChanges(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-release-committed-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	// record the baseBranch commit hash for later comparison
 	baseBranchOut, err := executor.Git(ctx, repoDir, "rev-parse", "HEAD")
@@ -652,30 +460,16 @@ func TestWorktreePool_Release_ResetsCommittedChanges(t *testing.T) {
 }
 
 func TestWorktreePool_Init_SetupCmdFailure_PartialInit(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-setupfail-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	// pool with setupCmd that always fails
 	failingPool := NewWorktreePool(executor, repoDir, "main", "exit 1", 3)
 
 	// when
-	err = failingPool.Init(ctx)
+	err := failingPool.Init(ctx)
 
 	// then — Init should return error
 	if err == nil {
@@ -708,24 +502,10 @@ func TestWorktreePool_Init_SetupCmdFailure_PartialInit(t *testing.T) {
 }
 
 func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-shutdown-partial-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 2)
 	if err := pool.Init(ctx); err != nil {
@@ -736,7 +516,7 @@ func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
 	_ = pool.Acquire()
 
 	// when — shutdown should only remove the 1 worker still in the channel
-	err = pool.Shutdown(ctx)
+	err := pool.Shutdown(ctx)
 	if err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
 	}
@@ -777,24 +557,10 @@ func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
 }
 
 func TestWorktreePool_Release_ResetsStagedChanges(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-release-staged-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
 	if err := pool.Init(ctx); err != nil {
@@ -804,7 +570,7 @@ func TestWorktreePool_Release_ResetsStagedChanges(t *testing.T) {
 	path := pool.Acquire()
 
 	// stage a file without committing
-	_, err = executor.Shell(ctx, path, "echo 'staged content' > staged-file.txt")
+	_, err := executor.Shell(ctx, path, "echo 'staged content' > staged-file.txt")
 	if err != nil {
 		t.Fatalf("creating file failed: %v", err)
 	}
@@ -841,24 +607,10 @@ func TestWorktreePool_Release_ResetsStagedChanges(t *testing.T) {
 }
 
 func TestWorktreePool_Init_ContextCancellation(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-ctx-cancel-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 3)
 
@@ -867,7 +619,7 @@ func TestWorktreePool_Init_ContextCancellation(t *testing.T) {
 	cancel()
 
 	// when
-	err = pool.Init(cancelledCtx)
+	err := pool.Init(cancelledCtx)
 
 	// then — Init should return error due to cancelled context
 	if err == nil {
@@ -881,24 +633,10 @@ func TestWorktreePool_Init_ContextCancellation(t *testing.T) {
 }
 
 func TestWorktreePool_Acquire_BlocksWhenExhausted(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-acquire-blocks-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
 	if err := pool.Init(ctx); err != nil {
@@ -927,7 +665,7 @@ func TestWorktreePool_Acquire_BlocksWhenExhausted(t *testing.T) {
 	}
 
 	// release the first worker
-	err = pool.Release(ctx, firstPath)
+	err := pool.Release(ctx, firstPath)
 	if err != nil {
 		t.Fatalf("Release failed: %v", err)
 	}
@@ -965,24 +703,10 @@ func TestWorktreePool_Acquire_BlocksWhenExhausted(t *testing.T) {
 // where early returns in Paintress.Run skipped Release, leaving orphaned worktrees
 // that blocked the next Init's `git worktree add`.
 func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given — simulate a leaked worktree from a previous run
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-selfheal-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	// Run 1: init pool, acquire worker, shutdown WITHOUT releasing
 	pool1 := NewWorktreePool(executor, repoDir, "main", "", 1)
@@ -994,7 +718,7 @@ func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
 
 	// when — Run 2: new pool tries to Init on the same repo
 	pool2 := NewWorktreePool(executor, repoDir, "main", "", 1)
-	err = pool2.Init(ctx)
+	err := pool2.Init(ctx)
 
 	// then — Init should succeed (self-healing removes stale worktree before re-creating)
 	if err != nil {
@@ -1019,24 +743,10 @@ func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
 // Shutdown with a cancelled context cannot remove worktrees. This motivates
 // the caller (Paintress.Run) to use context.Background() for deferred Shutdown.
 func TestWorktreePool_Shutdown_CancelledContext_LeavesOrphans(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping container test in short mode")
-	}
-
 	// given
 	ctx := context.Background()
-	ctr := setupGitContainer(t, ctx)
-	executor := &containerGitExecutor{ctr: ctr}
-	repoDir := "/tmp/test-shutdown-cancelled-repo"
-
-	_, err := executor.Git(ctx, repoDir, "init")
-	if err != nil {
-		t.Fatalf("git init failed: %v", err)
-	}
-	_, err = executor.Git(ctx, repoDir, "commit", "--allow-empty", "-m", "init")
-	if err != nil {
-		t.Fatalf("git commit failed: %v", err)
-	}
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
 
 	pool := NewWorktreePool(executor, repoDir, "main", "", 2)
 	if err := pool.Init(ctx); err != nil {
@@ -1046,7 +756,7 @@ func TestWorktreePool_Shutdown_CancelledContext_LeavesOrphans(t *testing.T) {
 	// when — cancel context, then call Shutdown
 	cancelledCtx, cancel := context.WithCancel(ctx)
 	cancel()
-	err = pool.Shutdown(cancelledCtx)
+	err := pool.Shutdown(cancelledCtx)
 
 	// then — Shutdown should fail (cannot run git commands with cancelled context)
 	if err == nil {
