@@ -1,0 +1,24 @@
+rules:
+  # ==========================================================================
+  # paintress-specific layer rules
+  # Rules that reference paintress domain concepts or literals
+  # ==========================================================================
+
+  # --- Rule: No state dir literal in filepath.Join ---
+
+  - id: no-state-dir-literal-in-path-join
+    languages: [go]
+    severity: ERROR
+    pattern-either:
+      - pattern: filepath.Join($X, ".expedition")
+      - pattern: filepath.Join($X, ".expedition", ...)
+    paths:
+      include:
+        - "/internal/**"
+      exclude:
+        - "*_test.go"
+        - "/internal/domain/**"
+    message: |
+      filepath.Join での state dir literal ".expedition" 直書きは禁止です。
+      Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
+      How: domain.StateDir 定数を使用してください

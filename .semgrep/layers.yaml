@@ -518,25 +518,6 @@ rules:
       Why: embed はファイルシステム依存、text/template は I/O 寄りの責務であり、pure な domain 層に含めるべきではない
       How: template 責務は platform 層に配置してください
 
-  # --- Rule 23: No state dir literal in filepath.Join ---
-
-  - id: no-state-dir-literal-in-path-join
-    languages: [go]
-    severity: ERROR
-    pattern-either:
-      - pattern: filepath.Join($X, ".expedition")
-      - pattern: filepath.Join($X, ".expedition", ...)
-    paths:
-      include:
-        - "/internal/**"
-      exclude:
-        - "*_test.go"
-        - "/internal/domain/**"
-    message: |
-      filepath.Join での state dir literal ".expedition" 直書きは禁止です。
-      Why: マジックストリングの散在は変更時の修正漏れやタイポを引き起こす
-      How: domain.StateDir 定数を使用してください
-
   # --- Rule: session must not implement event persistence (todo 73) ---
   - id: layer-session-no-event-persistence
     languages: [generic]
@@ -627,7 +608,7 @@ rules:
       Why: session 層での fallback は config 設定ミスを隠蔽し、デフォルト値が散在して一貫性が壊れる
       How: config loading (session/config.go) で空文字チェックを行い、domain.Default* 定数を使用してください
 
-  # --- Rule: session 2-level dot-access prevention ---
+  # --- Rule: No raw .Session. field access (Law of Demeter) ---
 
   - id: session-no-raw-session-field-access
     languages: [go]
