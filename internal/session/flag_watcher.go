@@ -11,15 +11,17 @@ import (
 
 // watchFlag watches flag.md for current_issue changes using filesystem
 // notifications and invokes onIssueChange when a new issue is detected.
-func watchFlag(ctx context.Context, continent string, onIssueChange func(issue, title string), ready chan<- struct{}) {
+func watchFlag(ctx context.Context, continent string, logger domain.Logger, onIssueChange func(issue, title string), ready chan<- struct{}) {
 	runDir := filepath.Join(continent, domain.StateDir, ".run")
 
 	if _, err := os.Stat(runDir); err != nil {
+		logger.Debug("flag watcher: run dir not found: %v", err)
 		return
 	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
+		logger.Warn("flag watcher: create watcher: %v", err)
 		return
 	}
 	defer watcher.Close()

@@ -240,7 +240,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// Start flag.md watcher to detect issue selection in real-time
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
-	go watchFlag(watchCtx, workDir, func(issue, title string) {
+	go watchFlag(watchCtx, workDir, e.Logger, func(issue, title string) {
 		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
