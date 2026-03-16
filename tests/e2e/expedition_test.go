@@ -23,9 +23,9 @@ func TestE2E_PaintressInit(t *testing.T) {
 	}
 
 	// when: run paintress init (requires repo path as positional arg)
-	cmd := exec.Command("paintress", "init", "--lang", "en", dir)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
+	initCmd := exec.Command("paintress", "init", "--lang", "en", dir)
+	initCmd.Dir = dir
+	out, err := initCmd.Output()
 	if err != nil {
 		t.Fatalf("paintress init: %v\n%s", err, out)
 	}
