@@ -32,6 +32,7 @@ Direct `os.Stderr` is acceptable only where cobra's `cmd` is unavailable:
 |----------|--------|
 | `cmd/paintress/main.go` | Error handling after `root.ExecuteContext()` returns |
 | `internal/tools/docgen/main.go` | Standalone tool outside cobra |
+| `internal/session/paintress.go` | Quiet-mode fallback for interactive approval prompt (cmd layer passes `io.Discard` as errOut, but approval still needs visible output) |
 
 ## Pipeline Compatibility
 
