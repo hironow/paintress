@@ -61,24 +61,8 @@ type Paintress struct {
 	consecutiveSkips     atomic.Int64
 }
 
-// errWriter returns ErrOut or io.Discard if nil (nil-safe accessor for tests).
-func (p *Paintress) errWriter() io.Writer {
-	if p.ErrOut != nil {
-		return p.ErrOut
-	}
-	return io.Discard
-}
 
 func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver) *Paintress {
-	if logger == nil {
-		logger = &domain.NopLogger{}
-	}
-	if dataOut == nil {
-		dataOut = io.Discard
-	}
-	if errOut == nil {
-		errOut = io.Discard
-	}
 	if stdinIn == nil {
 		stdinIn = strings.NewReader("")
 	}
@@ -241,7 +225,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 	if p.config.DryRun {
 		p.Logger.Warn("%s", domain.Msg("dry_run"))
 	}
-	fmt.Fprintln(p.errWriter())
+	fmt.Fprintln(p.ErrOut)
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===
 	p.totalAttempted.Store(0)
@@ -316,7 +300,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		}
 	}
 
-	fmt.Fprintln(p.errWriter())
+	fmt.Fprintln(p.ErrOut)
 	p.printSummary()
 
 	switch {

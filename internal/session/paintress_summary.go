@@ -8,7 +8,7 @@ import (
 )
 
 func (p *Paintress) printBanner() {
-	w := p.errWriter()
+	w := p.ErrOut
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
 	fmt.Fprintln(w, "║          The Paintress awakens               ║")
@@ -73,7 +73,7 @@ func (p *Paintress) printSummary() {
 		return
 	}
 
-	w := p.errWriter()
+	w := p.ErrOut
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
 	fmt.Fprintln(w, "║          The Paintress rests                 ║")

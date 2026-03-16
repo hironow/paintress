@@ -53,13 +53,6 @@ type Expedition struct {
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
-// errWriter returns ErrOut or io.Discard if nil (nil-safe accessor for tests).
-func (e *Expedition) errWriter() io.Writer {
-	if e.ErrOut != nil {
-		return e.ErrOut
-	}
-	return io.Discard
-}
 
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
 func (e *Expedition) setCurrentIssue(issue string) {
@@ -378,7 +371,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	err = cmd.Wait()
 	if e.Config.OutputFormat != "json" {
-		fmt.Fprintln(e.errWriter())
+		fmt.Fprintln(e.ErrOut)
 	}
 
 	if expCtx.Err() == context.DeadlineExceeded {
