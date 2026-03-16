@@ -8,12 +8,7 @@ import (
 )
 
 func (p *Paintress) printBanner() {
-	w := p.ErrOut
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
-	fmt.Fprintln(w, "║          The Paintress awakens               ║")
-	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
-	fmt.Fprintln(w)
+	domain.LogSection(p.Logger, "paintress run")
 }
 
 // reconcileFlags scans the continent's own flag.md and, when workers > 0,
@@ -73,12 +68,7 @@ func (p *Paintress) printSummary() {
 		return
 	}
 
-	w := p.ErrOut
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "╔══════════════════════════════════════════════╗")
-	fmt.Fprintln(w, "║          The Paintress rests                 ║")
-	fmt.Fprintln(w, "╚══════════════════════════════════════════════╝")
-	fmt.Fprintln(w)
+	domain.LogSection(p.Logger, "paintress summary")
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("expeditions_sent"), total))
 	p.Logger.OK("%s", fmt.Sprintf(domain.Msg("success_count"), p.totalSuccess.Load()))
 	p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("skipped_count"), p.totalSkipped.Load()))
@@ -89,10 +79,10 @@ func (p *Paintress) printSummary() {
 	if p.totalBugs.Load() > 0 {
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("bugs_count"), p.totalBugs.Load()))
 	}
-	fmt.Fprintln(w)
+	fmt.Fprintln(p.ErrOut)
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("gradient_info"), p.gradient.FormatLog()))
 	p.Logger.Info("%s", fmt.Sprintf(domain.Msg("party_info"), p.reserve.Status()))
-	fmt.Fprintln(w)
+	fmt.Fprintln(p.ErrOut)
 	p.Logger.Info("Flag:     %s", domain.FlagPath(p.config.Continent))
 	p.Logger.Info("Journals: %s", domain.JournalDir(p.config.Continent))
 	p.Logger.Info("Logs:     %s", p.logDir)
