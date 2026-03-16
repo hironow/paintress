@@ -17,7 +17,15 @@ const (
 // DefaultWaitTimeout is the default D-Mail waiting phase timeout.
 const DefaultWaitTimeout = 30 * time.Minute
 
+// ApproverConfig describes how approval behavior is configured.
+// Implemented by Config. Used by session.BuildApprover.
+type ApproverConfig interface {
+	IsAutoApprove() bool
+	ApproveCmdString() string
+}
+
 // Config holds the runtime configuration for a Paintress session.
+// Config implements ApproverConfig.
 type Config struct {
 	Continent      string
 	MaxExpeditions int
@@ -40,6 +48,12 @@ type Config struct {
 	MaxRetries     int           // Maximum retry attempts per unique issue set (default: 3)
 	WaitTimeout    time.Duration `yaml:"wait_timeout,omitempty"` // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)
 }
+
+// IsAutoApprove reports whether the config is set to auto-approve.
+func (c Config) IsAutoApprove() bool { return c.AutoApprove }
+
+// ApproveCmdString returns the approval command string.
+func (c Config) ApproveCmdString() string { return c.ApproveCmd }
 
 // DefaultConfig returns a Config populated with sensible defaults.
 // Values are sourced from DefaultProjectConfig() for consistency.

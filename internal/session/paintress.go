@@ -73,12 +73,12 @@ func (p *Paintress) errWriter() io.Writer {
 // Priority: AutoApprove → CmdApprover → StdinApprover.
 // The promptOut writer is used for interactive approval prompts and must
 // be provided by the cmd layer (typically cmd.ErrOrStderr()).
-func BuildApprover(cfg domain.Config, input io.Reader, promptOut io.Writer) port.Approver {
+func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writer) port.Approver {
 	switch {
-	case cfg.AutoApprove:
+	case cfg.IsAutoApprove():
 		return &port.AutoApprover{}
-	case cfg.ApproveCmd != "":
-		return NewCmdApprover(cfg.ApproveCmd)
+	case cfg.ApproveCmdString() != "":
+		return NewCmdApprover(cfg.ApproveCmdString())
 	default:
 		return NewStdinApprover(input, promptOut)
 	}
