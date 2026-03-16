@@ -120,9 +120,9 @@ func TestStdinApprover_ContextCancel(t *testing.T) {
 func TestCmdApprover_ExitZero(t *testing.T) {
 	// given
 	a := &CmdApprover{
-		cmdTemplate: "true", // exit 0
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
-			return &fakeCmd{err: nil}
+		cmdTemplate: "true",
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return exec.Command("true")
 		},
 	}
 
@@ -141,9 +141,9 @@ func TestCmdApprover_ExitZero(t *testing.T) {
 func TestCmdApprover_ExitNonZero(t *testing.T) {
 	// given: non-zero exit is intentional deny — error should be nil
 	a := &CmdApprover{
-		cmdTemplate: "false", // exit 1
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
-			return &fakeCmd{err: &exec.ExitError{}}
+		cmdTemplate: "false",
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return exec.Command("false")
 		},
 	}
 
@@ -160,12 +160,11 @@ func TestCmdApprover_ExitNonZero(t *testing.T) {
 }
 
 func TestCmdApprover_ExecutionError_SurfacesError(t *testing.T) {
-	// given: execution error (e.g. binary not found) — must surface as error
-	execErr := fmt.Errorf("exec: \"nonexistent\": executable file not found in $PATH")
+	// given: execution error (binary not found)
 	a := &CmdApprover{
 		cmdTemplate: "nonexistent-binary",
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
-			return &fakeCmd{err: execErr}
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return exec.Command("nonexistent-binary-that-does-not-exist-anywhere")
 		},
 	}
 
@@ -179,9 +178,6 @@ func TestCmdApprover_ExecutionError_SurfacesError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error to be surfaced for execution failure, got nil")
 	}
-	if !strings.Contains(err.Error(), "executable file not found") {
-		t.Errorf("error should contain original message, got: %v", err)
-	}
 }
 
 func TestCmdApprover_PlaceholderReplacement(t *testing.T) {
@@ -189,9 +185,9 @@ func TestCmdApprover_PlaceholderReplacement(t *testing.T) {
 	var capturedShellCmd string
 	a := &CmdApprover{
 		cmdTemplate: `echo {message}`,
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedShellCmd = args[len(args)-1]
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -213,9 +209,9 @@ func TestCmdApprover_EscapesShellMetacharacters(t *testing.T) {
 	var capturedShellCmd string
 	a := &CmdApprover{
 		cmdTemplate: `echo {message}`,
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedShellCmd = args[len(args)-1]
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 

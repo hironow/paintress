@@ -104,30 +104,32 @@ func readLine(r io.Reader) (string, error) {
 // The template may contain a {message} placeholder.
 type CmdApprover struct {
 	cmdTemplate string
-	makeCmd     cmdFactory
+	cmdFactory  cmdFactoryFunc
 }
 
 func NewCmdApprover(cmdTemplate string) *CmdApprover {
 	return &CmdApprover{cmdTemplate: cmdTemplate}
 }
 
-func (a *CmdApprover) factory() cmdFactory {
-	if a.makeCmd != nil {
-		return a.makeCmd
+func (a *CmdApprover) factory() cmdFactoryFunc {
+	if a.cmdFactory != nil {
+		return a.cmdFactory
 	}
 	return defaultCmdFactory
 }
 
 func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
+	if a.cmdTemplate == "" {
+		return false, fmt.Errorf("approve: empty command template")
+	}
 	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", ShellQuote(message))
-	err := a.factory()(ctx, shellName(), shellFlag(), expanded).Run()
+	cmd := a.factory()(ctx, shellName(), shellFlag(), expanded)
+	err := cmd.Run()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			// Non-zero exit = intentional deny (not an error condition)
 			return false, nil
 		}
-		// Execution error (binary not found, permission denied, etc.)
 		return false, err
 	}
 	return true, nil
