@@ -69,7 +69,22 @@ func (p *Paintress) errWriter() io.Writer {
 	return io.Discard
 }
 
-func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter) *Paintress {
+// BuildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+// The promptOut writer is used for interactive approval prompts and must
+// be provided by the cmd layer (typically cmd.ErrOrStderr()).
+func BuildApprover(cfg domain.Config, input io.Reader, promptOut io.Writer) port.Approver {
+	switch {
+	case cfg.AutoApprove:
+		return &port.AutoApprover{}
+	case cfg.ApproveCmd != "":
+		return NewCmdApprover(cfg.ApproveCmd)
+	default:
+		return NewStdinApprover(input, promptOut)
+	}
+}
+
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver) *Paintress {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -84,6 +99,9 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	}
 	if emitter == nil {
 		emitter = &port.NopExpeditionEventEmitter{}
+	}
+	if approver == nil {
+		approver = &port.AutoApprover{}
 	}
 	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -110,21 +128,6 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		notifier = NewCmdNotifier(cfg.NotifyCmd)
 	} else {
 		notifier = &LocalNotifier{}
-	}
-
-	// Wire approver based on config
-	var approver port.Approver
-	switch {
-	case cfg.AutoApprove:
-		approver = &port.AutoApprover{}
-	case cfg.ApproveCmd != "":
-		approver = NewCmdApprover(cfg.ApproveCmd)
-	default:
-		promptOut := errOut
-		if promptOut == io.Discard || promptOut == dataOut {
-			promptOut = os.Stderr // nosemgrep: adr0002-no-os-stderr-in-internal — fallback for quiet-mode + interactive approval; cmd layer cannot predict this condition [permanent]
-		}
-		approver = NewStdinApprover(stdinIn, promptOut)
 	}
 
 	maxRetries := cfg.MaxRetries

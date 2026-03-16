@@ -218,7 +218,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
-	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
+	approver := session.BuildApprover(cfg, cmd.InOrStdin(), cmd.ErrOrStderr())
+	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil, approver)
 	rp, rpErr := domain.NewRepoPath(continent)
 	if rpErr != nil {
 		return rpErr
@@ -286,7 +287,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 		// Re-run expeditions on D-Mail arrival
 		logger.Info("paintress run: D-Mail received, re-running expedition cycle...")
-		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil)
+		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil, approver)
 		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
 		if ucErr != nil {
 			summary := p.HandoverSummary()
