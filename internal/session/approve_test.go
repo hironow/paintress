@@ -684,3 +684,49 @@ type errorApprover struct {
 func (a *errorApprover) RequestApproval(_ context.Context, _ string) (bool, error) {
 	return false, a.err
 }
+
+func TestBuildApprover_AutoApprove(t *testing.T) {
+	// given
+	cfg := domain.Config{AutoApprove: true}
+
+	// when
+	approver := BuildApprover(cfg, nil, nil)
+
+	// then
+	if _, ok := approver.(*port.AutoApprover); !ok {
+		t.Errorf("expected AutoApprover, got %T", approver)
+	}
+}
+
+func TestBuildApprover_CmdApprover(t *testing.T) {
+	// given
+	cfg := domain.Config{ApproveCmd: "echo approve"}
+
+	// when
+	approver := BuildApprover(cfg, nil, nil)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected CmdApprover, got AutoApprover")
+	}
+}
+
+func TestBuildApprover_StdinApprover(t *testing.T) {
+	// given
+	cfg := domain.Config{}
+	input := strings.NewReader("")
+
+	// when
+	approver := BuildApprover(cfg, input, io.Discard)
+
+	// then
+	if approver == nil {
+		t.Fatal("expected non-nil approver")
+	}
+	if _, ok := approver.(*port.AutoApprover); ok {
+		t.Error("expected StdinApprover, got AutoApprover")
+	}
+}
