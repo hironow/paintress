@@ -53,13 +53,6 @@ type Expedition struct {
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
-// errWriter returns ErrOut or io.Discard if nil (nil-safe accessor for tests).
-func (e *Expedition) errWriter() io.Writer {
-	if e.ErrOut != nil {
-		return e.ErrOut
-	}
-	return io.Discard
-}
 
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
 func (e *Expedition) setCurrentIssue(issue string) {
@@ -163,6 +156,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if e.DataOut == nil {
 		e.DataOut = io.Discard
 	}
+	if e.ErrOut == nil {
+		e.ErrOut = io.Discard
+	}
 	prompt := e.BuildPrompt()
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
@@ -240,7 +236,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	// Start flag.md watcher to detect issue selection in real-time
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
-	go watchFlag(watchCtx, workDir, func(issue, title string) {
+	go watchFlag(watchCtx, workDir, e.Logger, func(issue, title string) {
 		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
@@ -378,7 +374,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	err = cmd.Wait()
 	if e.Config.OutputFormat != "json" {
-		fmt.Fprintln(e.errWriter())
+		fmt.Fprintln(e.ErrOut)
 	}
 
 	if expCtx.Err() == context.DeadlineExceeded {

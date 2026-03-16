@@ -7,7 +7,23 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
+
+// BuildApprover creates the appropriate Approver based on config.
+// Priority: AutoApprove → CmdApprover → StdinApprover.
+func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writer) port.Approver {
+	switch {
+	case cfg.IsAutoApprove():
+		return &port.AutoApprover{}
+	case cfg.ApproveCmdString() != "":
+		return NewCmdApprover(cfg.ApproveCmdString())
+	default:
+		return NewStdinApprover(input, promptOut)
+	}
+}
 
 // StdinApprover prompts the human on a terminal and reads y/yes for approval.
 // Empty input or any other response is treated as denial (safe default).
@@ -88,30 +104,32 @@ func readLine(r io.Reader) (string, error) {
 // The template may contain a {message} placeholder.
 type CmdApprover struct {
 	cmdTemplate string
-	makeCmd     cmdFactory
+	cmdFactory  cmdFactoryFunc
 }
 
 func NewCmdApprover(cmdTemplate string) *CmdApprover {
 	return &CmdApprover{cmdTemplate: cmdTemplate}
 }
 
-func (a *CmdApprover) factory() cmdFactory {
-	if a.makeCmd != nil {
-		return a.makeCmd
+func (a *CmdApprover) factory() cmdFactoryFunc {
+	if a.cmdFactory != nil {
+		return a.cmdFactory
 	}
 	return defaultCmdFactory
 }
 
 func (a *CmdApprover) RequestApproval(ctx context.Context, message string) (bool, error) {
+	if a.cmdTemplate == "" {
+		return false, fmt.Errorf("approve: empty command template")
+	}
 	expanded := strings.ReplaceAll(a.cmdTemplate, "{message}", ShellQuote(message))
-	err := a.factory()(ctx, shellName(), shellFlag(), expanded).Run()
+	cmd := a.factory()(ctx, shellName(), shellFlag(), expanded)
+	err := cmd.Run()
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			// Non-zero exit = intentional deny (not an error condition)
 			return false, nil
 		}
-		// Execution error (binary not found, permission denied, etc.)
 		return false, err
 	}
 	return true, nil

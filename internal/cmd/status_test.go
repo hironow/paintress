@@ -73,9 +73,16 @@ func TestStatusCommand_TextOutput(t *testing.T) {
 	if !strings.Contains(text, "paintress status") {
 		t.Errorf("expected stdout to contain 'paintress status:', got:\n%s", text)
 	}
-	// stderr should be empty for text mode
-	if stderr.Len() != 0 {
-		t.Errorf("expected empty stderr for text mode, got:\n%s", stderr.String())
+	// stderr may contain Header/Section banners (expected)
+	// Verify no error-level content leaked to stderr
+	for _, line := range strings.Split(stderr.String(), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "===") || strings.HasPrefix(line, "---") {
+			continue
+		}
+		if strings.Contains(line, "ERR") {
+			t.Errorf("unexpected error in stderr: %s", line)
+		}
 	}
 }
 

@@ -1,9 +1,10 @@
 package session
 
-// white-box-reason: session internals: tests unexported LocalNotifier makeCmd injection
+// white-box-reason: session internals: tests unexported LocalNotifier cmdFactory injection
 
 import (
 	"context"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
@@ -20,10 +21,10 @@ func TestLocalNotifier_Darwin_CommandShape(t *testing.T) {
 	var capturedName string
 	var capturedArgs []string
 	n := &LocalNotifier{
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedName = name
 			capturedArgs = args
-			return &fakeCmd{} // succeeds immediately
+			return exec.Command("true")
 		},
 	}
 
@@ -52,10 +53,10 @@ func TestLocalNotifier_Linux_CommandShape(t *testing.T) {
 	var capturedArgs []string
 	n := &LocalNotifier{
 		forceOS: "linux",
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedName = name
 			capturedArgs = args
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -80,10 +81,10 @@ func TestLocalNotifier_Windows_CommandShape(t *testing.T) {
 	var capturedArgs []string
 	n := &LocalNotifier{
 		forceOS: "windows",
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedName = name
 			capturedArgs = args
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -110,9 +111,9 @@ func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	// given: force unsupported OS
 	n := &LocalNotifier{
 		forceOS: "freebsd",
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			t.Error("should not invoke command for unsupported OS")
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -130,9 +131,9 @@ func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 	var capturedShellCmd string
 	n := &CmdNotifier{
 		cmdTemplate: `curl -d {title}: {message} https://example.com`,
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedShellCmd = args[len(args)-1] // last arg to "sh -c ..."
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -161,9 +162,9 @@ func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
 	var capturedShellCmd string
 	n := &CmdNotifier{
 		cmdTemplate: `echo {message}`,
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedShellCmd = args[len(args)-1]
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -226,9 +227,9 @@ func TestCmdNotifier_Timeout(t *testing.T) {
 	var capturedCtx context.Context
 	n := &CmdNotifier{
 		cmdTemplate: `echo {message}`,
-		makeCmd: func(ctx context.Context, name string, args ...string) cmdRunner {
+		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
 			capturedCtx = ctx
-			return &fakeCmd{}
+			return exec.Command("true")
 		},
 	}
 
@@ -275,10 +276,3 @@ func TestNopNotifier_NoError(t *testing.T) {
 		t.Errorf("NopNotifier should always return nil, got: %v", err)
 	}
 }
-
-// fakeCmd implements cmdRunner for testing without executing real commands.
-type fakeCmd struct {
-	err error
-}
-
-func (f *fakeCmd) Run() error { return f.err }

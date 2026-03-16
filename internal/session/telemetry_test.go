@@ -68,7 +68,7 @@ func TestSpan_PaintressRun_CreatesRootSpan(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := session.NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := session.NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()
@@ -103,7 +103,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 		DryRun:         true,
 	}
 
-	p := session.NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil)
+	p := session.NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
 	p.Run(context.Background())
 
 	spans := exp.GetSpans()

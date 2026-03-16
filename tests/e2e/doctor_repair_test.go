@@ -28,9 +28,9 @@ func initPaintressProject(t *testing.T, dir string) {
 	if err := git.Run(); err != nil {
 		t.Fatalf("git init: %v", err)
 	}
-	cmd := exec.Command("paintress", "init", "--lang", "en", dir)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
+	initCmd := exec.Command("paintress", "init", "--lang", "en", dir)
+	initCmd.Dir = dir
+	out, err := initCmd.Output()
 	if err != nil {
 		t.Fatalf("paintress init: %v\n%s", err, out)
 	}
@@ -43,8 +43,8 @@ func runDoctorJSON(t *testing.T, dir string, repair bool) doctorJSONOutput {
 		args = append(args, "--repair")
 	}
 	args = append(args, dir)
-	cmd := exec.Command("paintress", args...)
-	out, _ := cmd.CombinedOutput()
+	doctorCmd := exec.Command("paintress", args...)
+	out, _ := doctorCmd.Output()
 
 	// Find JSON object start
 	raw := string(out)

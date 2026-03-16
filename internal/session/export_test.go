@@ -26,3 +26,18 @@ var ExportCheckGHScopes = checkGHScopes
 var ExportCheckContextBudget = CheckContextBudget
 var ExportExtractStreamResult = ExtractStreamResult
 var ExportCheckSkillsRefToolchain = checkSkillsRefToolchain
+
+// NewCmdApproverForTest creates a CmdApprover with a test command factory.
+func NewCmdApproverForTest(cmdTemplate string, factory cmdFactoryFunc) *CmdApprover {
+	return &CmdApprover{cmdTemplate: cmdTemplate, cmdFactory: factory}
+}
+
+// NewLocalNotifierForTest creates a LocalNotifier with test overrides.
+func NewLocalNotifierForTest(osName string, factory cmdFactoryFunc) *LocalNotifier {
+	return &LocalNotifier{forceOS: osName, cmdFactory: factory}
+}
+
+// NewCmdNotifierForTest creates a CmdNotifier with a test command factory.
+func NewCmdNotifierForTest(cmdTemplate string, factory cmdFactoryFunc) *CmdNotifier {
+	return &CmdNotifier{cmdTemplate: cmdTemplate, cmdFactory: factory}
+}

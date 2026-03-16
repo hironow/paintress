@@ -118,10 +118,6 @@ func ScanInbox(ctx context.Context, continent string) ([]domain.DMail, error) {
 		dmails = append(dmails, dm)
 	}
 
-	if dmails == nil {
-		span.SetAttributes(attribute.Int("dmail.scan.count", 0))
-		return []domain.DMail{}, nil
-	}
 	span.SetAttributes(attribute.Int("dmail.scan.count", len(dmails)))
 	return dmails, nil
 }

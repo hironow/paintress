@@ -11,22 +11,17 @@ import (
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// cmdRunner abstracts exec.Cmd.Run for testing.
-type cmdRunner interface {
-	Run() error
-}
+// cmdFactoryFunc creates an *exec.Cmd — injectable for testing.
+type cmdFactoryFunc func(ctx context.Context, name string, args ...string) *exec.Cmd
 
-// cmdFactory creates a cmdRunner from command name and args.
-type cmdFactory func(ctx context.Context, name string, args ...string) cmdRunner
-
-func defaultCmdFactory(ctx context.Context, name string, args ...string) cmdRunner {
+func defaultCmdFactory(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
 }
 
 // LocalNotifier sends desktop notifications using OS-native commands.
 // darwin: osascript, linux: notify-send, others: returns ErrUnsupportedOS.
 type LocalNotifier struct {
-	makeCmd cmdFactory
+	cmdFactory cmdFactoryFunc
 	forceOS string // for testing; empty = use runtime.GOOS
 }
 
@@ -37,9 +32,9 @@ func (n *LocalNotifier) os() string {
 	return runtime.GOOS
 }
 
-func (n *LocalNotifier) factory() cmdFactory {
-	if n.makeCmd != nil {
-		return n.makeCmd
+func (n *LocalNotifier) factory() cmdFactoryFunc {
+	if n.cmdFactory != nil {
+		return n.cmdFactory
 	}
 	return defaultCmdFactory
 }
@@ -79,16 +74,16 @@ func psEscapeSingleQuote(s string) string {
 // The template may contain {title} and {message} placeholders.
 type CmdNotifier struct {
 	cmdTemplate string
-	makeCmd     cmdFactory
+	cmdFactory  cmdFactoryFunc
 }
 
 func NewCmdNotifier(cmdTemplate string) *CmdNotifier {
 	return &CmdNotifier{cmdTemplate: cmdTemplate}
 }
 
-func (n *CmdNotifier) factory() cmdFactory {
-	if n.makeCmd != nil {
-		return n.makeCmd
+func (n *CmdNotifier) factory() cmdFactoryFunc {
+	if n.cmdFactory != nil {
+		return n.cmdFactory
 	}
 	return defaultCmdFactory
 }

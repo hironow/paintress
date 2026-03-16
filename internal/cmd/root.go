@@ -55,10 +55,16 @@ func NewRootCommand() *cobra.Command {
 			}
 			verbose, _ := cmd.Flags().GetBool("verbose")
 			out := cmd.ErrOrStderr()
-			if os.Getenv("PAINTRESS_QUIET") != "" {
+			quiet, _ := cmd.Flags().GetBool("quiet")
+			if quiet {
 				out = io.Discard
 			}
 			logger := platform.NewLogger(out, verbose)
+			outputFmt, _ := cmd.Flags().GetString("output")
+			if outputFmt != "json" {
+				logger.Header("paintress", Version)
+				logger.Section(cmd.Name())
+			}
 			ctx := context.WithValue(cmd.Context(), loggerKey, logger)
 			shutdownTracer = initTracer("paintress", Version)
 			shutdownMeter = initMeter("paintress", Version)
@@ -82,6 +88,7 @@ func NewRootCommand() *cobra.Command {
 
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (respects NO_COLOR env)")
+	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress all stderr output")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 	rootCmd.PersistentFlags().StringP("lang", "l", "", "Output language: en, ja (default from config)")
 
