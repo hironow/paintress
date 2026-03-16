@@ -156,6 +156,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if e.DataOut == nil {
 		e.DataOut = io.Discard
 	}
+	if e.ErrOut == nil {
+		e.ErrOut = io.Discard
+	}
 	prompt := e.BuildPrompt()
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
