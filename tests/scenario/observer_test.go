@@ -391,3 +391,45 @@ func (o *Observer) AssertExpeditionCount(wantCount int) {
 		o.t.Errorf("expedition.started count: got %d, want %d", count, wantCount)
 	}
 }
+
+// --- Retry exhaustion and inbox filter helpers (proposals 040, 041) ---
+
+// AssertEscalationEvent scans .expedition/events/*.jsonl for an escalation
+// event triggered by retry exhaustion (max_retries exceeded).
+func (o *Observer) AssertEscalationEvent() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if strings.Contains(string(data), `"escalation"`) || strings.Contains(string(data), `"escalated"`) {
+			return
+		}
+	}
+	o.t.Error("no escalation event found in .expedition/events/*.jsonl")
+}
+
+// AssertInboxProcessedAll verifies that all D-Mails in .expedition/inbox/
+// were consumed (inbox is empty after expedition run). This documents the
+// passthrough behavior: all kinds are processed, not just specification.
+func (o *Observer) AssertInboxProcessedAll() {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, ".expedition", "inbox")
+	files := o.ws.ListFiles(o.t, dir)
+	var remaining []string
+	for _, f := range files {
+		if strings.HasSuffix(f, ".md") {
+			remaining = append(remaining, f)
+		}
+	}
+	if len(remaining) > 0 {
+		o.t.Errorf(".expedition/inbox still has %d unprocessed D-Mails: %v", len(remaining), remaining)
+	}
+}
