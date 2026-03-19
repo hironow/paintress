@@ -1,8 +1,10 @@
 package domain_test
 
 import (
+	"encoding/json"
 	"testing"
 	"testing/quick"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 )
@@ -96,5 +98,61 @@ func TestGradient_Property_PriorityHintMonotonicity(t *testing.T) {
 	}
 	if err := quick.Check(f, &quick.Config{MaxCount: 500}); err != nil {
 		t.Errorf("PriorityHint monotonicity violated: %v", err)
+	}
+}
+
+// TestGradientGauge_ExpeditionAggregate_Linkage verifies that
+// RecordGradientChange produces events with Level matching the gauge state.
+func TestGradientGauge_ExpeditionAggregate_Linkage(t *testing.T) {
+	// given
+	gauge := domain.NewGradientGauge(5)
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now()
+
+	// when: charge gauge and record
+	gauge.Charge()
+	gauge.Charge()
+	gauge.Charge()
+	ev, err := agg.RecordGradientChange(gauge.Level(), "charge", now)
+
+	// then
+	if err != nil {
+		t.Fatalf("RecordGradientChange: %v", err)
+	}
+	if ev.Type != domain.EventGradientChanged {
+		t.Errorf("event type: got %s, want %s", ev.Type, domain.EventGradientChanged)
+	}
+
+	// Unmarshal and verify level matches gauge
+	var data domain.GradientChangedData
+	if unmarshalErr := json.Unmarshal(ev.Data, &data); unmarshalErr != nil {
+		t.Fatalf("unmarshal GradientChangedData: %v", unmarshalErr)
+	}
+	if data.Level != 3 {
+		t.Errorf("GradientChangedData.Level: got %d, want 3", data.Level)
+	}
+	if data.Operator != "charge" {
+		t.Errorf("GradientChangedData.Operator: got %q, want %q", data.Operator, "charge")
+	}
+}
+
+// TestGradientGauge_DischargeEvent verifies discharge produces level=0 event.
+func TestGradientGauge_DischargeEvent(t *testing.T) {
+	gauge := domain.NewGradientGauge(5)
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now()
+
+	gauge.Charge()
+	gauge.Charge()
+	gauge.Discharge()
+	ev, err := agg.RecordGradientChange(gauge.Level(), "discharge", now)
+	if err != nil {
+		t.Fatalf("RecordGradientChange: %v", err)
+	}
+
+	var data domain.GradientChangedData
+	json.Unmarshal(ev.Data, &data)
+	if data.Level != 0 {
+		t.Errorf("after discharge, Level: got %d, want 0", data.Level)
 	}
 }
