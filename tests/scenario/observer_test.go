@@ -501,3 +501,53 @@ func (o *Observer) AssertJournalWritten(minCount int) {
 		o.t.Errorf("journal files: got %d, want at least %d", mdCount, minCount)
 	}
 }
+
+// --- Specification consumption + insights helpers (proposals 063, 066) ---
+
+// AssertPromptContainsField reads prompt logs and verifies a specific
+// field value appears in at least one prompt. Generic version of
+// AssertPromptContainsLumina for any content check.
+func (o *Observer) AssertPromptContainsField(substring string) {
+	o.t.Helper()
+	dir := o.ws.PromptLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir: %v", err)
+	}
+	if len(entries) == 0 {
+		o.t.Fatal("no prompt logs found")
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if strings.Contains(string(data), substring) {
+			return
+		}
+	}
+	o.t.Errorf("no prompt log contains %q", substring)
+}
+
+// AssertLuminaInsightFile verifies that .expedition/insights/lumina.md
+// exists and contains the expected pattern text.
+func (o *Observer) AssertLuminaInsightFile(wantPattern string) {
+	o.t.Helper()
+	path := filepath.Join(o.ws.RepoPath, ".expedition", "insights", "lumina.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		o.t.Fatalf("read lumina.md: %v", err)
+	}
+	if wantPattern != "" && !strings.Contains(string(data), wantPattern) {
+		o.t.Errorf("lumina.md does not contain %q\ncontent (truncated):\n%.500s", wantPattern, string(data))
+	}
+}
+
+// AssertInsightsFileExists verifies .expedition/insights/lumina.md exists.
+func (o *Observer) AssertInsightsFileExists() {
+	o.t.Helper()
+	path := filepath.Join(o.ws.RepoPath, ".expedition", "insights", "lumina.md")
+	if _, err := os.Stat(path); err != nil {
+		o.t.Errorf(".expedition/insights/lumina.md not found: %v", err)
+	}
+}
