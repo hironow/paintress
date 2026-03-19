@@ -433,3 +433,22 @@ func (o *Observer) AssertInboxProcessedAll() {
 		o.t.Errorf(".expedition/inbox still has %d unprocessed D-Mails: %v", len(remaining), remaining)
 	}
 }
+
+// --- GitHub PR review gate helpers (proposal 048) ---
+
+// AssertPRReviewGateNotCalled verifies that fake-gh was NOT called with
+// "pr edit" (because all fixtures use pr_url=none). This documents the
+// current blind spot: UpdatePRReviewGate is never exercised in scenarios.
+func (o *Observer) AssertPRReviewGateNotCalled() {
+	o.t.Helper()
+	// When pr_url=none, the PR update path should be skipped entirely.
+	// If a FAKE_GH_EDIT_LOG_DIR existed and had files, that would indicate
+	// the path was unexpectedly called.
+	logDir := filepath.Join(o.ws.Root, "gh-edit-logs")
+	if _, err := os.Stat(logDir); err == nil {
+		entries, _ := os.ReadDir(logDir)
+		if len(entries) > 0 {
+			o.t.Errorf("unexpected gh pr edit calls found in %s (%d files)", logDir, len(entries))
+		}
+	}
+}
