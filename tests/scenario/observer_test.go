@@ -452,3 +452,29 @@ func (o *Observer) AssertPRReviewGateNotCalled() {
 		}
 	}
 }
+
+// --- Expedition timeout helpers (proposal 051) ---
+
+// AssertExpeditionTimedOut checks for a timeout-related event in JSONL.
+// Full implementation requires FAKE_CLAUDE_SLEEP_SEC env var support
+// in fake-claude (not yet implemented). This helper documents the
+// assertion pattern for when that infra is added.
+func (o *Observer) AssertExpeditionTimedOut() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		content := string(data)
+		if strings.Contains(content, `"timeout"`) || strings.Contains(content, `"timed_out"`) || strings.Contains(content, `"deadline_exceeded"`) {
+			return
+		}
+	}
+	o.t.Error("no timeout event found in .expedition/events/*.jsonl")
+}
