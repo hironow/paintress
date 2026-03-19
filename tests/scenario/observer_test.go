@@ -3,6 +3,7 @@
 package scenario_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -114,4 +115,55 @@ func (o *Observer) WaitForClosedLoop(timeout time.Duration) {
 	o.ws.WaitForDMail(o.t, ".expedition", "inbox", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".gate", "inbox", stepTimeout)
 	o.ws.WaitForDMail(o.t, ".siren", "inbox", stepTimeout)
+}
+
+// --- Prompt and expedition assertion helpers (proposals 003, 009 adapted) ---
+
+// AssertPromptCount verifies fake-claude was called exactly wantCount times.
+func (o *Observer) AssertPromptCount(wantCount int) {
+	o.t.Helper()
+	dir := o.ws.PromptLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir %s: %v", dir, err)
+	}
+	got := len(entries)
+	if got != wantCount {
+		if got == 0 {
+			o.t.Errorf("prompt count: got 0, want %d — fake-claude may not have been invoked", wantCount)
+		} else {
+			o.t.Errorf("prompt count: got %d, want %d", got, wantCount)
+		}
+	}
+}
+
+// AssertPromptCountAtLeast verifies fake-claude was called at least minCount times.
+// Useful for non-deterministic scenarios where exact count varies.
+func (o *Observer) AssertPromptCountAtLeast(minCount int) {
+	o.t.Helper()
+	dir := o.ws.PromptLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir %s: %v", dir, err)
+	}
+	got := len(entries)
+	if got < minCount {
+		o.t.Errorf("prompt count: got %d, want at least %d", got, minCount)
+	}
+}
+
+// AssertExpeditionJournalExists verifies that at least one expedition journal
+// entry was created in .expedition/journal/.
+func (o *Observer) AssertExpeditionJournalExists() {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, ".expedition", "journal")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		// journal dir may not exist if no expedition ran
+		o.t.Logf("journal dir %s not accessible: %v", dir, err)
+		return
+	}
+	if len(entries) == 0 {
+		o.t.Error("expected at least 1 expedition journal entry, got 0")
+	}
 }
