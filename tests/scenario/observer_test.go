@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -339,5 +340,54 @@ func (o *Observer) AssertNotifyFailOpen() {
 	}
 	if len(entries) == 0 {
 		o.t.Error("expected expedition events after notify failure (fail-open), but events dir is empty")
+	}
+}
+
+// --- Swarm and Approval assertion helpers (proposals 029, 030) ---
+
+// AssertWorktreeCount runs `git worktree list` in the workspace repo
+// and verifies the number of worktrees matches expected count.
+// A clean repo with no swarm should have exactly 1 worktree (main).
+func (o *Observer) AssertWorktreeCount(wantCount int) {
+	o.t.Helper()
+	cmd := exec.Command("git", "worktree", "list")
+	cmd.Dir = o.ws.RepoPath
+	out, err := cmd.Output()
+	if err != nil {
+		o.t.Fatalf("git worktree list: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	got := len(lines)
+	if got != wantCount {
+		o.t.Errorf("worktree count: got %d, want %d\nworktrees:\n%s", got, wantCount, string(out))
+	}
+}
+
+// AssertExpeditionCount checks the number of expedition events in JSONL.
+func (o *Observer) AssertExpeditionCount(wantCount int) {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		if wantCount == 0 {
+			return // no events dir = 0 expeditions, acceptable
+		}
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	count := 0
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.Contains(line, `"expedition.started"`) {
+				count++
+			}
+		}
+	}
+	if count != wantCount {
+		o.t.Errorf("expedition.started count: got %d, want %d", count, wantCount)
 	}
 }
