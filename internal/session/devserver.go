@@ -62,6 +62,11 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	)
 	defer span.End()
 
+	parts := strings.Fields(ds.cmd)
+	if len(parts) == 0 {
+		return fmt.Errorf("dev_cmd is empty; set dev_cmd or enable no_dev")
+	}
+
 	if ds.isRunning() {
 		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", false)))
 		return nil
@@ -81,12 +86,6 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	logFile, err := os.Create(ds.logPath)
 	if err != nil {
 		return fmt.Errorf("log file creation failed: %w", err)
-	}
-
-	parts := strings.Fields(ds.cmd)
-	if len(parts) == 0 {
-		logFile.Close()
-		return fmt.Errorf("dev_cmd is empty; set dev_cmd or enable no_dev")
 	}
 	ds.process = exec.CommandContext(ctx, parts[0], parts[1:]...)
 	ds.process.Dir = ds.dir
