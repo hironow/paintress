@@ -3,6 +3,8 @@
 package scenario_test
 
 import (
+	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -166,4 +168,95 @@ func (o *Observer) AssertExpeditionJournalExists() {
 	if len(entries) == 0 {
 		o.t.Error("expected at least 1 expedition journal entry, got 0")
 	}
+}
+
+// --- Event store assertion helpers (proposal 018) ---
+
+// AssertGommageEvent scans .expedition/events/*.jsonl for an event of type
+// "gommage.triggered" and verifies the consecutive_failures field matches
+// the expected count. This tests the full gommage pipeline:
+// FAIL_COUNT exhaustion -> gommage trigger -> JSONL event recording.
+func (o *Observer) AssertGommageEvent(wantConsecutiveFailures int) {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir %s: %v", eventsDir, err)
+	}
+
+	type eventEnvelope struct {
+		Type string          `json:"type"`
+		Data json.RawMessage `json:"data"`
+	}
+	type gommageData struct {
+		ConsecutiveFailures int `json:"consecutive_failures"`
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		f, openErr := os.Open(filepath.Join(eventsDir, entry.Name()))
+		if openErr != nil {
+			continue
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			var ev eventEnvelope
+			if jsonErr := json.Unmarshal(scanner.Bytes(), &ev); jsonErr != nil {
+				continue
+			}
+			if ev.Type == "gommage.triggered" {
+				var data gommageData
+				if dataErr := json.Unmarshal(ev.Data, &data); dataErr != nil {
+					o.t.Errorf("gommage event found but data unmarshal failed: %v", dataErr)
+					f.Close()
+					return
+				}
+				if data.ConsecutiveFailures != wantConsecutiveFailures {
+					o.t.Errorf("gommage consecutive_failures: got %d, want %d",
+						data.ConsecutiveFailures, wantConsecutiveFailures)
+				}
+				f.Close()
+				return // found
+			}
+		}
+		f.Close()
+	}
+	o.t.Error("no gommage.triggered event found in .expedition/events/*.jsonl")
+}
+
+// AssertEventInJSONL scans .expedition/events/*.jsonl for any event of the
+// given type. Returns true if found. Generic helper for future event assertions.
+func (o *Observer) AssertEventInJSONL(wantType string) {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	type eventEnvelope struct {
+		Type string `json:"type"`
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		f, _ := os.Open(filepath.Join(eventsDir, entry.Name()))
+		if f == nil {
+			continue
+		}
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			var ev eventEnvelope
+			if json.Unmarshal(scanner.Bytes(), &ev) == nil && ev.Type == wantType {
+				f.Close()
+				return
+			}
+		}
+		f.Close()
+	}
+	o.t.Errorf("event type %q not found in .expedition/events/*.jsonl", wantType)
 }
