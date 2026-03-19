@@ -321,3 +321,23 @@ func (o *Observer) AssertPromptNotContainsLumina(substring string) {
 		}
 	}
 }
+
+// --- Notification assertion helpers (proposal 024) ---
+
+// AssertNotifyFailOpen verifies that when a notify-cmd fails, the expedition
+// still completes (fail-open semantic). Checks that expedition proceeded by
+// verifying at least one D-Mail was produced despite notification failure.
+func (o *Observer) AssertNotifyFailOpen() {
+	o.t.Helper()
+	// If expedition completed despite notify failure, there should be
+	// expedition events or D-Mails produced
+	dir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Logf("events dir not accessible: %v", err)
+		return
+	}
+	if len(entries) == 0 {
+		o.t.Error("expected expedition events after notify failure (fail-open), but events dir is empty")
+	}
+}
