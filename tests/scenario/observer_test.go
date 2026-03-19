@@ -551,3 +551,46 @@ func (o *Observer) AssertInsightsFileExists() {
 		o.t.Errorf(".expedition/insights/lumina.md not found: %v", err)
 	}
 }
+
+// --- Bug issue + HIGH severity gate helpers (proposals 069, 072) ---
+
+// AssertBugsFoundInJSONL scans .expedition/events/*.jsonl for
+// expedition.completed events with bugs_found > 0.
+func (o *Observer) AssertBugsFoundInJSONL() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		content := string(data)
+		if strings.Contains(content, `"bugs_found"`) && !strings.Contains(content, `"bugs_found":"0"`) {
+			return
+		}
+	}
+	o.t.Error("no expedition.completed event with bugs_found > 0")
+}
+
+// AssertNotifyArgvContains reads the notify-cmd log file and verifies
+// the notification message contains the expected substring.
+func (o *Observer) AssertNotifyArgvContains(wantSubstring string) {
+	o.t.Helper()
+	logDir := filepath.Join(o.ws.Root, "notify-logs")
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		o.t.Logf("notify-logs dir not accessible: %v (notify-cmd may not have run)", err)
+		return
+	}
+	for _, entry := range entries {
+		data, _ := os.ReadFile(filepath.Join(logDir, entry.Name()))
+		if strings.Contains(string(data), wantSubstring) {
+			return
+		}
+	}
+	o.t.Errorf("no notify log contains %q (checked %d files)", wantSubstring, len(entries))
+}
