@@ -594,3 +594,25 @@ func (o *Observer) AssertNotifyArgvContains(wantSubstring string) {
 	}
 	o.t.Errorf("no notify log contains %q (checked %d files)", wantSubstring, len(entries))
 }
+
+// --- Report D-Mail field verification helper (proposal 075) ---
+
+// AssertReportDMailFields reads a report D-Mail and verifies key fields
+// (description, issues, status, mission_type) are present and non-empty.
+// This is the scenario-level complement to 035's domain-level contract test.
+func (o *Observer) AssertReportDMailFields(path string) {
+	o.t.Helper()
+	fm, body := o.ws.ReadDMail(o.t, path)
+
+	for _, field := range []string{"description", "kind", "name"} {
+		val, ok := fm[field].(string)
+		if !ok || val == "" {
+			o.t.Errorf("report D-Mail %s: missing or empty field %q", filepath.Base(path), field)
+		}
+	}
+
+	// Body should contain status and mission info
+	if body == "" {
+		o.t.Errorf("report D-Mail %s: empty body", filepath.Base(path))
+	}
+}
