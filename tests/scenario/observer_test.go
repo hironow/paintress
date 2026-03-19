@@ -260,3 +260,64 @@ func (o *Observer) AssertEventInJSONL(wantType string) {
 	}
 	o.t.Errorf("event type %q not found in .expedition/events/*.jsonl", wantType)
 }
+
+// --- Lumina assertion helpers (proposal 021) ---
+
+// AssertPromptContainsLumina reads all prompt log files and verifies that
+// at least one contains the given substring. Used to confirm Lumina patterns
+// extracted from journals are injected into the expedition prompt.
+func (o *Observer) AssertPromptContainsLumina(substring string) {
+	o.t.Helper()
+	dir := o.ws.PromptLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir %s: %v", dir, err)
+	}
+	if len(entries) == 0 {
+		o.t.Fatalf("no prompt logs found in %s — fake-claude was not invoked", dir)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+		if strings.Contains(string(data), substring) {
+			return
+		}
+	}
+
+	if len(entries) > 0 {
+		first, _ := os.ReadFile(filepath.Join(dir, entries[0].Name()))
+		o.t.Logf("first prompt log (truncated):\n%.2000s", string(first))
+	}
+	o.t.Errorf("no prompt log contains substring %q (checked %d files)", substring, len(entries))
+}
+
+// AssertPromptNotContainsLumina verifies that none of the prompt logs
+// contain the given substring. Useful for negative tests.
+func (o *Observer) AssertPromptNotContainsLumina(substring string) {
+	o.t.Helper()
+	dir := o.ws.PromptLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read prompt-log dir %s: %v", dir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		data, readErr := os.ReadFile(filepath.Join(dir, entry.Name()))
+		if readErr != nil {
+			continue
+		}
+		if strings.Contains(string(data), substring) {
+			o.t.Errorf("prompt log %s unexpectedly contains %q", entry.Name(), substring)
+			return
+		}
+	}
+}
