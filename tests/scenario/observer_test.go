@@ -478,3 +478,26 @@ func (o *Observer) AssertExpeditionTimedOut() {
 	}
 	o.t.Error("no timeout event found in .expedition/events/*.jsonl")
 }
+
+// --- Journal round-trip helpers (proposal 059) ---
+
+// AssertJournalExists verifies that at least one journal .md file exists
+// in .expedition/journal/ that was written by WriteJournal (not hand-seeded).
+// Uses file count comparison: if count > seed count, WriteJournal ran.
+func (o *Observer) AssertJournalWritten(minCount int) {
+	o.t.Helper()
+	dir := filepath.Join(o.ws.RepoPath, ".expedition", "journal")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		o.t.Fatalf("read journal dir: %v", err)
+	}
+	var mdCount int
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".md") {
+			mdCount++
+		}
+	}
+	if mdCount < minCount {
+		o.t.Errorf("journal files: got %d, want at least %d", mdCount, minCount)
+	}
+}
