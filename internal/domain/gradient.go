@@ -28,6 +28,9 @@ type GradientGauge struct {
 }
 
 func NewGradientGauge(max int) *GradientGauge {
+	if max < 0 {
+		max = 0
+	}
 	return &GradientGauge{
 		max: max,
 	}

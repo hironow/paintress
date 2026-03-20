@@ -362,6 +362,34 @@ func TestGradient_LargeMax(t *testing.T) {
 	}
 }
 
+func TestGradient_NegativeMax_ClampsToZero(t *testing.T) {
+	// given
+	g := domain.NewGradientGauge(-5)
+
+	// then: level starts at 0
+	if g.Level() != 0 {
+		t.Errorf("Level = %d, want 0", g.Level())
+	}
+
+	// then: FormatForPrompt does not panic
+	s := g.FormatForPrompt()
+	if s == "" {
+		t.Error("FormatForPrompt should not return empty")
+	}
+
+	// then: Charge is no-op (max is clamped to 0, so level < max is false)
+	g.Charge()
+	if g.Level() != 0 {
+		t.Errorf("after Charge, Level = %d, want 0 (max clamped to 0)", g.Level())
+	}
+
+	// then: FormatLog does not panic
+	log := g.FormatLog()
+	if log == "" {
+		t.Error("FormatLog should not return empty")
+	}
+}
+
 // --- from race_test.go ---
 
 func TestGradient_ConcurrentFormatForPrompt(t *testing.T) {
