@@ -37,9 +37,9 @@ func TestRecordExpedition_IncreasesCounter(t *testing.T) {
 	ctx := context.Background()
 
 	// when
-	platform.RecordExpedition(ctx, "success")
-	platform.RecordExpedition(ctx, "failed")
-	platform.RecordExpedition(ctx, "success")
+	platform.RecordExpedition(ctx, "success", "opus")
+	platform.RecordExpedition(ctx, "failed", "sonnet")
+	platform.RecordExpedition(ctx, "success", "opus")
 
 	// then
 	var rm metricdata.ResourceMetrics
@@ -49,6 +49,44 @@ func TestRecordExpedition_IncreasesCounter(t *testing.T) {
 	total := sumCounter(t, rm, "paintress.expedition.total")
 	if total != 3 {
 		t.Errorf("total = %d, want 3", total)
+	}
+}
+
+func TestRecordExpedition_IncludesModelAttribute(t *testing.T) {
+	// given
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	origMeter := platform.Meter
+	platform.Meter = mp.Meter("test")
+	defer func() { platform.Meter = origMeter }()
+	ctx := context.Background()
+
+	// when
+	platform.RecordExpedition(ctx, "success", "claude-sonnet-4-20250514")
+
+	// then
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name != "paintress.expedition.total" {
+				continue
+			}
+			sum := m.Data.(metricdata.Sum[int64])
+			for _, dp := range sum.DataPoints {
+				for _, attr := range dp.Attributes.ToSlice() {
+					if string(attr.Key) == "model" && attr.Value.AsString() == "claude-sonnet-4-20250514" {
+						found = true
+					}
+				}
+			}
+		}
+	}
+	if !found {
+		t.Error("expected model attribute on metric data point")
 	}
 }
 
