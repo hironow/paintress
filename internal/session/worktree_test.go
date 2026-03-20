@@ -715,6 +715,68 @@ func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
 	}
 }
 
+// failOnCheckoutGitExecutor wraps a real executor but fails on checkout commands.
+type failOnCheckoutGitExecutor struct {
+	real      *localGitExecutor
+	failCount atomic.Int32
+}
+
+func (f *failOnCheckoutGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "checkout" && args[1] == "--detach" {
+		f.failCount.Add(1)
+		return nil, fmt.Errorf("simulated checkout failure")
+	}
+	return f.real.Git(ctx, dir, args...)
+}
+
+func (f *failOnCheckoutGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	return f.real.Shell(ctx, dir, command)
+}
+
+func TestWorktreePool_Release_CheckoutFailure_RecyclesSlot(t *testing.T) {
+	// given: init with real executor, then swap to failing executor for Release
+	ctx := context.Background()
+	realExecutor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(realExecutor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// swap executor to one that fails checkout
+	failingExecutor := &failOnCheckoutGitExecutor{real: realExecutor}
+	pool.git = failingExecutor
+
+	// when: Release encounters checkout failure
+	err := pool.Release(ctx, path)
+
+	// then: Release should recover via forceRecycle (not lose the slot)
+	if err != nil {
+		t.Fatalf("Release should recover via recycle, got error: %v", err)
+	}
+
+	// swap back to real executor for verification
+	pool.git = realExecutor
+
+	// verify: the slot is back in the pool (can acquire again without deadlocking)
+	path2 := pool.Acquire()
+	if path2 == "" {
+		t.Fatal("expected to acquire a worker after recycled Release")
+	}
+
+	// verify: the recycled worktree is functional
+	out, err := realExecutor.Git(ctx, path2, "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		t.Fatalf("rev-parse failed on recycled worktree: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "true" {
+		t.Errorf("expected 'true', got %q", strings.TrimSpace(string(out)))
+	}
+}
+
 func TestWorktreePool_Shutdown_CleansAcquiredWorkers(t *testing.T) {
 	// given
 	ctx := context.Background()
