@@ -56,12 +56,25 @@ func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string,
 	}
 }
 
+// ValidateBaseBranch verifies that the given branch exists as a local git ref.
+func ValidateBaseBranch(ctx context.Context, git port.GitExecutor, repoDir, branch string) error {
+	_, err := git.Git(ctx, repoDir, "rev-parse", "--verify", branch)
+	if err != nil {
+		return fmt.Errorf("base branch %q does not exist as a git ref", branch)
+	}
+	return nil
+}
+
 // Init prunes stale worktree references and creates fresh worktrees for each worker.
 func (wp *WorktreePool) Init(ctx context.Context) error {
 	ctx, span := platform.Tracer.Start(ctx, "worktree_pool.init",
 		trace.WithAttributes(attribute.Int("pool.size", wp.size)),
 	)
 	defer span.End()
+
+	if err := ValidateBaseBranch(ctx, wp.git, wp.repoDir, wp.baseBranch); err != nil {
+		return err
+	}
 
 	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "prune"); err != nil {
 		return fmt.Errorf("worktree prune: %w", err)
