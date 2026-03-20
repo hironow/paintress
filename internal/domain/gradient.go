@@ -61,8 +61,8 @@ func (g *GradientGauge) Decay() {
 	defer g.mu.Unlock()
 	if g.level > 0 {
 		g.level--
+		g.log = append(g.log, fmt.Sprintf("-1 (now %d/%d)", g.level, g.max))
 	}
-	g.log = append(g.log, fmt.Sprintf("-1 (now %d/%d)", g.level, g.max))
 }
 
 // Level returns the current gauge level.

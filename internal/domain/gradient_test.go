@@ -362,6 +362,20 @@ func TestGradient_LargeMax(t *testing.T) {
 	}
 }
 
+func TestGradient_DecayAtZero_NoPhantomLog(t *testing.T) {
+	// given: gauge at level 0
+	g := domain.NewGradientGauge(5)
+
+	// when: decay at zero
+	g.Decay()
+
+	// then: no log entry should be appended (level didn't change)
+	log := g.FormatLog()
+	if log != "(empty)" {
+		t.Errorf("decay at 0 should not produce log entries, got %q", log)
+	}
+}
+
 func TestGradient_NegativeMax_ClampsToZero(t *testing.T) {
 	// given
 	g := domain.NewGradientGauge(-5)
