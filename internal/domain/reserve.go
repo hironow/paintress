@@ -24,7 +24,7 @@ type ReserveParty struct {
 	// Rate limit tracking
 	rateLimitHits int
 	lastHitTime   time.Time
-	cooldownUntil time.Time
+	cooldowns     map[string]time.Time // per-model cooldown expiry
 }
 
 func NewReserveParty(primary string, reserves []string, logger Logger) *ReserveParty {
@@ -32,10 +32,11 @@ func NewReserveParty(primary string, reserves []string, logger Logger) *ReserveP
 		logger = &NopLogger{}
 	}
 	return &ReserveParty{
-		primary: primary,
-		reserve: reserves,
-		active:  primary,
-		logger:  logger,
+		primary:   primary,
+		reserve:   reserves,
+		active:    primary,
+		logger:    logger,
+		cooldowns: make(map[string]time.Time),
 	}
 }
 
@@ -101,44 +102,72 @@ func isAlphaNum(b byte) bool {
 	return false
 }
 
+// nextAvailableModel returns the first model from the reserve list that is not
+// in cooldown. Returns "" if all reserves are in cooldown.
+// Caller must hold rp.mu.
+func (rp *ReserveParty) nextAvailableModel() string {
+	now := time.Now()
+	// Check primary first
+	if until, ok := rp.cooldowns[rp.primary]; !ok || now.After(until) {
+		if rp.active != rp.primary {
+			return rp.primary
+		}
+	}
+	// Then check reserves in order
+	for _, m := range rp.reserve {
+		if m == rp.active {
+			continue
+		}
+		if until, ok := rp.cooldowns[m]; !ok || now.After(until) {
+			return m
+		}
+	}
+	return ""
+}
+
 func (rp *ReserveParty) onRateLimitDetected() {
 	rp.mu.Lock()
 	defer rp.mu.Unlock()
 
 	rp.rateLimitHits++
 	rp.lastHitTime = time.Now()
-	// Cooldown: wait 30 minutes before trying primary again
-	rp.cooldownUntil = time.Now().Add(30 * time.Minute)
+	// Put current model in cooldown
+	rp.cooldowns[rp.active] = time.Now().Add(30 * time.Minute)
 
-	if rp.active == rp.primary && len(rp.reserve) > 0 {
+	if next := rp.nextAvailableModel(); next != "" {
 		prev := rp.active
-		rp.active = rp.reserve[0]
+		rp.active = next
 		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_activated"), prev, rp.active))
 	}
 }
 
-// TryRecoverPrimary checks if cooldown has passed and switches back to primary.
+// TryRecoverPrimary checks if primary's cooldown has passed and switches back.
 // Called before each expedition.
 func (rp *ReserveParty) TryRecoverPrimary() {
 	rp.mu.Lock()
 	defer rp.mu.Unlock()
 
-	if rp.active != rp.primary && time.Now().After(rp.cooldownUntil) {
-		prev := rp.active
-		rp.active = rp.primary
-		rp.logger.OK("%s", fmt.Sprintf(Msg("primary_recovered"), prev, rp.active))
+	if rp.active == rp.primary {
+		return
 	}
+	if until, ok := rp.cooldowns[rp.primary]; ok && !time.Now().After(until) {
+		return
+	}
+	prev := rp.active
+	rp.active = rp.primary
+	rp.logger.OK("%s", fmt.Sprintf(Msg("primary_recovered"), prev, rp.active))
 }
 
-// ForceReserve manually switches to reserve (e.g., after a timeout that looks rate-limit-related).
+// ForceReserve manually switches to the next available reserve model.
+// Cascades through reserves if multiple are needed.
 func (rp *ReserveParty) ForceReserve() {
 	rp.mu.Lock()
 	defer rp.mu.Unlock()
 
-	if rp.active == rp.primary && len(rp.reserve) > 0 {
+	rp.cooldowns[rp.active] = time.Now().Add(30 * time.Minute)
+	if next := rp.nextAvailableModel(); next != "" {
 		prev := rp.active
-		rp.active = rp.reserve[0]
-		rp.cooldownUntil = time.Now().Add(30 * time.Minute)
+		rp.active = next
 		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_forced"), prev, rp.active))
 	}
 }
@@ -153,9 +182,23 @@ func (rp *ReserveParty) Status() string {
 			rp.active, rp.reserve, rp.rateLimitHits)
 	}
 
-	remaining := time.Until(rp.cooldownUntil).Round(time.Minute)
-	return fmt.Sprintf("Active: %s (RESERVE) | Primary %s recovering (%v) | Hits: %d",
-		rp.active, rp.primary, remaining, rp.rateLimitHits)
+	// Show primary cooldown remaining
+	now := time.Now()
+	var parts []string
+	if until, ok := rp.cooldowns[rp.primary]; ok && now.Before(until) {
+		parts = append(parts, fmt.Sprintf("%s recovering (%v)", rp.primary, time.Until(until).Round(time.Minute)))
+	}
+	for _, m := range rp.reserve {
+		if until, ok := rp.cooldowns[m]; ok && now.Before(until) {
+			parts = append(parts, fmt.Sprintf("%s recovering (%v)", m, time.Until(until).Round(time.Minute)))
+		}
+	}
+	cooldownInfo := strings.Join(parts, ", ")
+	if cooldownInfo == "" {
+		cooldownInfo = "none in cooldown"
+	}
+	return fmt.Sprintf("Active: %s (RESERVE) | %s | Hits: %d",
+		rp.active, cooldownInfo, rp.rateLimitHits)
 }
 
 // FormatForPrompt provides model context for the prompt.
