@@ -79,16 +79,8 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
-	// Reserve Party: parse model string for reserves
-	models := strings.Split(cfg.Model, ",")
-	primary := strings.TrimSpace(models[0])
-	var reserves []string
-	for _, m := range models[1:] {
-		m = strings.TrimSpace(m)
-		if m != "" {
-			reserves = append(reserves, m)
-		}
-	}
+	// Reserve Party: parse model string for reserves (already validated by ValidateProjectConfig)
+	primary, reserves, _ := domain.ParseModelConfig(cfg.Model)
 
 	devDir := cfg.DevDir
 	if devDir == "" {
