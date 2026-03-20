@@ -110,6 +110,23 @@ func (g *GradientGauge) FormatForPrompt() string {
 	return fmt.Sprintf("Gradient Gauge: [%s] %d/%d\n%s", bar, g.level, g.max, g.priorityHint())
 }
 
+// Stats returns aggregate counts of charges, discharges (decays), and resets.
+func (g *GradientGauge) Stats() (charges, discharges, resets int) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, entry := range g.log {
+		switch {
+		case strings.HasPrefix(entry, "+1"):
+			charges++
+		case strings.HasPrefix(entry, "-1"):
+			discharges++
+		case strings.HasPrefix(entry, "RESET"):
+			resets++
+		}
+	}
+	return
+}
+
 // FormatLog returns the gauge history as a single-line summary.
 // Shows the final state and total charge/discharge counts to avoid
 // multi-line output that breaks logger prefix formatting.

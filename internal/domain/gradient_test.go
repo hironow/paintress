@@ -164,6 +164,50 @@ func TestGradient_PriorityHint_AllLevels(t *testing.T) {
 	}
 }
 
+func TestGradientGauge_DecayFromPositive_LogsDecrement(t *testing.T) {
+	// given
+	g := domain.NewGradientGauge(5)
+	g.Charge()
+	g.Charge()
+
+	// when
+	g.Decay()
+
+	// then
+	charges, discharges, resets := g.Stats()
+	if charges != 2 {
+		t.Errorf("charges = %d, want 2", charges)
+	}
+	if discharges != 1 {
+		t.Errorf("discharges = %d, want 1", discharges)
+	}
+	if resets != 0 {
+		t.Errorf("resets = %d, want 0", resets)
+	}
+}
+
+func TestGradientGauge_MultipleDecaysAtZero_NoPhantomCounts(t *testing.T) {
+	// given — gauge starts at zero
+	g := domain.NewGradientGauge(5)
+
+	// when — 3 decays at zero
+	g.Decay()
+	g.Decay()
+	g.Decay()
+
+	// then — no discharges recorded (level was already 0)
+	charges, discharges, resets := g.Stats()
+	if charges != 0 {
+		t.Errorf("charges = %d, want 0", charges)
+	}
+	if discharges != 0 {
+		t.Errorf("discharges = %d, want 0", discharges)
+	}
+	if resets != 0 {
+		t.Errorf("resets = %d, want 0", resets)
+	}
+}
+
 // --- from ralph_test.go ---
 
 func TestGradient_Charge(t *testing.T) {
