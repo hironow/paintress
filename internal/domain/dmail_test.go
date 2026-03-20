@@ -312,6 +312,69 @@ func TestDMailMarshal_NilContextOmitted(t *testing.T) {
 	}
 }
 
+func TestNewReportDMail_InsightContext_Present(t *testing.T) {
+	// given — report with an insight string
+	report := &domain.ExpeditionReport{
+		Expedition:  42,
+		IssueID:     "MY-100",
+		IssueTitle:  "Fix thing",
+		MissionType: "fix",
+		Status:      "success",
+		Insight:     "retry reduced failures by 30%",
+	}
+
+	// when
+	dm := domain.NewReportDMail(report)
+
+	// then
+	if dm.Context == nil {
+		t.Fatal("expected non-nil Context when Insight is present")
+	}
+	if len(dm.Context.Insights) == 0 {
+		t.Fatal("expected at least one InsightSummary in Context")
+	}
+	if dm.Context.Insights[0].Summary != "retry reduced failures by 30%" {
+		t.Errorf("Summary = %q, want %q", dm.Context.Insights[0].Summary, "retry reduced failures by 30%")
+	}
+}
+
+func TestNewReportDMail_InsightContext_Absent(t *testing.T) {
+	// given — report with no insight string
+	report := &domain.ExpeditionReport{
+		Expedition:  43,
+		IssueID:     "MY-101",
+		IssueTitle:  "Fix other thing",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when
+	dm := domain.NewReportDMail(report)
+
+	// then — backward-compatible: nil Context when Insight is empty
+	if dm.Context != nil {
+		t.Errorf("expected nil Context when Insight is absent, got %+v", dm.Context)
+	}
+}
+
+func TestNewReportDMail_InsightContext_NilGuard(t *testing.T) {
+	// given — report pointer itself; verify NewReportDMail does not panic on empty insight
+	report := &domain.ExpeditionReport{
+		Expedition:  44,
+		IssueID:     "MY-102",
+		IssueTitle:  "Another fix",
+		MissionType: "fix",
+		Status:      "failed",
+		Insight:     "",
+	}
+
+	// when / then — must not panic
+	dm := domain.NewReportDMail(report)
+	if dm.Context != nil {
+		t.Errorf("expected nil Context for empty Insight, got %+v", dm.Context)
+	}
+}
+
 func TestDMailMarshal_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given
 	dm := domain.DMail{
