@@ -170,6 +170,40 @@ func TestExpeditionAggregate_StatusVocabulary(t *testing.T) {
 	}
 }
 
+func TestExpeditionAggregate_CompleteExpedition_RejectsUnknownStatus(t *testing.T) {
+	// given
+	agg := domain.NewExpeditionAggregate()
+
+	// when
+	events, err := agg.CompleteExpedition(1, "typo_status", "", "", time.Now().UTC())
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unknown status, got nil")
+	}
+	if events != nil {
+		t.Errorf("expected nil events, got %v", events)
+	}
+	if agg.ConsecutiveFailures() != 0 {
+		t.Errorf("expected consecutive failures 0, got %d", agg.ConsecutiveFailures())
+	}
+}
+
+func TestValidExpeditionStatus(t *testing.T) {
+	known := []string{"success", "failed", "parse_error", "skipped"}
+	for _, s := range known {
+		if !domain.ValidExpeditionStatus(s) {
+			t.Errorf("expected %q to be valid", s)
+		}
+	}
+	unknown := []string{"typo", "", "timeout", "SUCCESS"}
+	for _, s := range unknown {
+		if domain.ValidExpeditionStatus(s) {
+			t.Errorf("expected %q to be invalid", s)
+		}
+	}
+}
+
 func TestExpeditionAggregate_SuccessResetsFailures(t *testing.T) {
 	// given: 2 consecutive failures then a success
 	agg := domain.NewExpeditionAggregate()

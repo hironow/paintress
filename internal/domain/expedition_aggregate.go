@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // ExpeditionAggregate owns expedition lifecycle state and produces events.
 // It tracks consecutive failures for gommage decisions and gradient state.
@@ -27,10 +30,22 @@ func (a *ExpeditionAggregate) StartExpedition(expedition, worker int, model stri
 	}, now)
 }
 
+// ValidExpeditionStatus reports whether s is a recognized expedition status.
+func ValidExpeditionStatus(s string) bool {
+	switch s {
+	case "success", "failed", "parse_error", "skipped":
+		return true
+	}
+	return false
+}
+
 // CompleteExpedition produces events for an expedition result.
 // On success, consecutive failures are reset. On failure, they increment.
 // Returns the expedition.completed event plus a gradient.changed event if applicable.
 func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID, bugsFound string, now time.Time) ([]Event, error) {
+	if !ValidExpeditionStatus(status) {
+		return nil, fmt.Errorf("unrecognized expedition status: %q", status)
+	}
 	completedEvent, err := NewEvent(EventExpeditionCompleted, ExpeditionCompletedData{
 		Expedition: expedition,
 		Status:     status,
