@@ -777,6 +777,152 @@ func TestWorktreePool_Release_CheckoutFailure_RecyclesSlot(t *testing.T) {
 	}
 }
 
+// failOnResetGitExecutor wraps a real executor but fails on "reset --hard" commands.
+type failOnResetGitExecutor struct {
+	real      *localGitExecutor
+	failCount atomic.Int32
+}
+
+func (f *failOnResetGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "reset" && args[1] == "--hard" {
+		f.failCount.Add(1)
+		return nil, fmt.Errorf("simulated reset failure")
+	}
+	return f.real.Git(ctx, dir, args...)
+}
+
+func (f *failOnResetGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	return f.real.Shell(ctx, dir, command)
+}
+
+// failOnCleanGitExecutor wraps a real executor but fails on "clean" commands.
+type failOnCleanGitExecutor struct {
+	real      *localGitExecutor
+	failCount atomic.Int32
+}
+
+func (f *failOnCleanGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 1 && args[0] == "clean" {
+		f.failCount.Add(1)
+		return nil, fmt.Errorf("simulated clean failure")
+	}
+	return f.real.Git(ctx, dir, args...)
+}
+
+func (f *failOnCleanGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	return f.real.Shell(ctx, dir, command)
+}
+
+func TestWorktreePool_Release_ResetFailure_RecyclesSlot(t *testing.T) {
+	// given: init with real executor, then swap to failing executor for Release
+	ctx := context.Background()
+	realExecutor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(realExecutor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// swap executor to one that fails reset --hard
+	failingExecutor := &failOnResetGitExecutor{real: realExecutor}
+	pool.git = failingExecutor
+
+	// when: Release encounters reset failure (checkout succeeds, reset fails)
+	err := pool.Release(ctx, path)
+
+	// then: Release should recover via forceRecycle
+	if err != nil {
+		t.Fatalf("Release should recover via recycle, got error: %v", err)
+	}
+
+	// swap back for verification
+	pool.git = realExecutor
+
+	// verify: slot is back in the pool
+	path2 := pool.Acquire()
+	if path2 == "" {
+		t.Fatal("expected to acquire a worker after recycled Release")
+	}
+}
+
+func TestWorktreePool_Release_CleanFailure_StillReturnsSlot(t *testing.T) {
+	// given: init with real executor, then swap to failing executor for Release
+	ctx := context.Background()
+	realExecutor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(realExecutor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// swap executor to one that fails clean
+	failingExecutor := &failOnCleanGitExecutor{real: realExecutor}
+	pool.git = failingExecutor
+
+	// when: Release encounters clean failure (checkout+reset succeed, clean fails)
+	err := pool.Release(ctx, path)
+
+	// then: Release should succeed (clean failure is non-fatal)
+	if err != nil {
+		t.Fatalf("Release should succeed despite clean failure, got error: %v", err)
+	}
+
+	// swap back for verification
+	pool.git = realExecutor
+
+	// verify: slot is back in the pool
+	path2 := pool.Acquire()
+	if path2 == "" {
+		t.Fatal("expected to acquire a worker after Release with clean failure")
+	}
+	if path != path2 {
+		t.Errorf("expected same path, got path1=%q path2=%q", path, path2)
+	}
+}
+
+func TestWorktreePool_Release_Success_ReturnsSlot(t *testing.T) {
+	// given
+	ctx := context.Background()
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// when: normal Release (happy path)
+	err := pool.Release(ctx, path)
+
+	// then
+	if err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+
+	// verify: slot is back in the pool and reusable
+	path2 := pool.Acquire()
+	if path2 != path {
+		t.Errorf("expected same path %q, got %q", path, path2)
+	}
+
+	// verify: worktree is clean
+	out, err := executor.Git(ctx, path2, "status", "--porcelain")
+	if err != nil {
+		t.Fatalf("git status failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "" {
+		t.Errorf("expected clean status, got: %q", string(out))
+	}
+}
+
 func TestWorktreePool_Shutdown_CleansAcquiredWorkers(t *testing.T) {
 	// given
 	ctx := context.Background()
