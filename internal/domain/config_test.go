@@ -380,6 +380,21 @@ func TestValidateProjectConfig_EmptyBaseBranch(t *testing.T) {
 	}
 }
 
+func TestValidateProjectConfig_NonEmptyBaseBranch_NoError(t *testing.T) {
+	// given — default config has base_branch="main" (non-empty)
+	cfg := domain.DefaultProjectConfig()
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then — no base_branch error
+	for _, e := range errs {
+		if strings.Contains(e, "base_branch") {
+			t.Errorf("unexpected base_branch error: %s", e)
+		}
+	}
+}
+
 func TestProjectConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
 	// given
 	cfg := domain.DefaultProjectConfig()
