@@ -47,5 +47,5 @@ func AppendReviewGateSection(body, section string) string {
 	if nextHeader == -1 {
 		return body[:idx] + section
 	}
-	return body[:idx] + section + "\n" + strings.TrimLeft(rest[nextHeader:], "\n")
+	return strings.TrimRight(body[:idx]+section, "\n") + "\n" + rest[nextHeader:]
 }

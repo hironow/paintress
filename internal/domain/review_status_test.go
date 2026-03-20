@@ -91,6 +91,28 @@ func TestAppendReviewGateSection_ReplaceExisting(t *testing.T) {
 	}
 }
 
+func TestAppendReviewGateSection_PreservesBlankLineBetweenSections(t *testing.T) {
+	// given: body with Summary, Review Gate, and Changelog sections.
+	// The section replacement has no trailing newline, exposing the TrimLeft bug
+	// where the blank-line separator between ## headers is lost.
+	body := "## Summary\n\nSome PR description\n\n## Review Gate\n\n- Status: **OLD**\n\n## Changelog\n\nEntries here\n"
+	section := "## Review Gate\n\n- Status: **PASSED**"
+
+	// when
+	result := domain.AppendReviewGateSection(body, section)
+
+	// then: blank line between Review Gate and Changelog must be preserved
+	if !strings.Contains(result, "\n\n## Changelog") {
+		t.Errorf("blank line before ## Changelog is missing:\n%s", result)
+	}
+	if !strings.Contains(result, "Entries here") {
+		t.Errorf("Changelog content lost:\n%s", result)
+	}
+	if strings.Contains(result, "OLD") {
+		t.Errorf("old section not replaced:\n%s", result)
+	}
+}
+
 func containsAll(s string, subs ...string) bool {
 	for _, sub := range subs {
 		if !strings.Contains(s, sub) {
