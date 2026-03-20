@@ -177,6 +177,9 @@ func ValidateProjectConfig(cfg ProjectConfig) []string {
 	if cfg.ClaudeCmd == "" {
 		errs = append(errs, "claude_cmd must not be empty")
 	}
+	if cfg.BaseBranch == "" {
+		errs = append(errs, "base_branch must not be empty")
+	}
 	if cfg.Model == "" {
 		errs = append(errs, "model must not be empty")
 	} else if _, _, err := ParseModelConfig(cfg.Model); err != nil {

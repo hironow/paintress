@@ -357,6 +357,29 @@ func TestValidateProjectConfig_ModelFormat(t *testing.T) {
 	}
 }
 
+func TestValidateProjectConfig_EmptyBaseBranch(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+	cfg.BaseBranch = ""
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected validation error for empty base_branch")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "base_branch") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected base_branch error, got: %v", errs)
+	}
+}
+
 func TestProjectConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
 	// given
 	cfg := domain.DefaultProjectConfig()
