@@ -9,6 +9,7 @@ import (
 // It tracks consecutive failures for gommage decisions and gradient state.
 type ExpeditionAggregate struct {
 	consecutiveFailures int
+	escalationFired     bool
 }
 
 // NewExpeditionAggregate creates an empty ExpeditionAggregate.
@@ -60,6 +61,7 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 	switch status {
 	case "success":
 		a.consecutiveFailures = 0
+		a.escalationFired = false
 	case "failed", "parse_error":
 		a.consecutiveFailures++
 	case "skipped":
@@ -67,6 +69,17 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 	}
 
 	return events, nil
+}
+
+// ShouldEscalate returns true if escalation should fire: consecutive failures
+// have reached the threshold AND escalation has not yet fired for this streak.
+// Once it returns true, subsequent calls return false until ResetEscalation is called.
+func (a *ExpeditionAggregate) ShouldEscalate(threshold int) bool {
+	if a.consecutiveFailures >= threshold && !a.escalationFired {
+		a.escalationFired = true
+		return true
+	}
+	return false
 }
 
 // ShouldGommage returns true if consecutive failures have reached the threshold.

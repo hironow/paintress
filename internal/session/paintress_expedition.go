@@ -168,7 +168,8 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
-		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
+		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && !p.escalationFired.Load() {
+			p.escalationFired.Store(true)
 			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
 
 			// Best-effort: write Gommage insight for cross-tool observability
@@ -379,6 +380,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.consecutiveFailures.Store(0)
 		p.consecutiveSkips.Store(0)
+		p.escalationFired.Store(false)
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))

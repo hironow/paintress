@@ -62,6 +62,7 @@ type Paintress struct {
 	totalMidHighSeverity atomic.Int64
 	consecutiveFailures  atomic.Int64
 	consecutiveSkips     atomic.Int64
+	escalationFired      atomic.Bool
 }
 
 
