@@ -501,7 +501,7 @@ func TestWorktreePool_Init_SetupCmdFailure_PartialInit(t *testing.T) {
 	}
 }
 
-func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
+func TestWorktreePool_Shutdown_AcquiredWorkersAlsoCleaned(t *testing.T) {
 	// given
 	ctx := context.Background()
 	executor := &localGitExecutor{}
@@ -515,44 +515,20 @@ func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
 	// acquire 1 worker (don't release it)
 	_ = pool.Acquire()
 
-	// when — shutdown should only remove the 1 worker still in the channel
+	// when — shutdown should remove ALL workers including acquired ones
 	err := pool.Shutdown(ctx)
 	if err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
 	}
 
-	// then: git worktree list shows 2 entries (main + 1 acquired worker still registered)
+	// then: git worktree list shows only 1 entry (main only, all workers cleaned)
 	out, err := executor.Git(ctx, repoDir, "worktree", "list")
 	if err != nil {
 		t.Fatalf("git worktree list failed: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) != 2 {
-		t.Errorf("expected 2 worktree entries (main + acquired), got %d:\n%s", len(lines), string(out))
-	}
-
-	// verify self-healing: remove the acquired worker's directory (simulating a crash),
-	// then a new pool calling Init prunes the orphaned worktree ref
-	poolDir := repoDir + "/.expedition/.run/worktrees"
-	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", poolDir))
-	if err != nil {
-		t.Fatalf("rm -rf poolDir failed: %v", err)
-	}
-
-	newPool := NewWorktreePool(executor, repoDir, "main", "", 1)
-	err = newPool.Init(ctx)
-	if err != nil {
-		t.Fatalf("new pool Init (self-healing) failed: %v", err)
-	}
-
-	out, err = executor.Git(ctx, repoDir, "worktree", "list")
-	if err != nil {
-		t.Fatalf("git worktree list after self-healing failed: %v", err)
-	}
-	// After prune cleans stale refs + adding 1 new worker: main + 1 new worker = 2 entries
-	lines = strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) != 2 {
-		t.Errorf("expected 2 worktree entries after self-healing, got %d:\n%s", len(lines), string(out))
+	if len(lines) != 1 {
+		t.Errorf("expected 1 worktree entry (main only), got %d:\n%s", len(lines), string(out))
 	}
 }
 
@@ -736,6 +712,37 @@ func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
 	}
 	if strings.TrimSpace(string(out)) != "true" {
 		t.Errorf("expected 'true', got %q", strings.TrimSpace(string(out)))
+	}
+}
+
+func TestWorktreePool_Shutdown_CleansAcquiredWorkers(t *testing.T) {
+	// given
+	ctx := context.Background()
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 2)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// acquire 1 worker (don't release it -- simulates in-flight expedition)
+	_ = pool.Acquire()
+
+	// when
+	err := pool.Shutdown(ctx)
+	if err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	// then: ALL worktrees should be removed, including the acquired one
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 worktree entry (main only), got %d:\n%s", len(lines), string(out))
 	}
 }
 

@@ -40,6 +40,7 @@ type WorktreePool struct {
 	setupCmd   string      // command to run after worktree creation
 	workers    chan string // available worktree paths
 	size       int
+	allPaths   []string   // all created worktree paths (for complete shutdown cleanup)
 }
 
 // NewWorktreePool creates a new WorktreePool with the given configuration.
@@ -82,6 +83,7 @@ func (wp *WorktreePool) Init(ctx context.Context) error {
 			}
 		}
 
+		wp.allPaths = append(wp.allPaths, path)
 		wp.workers <- path
 	}
 
@@ -109,20 +111,33 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 }
 
 // Shutdown removes all worktrees and cleans up the pool.
+// It removes all worktrees tracked in allPaths, including those currently
+// acquired by workers, preventing resource leaks on shutdown.
 func (wp *WorktreePool) Shutdown(ctx context.Context) error {
+	// Drain channel to unblock any pending Acquires.
+	drain:
 	for {
 		select {
-		case path := <-wp.workers:
-			if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path); err != nil {
-				return fmt.Errorf("worktree remove %s: %w", path, err)
-			}
+		case <-wp.workers:
 		default:
-			goto done
+			break drain
 		}
 	}
-done:
+
+	// Remove all worktrees (both acquired and released).
+	var errs []error
+	for _, path := range wp.allPaths {
+		if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path); err != nil {
+			errs = append(errs, fmt.Errorf("worktree remove %s: %w", path, err))
+		}
+	}
+
 	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "prune"); err != nil {
-		return fmt.Errorf("worktree prune: %w", err)
+		errs = append(errs, fmt.Errorf("worktree prune: %w", err))
+	}
+
+	if len(errs) > 0 {
+		return errs[0]
 	}
 	return nil
 }
