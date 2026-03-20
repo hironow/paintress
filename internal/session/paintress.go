@@ -49,6 +49,9 @@ type Paintress struct {
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryTracker *domain.RetryTracker
 
+	// Parallel worker same-issue guard (nil when Workers <= 1)
+	claimRegistry *domain.IssueClaimRegistry
+
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
 	totalAttempted       atomic.Int64
@@ -192,8 +195,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 		defer p.devServer.Stop()
 	}
 
-	// Initialize worktree pool if workers > 0.
+	// Initialize worktree pool and claim registry if workers > 0.
 	if p.config.Workers > 0 {
+		p.claimRegistry = domain.NewIssueClaimRegistry()
 		p.pool = NewWorktreePool(
 			&localGitExecutor{},
 			p.config.Continent,

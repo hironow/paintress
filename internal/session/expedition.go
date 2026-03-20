@@ -43,6 +43,9 @@ type Expedition struct {
 	midHighMu    sync.Mutex
 	midHighNames []string
 
+	// Parallel worker same-issue guard (nil in single-worker mode)
+	ClaimRegistry *domain.IssueClaimRegistry
+
 	// Mid-expedition issue-matched D-Mail routing (MY-361)
 	currentIssueMu  sync.Mutex
 	currentIssue    string
@@ -59,6 +62,17 @@ func (e *Expedition) setCurrentIssue(issue string) {
 	e.currentIssueMu.Lock()
 	defer e.currentIssueMu.Unlock()
 	e.currentIssue = issue
+}
+
+// ReleaseClaim releases the issue claim held by this expedition, if any.
+func (e *Expedition) ReleaseClaim() {
+	if e.ClaimRegistry == nil {
+		return
+	}
+	issue := e.getCurrentIssue()
+	if issue != "" {
+		e.ClaimRegistry.Release(issue)
+	}
 }
 
 // getCurrentIssue returns the issue being worked on (thread-safe).
@@ -237,6 +251,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
 	go watchFlag(watchCtx, workDir, e.Logger, func(issue, title string) {
+		if e.ClaimRegistry != nil {
+			ok, holder := e.ClaimRegistry.TryClaim(issue, e.Number)
+			if !ok {
+				e.Logger.Warn("Expedition #%d: issue %s already claimed by expedition #%d, skipping", e.Number, issue, holder)
+				return
+			}
+		}
 		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(

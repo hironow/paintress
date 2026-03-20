@@ -100,20 +100,28 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		expedition := &Expedition{
-			Number:      exp,
-			Continent:   p.config.Continent,
-			WorkDir:     workDir,
-			Config:      p.config,
-			LogDir:      p.logDir,
-			Logger:      p.Logger,
-			DataOut:     p.DataOut,
-			ErrOut:      p.ErrOut,
-			Luminas:     luminas,
-			Gradient:    p.gradient,
-			Reserve:     p.reserve,
-			InboxDMails: inboxDMails,
-			Notifier:    p.notifier,
+			Number:        exp,
+			Continent:     p.config.Continent,
+			WorkDir:       workDir,
+			Config:        p.config,
+			LogDir:        p.logDir,
+			Logger:        p.Logger,
+			DataOut:       p.DataOut,
+			ErrOut:        p.ErrOut,
+			Luminas:       luminas,
+			Gradient:      p.gradient,
+			Reserve:       p.reserve,
+			InboxDMails:   inboxDMails,
+			Notifier:      p.notifier,
+			ClaimRegistry: p.claimRegistry,
 		}
+		// Wrap releaseWorkDir to also release the issue claim.
+		origReleaseWorkDir := releaseWorkDir
+		releaseWorkDir = func() {
+			expedition.ReleaseClaim()
+			origReleaseWorkDir()
+		}
+
 		// archiveInbox moves all inbox D-Mails to archive. Called on error/gommage
 		// paths; the success path is covered by dispatchExpeditionResult's defer.
 		archiveInbox := func() {
