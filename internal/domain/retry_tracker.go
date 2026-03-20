@@ -27,6 +27,10 @@ func NewRetryTrackerWithMax(max int) *RetryTracker {
 }
 
 // Track increments and returns the retry count for the given issue set.
+// Design decision: Track always increments regardless of max. The max cap is
+// enforced only by Exhausted(), which is the authoritative check for whether
+// retries are exhausted. This separation allows callers to observe the true
+// count (e.g. for logging) even after the cap is reached.
 func (rt *RetryTracker) Track(issues []string) int {
 	key := RetryKey(issues)
 
