@@ -74,21 +74,69 @@ Injected directly into the next Expedition's prompt.
 - **Defensive**: Insights from failed expeditions that appear 2+ times → "Avoid — failed N times: ..." (falls back to failure reason if no insight)
 - **Offensive**: Insights from successful expeditions that appear 3+ times → "Proven approach (Nx successful): ..." (falls back to mission type if no insight)
 
-### Reserve Party (Model Fallback)
+### Reserve Party (Model Cascade Fallback)
 
-The output streaming goroutine detects rate limits in real-time and switches models automatically.
+The output streaming goroutine detects rate limits in real-time and cascades through available models automatically. Each model has an independent 30-minute cooldown, so a three-tier configuration can fall back from Opus to Sonnet to Haiku without waiting.
 
 ```bash
 # Opus primary, Sonnet reserve
 paintress --model opus,sonnet ./repo
 
-# Three-tier fallback
+# Three-tier cascade fallback
 paintress --model opus,sonnet,haiku ./repo
 ```
 
-- Rate limit detected → immediate switch to reserve
-- After 30-min cooldown → attempt recovery to primary
-- Timeout also triggers reserve switch (possible rate limit)
+- Rate limit detected → put current model in per-model cooldown → switch to next available model
+- After 30-min cooldown expires → attempt recovery to primary
+- Timeout also triggers cascade switch (possible rate limit)
+
+## Expedition Intelligence
+
+Additional systems that improve expedition quality across runs:
+
+### Capability Detection
+
+`ClassifyCapabilityViolation` scans journal text for signals indicating the expedition hit an environment boundary (network access, filesystem permissions, missing tools, Docker unavailability, auth failures, resource limits). Detected violations are recorded and injected into the Capability Boundary section of subsequent expedition prompts to prevent repeated failures.
+
+### Reflection Accumulator
+
+`ReflectionAccumulator` collects review comments across review-fix cycles within a single expedition. It tracks priority tag counts per cycle and detects stagnation (tag counts not decreasing across cycles). `FormatForPrompt` renders the accumulated history for injection into fix prompts.
+
+### Strategy Rotation
+
+`StrategyForCycle` rotates through three fix strategies across review-fix cycles: **Direct** (cycle 1) applies review comments directly, **Decompose** (cycle 2) breaks comments into sub-tasks, **Rewrite** (cycle 3) rewrites the affected section from scratch. The rotation repeats for longer review chains.
+
+### Issue Claim Registry
+
+`IssueClaimRegistry` prevents multiple parallel workers (Swarm Mode) from working on the same Linear issue simultaneously. Thread-safe via mutex; `TryClaim` returns the holding expedition number on conflict.
+
+### Duration Percentiles
+
+`ExpeditionDurations` pairs start/complete events to compute per-expedition durations. `DurationPercentiles` calculates p50, p90, and p99 from the duration list. Telemetry breakdown attributes track time spent in each expedition phase.
+
+### Windowed Success Rate
+
+`WindowedSuccessRate` computes success rate over the most recent N completed expeditions. `DetectSuccessRateTrend` compares the recent window against the preceding window to detect improvement, decline, or stability (threshold: 10% change).
+
+### Worktree Health Check
+
+`AcquireContext` runs a `git status` health check on acquired worktrees before returning them to workers. If the worktree is corrupted or inaccessible, it is automatically force-recycled and a fresh worktree is created. Acquired worktrees are also cleaned up on `Shutdown`.
+
+### Context File Size Guard
+
+Per-file and total byte limits prevent oversized context files from bloating the expedition prompt. Files exceeding the per-file limit are excluded with a warning; the total budget caps aggregate context size.
+
+### Review Comment Extraction
+
+`ExtractReviewComments` parses review tool output into structured `ReviewComment` values with priority sorting (`[P0]` highest). Falls back to raw text when structured parsing fails.
+
+### Escalation Cooldown
+
+Escalation events fire once per failure streak rather than on every consecutive failure. Retry backoff is capped via `NewRetryTrackerWithMax` with an `Exhausted` check.
+
+### Label-Based Issue Exclusion
+
+`ExcludeIssuesByLabel` filters Linear issues by label (case-insensitive match), allowing teams to exclude issues tagged with specific labels from the expedition loop.
 
 ## D-Mail Protocol
 
@@ -115,9 +163,12 @@ Paintress (binary)         <- Outside the repository
     |  +-- WorktreePool.Init (when --workers >= 1)
     |
     |  Per Expedition:
+    |  +-- IssueClaimRegistry.TryClaim (Swarm Mode dedup)
     |  +-- triagePreFlightDMails (escalate/resolve/retry)
     |  +-- Gradient Gauge check -> difficulty hint
     |  +-- Reserve Party check -> primary recovery attempt
+    |  +-- StrategyForCycle -> fix strategy selection
+    |  +-- ReflectionAccumulator -> stagnation detection
     |
     v
 Monolith (Linear)          <- Fully external
@@ -163,8 +214,8 @@ Continent (Git repo)       <- Persistent world
 ### WorktreePool Lifecycle (`--workers >= 1`)
 
 1. **Init** — `git worktree prune`, then for each worker: force-remove leftover → `git worktree add --detach` → run `--setup-cmd` if set
-2. **Acquire** — Worker claims a worktree from the pool (blocks if all in use)
-3. **Release** — After each expedition: `git checkout --detach <base-branch>` → `git reset --hard <base-branch>` → `git clean -fd -e .expedition` → return to pool. The `-e .expedition` exclusion preserves per-worker flag.md across releases.
+2. **Acquire** — Worker claims a worktree from the pool (blocks if all in use). `AcquireContext` runs a `git status` health check; corrupted worktrees are force-recycled and re-created automatically.
+3. **Release** — After each expedition: `git checkout --detach <base-branch>` → `git reset --hard <base-branch>` → `git clean -fd -e .expedition` → return to pool. The `-e .expedition` exclusion preserves per-worker flag.md across releases. Checkout/reset failures trigger automatic worktree recycling.
 4. **Consolidate** — After all workers complete: `reconcileFlags` scans all worktree flag.md files, picks max(LastExpedition), writes it back to Continent's flag.md for human inspection and next startup.
 5. **Shutdown** — On exit (30s timeout, independent of parent context): `git worktree remove -f` each → `git worktree prune`
 
