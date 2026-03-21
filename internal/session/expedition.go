@@ -262,7 +262,8 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		if e.ClaimRegistry != nil {
 			ok, holder := e.ClaimRegistry.TryClaim(issue, e.Number)
 			if !ok {
-				e.Logger.Warn("Expedition #%d: issue %s already claimed by expedition #%d, skipping", e.Number, issue, holder)
+				e.Logger.Warn("Expedition #%d: issue %s already claimed by expedition #%d — cancelling expedition", e.Number, issue, holder)
+				cancel() // cancel the expedition context to kill the Claude process
 				return
 			}
 		}
