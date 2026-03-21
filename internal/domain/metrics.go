@@ -100,3 +100,95 @@ func DurationPercentiles(durations []time.Duration) (p50, p90, p99 time.Duration
 
 	return percentile(0.50), percentile(0.90), percentile(0.99)
 }
+
+// SuccessRateTrendType represents the direction of success rate change.
+type SuccessRateTrendType string
+
+const (
+	// TrendImproving indicates the recent success rate is significantly higher than early.
+	TrendImproving SuccessRateTrendType = "improving"
+	// TrendDeclining indicates the recent success rate is significantly lower than early.
+	TrendDeclining SuccessRateTrendType = "declining"
+	// TrendStable indicates the success rate has not changed significantly.
+	TrendStable SuccessRateTrendType = "stable"
+)
+
+// trendThreshold is the minimum rate difference to be considered a trend change.
+const trendThreshold = 0.10
+
+// WindowedSuccessRate computes the success rate over the last windowSize completed
+// (non-skipped) events. If windowSize >= total events, all events are used.
+func WindowedSuccessRate(events []Event, windowSize int) float64 {
+	// Collect only non-skipped completed events.
+	var relevant []Event
+	for _, ev := range events {
+		if ev.Type != EventExpeditionCompleted {
+			continue
+		}
+		var data ExpeditionCompletedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data.Status == "skipped" {
+			continue
+		}
+		relevant = append(relevant, ev)
+	}
+
+	if len(relevant) == 0 {
+		return 0.0
+	}
+
+	// Take the last windowSize events.
+	if windowSize > 0 && len(relevant) > windowSize {
+		relevant = relevant[len(relevant)-windowSize:]
+	}
+
+	return SuccessRate(relevant)
+}
+
+// SuccessRateTrend compares earlyRate and recentRate and returns the trend direction.
+// A change of less than trendThreshold (10%) is considered stable.
+func SuccessRateTrend(earlyRate, recentRate float64) SuccessRateTrendType {
+	diff := recentRate - earlyRate
+	if diff > trendThreshold {
+		return TrendImproving
+	}
+	if diff < -trendThreshold {
+		return TrendDeclining
+	}
+	return TrendStable
+}
+
+// DetectSuccessRateTrend compares the success rate of the most recent windowSize events
+// against the windowSize events before that to detect improvement or decline.
+// Returns TrendStable when there are fewer events than 2×windowSize.
+func DetectSuccessRateTrend(events []Event, windowSize int) SuccessRateTrendType {
+	// Collect only non-skipped completed events.
+	var relevant []Event
+	for _, ev := range events {
+		if ev.Type != EventExpeditionCompleted {
+			continue
+		}
+		var data ExpeditionCompletedData
+		if err := json.Unmarshal(ev.Data, &data); err != nil {
+			continue
+		}
+		if data.Status == "skipped" {
+			continue
+		}
+		relevant = append(relevant, ev)
+	}
+
+	if len(relevant) < 2*windowSize {
+		return TrendStable
+	}
+
+	earlyWindow := relevant[:windowSize]
+	recentWindow := relevant[len(relevant)-windowSize:]
+
+	earlyRate := SuccessRate(earlyWindow)
+	recentRate := SuccessRate(recentWindow)
+
+	return SuccessRateTrend(earlyRate, recentRate)
+}
