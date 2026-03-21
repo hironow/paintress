@@ -103,7 +103,34 @@ func (wp *WorktreePool) Init(ctx context.Context) error {
 	return nil
 }
 
+// AcquireContext returns the path to an available worktree, respecting context cancellation.
+// Runs a git status health check on the acquired worktree. If the worktree is
+// unhealthy, it is automatically recycled and a fresh one is returned.
+// Returns an error if the context is canceled before a worktree becomes available.
+func (wp *WorktreePool) AcquireContext(ctx context.Context) (string, error) {
+	select {
+	case path := <-wp.workers:
+		// Health check: verify the worktree is accessible via git status.
+		if _, err := wp.git.Git(ctx, path, "status", "--short"); err != nil {
+			// Worktree is unhealthy — attempt recreation.
+			if recycleErr := wp.forceRecycle(ctx, path); recycleErr != nil {
+				return "", fmt.Errorf("worktree health check failed and recycle failed: %w", recycleErr)
+			}
+			// Pick the freshly recycled worktree.
+			select {
+			case path = <-wp.workers:
+			case <-ctx.Done():
+				return "", ctx.Err()
+			}
+		}
+		return path, nil
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
 // Acquire returns the path to an available worktree. Blocks if none available.
+// Deprecated: prefer AcquireContext for context-aware acquisition.
 func (wp *WorktreePool) Acquire() string {
 	return <-wp.workers
 }
