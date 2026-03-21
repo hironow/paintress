@@ -127,6 +127,19 @@ func (g *GradientGauge) Stats() (charges, discharges, resets int) {
 	return
 }
 
+// ReportSeverity maps a GradientGauge level to a D-Mail severity string.
+// level 0 → "high", levels 1-2 → "medium", levels 3+ → "low"
+func ReportSeverity(gaugeLevel int) string {
+	switch {
+	case gaugeLevel == 0:
+		return "high"
+	case gaugeLevel <= 2:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
 // FormatLog returns the gauge history as a single-line summary.
 // Shows the final state and total charge/discharge counts to avoid
 // multi-line output that breaks logger prefix formatting.

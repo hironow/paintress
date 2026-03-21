@@ -372,7 +372,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := p.emitExpeditionCompleted(expCtx, exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound), model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
-		if dm := domain.NewReportDMail(report); dm.Name != "" {
+		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)

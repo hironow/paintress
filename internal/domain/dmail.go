@@ -41,7 +41,8 @@ func FormatDMailForPrompt(dmails []DMail) string {
 }
 
 // NewReportDMail creates a report d-mail from an ExpeditionReport.
-func NewReportDMail(report *ExpeditionReport) DMail {
+// gaugeLevel is the current GradientGauge level and determines the Severity field.
+func NewReportDMail(report *ExpeditionReport, gaugeLevel int) DMail {
 	name := "report-" + strings.ToLower(report.IssueID)
 
 	var body strings.Builder
@@ -61,6 +62,7 @@ func NewReportDMail(report *ExpeditionReport) DMail {
 		Kind:          "report",
 		Description:   fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
 		Issues:        []string{report.IssueID},
+		Severity:      ReportSeverity(gaugeLevel),
 		SchemaVersion: DMailSchemaVersion,
 		Body:          body.String(),
 	}

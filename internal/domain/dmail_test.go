@@ -324,7 +324,7 @@ func TestNewReportDMail_InsightContext_Present(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then
 	if dm.Context == nil {
@@ -349,11 +349,120 @@ func TestNewReportDMail_InsightContext_Absent(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then — backward-compatible: nil Context when Insight is empty
 	if dm.Context != nil {
 		t.Errorf("expected nil Context when Insight is absent, got %+v", dm.Context)
+	}
+}
+
+// --- MY-536: ReportSeverity from GradientGauge level ---
+
+func TestReportSeverity_LevelZero_ReturnsHigh(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(0)
+
+	// then
+	if severity != "high" {
+		t.Errorf("ReportSeverity(0) = %q, want %q", severity, "high")
+	}
+}
+
+func TestReportSeverity_LevelOne_ReturnsMedium(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(1)
+
+	// then
+	if severity != "medium" {
+		t.Errorf("ReportSeverity(1) = %q, want %q", severity, "medium")
+	}
+}
+
+func TestReportSeverity_LevelTwo_ReturnsMedium(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(2)
+
+	// then
+	if severity != "medium" {
+		t.Errorf("ReportSeverity(2) = %q, want %q", severity, "medium")
+	}
+}
+
+func TestReportSeverity_LevelThree_ReturnsLow(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(3)
+
+	// then
+	if severity != "low" {
+		t.Errorf("ReportSeverity(3) = %q, want %q", severity, "low")
+	}
+}
+
+func TestReportSeverity_LevelFive_ReturnsLow(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(5)
+
+	// then
+	if severity != "low" {
+		t.Errorf("ReportSeverity(5) = %q, want %q", severity, "low")
+	}
+}
+
+func TestNewReportDMail_GaugeLevelZero_SetsHighSeverity(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  10,
+		IssueID:     "MY-200",
+		IssueTitle:  "Critical fix",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when — gauge at 0 means high severity
+	dm := domain.NewReportDMail(report, 0)
+
+	// then
+	if dm.Severity != "high" {
+		t.Errorf("NewReportDMail with gaugeLevel=0: Severity = %q, want %q", dm.Severity, "high")
+	}
+}
+
+func TestNewReportDMail_GaugeLevelTwo_SetsMediumSeverity(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  11,
+		IssueID:     "MY-201",
+		IssueTitle:  "Normal fix",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when — gauge at 2 means medium severity
+	dm := domain.NewReportDMail(report, 2)
+
+	// then
+	if dm.Severity != "medium" {
+		t.Errorf("NewReportDMail with gaugeLevel=2: Severity = %q, want %q", dm.Severity, "medium")
+	}
+}
+
+func TestNewReportDMail_GaugeLevelFour_SetsLowSeverity(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  12,
+		IssueID:     "MY-202",
+		IssueTitle:  "Low priority improvement",
+		MissionType: "enhance",
+		Status:      "success",
+	}
+
+	// when — gauge at 4 means low severity
+	dm := domain.NewReportDMail(report, 4)
+
+	// then
+	if dm.Severity != "low" {
+		t.Errorf("NewReportDMail with gaugeLevel=4: Severity = %q, want %q", dm.Severity, "low")
 	}
 }
 
@@ -369,7 +478,7 @@ func TestNewReportDMail_InsightContext_NilGuard(t *testing.T) {
 	}
 
 	// when / then — must not panic
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 	if dm.Context != nil {
 		t.Errorf("expected nil Context for empty Insight, got %+v", dm.Context)
 	}

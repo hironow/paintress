@@ -111,7 +111,7 @@ func TestContract_NewReportDMail_ValidatesSuccessfully(t *testing.T) {
 	}
 
 	// when
-	dmail := domain.NewReportDMail(report)
+	dmail := domain.NewReportDMail(report, 0)
 
 	// then: must pass validation
 	if err := domain.ValidateDMail(dmail); err != nil {
@@ -162,7 +162,7 @@ func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 				PRUrl:       tc.prUrl,
 			}
 
-			dmail := domain.NewReportDMail(report)
+			dmail := domain.NewReportDMail(report, 0)
 
 			if err := domain.ValidateDMail(dmail); err != nil {
 				t.Fatalf("validation failed: %v", err)
@@ -188,7 +188,7 @@ func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
 		Reason:      "OOM during benchmark",
 	}
 
-	dmail := domain.NewReportDMail(report)
+	dmail := domain.NewReportDMail(report, 0)
 
 	if err := domain.ValidateDMail(dmail); err != nil {
 		t.Fatalf("validation failed: %v", err)
