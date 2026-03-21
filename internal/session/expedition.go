@@ -173,7 +173,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if e.ErrOut == nil {
 		e.ErrOut = io.Discard
 	}
+	promptStart := time.Now()
 	prompt := e.BuildPrompt()
+	promptBuildDuration := time.Since(promptStart)
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
 	if err := os.WriteFile(promptFile, []byte(prompt), 0644); err != nil {
@@ -196,6 +198,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		),
 	)
 	defer invokeSpan.End()
+
+	// Record prompt build duration as span attribute for telemetry breakdown.
+	breakdown := domain.ExpeditionDurationBreakdown{
+		PromptBuildDuration: promptBuildDuration,
+	}
+	invokeSpan.SetAttributes(breakdown.SpanAttributes()...)
 
 	claudeCmd := e.Config.ClaudeCmd
 
