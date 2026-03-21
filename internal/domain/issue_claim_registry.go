@@ -20,6 +20,9 @@ func (r *IssueClaimRegistry) TryClaim(issueID string, expedition int) (bool, int
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if holder, exists := r.claims[issueID]; exists {
+		if holder == expedition {
+			return true, 0 // already claimed by same expedition — idempotent success
+		}
 		return false, holder
 	}
 	r.claims[issueID] = expedition

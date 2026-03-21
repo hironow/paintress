@@ -260,6 +260,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	defer watchCancel()
 	go watchFlag(watchCtx, workDir, e.Logger, func(issue, title string) {
 		if e.ClaimRegistry != nil {
+			// Release old claim before attempting new one (prevents claim leak on issue switch)
+			if old := e.getCurrentIssue(); old != "" && old != issue {
+				e.ClaimRegistry.Release(old)
+			}
 			ok, holder := e.ClaimRegistry.TryClaim(issue, e.Number)
 			if !ok {
 				e.Logger.Warn("Expedition #%d: issue %s already claimed by expedition #%d — cancelling expedition", e.Number, issue, holder)
