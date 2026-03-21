@@ -101,3 +101,32 @@ func FormatIssuesJSON(issues []Issue) (string, error) {
 	}
 	return string(data), nil
 }
+
+// ExcludeIssuesByLabel returns a filtered slice of issues that do not have any
+// of the specified labels. Comparison is case-insensitive.
+// If excludeLabels is nil or empty, all issues are returned unchanged.
+func ExcludeIssuesByLabel(issues []Issue, excludeLabels []string) []Issue {
+	if len(excludeLabels) == 0 {
+		return issues
+	}
+
+	excluded := make(map[string]bool, len(excludeLabels))
+	for _, label := range excludeLabels {
+		excluded[strings.ToLower(label)] = true
+	}
+
+	var result []Issue
+	for _, issue := range issues {
+		hasExcluded := false
+		for _, label := range issue.Labels {
+			if excluded[strings.ToLower(label)] {
+				hasExcluded = true
+				break
+			}
+		}
+		if !hasExcluded {
+			result = append(result, issue)
+		}
+	}
+	return result
+}
