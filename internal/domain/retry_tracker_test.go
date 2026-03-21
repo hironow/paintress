@@ -6,7 +6,7 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 )
 
-func TestRetryTracker_Track_CapsAtMaxRetries(t *testing.T) {
+func TestRetryTracker_Track_AlwaysIncrements(t *testing.T) {
 	// given
 	rt := domain.NewRetryTrackerWithMax(3)
 	issues := []string{"ISS-1", "ISS-2"}
