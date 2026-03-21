@@ -140,7 +140,14 @@ func ScanJournalsForLumina(continent string) []domain.Lumina {
 		if pa != pb {
 			return pa - pb // lower priority number = higher priority
 		}
-		return b.Uses - a.Uses // higher Uses first
+		if a.Uses != b.Uses {
+			return b.Uses - a.Uses // higher Uses first
+		}
+		// Deterministic tiebreaker: lexicographic by Source then Pattern.
+		if a.Source != b.Source {
+			return strings.Compare(a.Source, b.Source)
+		}
+		return strings.Compare(a.Pattern, b.Pattern)
 	})
 
 	if len(luminas) > maxLuminas {
