@@ -49,7 +49,7 @@ type Paintress struct {
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryTracker *domain.RetryTracker
 
-	// Parallel worker same-issue guard (nil when Workers <= 1)
+	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 
 	// Swarm Mode: atomic counters for concurrent worker access
@@ -79,8 +79,14 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
-	// Reserve Party: parse model string for reserves (already validated by ValidateProjectConfig)
-	primary, reserves, _ := domain.ParseModelConfig(cfg.Model)
+	// Reserve Party: parse model string for reserves (already validated by ValidateProjectConfig).
+	// On error, fall back to legacy single-model behavior with a warning.
+	primary, reserves, parseErr := domain.ParseModelConfig(cfg.Model)
+	if parseErr != nil {
+		logger.Warn("ParseModelConfig: %v — falling back to raw model string %q", parseErr, cfg.Model)
+		primary = cfg.Model
+		reserves = nil
+	}
 
 	devDir := cfg.DevDir
 	if devDir == "" {
