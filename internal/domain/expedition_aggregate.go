@@ -73,7 +73,7 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 
 // ShouldEscalate returns true if escalation should fire: consecutive failures
 // have reached the threshold AND escalation has not yet fired for this streak.
-// Once it returns true, subsequent calls return false until ResetEscalation is called.
+// Once it returns true, subsequent calls return false until a success resets the streak.
 func (a *ExpeditionAggregate) ShouldEscalate(threshold int) bool {
 	if a.consecutiveFailures >= threshold && !a.escalationFired {
 		a.escalationFired = true
