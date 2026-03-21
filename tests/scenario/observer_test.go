@@ -162,9 +162,7 @@ func (o *Observer) AssertExpeditionJournalExists() {
 	dir := filepath.Join(o.ws.RepoPath, ".expedition", "journal")
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		// journal dir may not exist if no expedition ran
-		o.t.Logf("journal dir %s not accessible: %v", dir, err)
-		return
+		o.t.Fatalf("journal dir %s not accessible: %v", dir, err)
 	}
 	if len(entries) == 0 {
 		o.t.Error("expected at least 1 expedition journal entry, got 0")
@@ -222,13 +220,16 @@ func (o *Observer) AssertGommageEvent(wantConsecutiveFailures int) {
 				return // found
 			}
 		}
+		if scanErr := scanner.Err(); scanErr != nil {
+			o.t.Errorf("scanner error reading %s: %v", entry.Name(), scanErr)
+		}
 		f.Close()
 	}
 	o.t.Error("no gommage.triggered event found in .expedition/events/*.jsonl")
 }
 
 // AssertEventInJSONL scans .expedition/events/*.jsonl for any event of the
-// given type. Returns true if found. Generic helper for future event assertions.
+// given type. Fails the test if not found. Generic helper for future event assertions.
 func (o *Observer) AssertEventInJSONL(wantType string) {
 	o.t.Helper()
 	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
