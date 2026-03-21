@@ -60,7 +60,7 @@ func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string,
 func ValidateBaseBranch(ctx context.Context, git port.GitExecutor, repoDir, branch string) error {
 	_, err := git.Git(ctx, repoDir, "rev-parse", "--verify", branch)
 	if err != nil {
-		return fmt.Errorf("base branch %q does not exist as a git ref", branch)
+		return fmt.Errorf("base branch %q does not exist as a git ref: %w", branch, err)
 	}
 	return nil
 }
@@ -136,8 +136,9 @@ func (wp *WorktreePool) Acquire() string {
 }
 
 // Release resets the worktree to a clean state and returns it to the pool.
-// On checkout or reset failure, it force-recycles the worktree (remove + re-add)
-// to prevent permanent pool slot loss.
+// On checkout, reset, or clean failure, it force-recycles the worktree (remove + re-add)
+// to prevent permanent pool slot loss. If forceRecycle itself fails, the path is
+// still returned to the pool; the next Acquire's health check will re-attempt recycling.
 func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	if _, err := wp.git.Git(ctx, path, "checkout", "--detach", wp.baseBranch); err != nil {
 		return wp.forceRecycle(ctx, path)
@@ -145,8 +146,11 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 	if _, err := wp.git.Git(ctx, path, "reset", "--hard", wp.baseBranch); err != nil {
 		return wp.forceRecycle(ctx, path)
 	}
-	// clean failure is non-fatal: worktree is on correct commit, just may have untracked files
-	wp.git.Git(ctx, path, "clean", "-fd", "-e", domain.StateDir)
+	// clean failure means the worktree may have leftover state — recycle it
+	// to avoid returning a dirty worktree to the pool.
+	if _, err := wp.git.Git(ctx, path, "clean", "-fd", "-e", domain.StateDir); err != nil {
+		return wp.forceRecycle(ctx, path)
+	}
 	wp.workers <- path
 	return nil
 }
@@ -154,14 +158,21 @@ func (wp *WorktreePool) Release(ctx context.Context, path string) error {
 // forceRecycle removes a corrupted worktree and re-creates it from scratch.
 // This prevents permanent pool slot loss when checkout/reset fails.
 func (wp *WorktreePool) forceRecycle(ctx context.Context, path string) error {
-	wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path)
+	if _, removeErr := wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path); removeErr != nil {
+		// Log but continue — the directory may already be gone, and --force add below can cope.
+		_ = removeErr
+	}
 
-	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "add", "--detach", path, wp.baseBranch); err != nil {
+	if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "add", "--force", "--detach", path, wp.baseBranch); err != nil {
+		// Return the path anyway to avoid permanent slot loss; Acquire's
+		// health check will attempt recycling again on next use.
+		wp.workers <- path
 		return fmt.Errorf("forceRecycle worktree add %s: %w", path, err)
 	}
 
 	if wp.setupCmd != "" {
 		if _, err := wp.git.Shell(ctx, path, wp.setupCmd); err != nil {
+			wp.workers <- path
 			return fmt.Errorf("forceRecycle setup cmd in %s: %w", path, err)
 		}
 	}
@@ -171,8 +182,9 @@ func (wp *WorktreePool) forceRecycle(ctx context.Context, path string) error {
 }
 
 // Shutdown removes all worktrees and cleans up the pool.
-// It removes all worktrees tracked in allPaths, including those currently
-// acquired by workers, preventing resource leaks on shutdown.
+// It drains the channel to unblock any pending Acquires, then removes all
+// worktrees tracked in allPaths (including those currently acquired by
+// workers), preventing resource leaks on shutdown.
 func (wp *WorktreePool) Shutdown(ctx context.Context) error {
 	// Drain channel to unblock any pending Acquires.
 	drain:
