@@ -1,6 +1,9 @@
 package domain
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // SPRTVerdict represents the outcome of a Sequential Probability Ratio Test.
 type SPRTVerdict string
@@ -37,6 +40,27 @@ type SPRTState struct {
 	LambdaN    float64 // log-likelihood ratio
 	UpperBound float64 // A = log((1-beta)/alpha)
 	LowerBound float64 // B = log(beta/(1-alpha))
+}
+
+// ValidateSPRTConfig checks that cfg values will not produce NaN/Inf in
+// the log-likelihood computation. Returns an error describing the violation.
+func ValidateSPRTConfig(cfg SPRTConfig) error {
+	if cfg.P0 <= 0 || cfg.P0 >= 1 {
+		return fmt.Errorf("P0 must be in (0,1), got %g", cfg.P0)
+	}
+	if cfg.P1 <= 0 || cfg.P1 >= 1 {
+		return fmt.Errorf("P1 must be in (0,1), got %g", cfg.P1)
+	}
+	if cfg.P0 >= cfg.P1 {
+		return fmt.Errorf("P0 must be less than P1 (got P0=%g, P1=%g)", cfg.P0, cfg.P1)
+	}
+	if cfg.Alpha <= 0 || cfg.Alpha >= 1 {
+		return fmt.Errorf("Alpha must be in (0,1), got %g", cfg.Alpha)
+	}
+	if cfg.Beta <= 0 || cfg.Beta >= 1 {
+		return fmt.Errorf("Beta must be in (0,1), got %g", cfg.Beta)
+	}
+	return nil
 }
 
 // SPRT runs a Sequential Probability Ratio Test on expedition results.
