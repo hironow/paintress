@@ -41,7 +41,8 @@ func FormatDMailForPrompt(dmails []DMail) string {
 }
 
 // NewReportDMail creates a report d-mail from an ExpeditionReport.
-func NewReportDMail(report *ExpeditionReport) DMail {
+// gaugeLevel is the current GradientGauge level and determines the Severity field.
+func NewReportDMail(report *ExpeditionReport, gaugeLevel int) DMail {
 	name := "report-" + strings.ToLower(report.IssueID)
 
 	var body strings.Builder
@@ -56,14 +57,25 @@ func NewReportDMail(report *ExpeditionReport) DMail {
 		fmt.Fprintf(&body, "\n## Summary\n\n%s\n", report.Reason)
 	}
 
-	return DMail{
+	dm := DMail{
 		Name:          name,
 		Kind:          "report",
 		Description:   fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
 		Issues:        []string{report.IssueID},
+		Severity:      ReportSeverity(gaugeLevel),
 		SchemaVersion: DMailSchemaVersion,
 		Body:          body.String(),
 	}
+
+	if report.Insight != "" {
+		dm.Context = &InsightContext{
+			Insights: []InsightSummary{
+				{Source: report.IssueID, Summary: report.Insight},
+			},
+		}
+	}
+
+	return dm
 }
 
 // BuildFollowUpPrompt builds a follow-up prompt for issue-matched D-Mails

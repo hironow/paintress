@@ -43,6 +43,9 @@ type Expedition struct {
 	midHighMu    sync.Mutex
 	midHighNames []string
 
+	// Parallel worker same-issue guard (nil in single-worker mode)
+	ClaimRegistry *domain.IssueClaimRegistry
+
 	// Mid-expedition issue-matched D-Mail routing (MY-361)
 	currentIssueMu  sync.Mutex
 	currentIssue    string
@@ -59,6 +62,17 @@ func (e *Expedition) setCurrentIssue(issue string) {
 	e.currentIssueMu.Lock()
 	defer e.currentIssueMu.Unlock()
 	e.currentIssue = issue
+}
+
+// ReleaseClaim releases the issue claim held by this expedition, if any.
+func (e *Expedition) ReleaseClaim() {
+	if e.ClaimRegistry == nil {
+		return
+	}
+	issue := e.getCurrentIssue()
+	if issue != "" {
+		e.ClaimRegistry.Release(issue)
+	}
 }
 
 // getCurrentIssue returns the issue being worked on (thread-safe).
@@ -143,7 +157,7 @@ func (e *Expedition) loadInboxSection() string {
 }
 
 func (e *Expedition) loadContextSection() string {
-	ctx, err := ReadContextFiles(e.Continent)
+	ctx, err := readContextFilesWithLogger(e.Continent, e.Logger)
 	if err != nil {
 		e.Logger.Warn("context injection failed: %v", err)
 		return ""
@@ -159,7 +173,9 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	if e.ErrOut == nil {
 		e.ErrOut = io.Discard
 	}
+	promptStart := time.Now()
 	prompt := e.BuildPrompt()
+	promptBuildDuration := time.Since(promptStart)
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
 	if err := os.WriteFile(promptFile, []byte(prompt), 0644); err != nil {
@@ -182,6 +198,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		),
 	)
 	defer invokeSpan.End()
+
+	// Record prompt build duration as span attribute for telemetry breakdown.
+	breakdown := domain.ExpeditionDurationBreakdown{
+		PromptBuildDuration: promptBuildDuration,
+	}
+	invokeSpan.SetAttributes(breakdown.SpanAttributes()...)
 
 	claudeCmd := e.Config.ClaudeCmd
 
@@ -237,6 +259,18 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	watchCtx, watchCancel := context.WithCancel(expCtx)
 	defer watchCancel()
 	go watchFlag(watchCtx, workDir, e.Logger, func(issue, title string) {
+		if e.ClaimRegistry != nil {
+			// Release old claim before attempting new one (prevents claim leak on issue switch)
+			if old := e.getCurrentIssue(); old != "" && old != issue {
+				e.ClaimRegistry.Release(old)
+			}
+			ok, holder := e.ClaimRegistry.TryClaim(issue, e.Number)
+			if !ok {
+				e.Logger.Warn("Expedition #%d: issue %s already claimed by expedition #%d — cancelling expedition", e.Number, issue, holder)
+				cancel() // cancel the expedition context to kill the Claude process
+				return
+			}
+		}
 		e.setCurrentIssue(issue)
 		invokeSpan.AddEvent("issue.picked",
 			trace.WithAttributes(
@@ -394,9 +428,26 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	return output.String(), err
 }
 
+// MaxContextFileBytes is the maximum allowed size for a single context file.
+// Files exceeding this limit are skipped with a warning log.
+const MaxContextFileBytes int64 = 512 * 1024 // 512 KiB
+
+// MaxContextTotalBytes is the maximum total size of all context files injected
+// into the prompt. Loading stops early once this limit is reached.
+const MaxContextTotalBytes int64 = 2 * 1024 * 1024 // 2 MiB
+
 // ReadContextFiles reads all .md files from .expedition/context/ and
 // concatenates them into a single string for prompt injection.
+// Files that exceed MaxContextFileBytes are skipped with a warning log.
+// Loading stops when the accumulated total would exceed MaxContextTotalBytes.
 func ReadContextFiles(continent string) (string, error) {
+	return readContextFilesWithLogger(continent, nil)
+}
+
+// readContextFilesWithLogger is the internal implementation that accepts an
+// optional logger for testing. When logger is nil, the function is a no-op
+// for warnings (callers should pass a real logger via loadContextSection).
+func readContextFilesWithLogger(continent string, logger domain.Logger) (string, error) {
 	dir := domain.ContextDir(continent)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -418,10 +469,29 @@ func ReadContextFiles(continent string) (string, error) {
 	}
 
 	var buf strings.Builder
+	var totalBytes int64
 	for _, e := range sortedEntries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".md" {
 			continue
 		}
+
+		// Per-file size guard: skip files that exceed the per-file limit.
+		info, err := e.Info()
+		if err != nil {
+			return "", fmt.Errorf("stat context file %s: %w", e.Name(), err)
+		}
+		if info.Size() > MaxContextFileBytes {
+			if logger != nil {
+				logger.Warn("context file %s exceeds size limit (%d bytes > %d), skipping", e.Name(), info.Size(), MaxContextFileBytes)
+			}
+			continue
+		}
+
+		// Total size guard: stop loading once the accumulator would exceed the total limit.
+		if totalBytes+info.Size() > MaxContextTotalBytes {
+			break
+		}
+
 		content, err := os.ReadFile(filepath.Join(dir, e.Name()))
 		if err != nil {
 			return "", fmt.Errorf("reading context file %s: %w", e.Name(), err)
@@ -430,6 +500,7 @@ func ReadContextFiles(continent string) (string, error) {
 		buf.WriteString(fmt.Sprintf("### %s\n\n", name))
 		buf.Write(content)
 		buf.WriteString("\n\n")
+		totalBytes += info.Size()
 	}
 	return buf.String(), nil
 }

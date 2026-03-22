@@ -170,6 +170,40 @@ func TestExpeditionAggregate_StatusVocabulary(t *testing.T) {
 	}
 }
 
+func TestExpeditionAggregate_CompleteExpedition_RejectsUnknownStatus(t *testing.T) {
+	// given
+	agg := domain.NewExpeditionAggregate()
+
+	// when
+	events, err := agg.CompleteExpedition(1, "typo_status", "", "", time.Now().UTC())
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for unknown status, got nil")
+	}
+	if events != nil {
+		t.Errorf("expected nil events, got %v", events)
+	}
+	if agg.ConsecutiveFailures() != 0 {
+		t.Errorf("expected consecutive failures 0, got %d", agg.ConsecutiveFailures())
+	}
+}
+
+func TestValidExpeditionStatus(t *testing.T) {
+	known := []string{"success", "failed", "parse_error", "skipped"}
+	for _, s := range known {
+		if !domain.ValidExpeditionStatus(s) {
+			t.Errorf("expected %q to be valid", s)
+		}
+	}
+	unknown := []string{"typo", "", "timeout", "SUCCESS"}
+	for _, s := range unknown {
+		if domain.ValidExpeditionStatus(s) {
+			t.Errorf("expected %q to be invalid", s)
+		}
+	}
+}
+
 func TestExpeditionAggregate_SuccessResetsFailures(t *testing.T) {
 	// given: 2 consecutive failures then a success
 	agg := domain.NewExpeditionAggregate()
@@ -187,5 +221,57 @@ func TestExpeditionAggregate_SuccessResetsFailures(t *testing.T) {
 	}
 	if agg.ConsecutiveFailures() != 0 {
 		t.Errorf("expected consecutive failures 0 after success, got %d", agg.ConsecutiveFailures())
+	}
+}
+
+func TestShouldEscalate_FiresOncePerStreak(t *testing.T) {
+	// given: 3 consecutive failures
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now().UTC()
+	for i := range 3 {
+		agg.CompleteExpedition(i+1, "failed", "", "", now)
+	}
+
+	// when / then: first call returns true, second returns false
+	if !agg.ShouldEscalate(3) {
+		t.Fatal("expected ShouldEscalate=true on first call")
+	}
+	if agg.ShouldEscalate(3) {
+		t.Fatal("expected ShouldEscalate=false on second call (already fired)")
+	}
+}
+
+func TestShouldEscalate_ResetsOnSuccess(t *testing.T) {
+	// given: escalation fired, then success, then new failure streak
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now().UTC()
+	for i := range 3 {
+		agg.CompleteExpedition(i+1, "failed", "", "", now)
+	}
+	agg.ShouldEscalate(3) // fires
+	agg.CompleteExpedition(4, "success", "ISS-1", "", now)
+
+	// when: new failure streak reaches threshold
+	for i := range 3 {
+		agg.CompleteExpedition(5+i, "failed", "", "", now)
+	}
+
+	// then: should fire again
+	if !agg.ShouldEscalate(3) {
+		t.Fatal("expected ShouldEscalate=true after success reset")
+	}
+}
+
+func TestShouldEscalate_BelowThreshold(t *testing.T) {
+	// given: 2 failures (below threshold of 3)
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now().UTC()
+	for i := range 2 {
+		agg.CompleteExpedition(i+1, "failed", "", "", now)
+	}
+
+	// when / then
+	if agg.ShouldEscalate(3) {
+		t.Fatal("expected ShouldEscalate=false below threshold")
 	}
 }

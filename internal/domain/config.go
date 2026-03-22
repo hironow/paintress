@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -135,6 +136,35 @@ func (c ProjectConfig) TrackerProject() string { return c.Tracker.Project }
 // HasTrackerTeam reports whether a tracker team is configured.
 func (c ProjectConfig) HasTrackerTeam() bool { return c.Tracker.Team != "" }
 
+// ParseModelConfig parses a model config string (e.g. "opus,sonnet,haiku")
+// into a primary model and optional reserve models. Returns an error for
+// empty strings, empty segments, whitespace-only segments, or duplicates.
+func ParseModelConfig(model string) (string, []string, error) {
+	if strings.TrimSpace(model) == "" {
+		return "", nil, fmt.Errorf("model config must not be empty")
+	}
+	parts := strings.Split(model, ",")
+	seen := make(map[string]bool, len(parts))
+	var primary string
+	var reserves []string
+	for i, p := range parts {
+		m := strings.TrimSpace(p)
+		if m == "" {
+			return "", nil, fmt.Errorf("model config has empty segment at position %d", i)
+		}
+		if seen[m] {
+			return "", nil, fmt.Errorf("model config has duplicate: %q", m)
+		}
+		seen[m] = true
+		if i == 0 {
+			primary = m
+		} else {
+			reserves = append(reserves, m)
+		}
+	}
+	return primary, reserves, nil
+}
+
 // ValidLang reports whether lang is a supported language code.
 func ValidLang(lang string) bool {
 	return lang == "ja" || lang == "en"
@@ -147,8 +177,13 @@ func ValidateProjectConfig(cfg ProjectConfig) []string {
 	if cfg.ClaudeCmd == "" {
 		errs = append(errs, "claude_cmd must not be empty")
 	}
+	if cfg.BaseBranch == "" {
+		errs = append(errs, "base_branch must not be empty")
+	}
 	if cfg.Model == "" {
 		errs = append(errs, "model must not be empty")
+	} else if _, _, err := ParseModelConfig(cfg.Model); err != nil {
+		errs = append(errs, fmt.Sprintf("model config invalid: %v", err))
 	}
 	if cfg.Lang != "" && !ValidLang(cfg.Lang) {
 		errs = append(errs, fmt.Sprintf("lang must be \"ja\" or \"en\" (got %q)", cfg.Lang))

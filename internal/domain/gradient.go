@@ -28,6 +28,9 @@ type GradientGauge struct {
 }
 
 func NewGradientGauge(max int) *GradientGauge {
+	if max < 0 {
+		max = 0
+	}
 	return &GradientGauge{
 		max: max,
 	}
@@ -58,8 +61,8 @@ func (g *GradientGauge) Decay() {
 	defer g.mu.Unlock()
 	if g.level > 0 {
 		g.level--
+		g.log = append(g.log, fmt.Sprintf("-1 (now %d/%d)", g.level, g.max))
 	}
-	g.log = append(g.log, fmt.Sprintf("-1 (now %d/%d)", g.level, g.max))
 }
 
 // Level returns the current gauge level.
@@ -105,6 +108,36 @@ func (g *GradientGauge) FormatForPrompt() string {
 
 	bar := strings.Repeat("█", g.level) + strings.Repeat("░", g.max-g.level)
 	return fmt.Sprintf("Gradient Gauge: [%s] %d/%d\n%s", bar, g.level, g.max, g.priorityHint())
+}
+
+// Stats returns aggregate counts of charges, discharges (decays), and resets.
+func (g *GradientGauge) Stats() (charges, discharges, resets int) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	for _, entry := range g.log {
+		switch {
+		case strings.HasPrefix(entry, "+1"):
+			charges++
+		case strings.HasPrefix(entry, "-1"):
+			discharges++
+		case strings.HasPrefix(entry, "RESET"):
+			resets++
+		}
+	}
+	return
+}
+
+// ReportSeverity maps a GradientGauge level to a D-Mail severity string.
+// level 0 → "high", levels 1-2 → "medium", levels 3+ → "low"
+func ReportSeverity(gaugeLevel int) string {
+	switch {
+	case gaugeLevel == 0:
+		return "high"
+	case gaugeLevel <= 2:
+		return "medium"
+	default:
+		return "low"
+	}
 }
 
 // FormatLog returns the gauge history as a single-line summary.

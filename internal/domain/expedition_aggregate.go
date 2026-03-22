@@ -1,11 +1,15 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // ExpeditionAggregate owns expedition lifecycle state and produces events.
 // It tracks consecutive failures for gommage decisions and gradient state.
 type ExpeditionAggregate struct {
 	consecutiveFailures int
+	escalationFired     bool
 }
 
 // NewExpeditionAggregate creates an empty ExpeditionAggregate.
@@ -27,10 +31,22 @@ func (a *ExpeditionAggregate) StartExpedition(expedition, worker int, model stri
 	}, now)
 }
 
+// ValidExpeditionStatus reports whether s is a recognized expedition status.
+func ValidExpeditionStatus(s string) bool {
+	switch s {
+	case "success", "failed", "parse_error", "skipped":
+		return true
+	}
+	return false
+}
+
 // CompleteExpedition produces events for an expedition result.
 // On success, consecutive failures are reset. On failure, they increment.
 // Returns the expedition.completed event plus a gradient.changed event if applicable.
 func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID, bugsFound string, now time.Time) ([]Event, error) {
+	if !ValidExpeditionStatus(status) {
+		return nil, fmt.Errorf("unrecognized expedition status: %q", status)
+	}
 	completedEvent, err := NewEvent(EventExpeditionCompleted, ExpeditionCompletedData{
 		Expedition: expedition,
 		Status:     status,
@@ -45,6 +61,7 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 	switch status {
 	case "success":
 		a.consecutiveFailures = 0
+		a.escalationFired = false
 	case "failed", "parse_error":
 		a.consecutiveFailures++
 	case "skipped":
@@ -52,6 +69,17 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 	}
 
 	return events, nil
+}
+
+// ShouldEscalate returns true if escalation should fire: consecutive failures
+// have reached the threshold AND escalation has not yet fired for this streak.
+// Once it returns true, subsequent calls return false until a success resets the streak.
+func (a *ExpeditionAggregate) ShouldEscalate(threshold int) bool {
+	if a.consecutiveFailures >= threshold && !a.escalationFired {
+		a.escalationFired = true
+		return true
+	}
+	return false
 }
 
 // ShouldGommage returns true if consecutive failures have reached the threshold.

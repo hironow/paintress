@@ -8,13 +8,14 @@ import (
 )
 
 // RecordExpedition increments the paintress.expedition.total OTel counter.
-func RecordExpedition(ctx context.Context, status string) {
+func RecordExpedition(ctx context.Context, status, model string) {
 	c, _ := Meter.Int64Counter("paintress.expedition.total",
 		metric.WithDescription("Total expedition completions"),
 	)
 	c.Add(ctx, 1,
 		metric.WithAttributes(
 			attribute.String("status", SanitizeUTF8(status)),
+			attribute.String("model", SanitizeUTF8(model)),
 		),
 	)
 }

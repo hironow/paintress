@@ -346,7 +346,7 @@ func TestNewReportDMail_BasicFields(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then
 	if dm.Kind != "report" {
@@ -376,7 +376,7 @@ func TestNewReportDMail_NameNormalization(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then — name should be lowercase
 	if dm.Name != "report-my-100" {
@@ -1078,7 +1078,7 @@ func TestNewReportDMail_NoPRUrl(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then — body should not contain PR line
 	if strings.Contains(dm.Body, "**PR:**") {
@@ -1098,7 +1098,7 @@ func TestNewReportDMail_PRUrlNone(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then — "none" is also excluded
 	if strings.Contains(dm.Body, "**PR:**") {
@@ -1118,7 +1118,7 @@ func TestNewReportDMail_NoReason(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then — body should not contain Summary section
 	if strings.Contains(dm.Body, "## Summary") {
@@ -1138,7 +1138,7 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 		Reason:      "Added Redis caching layer",
 	}
 
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// when — marshal then parse
 	data, err := dm.Marshal()
@@ -1234,7 +1234,7 @@ func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report)
+	dm := domain.NewReportDMail(report, 0)
 
 	// then
 	if dm.SchemaVersion != domain.DMailSchemaVersion {
@@ -1428,7 +1428,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		Status:      "success",
 		Reason:      "Implemented token bucket with Redis backend",
 	}
-	reportDMail := domain.NewReportDMail(report)
+	reportDMail := domain.NewReportDMail(report, 0)
 
 	if reportDMail.Name != "report-my-42" {
 		t.Errorf("report Name = %q, want report-my-42", reportDMail.Name)
@@ -1567,7 +1567,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Status:      "success",
 		Reason:      "Initial setup complete",
 	}
-	reportDMail := domain.NewReportDMail(report)
+	reportDMail := domain.NewReportDMail(report, 0)
 	if err := session.SendDMail(context.Background(), store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
@@ -1609,7 +1609,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	// Success → send report + archive inbox
 	report1 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
-	})
+	}, 0)
 	if err := session.SendDMail(context.Background(), store, report1, nil); err != nil {
 		t.Fatalf("Exp1 SendDMail: %v", err)
 	}
@@ -1641,7 +1641,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	report2 := domain.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
-	})
+	}, 0)
 	if err := session.SendDMail(context.Background(), store, report2, nil); err != nil {
 		t.Fatalf("Exp2 SendDMail: %v", err)
 	}

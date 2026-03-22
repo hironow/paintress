@@ -42,6 +42,49 @@
 
 Run: `just test-scenario` (L1+L2) or `just test-scenario-all`
 
+### Observer Helpers
+
+The `Observer` type (`tests/scenario/observer_test.go`) provides high-level assertion helpers for scenario tests. An `Observer` wraps a `Workspace` and `testing.T` to verify post-expedition state without low-level file inspection.
+
+| Helper | Purpose |
+|--------|---------|
+| `AssertMailboxState` | Verify file counts in mailbox directories |
+| `AssertAllOutboxEmpty` | Verify all tool outboxes are empty |
+| `AssertArchiveContains` | Check archive contains specific D-Mail kinds |
+| `AssertDMailKind` | Verify a D-Mail file has the expected kind |
+| `WaitForClosedLoop` | Block until the expedition loop completes |
+| `AssertExpeditionJournalExists` | Verify journal was written |
+| `AssertJournalWritten` | Verify minimum journal entry count |
+| `AssertGommageEvent` | Verify gommage event with expected failure count |
+| `AssertEventInJSONL` | Verify an event type exists in the JSONL event store |
+| `AssertPromptContainsLumina` | Verify Lumina content appears in the prompt |
+| `AssertPromptNotContainsLumina` | Verify Lumina content is absent from the prompt |
+| `AssertNotifyFailOpen` | Verify notification failure does not block the loop |
+| `AssertWorktreeCount` | Verify worktree count in Swarm Mode |
+| `AssertExpeditionCount` | Verify total expedition count |
+| `AssertEscalationEvent` | Verify escalation event was emitted |
+| `AssertInboxProcessedAll` | Verify all inbox D-Mails were consumed |
+| `AssertPRReviewGateNotCalled` | Verify review gate was skipped |
+| `AssertExpeditionTimedOut` | Verify expedition hit timeout |
+| `AssertPromptContainsField` | Verify a field substring appears in the prompt |
+| `AssertLuminaInsightFile` | Verify Lumina insight file matches a pattern |
+| `AssertInsightsFileExists` | Verify insights file exists on disk |
+| `AssertBugsFoundInJSONL` | Verify bug events in the JSONL store |
+| `AssertNotifyArgvContains` | Verify notification command arguments |
+| `AssertReportDMailFields` | Verify report D-Mail contains required fields |
+
+### SPRT Regression Detection
+
+The `SPRTEvaluator` (`internal/domain/sprt.go`) implements the Sequential Probability Ratio Test for detecting expedition success rate regressions. Based on AgentAssay (arXiv:2603.02601) defaults, it compares observed success rates against null (`P0=0.70`) and alternative (`P1=0.85`) hypotheses, yielding `PASS`, `FAIL`, or `INCONCLUSIVE` verdicts. Scenario tests use SPRT to gate multi-expedition runs.
+
+## Property-Based Tests
+
+Property-based tests use `testing/quick` (stdlib) to verify invariants hold for arbitrary operation sequences. Located in `internal/domain/`:
+
+- **GradientGauge bounds**: Level never goes below 0 or above max regardless of Charge/Discharge/Decay sequence
+- **GradientGauge monotonicity**: Charge never decreases level; Discharge always resets to 0
+- **GradientGauge JSON round-trip**: Marshal/Unmarshal preserves gauge state
+
 ## E2E Tests
 
 - Located in `tests/e2e/`

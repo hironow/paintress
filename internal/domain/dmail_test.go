@@ -312,6 +312,178 @@ func TestDMailMarshal_NilContextOmitted(t *testing.T) {
 	}
 }
 
+func TestNewReportDMail_InsightContext_Present(t *testing.T) {
+	// given — report with an insight string
+	report := &domain.ExpeditionReport{
+		Expedition:  42,
+		IssueID:     "MY-100",
+		IssueTitle:  "Fix thing",
+		MissionType: "fix",
+		Status:      "success",
+		Insight:     "retry reduced failures by 30%",
+	}
+
+	// when
+	dm := domain.NewReportDMail(report, 0)
+
+	// then
+	if dm.Context == nil {
+		t.Fatal("expected non-nil Context when Insight is present")
+	}
+	if len(dm.Context.Insights) == 0 {
+		t.Fatal("expected at least one InsightSummary in Context")
+	}
+	if dm.Context.Insights[0].Summary != "retry reduced failures by 30%" {
+		t.Errorf("Summary = %q, want %q", dm.Context.Insights[0].Summary, "retry reduced failures by 30%")
+	}
+}
+
+func TestNewReportDMail_InsightContext_Absent(t *testing.T) {
+	// given — report with no insight string
+	report := &domain.ExpeditionReport{
+		Expedition:  43,
+		IssueID:     "MY-101",
+		IssueTitle:  "Fix other thing",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when
+	dm := domain.NewReportDMail(report, 0)
+
+	// then — backward-compatible: nil Context when Insight is empty
+	if dm.Context != nil {
+		t.Errorf("expected nil Context when Insight is absent, got %+v", dm.Context)
+	}
+}
+
+// --- MY-536: ReportSeverity from GradientGauge level ---
+
+func TestReportSeverity_LevelZero_ReturnsHigh(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(0)
+
+	// then
+	if severity != "high" {
+		t.Errorf("ReportSeverity(0) = %q, want %q", severity, "high")
+	}
+}
+
+func TestReportSeverity_LevelOne_ReturnsMedium(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(1)
+
+	// then
+	if severity != "medium" {
+		t.Errorf("ReportSeverity(1) = %q, want %q", severity, "medium")
+	}
+}
+
+func TestReportSeverity_LevelTwo_ReturnsMedium(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(2)
+
+	// then
+	if severity != "medium" {
+		t.Errorf("ReportSeverity(2) = %q, want %q", severity, "medium")
+	}
+}
+
+func TestReportSeverity_LevelThree_ReturnsLow(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(3)
+
+	// then
+	if severity != "low" {
+		t.Errorf("ReportSeverity(3) = %q, want %q", severity, "low")
+	}
+}
+
+func TestReportSeverity_LevelFive_ReturnsLow(t *testing.T) {
+	// given / when
+	severity := domain.ReportSeverity(5)
+
+	// then
+	if severity != "low" {
+		t.Errorf("ReportSeverity(5) = %q, want %q", severity, "low")
+	}
+}
+
+func TestNewReportDMail_GaugeLevelZero_SetsHighSeverity(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  10,
+		IssueID:     "MY-200",
+		IssueTitle:  "Critical fix",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when — gauge at 0 means high severity
+	dm := domain.NewReportDMail(report, 0)
+
+	// then
+	if dm.Severity != "high" {
+		t.Errorf("NewReportDMail with gaugeLevel=0: Severity = %q, want %q", dm.Severity, "high")
+	}
+}
+
+func TestNewReportDMail_GaugeLevelTwo_SetsMediumSeverity(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  11,
+		IssueID:     "MY-201",
+		IssueTitle:  "Normal fix",
+		MissionType: "fix",
+		Status:      "success",
+	}
+
+	// when — gauge at 2 means medium severity
+	dm := domain.NewReportDMail(report, 2)
+
+	// then
+	if dm.Severity != "medium" {
+		t.Errorf("NewReportDMail with gaugeLevel=2: Severity = %q, want %q", dm.Severity, "medium")
+	}
+}
+
+func TestNewReportDMail_GaugeLevelFour_SetsLowSeverity(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  12,
+		IssueID:     "MY-202",
+		IssueTitle:  "Low priority improvement",
+		MissionType: "enhance",
+		Status:      "success",
+	}
+
+	// when — gauge at 4 means low severity
+	dm := domain.NewReportDMail(report, 4)
+
+	// then
+	if dm.Severity != "low" {
+		t.Errorf("NewReportDMail with gaugeLevel=4: Severity = %q, want %q", dm.Severity, "low")
+	}
+}
+
+func TestNewReportDMail_InsightContext_NilGuard(t *testing.T) {
+	// given — report pointer itself; verify NewReportDMail does not panic on empty insight
+	report := &domain.ExpeditionReport{
+		Expedition:  44,
+		IssueID:     "MY-102",
+		IssueTitle:  "Another fix",
+		MissionType: "fix",
+		Status:      "failed",
+		Insight:     "",
+	}
+
+	// when / then — must not panic
+	dm := domain.NewReportDMail(report, 0)
+	if dm.Context != nil {
+		t.Errorf("expected nil Context for empty Insight, got %+v", dm.Context)
+	}
+}
+
 func TestDMailMarshal_IdempotencyKey_PreservesExistingMetadata(t *testing.T) {
 	// given
 	dm := domain.DMail{

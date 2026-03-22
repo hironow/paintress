@@ -84,9 +84,9 @@ func TestReserve_TryRecoverPrimary_AfterCooldown(t *testing.T) {
 	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.CheckOutput("rate limit")
 
-	// Manually set cooldown to past
+	// Manually set primary cooldown to past
 	rp.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
-	rp.cooldownUntil = time.Now().Add(-1 * time.Minute)
+	rp.cooldowns["opus"] = time.Now().Add(-1 * time.Minute)
 	rp.mu.Unlock()
 
 	rp.TryRecoverPrimary()
@@ -108,9 +108,9 @@ func TestReserve_MultipleRateLimits(t *testing.T) {
 	rp.CheckOutput("rate limit")
 	rp.CheckOutput("429 again")
 
-	// Should stay on first reserve (sonnet), not cascade to haiku
-	if rp.ActiveModel() != "sonnet" {
-		t.Errorf("should stay on sonnet: %q", rp.ActiveModel())
+	// Should cascade to haiku after both opus and sonnet hit rate limits
+	if rp.ActiveModel() != "haiku" {
+		t.Errorf("should cascade to haiku: %q", rp.ActiveModel())
 	}
 
 	// Hit count should increase
@@ -345,9 +345,9 @@ func TestReserve_ForceReserve_CooldownReset(t *testing.T) {
 	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
 	rp.ForceReserve()
 
-	// Cooldown should be set
+	// Cooldown should be set for opus (the model that was forced out)
 	rp.mu.RLock()
-	cooldown := rp.cooldownUntil
+	cooldown := rp.cooldowns["opus"]
 	rp.mu.RUnlock()
 
 	if cooldown.IsZero() {
@@ -439,6 +439,68 @@ func TestReserve_ConcurrentForceAndRecover(t *testing.T) {
 	model := rp.ActiveModel()
 	if model != "opus" && model != "sonnet" {
 		t.Errorf("unexpected model: %q", model)
+	}
+}
+
+func TestReserve_CascadesToSecondReserve(t *testing.T) {
+	// given: opus -> sonnet -> haiku
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, &NopLogger{})
+
+	// when: primary hits rate limit (opus -> sonnet)
+	rp.CheckOutput("rate limit exceeded")
+	if rp.ActiveModel() != "sonnet" {
+		t.Fatalf("expected sonnet, got %q", rp.ActiveModel())
+	}
+
+	// when: sonnet also hits rate limit (should cascade to haiku)
+	rp.CheckOutput("rate limit exceeded")
+
+	// then
+	if rp.ActiveModel() != "haiku" {
+		t.Errorf("expected haiku after cascade, got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_RecoversPrimaryAfterCooldown(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
+	rp.CheckOutput("rate limit")
+	if rp.ActiveModel() != "sonnet" {
+		t.Fatalf("expected sonnet, got %q", rp.ActiveModel())
+	}
+
+	// Expire primary cooldown
+	rp.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
+	rp.cooldowns["opus"] = time.Now().Add(-1 * time.Minute)
+	rp.mu.Unlock()
+
+	rp.TryRecoverPrimary()
+	if rp.ActiveModel() != "opus" {
+		t.Errorf("expected recovery to opus, got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_AllInCooldownStaysOnCurrent(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, &NopLogger{})
+	// Primary hits limit -> switch to sonnet
+	rp.CheckOutput("rate limit")
+	// Sonnet also hits limit -> no more reserves, stays on sonnet
+	rp.CheckOutput("rate limit")
+
+	if rp.ActiveModel() != "sonnet" {
+		t.Errorf("expected to stay on sonnet when all in cooldown, got %q", rp.ActiveModel())
+	}
+}
+
+func TestReserve_ForceReserve_CascadesToNextAvailable(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet", "haiku"}, &NopLogger{})
+	rp.ForceReserve() // opus -> sonnet
+	if rp.ActiveModel() != "sonnet" {
+		t.Fatalf("expected sonnet, got %q", rp.ActiveModel())
+	}
+
+	rp.ForceReserve() // sonnet -> haiku
+	if rp.ActiveModel() != "haiku" {
+		t.Errorf("expected haiku after second force, got %q", rp.ActiveModel())
 	}
 }
 

@@ -280,6 +280,121 @@ func TestDefaultWaitTimeout_Is30Minutes(t *testing.T) {
 	}
 }
 
+func TestParseModelConfig_Valid(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		wantPrimary  string
+		wantReserves []string
+	}{
+		{"single model", "opus", "opus", nil},
+		{"two models", "opus,sonnet", "opus", []string{"sonnet"}},
+		{"three models", "opus,sonnet,haiku", "opus", []string{"sonnet", "haiku"}},
+		{"whitespace trimmed", " opus , sonnet ", "opus", []string{"sonnet"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			primary, reserves, err := domain.ParseModelConfig(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if primary != tt.wantPrimary {
+				t.Errorf("primary = %q, want %q", primary, tt.wantPrimary)
+			}
+			if len(reserves) != len(tt.wantReserves) {
+				t.Fatalf("reserves = %v, want %v", reserves, tt.wantReserves)
+			}
+			for i, r := range reserves {
+				if r != tt.wantReserves[i] {
+					t.Errorf("reserves[%d] = %q, want %q", i, r, tt.wantReserves[i])
+				}
+			}
+		})
+	}
+}
+
+func TestParseModelConfig_Invalid(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty string", ""},
+		{"empty segment", "opus,,haiku"},
+		{"duplicate models", "opus,opus"},
+		{"leading comma", ",sonnet"},
+		{"trailing whitespace-only", "opus, "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := domain.ParseModelConfig(tt.input)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		})
+	}
+}
+
+func TestValidateProjectConfig_ModelFormat(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+	cfg.Model = "opus,,haiku"
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected validation error for malformed model string")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "model") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected model-related error, got: %v", errs)
+	}
+}
+
+func TestValidateProjectConfig_EmptyBaseBranch(t *testing.T) {
+	// given
+	cfg := domain.DefaultProjectConfig()
+	cfg.BaseBranch = ""
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then
+	if len(errs) == 0 {
+		t.Fatal("expected validation error for empty base_branch")
+	}
+	found := false
+	for _, e := range errs {
+		if strings.Contains(e, "base_branch") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected base_branch error, got: %v", errs)
+	}
+}
+
+func TestValidateProjectConfig_NonEmptyBaseBranch_NoError(t *testing.T) {
+	// given — default config has base_branch="main" (non-empty)
+	cfg := domain.DefaultProjectConfig()
+
+	// when
+	errs := domain.ValidateProjectConfig(cfg)
+
+	// then — no base_branch error
+	for _, e := range errs {
+		if strings.Contains(e, "base_branch") {
+			t.Errorf("unexpected base_branch error: %s", e)
+		}
+	}
+}
+
 func TestProjectConfig_YAMLRoundTrip_NoComputedKey(t *testing.T) {
 	// given
 	cfg := domain.DefaultProjectConfig()

@@ -501,7 +501,7 @@ func TestWorktreePool_Init_SetupCmdFailure_PartialInit(t *testing.T) {
 	}
 }
 
-func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
+func TestWorktreePool_Shutdown_AcquiredWorkersAlsoCleaned(t *testing.T) {
 	// given
 	ctx := context.Background()
 	executor := &localGitExecutor{}
@@ -515,44 +515,20 @@ func TestWorktreePool_Shutdown_AcquiredWorkersNotCleaned(t *testing.T) {
 	// acquire 1 worker (don't release it)
 	_ = pool.Acquire()
 
-	// when — shutdown should only remove the 1 worker still in the channel
+	// when — shutdown should remove ALL workers including acquired ones
 	err := pool.Shutdown(ctx)
 	if err != nil {
 		t.Fatalf("Shutdown failed: %v", err)
 	}
 
-	// then: git worktree list shows 2 entries (main + 1 acquired worker still registered)
+	// then: git worktree list shows only 1 entry (main only, all workers cleaned)
 	out, err := executor.Git(ctx, repoDir, "worktree", "list")
 	if err != nil {
 		t.Fatalf("git worktree list failed: %v", err)
 	}
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) != 2 {
-		t.Errorf("expected 2 worktree entries (main + acquired), got %d:\n%s", len(lines), string(out))
-	}
-
-	// verify self-healing: remove the acquired worker's directory (simulating a crash),
-	// then a new pool calling Init prunes the orphaned worktree ref
-	poolDir := repoDir + "/.expedition/.run/worktrees"
-	_, err = executor.Shell(ctx, repoDir, fmt.Sprintf("rm -rf %s", poolDir))
-	if err != nil {
-		t.Fatalf("rm -rf poolDir failed: %v", err)
-	}
-
-	newPool := NewWorktreePool(executor, repoDir, "main", "", 1)
-	err = newPool.Init(ctx)
-	if err != nil {
-		t.Fatalf("new pool Init (self-healing) failed: %v", err)
-	}
-
-	out, err = executor.Git(ctx, repoDir, "worktree", "list")
-	if err != nil {
-		t.Fatalf("git worktree list after self-healing failed: %v", err)
-	}
-	// After prune cleans stale refs + adding 1 new worker: main + 1 new worker = 2 entries
-	lines = strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) != 2 {
-		t.Errorf("expected 2 worktree entries after self-healing, got %d:\n%s", len(lines), string(out))
+	if len(lines) != 1 {
+		t.Errorf("expected 1 worktree entry (main only), got %d:\n%s", len(lines), string(out))
 	}
 }
 
@@ -739,6 +715,245 @@ func TestWorktreePool_Init_SelfHeals_LeakedWorktrees(t *testing.T) {
 	}
 }
 
+// failOnCheckoutGitExecutor wraps a real executor but fails on checkout commands.
+type failOnCheckoutGitExecutor struct {
+	real      *localGitExecutor
+	failCount atomic.Int32
+}
+
+func (f *failOnCheckoutGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "checkout" && args[1] == "--detach" {
+		f.failCount.Add(1)
+		return nil, fmt.Errorf("simulated checkout failure")
+	}
+	return f.real.Git(ctx, dir, args...)
+}
+
+func (f *failOnCheckoutGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	return f.real.Shell(ctx, dir, command)
+}
+
+func TestWorktreePool_Release_CheckoutFailure_RecyclesSlot(t *testing.T) {
+	// given: init with real executor, then swap to failing executor for Release
+	ctx := context.Background()
+	realExecutor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(realExecutor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// swap executor to one that fails checkout
+	failingExecutor := &failOnCheckoutGitExecutor{real: realExecutor}
+	pool.git = failingExecutor
+
+	// when: Release encounters checkout failure
+	err := pool.Release(ctx, path)
+
+	// then: Release should recover via forceRecycle (not lose the slot)
+	if err != nil {
+		t.Fatalf("Release should recover via recycle, got error: %v", err)
+	}
+
+	// swap back to real executor for verification
+	pool.git = realExecutor
+
+	// verify: the slot is back in the pool (can acquire again without deadlocking)
+	path2 := pool.Acquire()
+	if path2 == "" {
+		t.Fatal("expected to acquire a worker after recycled Release")
+	}
+
+	// verify: the recycled worktree is functional
+	out, err := realExecutor.Git(ctx, path2, "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		t.Fatalf("rev-parse failed on recycled worktree: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "true" {
+		t.Errorf("expected 'true', got %q", strings.TrimSpace(string(out)))
+	}
+}
+
+// failOnResetGitExecutor wraps a real executor but fails on "reset --hard" commands.
+type failOnResetGitExecutor struct {
+	real      *localGitExecutor
+	failCount atomic.Int32
+}
+
+func (f *failOnResetGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 2 && args[0] == "reset" && args[1] == "--hard" {
+		f.failCount.Add(1)
+		return nil, fmt.Errorf("simulated reset failure")
+	}
+	return f.real.Git(ctx, dir, args...)
+}
+
+func (f *failOnResetGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	return f.real.Shell(ctx, dir, command)
+}
+
+// failOnCleanGitExecutor wraps a real executor but fails on "clean" commands.
+type failOnCleanGitExecutor struct {
+	real      *localGitExecutor
+	failCount atomic.Int32
+}
+
+func (f *failOnCleanGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if len(args) >= 1 && args[0] == "clean" {
+		f.failCount.Add(1)
+		return nil, fmt.Errorf("simulated clean failure")
+	}
+	return f.real.Git(ctx, dir, args...)
+}
+
+func (f *failOnCleanGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	return f.real.Shell(ctx, dir, command)
+}
+
+func TestWorktreePool_Release_ResetFailure_RecyclesSlot(t *testing.T) {
+	// given: init with real executor, then swap to failing executor for Release
+	ctx := context.Background()
+	realExecutor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(realExecutor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// swap executor to one that fails reset --hard
+	failingExecutor := &failOnResetGitExecutor{real: realExecutor}
+	pool.git = failingExecutor
+
+	// when: Release encounters reset failure (checkout succeeds, reset fails)
+	err := pool.Release(ctx, path)
+
+	// then: Release should recover via forceRecycle
+	if err != nil {
+		t.Fatalf("Release should recover via recycle, got error: %v", err)
+	}
+
+	// swap back for verification
+	pool.git = realExecutor
+
+	// verify: slot is back in the pool
+	path2 := pool.Acquire()
+	if path2 == "" {
+		t.Fatal("expected to acquire a worker after recycled Release")
+	}
+}
+
+func TestWorktreePool_Release_CleanFailure_StillReturnsSlot(t *testing.T) {
+	// given: init with real executor, then swap to failing executor for Release
+	ctx := context.Background()
+	realExecutor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(realExecutor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// swap executor to one that fails clean
+	failingExecutor := &failOnCleanGitExecutor{real: realExecutor}
+	pool.git = failingExecutor
+
+	// when: Release encounters clean failure (checkout+reset succeed, clean fails)
+	err := pool.Release(ctx, path)
+
+	// then: Release should succeed (clean failure is non-fatal)
+	if err != nil {
+		t.Fatalf("Release should succeed despite clean failure, got error: %v", err)
+	}
+
+	// swap back for verification
+	pool.git = realExecutor
+
+	// verify: slot is back in the pool
+	path2 := pool.Acquire()
+	if path2 == "" {
+		t.Fatal("expected to acquire a worker after Release with clean failure")
+	}
+	if path != path2 {
+		t.Errorf("expected same path, got path1=%q path2=%q", path, path2)
+	}
+}
+
+func TestWorktreePool_Release_Success_ReturnsSlot(t *testing.T) {
+	// given
+	ctx := context.Background()
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 1)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	path := pool.Acquire()
+
+	// when: normal Release (happy path)
+	err := pool.Release(ctx, path)
+
+	// then
+	if err != nil {
+		t.Fatalf("Release failed: %v", err)
+	}
+
+	// verify: slot is back in the pool and reusable
+	path2 := pool.Acquire()
+	if path2 != path {
+		t.Errorf("expected same path %q, got %q", path, path2)
+	}
+
+	// verify: worktree is clean
+	out, err := executor.Git(ctx, path2, "status", "--porcelain")
+	if err != nil {
+		t.Fatalf("git status failed: %v", err)
+	}
+	if strings.TrimSpace(string(out)) != "" {
+		t.Errorf("expected clean status, got: %q", string(out))
+	}
+}
+
+func TestWorktreePool_Shutdown_CleansAcquiredWorkers(t *testing.T) {
+	// given
+	ctx := context.Background()
+	executor := &localGitExecutor{}
+	repoDir := initGitRepoForWorktreeWithCommit(t)
+
+	pool := NewWorktreePool(executor, repoDir, "main", "", 2)
+	if err := pool.Init(ctx); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	// acquire 1 worker (don't release it -- simulates in-flight expedition)
+	_ = pool.Acquire()
+
+	// when
+	err := pool.Shutdown(ctx)
+	if err != nil {
+		t.Fatalf("Shutdown failed: %v", err)
+	}
+
+	// then: ALL worktrees should be removed, including the acquired one
+	out, err := executor.Git(ctx, repoDir, "worktree", "list")
+	if err != nil {
+		t.Fatalf("git worktree list failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 worktree entry (main only), got %d:\n%s", len(lines), string(out))
+	}
+}
+
 // TestWorktreePool_Shutdown_CancelledContext_LeavesOrphans documents that
 // Shutdown with a cancelled context cannot remove worktrees. This motivates
 // the caller (Paintress.Run) to use context.Background() for deferred Shutdown.
@@ -771,5 +986,62 @@ func TestWorktreePool_Shutdown_CancelledContext_LeavesOrphans(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 	if len(lines) < 2 {
 		t.Errorf("expected orphaned worktrees (>1 entries), got %d:\n%s", len(lines), string(out))
+	}
+}
+
+// mockGitExecutor is a test double for port.GitExecutor (used by ValidateBaseBranch tests).
+type mockGitExecutor struct {
+	gitFn   func(ctx context.Context, dir string, args ...string) ([]byte, error)
+	shellFn func(ctx context.Context, dir string, command string) ([]byte, error)
+}
+
+func (m *mockGitExecutor) Git(ctx context.Context, dir string, args ...string) ([]byte, error) {
+	if m.gitFn != nil {
+		return m.gitFn(ctx, dir, args...)
+	}
+	return nil, nil
+}
+
+func (m *mockGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
+	if m.shellFn != nil {
+		return m.shellFn(ctx, dir, command)
+	}
+	return nil, nil
+}
+
+func TestValidateBaseBranch_NonexistentBranch(t *testing.T) {
+	// given
+	git := &mockGitExecutor{
+		gitFn: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			return nil, fmt.Errorf("fatal: Needed a single revision")
+		},
+	}
+
+	// when
+	err := ValidateBaseBranch(context.Background(), git, "/tmp/repo", "mian")
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for nonexistent branch")
+	}
+	if !strings.Contains(err.Error(), "mian") {
+		t.Errorf("error should mention branch name, got: %v", err)
+	}
+}
+
+func TestValidateBaseBranch_ExistingBranch(t *testing.T) {
+	// given
+	git := &mockGitExecutor{
+		gitFn: func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			return []byte("abc123\n"), nil
+		},
+	}
+
+	// when
+	err := ValidateBaseBranch(context.Background(), git, "/tmp/repo", "main")
+
+	// then
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

@@ -49,6 +49,9 @@ type Paintress struct {
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryTracker *domain.RetryTracker
 
+	// Parallel worker same-issue guard (nil when Workers == 0)
+	claimRegistry *domain.IssueClaimRegistry
+
 	// Swarm Mode: atomic counters for concurrent worker access
 	expCounter           atomic.Int64
 	totalAttempted       atomic.Int64
@@ -59,6 +62,7 @@ type Paintress struct {
 	totalMidHighSeverity atomic.Int64
 	consecutiveFailures  atomic.Int64
 	consecutiveSkips     atomic.Int64
+	escalationFired      atomic.Bool
 }
 
 
@@ -75,15 +79,13 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
 
-	// Reserve Party: parse model string for reserves
-	models := strings.Split(cfg.Model, ",")
-	primary := strings.TrimSpace(models[0])
-	var reserves []string
-	for _, m := range models[1:] {
-		m = strings.TrimSpace(m)
-		if m != "" {
-			reserves = append(reserves, m)
-		}
+	// Reserve Party: parse model string for reserves (already validated by ValidateProjectConfig).
+	// On error, fall back to legacy single-model behavior with a warning.
+	primary, reserves, parseErr := domain.ParseModelConfig(cfg.Model)
+	if parseErr != nil {
+		logger.Warn("ParseModelConfig: %v — falling back to raw model string %q", parseErr, cfg.Model)
+		primary = cfg.Model
+		reserves = nil
 	}
 
 	devDir := cfg.DevDir
@@ -192,8 +194,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 		defer p.devServer.Stop()
 	}
 
-	// Initialize worktree pool if workers > 0.
+	// Initialize worktree pool and claim registry if workers > 0.
 	if p.config.Workers > 0 {
+		p.claimRegistry = domain.NewIssueClaimRegistry()
 		p.pool = NewWorktreePool(
 			&localGitExecutor{},
 			p.config.Continent,

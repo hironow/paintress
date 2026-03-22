@@ -23,10 +23,10 @@ var expeditionCooldown = 10 * time.Second
 var worktreeReleaseTimeout = 10 * time.Second
 
 // emitExpeditionCompleted emits an expedition.completed event via the emitter.
-// OTel metric is recorded directly.
+// OTel metric is recorded directly with model attribution.
 // Returns an error if event persistence fails — expedition completion is critical.
-func (p *Paintress) emitExpeditionCompleted(exp int, status, issueID, bugsFound string) error {
-	platform.RecordExpedition(context.Background(), status)
+func (p *Paintress) emitExpeditionCompleted(ctx context.Context, exp int, status, issueID, bugsFound, model string) error {
+	platform.RecordExpedition(ctx, status, model)
 	return p.Emitter.EmitCompleteExpedition(exp, status, issueID, bugsFound, time.Now())
 }
 
@@ -100,20 +100,28 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		expedition := &Expedition{
-			Number:      exp,
-			Continent:   p.config.Continent,
-			WorkDir:     workDir,
-			Config:      p.config,
-			LogDir:      p.logDir,
-			Logger:      p.Logger,
-			DataOut:     p.DataOut,
-			ErrOut:      p.ErrOut,
-			Luminas:     luminas,
-			Gradient:    p.gradient,
-			Reserve:     p.reserve,
-			InboxDMails: inboxDMails,
-			Notifier:    p.notifier,
+			Number:        exp,
+			Continent:     p.config.Continent,
+			WorkDir:       workDir,
+			Config:        p.config,
+			LogDir:        p.logDir,
+			Logger:        p.Logger,
+			DataOut:       p.DataOut,
+			ErrOut:        p.ErrOut,
+			Luminas:       luminas,
+			Gradient:      p.gradient,
+			Reserve:       p.reserve,
+			InboxDMails:   inboxDMails,
+			Notifier:      p.notifier,
+			ClaimRegistry: p.claimRegistry,
 		}
+		// Wrap releaseWorkDir to also release the issue claim.
+		origReleaseWorkDir := releaseWorkDir
+		releaseWorkDir = func() {
+			expedition.ReleaseClaim()
+			origReleaseWorkDir()
+		}
+
 		// archiveInbox moves all inbox D-Mails to archive. Called on error/gommage
 		// paths; the success path is covered by dispatchExpeditionResult's defer.
 		archiveInbox := func() {
@@ -150,17 +158,18 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				expSpan.End()
 				return nil
 			}
-			p.handleExpeditionError(expSpan, exp, expedition, flagDir, err)
+			p.handleExpeditionError(expCtx, expSpan, exp, expedition, flagDir, model, err)
 			archiveInbox()
 		} else {
-			if retErr := p.dispatchExpeditionResult(ctx, expCtx, expSpan, exp, expedition, flagDir, workDir, output, expStart); retErr != nil {
+			if retErr := p.dispatchExpeditionResult(ctx, expCtx, expSpan, exp, expedition, flagDir, workDir, output, model, expStart); retErr != nil {
 				releaseWorkDir()
 				expSpan.End()
 				return retErr
 			}
 		}
 
-		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) {
+		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && !p.escalationFired.Load() {
+			p.escalationFired.Store(true)
 			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
 
 			// Best-effort: write Gommage insight for cross-tool observability
@@ -211,7 +220,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 // handleExpeditionError processes a failed expedition run: switches model on
 // timeout, discharges gradient, writes flag/journal, and updates counters.
-func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expedition *Expedition, flagDir string, runErr error) {
+func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, model string, runErr error) {
 	p.Logger.Error("%s", fmt.Sprintf(domain.Msg("exp_failed"), exp, runErr))
 	if strings.Contains(runErr.Error(), "timeout") {
 		prevModel := p.reserve.ActiveModel()
@@ -248,7 +257,7 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 		errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 	}
 	WriteJournal(p.config.Continent, errReport)
-	if err := p.emitExpeditionCompleted(exp, "failed", "", ""); err != nil {
+	if err := p.emitExpeditionCompleted(expCtx, exp, "failed", "", "", model); err != nil {
 		p.Logger.Error("expedition completion event lost: %v", err)
 	}
 	if midHighCount > 0 {
@@ -261,7 +270,7 @@ func (p *Paintress) handleExpeditionError(expSpan trace.Span, exp int, expeditio
 // dispatchExpeditionResult parses the expedition output, dispatches based on
 // status (complete/success/skipped/failed/parse-error), and updates counters.
 // Returns errComplete when all issues are done; nil otherwise.
-func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output string, expStart time.Time) error {
+func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output, model string, expStart time.Time) error {
 	// Archive ALL inbox D-Mails when this function returns, regardless of status.
 	// Without this, D-Mails remain in inbox and re-trigger waiting mode infinitely.
 	defer func() {
@@ -311,7 +320,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 		}
 		WriteJournal(p.config.Continent, parseErrReport)
-		if err := p.emitExpeditionCompleted(exp, "parse_error", "", ""); err != nil {
+		if err := p.emitExpeditionCompleted(expCtx, exp, "parse_error", "", "", model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		p.consecutiveFailures.Add(1)
@@ -360,10 +369,10 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := WritePRIndex(p.config.Continent, report); err != nil {
 			p.Logger.Warn("pr index: %v", err)
 		}
-		if err := p.emitExpeditionCompleted(exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound)); err != nil {
+		if err := p.emitExpeditionCompleted(expCtx, exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound), model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
-		if dm := domain.NewReportDMail(report); dm.Name != "" {
+		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
@@ -371,6 +380,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.consecutiveFailures.Store(0)
 		p.consecutiveSkips.Store(0)
+		p.escalationFired.Store(false)
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))
@@ -380,7 +390,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		if err := p.emitExpeditionCompleted(exp, "skipped", report.IssueID, ""); err != nil {
+		if err := p.emitExpeditionCompleted(expCtx, exp, "skipped", report.IssueID, "", model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		// Re-review past PRs when skipped and review_cmd is configured.
@@ -397,7 +407,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		if err := p.emitExpeditionCompleted(exp, "failed", report.IssueID, ""); err != nil {
+		if err := p.emitExpeditionCompleted(expCtx, exp, "failed", report.IssueID, "", model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		p.consecutiveFailures.Add(1)

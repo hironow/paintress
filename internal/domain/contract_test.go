@@ -93,3 +93,112 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 		t.Errorf("unexpected ValidateDMail error for unknown kind: %v", err)
 	}
 }
+
+// --- Send-side contract tests (proposal 035) ---
+
+// TestContract_NewReportDMail_ValidatesSuccessfully verifies that a report
+// D-Mail created by NewReportDMail passes ValidateDMail and marshals correctly.
+func TestContract_NewReportDMail_ValidatesSuccessfully(t *testing.T) {
+	// given
+	report := &domain.ExpeditionReport{
+		Expedition:  1,
+		IssueID:     "AUTH-42",
+		IssueTitle:  "Implement 2FA",
+		MissionType: "implement",
+		Status:      "success",
+		PRUrl:       "https://github.com/test/repo/pull/123",
+		Reason:      "All tests pass, 2FA implemented",
+	}
+
+	// when
+	dmail := domain.NewReportDMail(report, 0)
+
+	// then: must pass validation
+	if err := domain.ValidateDMail(dmail); err != nil {
+		t.Fatalf("NewReportDMail produced invalid D-Mail: %v", err)
+	}
+
+	// then: kind must be "report"
+	if dmail.Kind != "report" {
+		t.Errorf("kind: got %q, want %q", dmail.Kind, "report")
+	}
+
+	// then: name must start with "report-"
+	if !strings.HasPrefix(dmail.Name, "report-") {
+		t.Errorf("name: got %q, want prefix %q", dmail.Name, "report-")
+	}
+
+	// then: marshal must succeed
+	data, err := dmail.Marshal()
+	if err != nil {
+		t.Fatalf("MarshalDMail: %v", err)
+	}
+
+	// then: marshaled output must contain PR URL
+	if !strings.Contains(string(data), "https://github.com/test/repo/pull/123") {
+		t.Error("marshaled D-Mail should contain PR URL")
+	}
+}
+
+// TestContract_NewReportDMail_OmitsPRWhenNone verifies that PR URL is
+// omitted when set to empty string or "none".
+func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
+	cases := []struct {
+		name  string
+		prUrl string
+	}{
+		{"empty", ""},
+		{"none", "none"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			report := &domain.ExpeditionReport{
+				Expedition:  1,
+				IssueID:     "BUG-1",
+				IssueTitle:  "Fix crash",
+				MissionType: "fix",
+				Status:      "failed",
+				PRUrl:       tc.prUrl,
+			}
+
+			dmail := domain.NewReportDMail(report, 0)
+
+			if err := domain.ValidateDMail(dmail); err != nil {
+				t.Fatalf("validation failed: %v", err)
+			}
+
+			data, _ := dmail.Marshal()
+			if strings.Contains(string(data), "**PR:**") {
+				t.Error("PR line should be omitted when URL is empty/none")
+			}
+		})
+	}
+}
+
+// TestContract_NewReportDMail_FailedStatus verifies report D-Mail with
+// failed status passes validation and includes reason in body.
+func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
+	report := &domain.ExpeditionReport{
+		Expedition:  3,
+		IssueID:     "PERF-7",
+		IssueTitle:  "Optimize query",
+		MissionType: "optimize",
+		Status:      "failed",
+		Reason:      "OOM during benchmark",
+	}
+
+	dmail := domain.NewReportDMail(report, 0)
+
+	if err := domain.ValidateDMail(dmail); err != nil {
+		t.Fatalf("validation failed: %v", err)
+	}
+
+	data, _ := dmail.Marshal()
+	if !strings.Contains(string(data), "OOM during benchmark") {
+		t.Error("body should contain failure reason")
+	}
+	if !strings.Contains(string(data), "failed") {
+		t.Error("body should contain status")
+	}
+}

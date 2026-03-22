@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/alitto/pond/v2"
 	"github.com/hironow/paintress/internal/domain"
 )
+
+const maxLuminas = 10
 
 // ScanJournalsForLumina reads all journal files in parallel goroutines,
 // extracts failure reasons and success patterns, and returns Luminas.
@@ -129,7 +132,42 @@ func ScanJournalsForLumina(continent string) []domain.Lumina {
 		}
 	}
 
+	// Sort by priority: high-severity-alert > failure-pattern > success-pattern,
+	// with Uses as tiebreaker (higher Uses first).
+	slices.SortFunc(luminas, func(a, b domain.Lumina) int {
+		pa := luminaPriority(a.Source)
+		pb := luminaPriority(b.Source)
+		if pa != pb {
+			return pa - pb // lower priority number = higher priority
+		}
+		if a.Uses != b.Uses {
+			return b.Uses - a.Uses // higher Uses first
+		}
+		// Deterministic tiebreaker: lexicographic by Source then Pattern.
+		if a.Source != b.Source {
+			return strings.Compare(a.Source, b.Source)
+		}
+		return strings.Compare(a.Pattern, b.Pattern)
+	})
+
+	if len(luminas) > maxLuminas {
+		luminas = luminas[:maxLuminas]
+	}
+
 	return luminas
+}
+
+func luminaPriority(source string) int {
+	switch source {
+	case "high-severity-alert":
+		return 0
+	case "failure-pattern":
+		return 1
+	case "success-pattern":
+		return 2
+	default:
+		return 3
+	}
 }
 
 func extractValue(line string) string {

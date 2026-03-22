@@ -368,6 +368,63 @@ func TestScanJournalsForLumina_NoHighSeverity(t *testing.T) {
 	}
 }
 
+func TestScanJournalsForLumina_CappedAt10(t *testing.T) {
+	// given: create enough journals to produce more than 10 luminas
+	dir := t.TempDir()
+	jDir := filepath.Join(dir, ".expedition", "journal")
+	os.MkdirAll(jDir, 0755)
+
+	// Create 2 high-severity alerts, 12 distinct failure patterns (each appearing 2x = 24 journals),
+	// producing 2 + 12 = 14 luminas without cap.
+	idx := 1
+
+	// 2 high-severity alerts (1 journal each)
+	for i := range 2 {
+		content := fmt.Sprintf(`# Expedition #%d — Journal
+
+- **Status**: failed
+- **Reason**: alert-reason-%d
+- **HIGH severity D-Mail**: critical-alert-%d
+`, idx, i, i)
+		os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", idx)), []byte(content), 0644)
+		idx++
+	}
+
+	// 12 distinct failure patterns, each appearing exactly 2 times (threshold)
+	for i := range 12 {
+		for j := range 2 {
+			content := fmt.Sprintf(`# Expedition #%d — Journal
+
+- **Status**: failed
+- **Reason**: failure-pattern-%d
+- **Insight**: repeated-failure-%d
+`, idx, i, i)
+			_ = j
+			os.WriteFile(filepath.Join(jDir, fmt.Sprintf("%03d.md", idx)), []byte(content), 0644)
+			idx++
+		}
+	}
+
+	// when
+	luminas := session.ScanJournalsForLumina(dir)
+
+	// then: should be capped at 10
+	if len(luminas) > 10 {
+		t.Errorf("expected at most 10 luminas, got %d", len(luminas))
+	}
+
+	// then: all high-severity alerts should be included (highest priority)
+	alertCount := 0
+	for _, l := range luminas {
+		if l.Source == "high-severity-alert" {
+			alertCount++
+		}
+	}
+	if alertCount != 2 {
+		t.Errorf("expected 2 high-severity alerts in capped result, got %d", alertCount)
+	}
+}
+
 func TestFormatLuminaForPrompt_WithAlert(t *testing.T) {
 	// given
 	luminas := []domain.Lumina{
