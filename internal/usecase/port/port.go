@@ -91,6 +91,18 @@ type ArchiveOps interface {
 	PruneFlushedOutbox(ctx context.Context, repoPath string) (int, error)
 }
 
+// PreFlightTriager processes inbox D-Mails before expedition creation.
+// Implemented in usecase layer, injected into session by cmd (composition root).
+type PreFlightTriager interface {
+	TriagePreFlightDMails(ctx context.Context, dmails []domain.DMail) []domain.DMail
+}
+
+// InboxArchiver archives consumed inbox D-Mails to the archive directory.
+// Implemented in session layer (filesystem I/O), injected into usecase by cmd.
+type InboxArchiver interface {
+	ArchiveInboxDMail(ctx context.Context, continent, name string) error
+}
+
 // ExpeditionEventEmitter wraps aggregate event production + persistence + dispatch
 // for expedition operations. Implemented in usecase layer, injected into session.
 // Dispatch is best-effort: errors are logged but not returned.
@@ -133,6 +145,7 @@ func (*NopExpeditionEventEmitter) EmitDMailArchived(_ string, _ time.Time) error
 // ExpeditionRunner wraps the session-layer expedition orchestrator.
 type ExpeditionRunner interface {
 	SetEmitter(emitter ExpeditionEventEmitter)
+	SetPreFlightTriager(triager PreFlightTriager)
 	Run(ctx context.Context) int
 }
 
