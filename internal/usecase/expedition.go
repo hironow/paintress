@@ -15,6 +15,7 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
 	notifier port.Notifier, metrics port.PolicyMetrics,
 	archiver port.InboxArchiver, followUp port.FollowUpRunner,
 	continent string, maxRetries int,
+	mode domain.TrackingMode, targetProvider port.TargetProvider,
 ) (int, error) {
 	engine := NewPolicyEngine(logger)
 	if metrics == nil {
@@ -40,6 +41,12 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
 	if followUp != nil {
 		handler := NewFeedbackActionHandler(maxRetries, tracker, emitter, followUp, logger)
 		runner.SetFeedbackHandler(handler)
+	}
+
+	// Wire tracking mode and target provider
+	runner.SetTrackingMode(mode)
+	if targetProvider != nil {
+		runner.SetTargetProvider(targetProvider)
 	}
 
 	return runner.Run(ctx), nil

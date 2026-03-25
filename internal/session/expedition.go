@@ -43,6 +43,9 @@ type Expedition struct {
 	midHighMu    sync.Mutex
 	midHighNames []string
 
+	// Wave-centric mode: expedition target (step or wave)
+	Target *domain.ExpeditionTarget
+
 	// Parallel worker same-issue guard (nil in single-worker mode)
 	ClaimRegistry *domain.IssueClaimRegistry
 
@@ -136,6 +139,7 @@ func (e *Expedition) BuildPrompt() string {
 		LinearTeam:      projCfg.TrackerTeam(),
 		LinearProject:   projCfg.TrackerProject(),
 		MissionSection:  platform.MissionText(domain.Lang),
+		WaveTarget:      e.Target,
 	}
 
 	return platform.RenderExpeditionPrompt(domain.Lang, data)

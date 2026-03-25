@@ -55,6 +55,10 @@ type Paintress struct {
 	// FeedbackActionHandler dispatches feedback D-Mail actions (usecase-injected)
 	feedbackHandler port.FeedbackActionHandler
 
+	// Wave-centric mode: target provider + tracking mode
+	targetProvider port.TargetProvider
+	trackingMode   domain.TrackingMode
+
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 
@@ -156,6 +160,16 @@ func (p *Paintress) SetEmitter(e port.ExpeditionEventEmitter) {
 // SetPreFlightTriager injects the pre-flight triage usecase.
 func (p *Paintress) SetPreFlightTriager(t port.PreFlightTriager) {
 	p.preFlightTriager = t
+}
+
+// SetTargetProvider injects the expedition target provider.
+func (p *Paintress) SetTargetProvider(tp port.TargetProvider) {
+	p.targetProvider = tp
+}
+
+// SetTrackingMode sets the tracking mode (wave or linear).
+func (p *Paintress) SetTrackingMode(mode domain.TrackingMode) {
+	p.trackingMode = mode
 }
 
 func (p *Paintress) Run(ctx context.Context) int {

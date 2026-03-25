@@ -172,6 +172,8 @@ type ExpeditionRunner interface {
 	SetEmitter(emitter ExpeditionEventEmitter)
 	SetPreFlightTriager(triager PreFlightTriager)
 	SetFeedbackHandler(handler FeedbackActionHandler)
+	SetTargetProvider(tp TargetProvider)
+	SetTrackingMode(mode domain.TrackingMode)
 	Run(ctx context.Context) int
 }
 
