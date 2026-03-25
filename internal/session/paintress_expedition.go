@@ -99,6 +99,44 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			flagDir = p.config.Continent
 		}
 
+		// Wave mode: fetch pending step targets from archive projection
+		var waveTarget *domain.ExpeditionTarget
+		if p.trackingMode.IsWave() && p.targetProvider != nil {
+			targets, tErr := p.targetProvider.FetchTargets(expCtx)
+			if tErr != nil {
+				p.Logger.Warn("wave target fetch: %v", tErr)
+			} else if len(targets) == 0 {
+				p.Logger.Info("Wave mode: no pending targets, expedition cycle complete")
+				expSpan.End()
+				return nil
+			} else {
+				// Pick first pending target; claim it before expedition starts
+				target := targets[0]
+				if p.claimRegistry != nil {
+					if ok, holder := p.claimRegistry.TryClaim(target.ID, exp); !ok {
+						p.Logger.Info("Wave target %s claimed by expedition #%d, trying next", target.ID, holder)
+						// Try remaining targets
+						claimed := false
+						for _, t := range targets[1:] {
+							if ok2, _ := p.claimRegistry.TryClaim(t.ID, exp); ok2 {
+								target = t
+								claimed = true
+								break
+							}
+						}
+						if !claimed {
+							p.Logger.Info("All wave targets claimed, skipping expedition #%d", exp)
+							p.totalSkipped.Add(1)
+							expSpan.End()
+							continue
+						}
+					}
+				}
+				waveTarget = &target
+				p.Logger.Info("Wave target: %s — %s", target.ID, target.Title)
+			}
+		}
+
 		expedition := &Expedition{
 			Number:        exp,
 			Continent:     p.config.Continent,
@@ -114,7 +152,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			InboxDMails:   inboxDMails,
 			Notifier:      p.notifier,
 			ClaimRegistry: p.claimRegistry,
+			Target:        waveTarget,
 		}
+		// Wave mode: pre-set the claim key from target ID (no flag watcher needed)
+		if waveTarget != nil {
+			expedition.setCurrentIssue(waveTarget.ID)
+		}
+
 		// Wrap releaseWorkDir to also release the issue claim.
 		origReleaseWorkDir := releaseWorkDir
 		releaseWorkDir = func() {
@@ -333,6 +377,11 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 				attribute.String("mission_type", platform.SanitizeUTF8(report.MissionType)),
 			),
 		)
+		// Wave mode: transfer wave/step context to report for D-Mail projection
+		if expedition.Target != nil {
+			report.WaveID = expedition.Target.WaveID
+			report.StepID = expedition.Target.StepID
+		}
 		p.handleSuccess(report)
 		p.gradient.Charge()
 		if err := p.Emitter.EmitGradientChange(p.gradient.Level(), "charge", time.Now()); err != nil {

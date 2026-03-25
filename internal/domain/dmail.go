@@ -75,6 +75,20 @@ func NewReportDMail(report *ExpeditionReport, gaugeLevel int) DMail {
 		}
 	}
 
+	// Wave-centric mode: attach wave reference for archive projection
+	if report.WaveID != "" {
+		dm.Wave = &WaveReference{
+			ID:   report.WaveID,
+			Step: report.StepID,
+		}
+		// Override name to include wave/step for uniqueness
+		if report.StepID != "" {
+			dm.Name = fmt.Sprintf("report-%s-%s", report.WaveID, report.StepID)
+		} else {
+			dm.Name = fmt.Sprintf("report-%s", report.WaveID)
+		}
+	}
+
 	return dm
 }
 
