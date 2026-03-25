@@ -119,6 +119,25 @@ func RunDir(continent string) string {
 // DMailSchemaVersion is the current D-Mail protocol schema version.
 const DMailSchemaVersion = "1"
 
+// WaveStepDef defines a single step within a wave specification.
+type WaveStepDef struct {
+	ID            string   `yaml:"id" json:"id"`
+	Title         string   `yaml:"title" json:"title"`
+	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
+	Targets       []string `yaml:"targets,omitempty" json:"targets,omitempty"`
+	Acceptance    string   `yaml:"acceptance,omitempty" json:"acceptance,omitempty"`
+	Prerequisites []string `yaml:"prerequisites,omitempty" json:"prerequisites,omitempty"`
+}
+
+// WaveReference links a D-Mail to a wave and optionally a specific step.
+// In specification D-Mails: Steps contains the full step definitions.
+// In report/feedback D-Mails: Step identifies the specific step.
+type WaveReference struct {
+	ID    string        `yaml:"id" json:"id"`
+	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
+	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`
+}
+
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
 type DMail struct {
 	Name          string            `yaml:"name"`
@@ -129,6 +148,7 @@ type DMail struct {
 	Action        string            `yaml:"action,omitempty"`
 	Priority      int               `yaml:"priority,omitempty"`
 	SchemaVersion string            `yaml:"dmail-schema-version,omitempty"`
+	Wave          *WaveReference    `yaml:"wave,omitempty"`
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 	Body          string            `yaml:"-"`
