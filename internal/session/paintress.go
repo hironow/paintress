@@ -52,6 +52,9 @@ type Paintress struct {
 	// PreFlightTriager processes D-Mail actions before expedition (usecase-injected)
 	preFlightTriager port.PreFlightTriager
 
+	// FeedbackActionHandler dispatches feedback D-Mail actions (usecase-injected)
+	feedbackHandler port.FeedbackActionHandler
+
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 

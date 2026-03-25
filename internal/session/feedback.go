@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // stageEscalation creates and stages a feedback D-Mail for escalation when
@@ -22,48 +23,19 @@ func (p *Paintress) stageEscalation(ctx context.Context, expedition, failureCoun
 	}
 }
 
-// handleFeedbackAction dispatches a D-Mail based on its Action field.
-// Actions: "retry" (with retry counting), "escalate", "resolve", or fallthrough.
+// handleFeedbackAction delegates to the injected FeedbackActionHandler port.
+// Falls back to runFollowUp for all D-Mails when no handler is set.
 func (p *Paintress) handleFeedbackAction(ctx context.Context, dm domain.DMail, workDir string, remaining time.Duration) {
-	switch dm.Action {
-	case "retry":
-		if len(dm.Issues) == 0 {
-			p.Logger.Warn("Retry action without issues, falling through: %s", dm.Name)
-			p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
-			return
-		}
-		count := p.retryTracker.Track(dm.Issues)
-		retryKey := domain.RetryKey(dm.Issues)
-
-		if count > p.config.MaxRetries {
-			p.Logger.Warn("Max retries (%d) reached for %s, escalating", p.config.MaxRetries, dm.Name)
-			if err := p.handleEscalation(dm); err != nil {
-				p.Logger.Error("escalation event lost: %v", err)
-			}
-			return
-		}
-		p.Logger.Info("Retry %d/%d for %s", count, p.config.MaxRetries, dm.Name)
-		if err := p.Emitter.EmitRetryAttempted(retryKey, count, time.Now()); err != nil {
-			p.Logger.Warn("retry event: %v", err)
-		}
-		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
-	case "escalate":
-		if err := p.handleEscalation(dm); err != nil {
-			p.Logger.Error("escalation event lost: %v", err)
-		}
-	case "resolve":
-		p.Logger.OK("Issue resolved per feedback: %s", dm.Name)
-		if err := p.Emitter.EmitResolved(dm.Name, dm.Issues, time.Now()); err != nil {
-			p.Logger.Warn("resolved event: %v", err)
-		}
-	default:
-		p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
+	if p.feedbackHandler != nil {
+		p.feedbackHandler.HandleFeedbackAction(ctx, dm, workDir, remaining)
+		return
 	}
+	// Fallback: pass through to expedition
+	p.runFollowUp(ctx, []domain.DMail{dm}, workDir, remaining)
 }
 
 // handleEscalation logs and emits an escalation event for a D-Mail that
-// requires human attention. Returns an error if the escalation event
-// cannot be persisted — escalation events are critical and must be detectable.
+// requires human attention. Used by stageEscalation.
 func (p *Paintress) handleEscalation(dm domain.DMail) error {
 	p.Logger.Warn("ESCALATION: %s requires human attention (issues: %v)", dm.Name, dm.Issues)
 	if err := p.Emitter.EmitEscalated(dm.Name, dm.Issues, time.Now()); err != nil {
@@ -71,4 +43,14 @@ func (p *Paintress) handleEscalation(dm domain.DMail) error {
 		return fmt.Errorf("escalation event: %w", err)
 	}
 	return nil
+}
+
+// SetFeedbackHandler injects the feedback action handler.
+func (p *Paintress) SetFeedbackHandler(h port.FeedbackActionHandler) {
+	p.feedbackHandler = h
+}
+
+// RunFollowUp implements port.FollowUpRunner by delegating to the session-layer runFollowUp.
+func (p *Paintress) RunFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration) {
+	p.runFollowUp(ctx, dmails, workDir, remaining)
 }

@@ -97,6 +97,18 @@ type PreFlightTriager interface {
 	TriagePreFlightDMails(ctx context.Context, dmails []domain.DMail) []domain.DMail
 }
 
+// FeedbackActionHandler processes feedback D-Mail actions.
+// Implemented in usecase layer, injected into session by cmd (composition root).
+type FeedbackActionHandler interface {
+	HandleFeedbackAction(ctx context.Context, dm domain.DMail, workDir string, remaining time.Duration)
+}
+
+// FollowUpRunner executes follow-up expeditions triggered by D-Mail feedback.
+// Implemented in session layer (Claude CLI subprocess), injected into usecase by cmd.
+type FollowUpRunner interface {
+	RunFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration)
+}
+
 // InboxArchiver archives consumed inbox D-Mails to the archive directory.
 // Implemented in session layer (filesystem I/O), injected into usecase by cmd.
 type InboxArchiver interface {
@@ -146,6 +158,7 @@ func (*NopExpeditionEventEmitter) EmitDMailArchived(_ string, _ time.Time) error
 type ExpeditionRunner interface {
 	SetEmitter(emitter ExpeditionEventEmitter)
 	SetPreFlightTriager(triager PreFlightTriager)
+	SetFeedbackHandler(handler FeedbackActionHandler)
 	Run(ctx context.Context) int
 }
 
