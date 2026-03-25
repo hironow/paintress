@@ -91,6 +91,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress all stderr output")
 	rootCmd.PersistentFlags().StringP("output", "o", "text", "Output format: text, json")
 	rootCmd.PersistentFlags().StringP("lang", "l", "", "Output language: en, ja (default from config)")
+	rootCmd.PersistentFlags().Bool("linear", false, "Use Linear MCP for issue tracking (default: wave-centric mode)")
 
 	rootCmd.AddCommand(
 		newRunCommand(),
