@@ -148,7 +148,7 @@ D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logg
 | `SendDMail` | `internal/session/dmail.go` | Write to archive/ then outbox/ |
 | `ScanInbox` | `internal/session/dmail.go` | Read all .md files from inbox/ |
 | `ArchiveInboxDMail` | `internal/session/dmail.go` | Move inbox/ file to archive/ (idempotent if already archived) |
-| `triagePreFlightDMails` | `internal/session/preflight_triage.go` | Pre-flight action processing (escalate/resolve/retry) |
+| `TriagePreFlightDMails` | `internal/usecase/preflight_triage.go` | Pre-flight action processing (escalate/resolve/retry) — delegated via `port.PreFlightTriager` |
 | `InsightsDir` | `dmail.go` | Path to insights directory |
 | `RunDir` | `dmail.go` | Path to run directory (SQLite, locks, logs) |
 | `InsightWriter.Append` | `internal/session/insight_writer.go` | Append insight entry to ledger file (flock + atomic rename, idempotent) |

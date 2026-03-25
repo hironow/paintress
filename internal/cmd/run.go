@@ -225,7 +225,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		return rpErr
 	}
 	logger.Info("paintress run: starting initial expedition cycle...")
-	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
+	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries)
 	if ucErr != nil {
 		summary := p.HandoverSummary()
 		return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
@@ -288,7 +288,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		// Re-run expeditions on D-Mail arrival
 		logger.Info("paintress run: D-Mail received, re-running expedition cycle...")
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil, approver)
-		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{})
+		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries)
 		if ucErr != nil {
 			summary := p.HandoverSummary()
 			return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{

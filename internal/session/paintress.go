@@ -49,6 +49,12 @@ type Paintress struct {
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryTracker *domain.RetryTracker
 
+	// PreFlightTriager processes D-Mail actions before expedition (usecase-injected)
+	preFlightTriager port.PreFlightTriager
+
+	// FeedbackActionHandler dispatches feedback D-Mail actions (usecase-injected)
+	feedbackHandler port.FeedbackActionHandler
+
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 
@@ -145,6 +151,11 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 // SetEmitter sets the event emitter for the session.
 func (p *Paintress) SetEmitter(e port.ExpeditionEventEmitter) {
 	p.Emitter = e
+}
+
+// SetPreFlightTriager injects the pre-flight triage usecase.
+func (p *Paintress) SetPreFlightTriager(t port.PreFlightTriager) {
+	p.preFlightTriager = t
 }
 
 func (p *Paintress) Run(ctx context.Context) int {

@@ -1,9 +1,10 @@
 package session
 
-// white-box-reason: session internals: tests unexported triagePreFlightDMails method
+// white-box-reason: session internals: tests triagePreFlightDMails delegation
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,60 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
+
+// testPreFlightTriager implements port.PreFlightTriager for session tests.
+// Replicates the usecase triage logic inline to avoid importing usecase.
+type testPreFlightTriager struct {
+	continent  string
+	maxRetries int
+	tracker    *domain.RetryTracker
+	archiver   port.InboxArchiver
+	emitter    port.ExpeditionEventEmitter
+}
+
+func newTestTriager(continent string, maxRetries int, tracker *domain.RetryTracker, archiver port.InboxArchiver, emitter port.ExpeditionEventEmitter) *testPreFlightTriager {
+	return &testPreFlightTriager{
+		continent:  continent,
+		maxRetries: maxRetries,
+		tracker:    tracker,
+		archiver:   archiver,
+		emitter:    emitter,
+	}
+}
+
+func (t *testPreFlightTriager) TriagePreFlightDMails(ctx context.Context, dmails []domain.DMail) []domain.DMail {
+	result := make([]domain.DMail, 0, len(dmails))
+	logger := &domain.NopLogger{}
+	for _, dm := range dmails {
+		switch dm.Action {
+		case "escalate":
+			_ = t.emitter.EmitEscalated(dm.Name, dm.Issues, time.Now())
+			_ = t.archiver.ArchiveInboxDMail(ctx, t.continent, dm.Name)
+		case "resolve":
+			_ = t.emitter.EmitResolved(dm.Name, dm.Issues, time.Now())
+			_ = t.archiver.ArchiveInboxDMail(ctx, t.continent, dm.Name)
+		case "retry":
+			if len(dm.Issues) == 0 {
+				result = append(result, dm)
+				continue
+			}
+			count := t.tracker.Track(dm.Issues)
+			if count > t.maxRetries {
+				_ = t.emitter.EmitEscalated(dm.Name, dm.Issues, time.Now())
+				_ = t.archiver.ArchiveInboxDMail(ctx, t.continent, dm.Name)
+				continue
+			}
+			retryKey := domain.RetryKey(dm.Issues)
+			_ = t.emitter.EmitRetryAttempted(retryKey, count, time.Now())
+			result = append(result, dm)
+		default:
+			result = append(result, dm)
+		}
+	}
+	_ = logger // suppress unused
+	_ = fmt.Sprintf // suppress unused import
+	return result
+}
 
 // countingEmitter wraps NopExpeditionEventEmitter and counts EmitEscalated
 // and EmitRetryAttempted calls for assertion in triage tests.
@@ -148,11 +203,13 @@ func TestTriagePreFlightDMails(t *testing.T) {
 				tracker.Track(tt.preloadIssues)
 			}
 
+			archiver := NewInboxArchiver(emitter)
 			p := &Paintress{
-				Emitter:      emitter,
-				config:       domain.Config{MaxRetries: tt.maxRetries},
-				Logger:       &domain.NopLogger{},
-				retryTracker: tracker,
+				Emitter:         emitter,
+				config:          domain.Config{MaxRetries: tt.maxRetries},
+				Logger:          &domain.NopLogger{},
+				retryTracker:    tracker,
+				preFlightTriager: newTestTriager("", tt.maxRetries, tracker, archiver, emitter),
 			}
 
 			// when
@@ -288,11 +345,13 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 				tracker.Track(tt.preloadIssues)
 			}
 
+			archiver := NewInboxArchiver(emitter)
 			p := &Paintress{
-				Emitter:      emitter,
-				config:       domain.Config{Continent: tmpDir, MaxRetries: tt.maxRetries},
-				Logger:       &domain.NopLogger{},
-				retryTracker: tracker,
+				Emitter:         emitter,
+				config:          domain.Config{Continent: tmpDir, MaxRetries: tt.maxRetries},
+				Logger:          &domain.NopLogger{},
+				retryTracker:    tracker,
+				preFlightTriager: newTestTriager(tmpDir, tt.maxRetries, tracker, archiver, emitter),
 			}
 
 			// when
