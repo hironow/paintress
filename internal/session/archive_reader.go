@@ -2,6 +2,8 @@ package session
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -24,7 +26,7 @@ func NewArchiveReader(archiveDir string) port.ArchiveReader {
 func (a *archiveReaderAdapter) ReadArchiveDMails(_ context.Context) ([]domain.DMail, error) {
 	entries, err := os.ReadDir(a.archiveDir)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, err
