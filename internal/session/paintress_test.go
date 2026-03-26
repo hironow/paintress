@@ -1732,3 +1732,163 @@ __EXPEDITION_END__`
 		t.Errorf("expected exit code 1 (consecutive skips), got %d", code)
 	}
 }
+
+// sleepThenSuccessScript creates a bash script that sleeps (causing timeout)
+// for the first `failCount` invocations, then emits a valid stream-json report.
+// Uses a counter file to track invocation count.
+func sleepThenSuccessScript(t *testing.T, dir string, failCount int) string {
+	t.Helper()
+	counterFile := filepath.Join(dir, "invoke-count")
+	os.WriteFile(counterFile, []byte("0"), 0644)
+
+	reportText := "__EXPEDITION_REPORT__\nissue_id: TEST-1\nissue_title: recovery test\nmission_type: fix\nbranch: none\npr_url: none\nstatus: success\nreason: done\nremaining_issues: 0\nbugs_found: 0\nbug_issues: none\n__EXPEDITION_END__"
+	assistantMsg := map[string]any{
+		"type": "assistant",
+		"message": map[string]any{
+			"id": "msg_test", "role": "assistant", "model": "claude-sonnet-4-20250514",
+			"content": []map[string]any{{"type": "text", "text": reportText}},
+		},
+	}
+	resultMsg := map[string]any{"type": "result", "result": reportText}
+	aJSON, _ := json.Marshal(assistantMsg)
+	rJSON, _ := json.Marshal(resultMsg)
+
+	scriptPath := filepath.Join(dir, "sleep-then-success.sh")
+	// Increment counter atomically BEFORE sleep, so it persists even if killed.
+	// Sleep for 5s on first N calls (will be killed by 1s timeout).
+	content := fmt.Sprintf(`#!/bin/bash
+set -e
+COUNTER_FILE="%s"
+# Atomic increment: read, increment, write in one shot
+if [ -f "$COUNTER_FILE" ]; then
+  COUNT=$(cat "$COUNTER_FILE")
+else
+  COUNT=0
+fi
+COUNT=$((COUNT + 1))
+printf "%%d" "$COUNT" > "${COUNTER_FILE}.tmp"
+mv "${COUNTER_FILE}.tmp" "$COUNTER_FILE"
+if [ "$COUNT" -le %d ]; then
+  sleep 5
+  exit 0
+fi
+echo '%s'
+echo '%s'
+`, counterFile, failCount, string(aJSON), string(rJSON))
+	os.WriteFile(scriptPath, []byte(content), 0755)
+	return scriptPath
+}
+
+// fastRecoveryDecider always retries with 1ms cooldown for the first maxAttempts,
+// then halts. Used for integration testing without real cooldown waits.
+type fastRecoveryDecider struct {
+	attempts    int
+	maxAttempts int
+}
+
+func (d *fastRecoveryDecider) DecideRecovery(reasons []string) domain.RecoveryDecision {
+	class := domain.ClassifyGommage(reasons)
+	switch class {
+	case domain.GommageClassTimeout, domain.GommageClassRateLimit, domain.GommageClassParseError:
+		if d.attempts >= d.maxAttempts {
+			return domain.RecoveryDecision{RecoveryKind: domain.RecoveryHalt, Class: class}
+		}
+		d.attempts++
+		return domain.RecoveryDecision{
+			RecoveryKind: domain.RecoveryRetry,
+			Class:        class,
+			Cooldown:     1 * time.Millisecond,
+			RetryNum:     d.attempts,
+			MaxRetry:     d.maxAttempts,
+			KeepWorkDir:  true,
+		}
+	default:
+		return domain.RecoveryDecision{RecoveryKind: domain.RecoveryHalt, Class: class}
+	}
+}
+
+func (d *fastRecoveryDecider) ResetRecovery() { d.attempts = 0 }
+
+func TestGommageRecovery_TimeoutThenSuccess(t *testing.T) {
+	// white-box-reason: integration test verifying the full recovery flow
+	// requires access to internal counters and recovery state
+	dir := setupTestRepo(t)
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Script sleeps (timeout) 3 times, then succeeds on 4th
+	script := sleepThenSuccessScript(t, dir, maxConsecutiveFailures)
+
+	cfg := domain.Config{
+		Continent:      dir,
+		MaxExpeditions: 10,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     1, // 1s timeout → script sleeps 5s → real context.DeadlineExceeded
+		Model:          "opus",
+	}
+
+	decider := &fastRecoveryDecider{maxAttempts: 2}
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, decider)
+	code := p.Run(context.Background())
+
+	// Debug: check counter file
+	counterData, _ := os.ReadFile(filepath.Join(dir, "invoke-count"))
+	t.Logf("counter file: %s, success=%d, failed=%d, code=%d",
+		string(counterData), p.totalSuccess.Load(), p.totalFailed.Load(), code)
+
+	// Recovery should have retried after timeout, and the 4th attempt should succeed.
+	if code != 0 {
+		t.Errorf("expected exit code 0 (recovery then success), got %d (success=%d, failed=%d)",
+			code, p.totalSuccess.Load(), p.totalFailed.Load())
+	}
+	if p.totalSuccess.Load() < 1 {
+		t.Errorf("expected at least 1 success after recovery, got %d", p.totalSuccess.Load())
+	}
+}
+
+func TestGommageRecovery_MaxRetriesThenHalt(t *testing.T) {
+	// white-box-reason: integration test verifying recovery cap behavior
+	if testing.Short() {
+		t.Skip("skipping slow integration test in short mode")
+	}
+	dir := setupTestRepo(t)
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	// Script always sleeps (always times out) — recovery retries exhaust, then halt
+	script := sleepThenSuccessScript(t, dir, 999) // never succeeds
+
+	cfg := domain.Config{
+		Continent:      dir,
+		MaxExpeditions: 20,
+		DryRun:         false,
+		BaseBranch:     "main",
+		ClaudeCmd:      script,
+		DevCmd:         "true",
+		DevURL:         srv.URL,
+		TimeoutSec:     1, // 1s timeout
+		Model:          "opus",
+	}
+
+	decider := &fastRecoveryDecider{maxAttempts: 2}
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, decider)
+	code := p.Run(context.Background())
+
+	// Should eventually halt with exit code 1 (Gommage after max retries)
+	if code != 1 {
+		t.Errorf("expected exit code 1 (gommage after max retries), got %d", code)
+	}
+	if p.totalSuccess.Load() != 0 {
+		t.Errorf("expected 0 successes, got %d", p.totalSuccess.Load())
+	}
+	// Should have attempted more than maxConsecutiveFailures due to recovery retries
+	totalFailed := p.totalFailed.Load()
+	if totalFailed <= int64(maxConsecutiveFailures) {
+		t.Errorf("expected more than %d failures (recovery should have retried), got %d",
+			maxConsecutiveFailures, totalFailed)
+	}
+}
