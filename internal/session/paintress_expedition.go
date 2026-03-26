@@ -221,7 +221,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				domain.InsightsDir(p.config.Continent),
 				domain.RunDir(p.config.Continent),
 			)
-			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent)
+			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent, domain.GommageClassSystematic)
 
 			expSpan.AddEvent("gommage",
 				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),

@@ -11,7 +11,7 @@ import (
 // WriteGommageInsight writes a gommage insight when consecutive failures trigger escalation.
 // Best-effort: silent on failure, does not propagate errors.
 // Idempotent: InsightWriter deduplicates by title.
-func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, continent string) {
+func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, continent string, class domain.GommageClass) {
 	why := "Consecutive failures indicate systematic issue requiring intervention"
 	if reasons := recentFailureReasons(continent, 5); len(reasons) > 0 {
 		why = fmt.Sprintf("Recent failure reasons: %s", strings.Join(reasons, "; "))
@@ -28,6 +28,7 @@ func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, contine
 		Extra: map[string]string{
 			"failure-type":   "gommage",
 			"gradient-level": "0",
+			"gommage-class":  string(class),
 		},
 	}
 
