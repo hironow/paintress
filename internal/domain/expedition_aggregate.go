@@ -5,16 +5,32 @@ import (
 	"time"
 )
 
+// AggregateTypeExpedition is the aggregate type for expedition events.
+const AggregateTypeExpedition = "expedition"
+
 // ExpeditionAggregate owns expedition lifecycle state and produces events.
 // It tracks consecutive failures for gommage decisions and gradient state.
 type ExpeditionAggregate struct {
 	consecutiveFailures int
 	escalationFired     bool
+	seqNr               uint64
 }
 
 // NewExpeditionAggregate creates an empty ExpeditionAggregate.
 func NewExpeditionAggregate() *ExpeditionAggregate {
 	return &ExpeditionAggregate{}
+}
+
+// nextEvent creates an event tagged with expedition aggregate identity.
+func (a *ExpeditionAggregate) nextEvent(eventType EventType, data any, now time.Time) (Event, error) {
+	a.seqNr++
+	ev, err := NewEvent(eventType, data, now)
+	if err != nil {
+		return ev, err
+	}
+	ev.AggregateType = AggregateTypeExpedition
+	ev.SeqNr = a.seqNr
+	return ev, nil
 }
 
 // ConsecutiveFailures returns the current consecutive failure count.
@@ -24,7 +40,7 @@ func (a *ExpeditionAggregate) ConsecutiveFailures() int {
 
 // StartExpedition produces an expedition.started event.
 func (a *ExpeditionAggregate) StartExpedition(expedition, worker int, model string, now time.Time) (Event, error) {
-	return NewEvent(EventExpeditionStarted, ExpeditionStartedData{
+	return a.nextEvent(EventExpeditionStarted, ExpeditionStartedData{
 		Expedition: expedition,
 		Worker:     worker,
 		Model:      model,
@@ -89,7 +105,7 @@ func (a *ExpeditionAggregate) ShouldGommage(threshold int) bool {
 
 // RecordGommage produces a gommage.triggered event.
 func (a *ExpeditionAggregate) RecordGommage(expedition int, now time.Time) (Event, error) {
-	return NewEvent(EventGommageTriggered, GommageTriggeredData{
+	return a.nextEvent(EventGommageTriggered, GommageTriggeredData{
 		Expedition:          expedition,
 		ConsecutiveFailures: a.consecutiveFailures,
 	}, now)
@@ -97,7 +113,7 @@ func (a *ExpeditionAggregate) RecordGommage(expedition int, now time.Time) (Even
 
 // RecordGradientChange produces a gradient.changed event.
 func (a *ExpeditionAggregate) RecordGradientChange(level int, operator string, now time.Time) (Event, error) {
-	return NewEvent(EventGradientChanged, GradientChangedData{
+	return a.nextEvent(EventGradientChanged, GradientChangedData{
 		Level:    level,
 		Operator: operator,
 	}, now)
@@ -105,7 +121,7 @@ func (a *ExpeditionAggregate) RecordGradientChange(level int, operator string, n
 
 // RecordInboxReceived produces an inbox.received event.
 func (a *ExpeditionAggregate) RecordInboxReceived(name, severity string, now time.Time) (Event, error) {
-	return NewEvent(EventInboxReceived, InboxReceivedData{
+	return a.nextEvent(EventInboxReceived, InboxReceivedData{
 		Name:     name,
 		Severity: severity,
 	}, now)
@@ -113,7 +129,7 @@ func (a *ExpeditionAggregate) RecordInboxReceived(name, severity string, now tim
 
 // RecordRetryAttempted produces a retry.attempted event.
 func (a *ExpeditionAggregate) RecordRetryAttempted(dmailKey string, attempt int, now time.Time) (Event, error) {
-	return NewEvent(EventRetryAttempted, RetryAttemptedData{
+	return a.nextEvent(EventRetryAttempted, RetryAttemptedData{
 		DMail:   dmailKey,
 		Attempt: attempt,
 	}, now)
@@ -121,7 +137,7 @@ func (a *ExpeditionAggregate) RecordRetryAttempted(dmailKey string, attempt int,
 
 // RecordEscalated produces an escalated event.
 func (a *ExpeditionAggregate) RecordEscalated(dmailName string, issues []string, now time.Time) (Event, error) {
-	return NewEvent(EventEscalated, EscalatedData{
+	return a.nextEvent(EventEscalated, EscalatedData{
 		DMail:  dmailName,
 		Issues: issues,
 	}, now)
@@ -129,7 +145,7 @@ func (a *ExpeditionAggregate) RecordEscalated(dmailName string, issues []string,
 
 // RecordResolved produces a resolved event.
 func (a *ExpeditionAggregate) RecordResolved(dmailName string, issues []string, now time.Time) (Event, error) {
-	return NewEvent(EventResolved, ResolvedData{
+	return a.nextEvent(EventResolved, ResolvedData{
 		DMail:  dmailName,
 		Issues: issues,
 	}, now)
@@ -137,15 +153,15 @@ func (a *ExpeditionAggregate) RecordResolved(dmailName string, issues []string, 
 
 // RecordDMailStaged produces a dmail.staged event.
 func (a *ExpeditionAggregate) RecordDMailStaged(name string, now time.Time) (Event, error) {
-	return NewEvent(EventDMailStaged, DMailStagedData{Name: name}, now)
+	return a.nextEvent(EventDMailStaged, DMailStagedData{Name: name}, now)
 }
 
 // RecordDMailFlushed produces a dmail.flushed event.
 func (a *ExpeditionAggregate) RecordDMailFlushed(count int, now time.Time) (Event, error) {
-	return NewEvent(EventDMailFlushed, DMailFlushedData{Count: count}, now)
+	return a.nextEvent(EventDMailFlushed, DMailFlushedData{Count: count}, now)
 }
 
 // RecordDMailArchived produces a dmail.archived event.
 func (a *ExpeditionAggregate) RecordDMailArchived(name string, now time.Time) (Event, error) {
-	return NewEvent(EventDMailArchived, DMailArchivedData{Name: name}, now)
+	return a.nextEvent(EventDMailArchived, DMailArchivedData{Name: name}, now)
 }
