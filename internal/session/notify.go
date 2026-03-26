@@ -22,7 +22,7 @@ func defaultCmdFactory(ctx context.Context, name string, args ...string) *exec.C
 // darwin: osascript, linux: notify-send, others: returns ErrUnsupportedOS.
 type LocalNotifier struct {
 	cmdFactory cmdFactoryFunc
-	forceOS string // for testing; empty = use runtime.GOOS
+	forceOS    string // for testing; empty = use runtime.GOOS
 }
 
 func (n *LocalNotifier) os() string {

@@ -82,7 +82,7 @@ func TestReflectionAccumulator_IsStagnantAfterImprovement(t *testing.T) {
 	// given: tag count decreased
 	acc := domain.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] issue A\n[P2] issue B\n[P1] issue C") // 3 tags
-	acc.AddCycle(2, "[P2] issue A")                              // 1 tag (improvement)
+	acc.AddCycle(2, "[P2] issue A")                             // 1 tag (improvement)
 
 	// when
 	stagnant := acc.IsStagnant()

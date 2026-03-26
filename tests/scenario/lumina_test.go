@@ -17,9 +17,9 @@ import (
 //
 // Journal format matches session.WriteJournal output:
 //
-//	- **Status**: failed
-//	- **Reason**: {reason}
-//	- **Insight**: {insight}  (optional, takes precedence over Reason)
+//   - **Status**: failed
+//   - **Reason**: {reason}
+//   - **Insight**: {insight}  (optional, takes precedence over Reason)
 func seedFailedJournals(t *testing.T, ws *Workspace, count int, reason, insight string) {
 	t.Helper()
 	journalDir := filepath.Join(ws.RepoPath, ".expedition", "journal")

@@ -75,7 +75,6 @@ type Paintress struct {
 	escalationFired      atomic.Bool
 }
 
-
 func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver) *Paintress {
 	if stdinIn == nil {
 		stdinIn = strings.NewReader("")

@@ -59,7 +59,6 @@ type Expedition struct {
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
-
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
 func (e *Expedition) setCurrentIssue(issue string) {
 	e.currentIssueMu.Lock()

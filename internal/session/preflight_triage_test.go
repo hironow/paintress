@@ -63,7 +63,7 @@ func (t *testPreFlightTriager) TriagePreFlightDMails(ctx context.Context, dmails
 			result = append(result, dm)
 		}
 	}
-	_ = logger // suppress unused
+	_ = logger      // suppress unused
 	_ = fmt.Sprintf // suppress unused import
 	return result
 }
@@ -205,10 +205,10 @@ func TestTriagePreFlightDMails(t *testing.T) {
 
 			archiver := NewInboxArchiver(emitter)
 			p := &Paintress{
-				Emitter:         emitter,
-				config:          domain.Config{MaxRetries: tt.maxRetries},
-				Logger:          &domain.NopLogger{},
-				retryTracker:    tracker,
+				Emitter:          emitter,
+				config:           domain.Config{MaxRetries: tt.maxRetries},
+				Logger:           &domain.NopLogger{},
+				retryTracker:     tracker,
 				preFlightTriager: newTestTriager("", tt.maxRetries, tracker, archiver, emitter),
 			}
 
@@ -347,10 +347,10 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 
 			archiver := NewInboxArchiver(emitter)
 			p := &Paintress{
-				Emitter:         emitter,
-				config:          domain.Config{Continent: tmpDir, MaxRetries: tt.maxRetries},
-				Logger:          &domain.NopLogger{},
-				retryTracker:    tracker,
+				Emitter:          emitter,
+				config:           domain.Config{Continent: tmpDir, MaxRetries: tt.maxRetries},
+				Logger:           &domain.NopLogger{},
+				retryTracker:     tracker,
 				preFlightTriager: newTestTriager(tmpDir, tt.maxRetries, tracker, archiver, emitter),
 			}
 

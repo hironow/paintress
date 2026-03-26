@@ -40,7 +40,7 @@ type WorktreePool struct {
 	setupCmd   string      // command to run after worktree creation
 	workers    chan string // available worktree paths
 	size       int
-	allPaths   []string   // all created worktree paths (for complete shutdown cleanup)
+	allPaths   []string // all created worktree paths (for complete shutdown cleanup)
 }
 
 // NewWorktreePool creates a new WorktreePool with the given configuration.
@@ -187,7 +187,7 @@ func (wp *WorktreePool) forceRecycle(ctx context.Context, path string) error {
 // workers), preventing resource leaks on shutdown.
 func (wp *WorktreePool) Shutdown(ctx context.Context) error {
 	// Drain channel to unblock any pending Acquires.
-	drain:
+drain:
 	for {
 		select {
 		case <-wp.workers:

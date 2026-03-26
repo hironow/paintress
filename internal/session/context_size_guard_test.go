@@ -98,8 +98,8 @@ type testWarnLogger struct {
 	messages []string
 }
 
-func (l *testWarnLogger) Info(format string, args ...any)  {}
-func (l *testWarnLogger) OK(format string, args ...any)    {}
+func (l *testWarnLogger) Info(format string, args ...any) {}
+func (l *testWarnLogger) OK(format string, args ...any)   {}
 func (l *testWarnLogger) Warn(format string, args ...any) {
 	l.messages = append(l.messages, fmt.Sprintf(format, args...))
 }
