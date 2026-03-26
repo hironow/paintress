@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -55,6 +56,15 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--disable-slash-commands")
+	workDir := rc.WorkDir
+	if workDir == "" {
+		workDir = "."
+	}
+	if mcpPath := MCPConfigPath(workDir); mcpPath != "" {
+		if _, statErr := os.Stat(mcpPath); statErr == nil {
+			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
+		}
+	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 
 	cmd := platform.NewShellCmd(ctx, a.ClaudeCmd, args...)
