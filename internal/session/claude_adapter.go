@@ -141,6 +141,13 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 
 		budget := platform.CalculateContextBudget(messages)
 		span.SetAttributes(budget.Attrs()...)
+
+		// Phase 5: persist raw events to .run/claude-logs/
+		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
+			if logErr := WriteClaudeLog(effectiveDir(rc.WorkDir), rawEvents); logErr != nil && a.Logger != nil {
+				a.Logger.Warn("claude-log write: %v", logErr)
+			}
+		}
 	}()
 
 	<-done
