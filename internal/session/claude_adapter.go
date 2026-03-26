@@ -2,7 +2,6 @@ package session
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -80,37 +79,78 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		return "", fmt.Errorf("claude start: %w", err)
 	}
 
-	reader := platform.NewStreamReader(stdout)
-	reader.SetLogger(a.Logger)
-
 	var output strings.Builder
-	var streamErr error
-	for {
-		msg, err := reader.Next()
-		if errors.Is(err, io.EOF) {
-			break
+	var responseModel, responseID string
+	streamErr := make(chan error, 1)
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		sr := platform.NewStreamReader(stdout)
+		if a.Logger != nil {
+			sr.SetLogger(a.Logger)
 		}
-		if err != nil {
-			streamErr = fmt.Errorf("stream read: %w", err)
-			break
+		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
+		emitter.SetInput(prompt)
+		result, messages, readErr := emitter.CollectAll()
+		if readErr != nil {
+			streamErr <- readErr
+			return
 		}
-		if msg == nil {
-			continue
-		}
-		if msg.Type == "assistant" {
-			text, extractErr := msg.ExtractText()
-			if extractErr == nil && text != "" {
-				output.WriteString(text)
-				if w != nil {
-					_, _ = w.Write([]byte(text))
+
+		for _, msg := range messages {
+			switch msg.Type {
+			case "assistant":
+				text, _ := msg.ExtractText()
+				if text != "" {
+					if w != nil {
+						_, _ = w.Write([]byte(text))
+					}
+					output.WriteString(text)
 				}
+				if am, _ := msg.ParseAssistantMessage(); am != nil {
+					if am.Model != "" {
+						responseModel = am.Model
+					}
+					if am.ID != "" {
+						responseID = am.ID
+					}
+				}
+			case "result":
+				output.Reset()
+				output.WriteString(msg.Result)
+				span.SetAttributes(platform.GenAIResultAttrs(msg, responseModel, responseID)...)
 			}
 		}
-		if msg.Type == "result" {
-			output.Reset()
-			output.WriteString(msg.Result)
+
+		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
+			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents)))
 		}
-	}
+		if result != nil && result.SessionID != "" {
+			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
+		}
+		if weaveAttrs := emitter.WeaveThreadAttrs(); len(weaveAttrs) > 0 {
+			span.SetAttributes(weaveAttrs...)
+		}
+		if ioAttrs := emitter.WeaveIOAttrs(); len(ioAttrs) > 0 {
+			span.SetAttributes(ioAttrs...)
+		}
+		if initAttrs := emitter.InitAttrs(); len(initAttrs) > 0 {
+			span.SetAttributes(initAttrs...)
+		}
+
+		budget := platform.CalculateContextBudget(messages)
+		span.SetAttributes(budget.Attrs()...)
+
+		// Phase 5: persist raw events to .run/claude-logs/
+		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
+			if logErr := WriteClaudeLog(effectiveDir(rc.WorkDir), rawEvents); logErr != nil && a.Logger != nil {
+				a.Logger.Warn("claude-log write: %v", logErr)
+			}
+		}
+	}()
+
+	<-done
 
 	// Log captured stderr at debug level; suppress raw NDJSON from errors.
 	if stderrBuf.Len() > 0 && a.Logger != nil {
@@ -128,8 +168,10 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		}
 		return output.String(), fmt.Errorf("claude exit: %w", waitErr)
 	}
-	if streamErr != nil {
-		return output.String(), streamErr
+	select {
+	case readError := <-streamErr:
+		return output.String(), fmt.Errorf("stream read: %w", readError)
+	default:
 	}
 	return output.String(), nil
 }
