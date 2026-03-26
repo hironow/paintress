@@ -54,7 +54,7 @@ Legend:
 | Class | Detection | Recovery | Cooldown (retry 1 / 2) |
 |-------|-----------|----------|------------------------|
 | `timeout` | `strings.Contains(reason, "timeout")` | Switch model + wait + retry same issue | 30s / 90s |
-| `rate_limit` | Reserve model already activated | Wait + retry same issue | 60s / 180s |
+| `rate_limit` | `strings.Contains(reason, "rate_limit")` (marker injected by `handleExpeditionError`) | Wait + retry same issue | 60s / 180s |
 | `parse_error` | `StatusParseError` in reason | Inject Lumina hint + retry same issue | 5s / 15s |
 | `blocker` | `FailureType == "blocker"` in journal | Halt + escalate (current behavior) | N/A |
 | `systematic` | 3+ identical reasons (default) | Halt + escalate (current behavior) | N/A |
@@ -94,6 +94,44 @@ DecideRecovery(reasons) -> RecoveryDecision
       return errGommage
 ```
 
+## Concurrency Safety
+
+### Gommage Guard: CAS Instead of Load-then-Store
+
+The existing TOCTOU race in the Gommage check (`Load` then `Store`) is fixed:
+
+```go
+// BEFORE (race-prone):
+if p.consecutiveFailures.Load() >= threshold && !p.escalationFired.Load() {
+    p.escalationFired.Store(true)
+
+// AFTER (atomic):
+if p.consecutiveFailures.Load() >= threshold && p.escalationFired.CompareAndSwap(false, true) {
+```
+
+Only one worker wins the CAS; others see `false` from `CompareAndSwap` and skip the block.
+
+### Counter Reset Ownership
+
+The authoritative `consecutiveFailures` counter is `p.consecutiveFailures` (session layer, `atomic.Int64`). The domain aggregate's `consecutiveFailures` is a shadow for event-sourced replay only. On recovery retry:
+
+1. `p.consecutiveFailures.Store(0)` — session layer, gates re-trigger
+2. Domain aggregate is NOT reset here (it tracks via events in `CompleteExpedition`)
+
+This avoids split-brain: the session layer counter is the single source of truth for the Gommage guard.
+
+### rate_limit Detection
+
+`handleExpeditionError` injects a marker string into the journal reason when the reserve model is activated:
+
+```go
+if p.reserve.IsReserveActive() {
+    reason = "rate_limit: " + reason
+}
+```
+
+This makes `ClassifyGommage(reasons []string)` a true pure function — it only inspects reason strings, never session state.
+
 ## Worktree Lifecycle
 
 ### During Recovery Retry
@@ -109,9 +147,11 @@ DecideRecovery(reasons) -> RecoveryDecision
 
 ### Resume on Session Restart
 1. `paintress run` checks event store for `expedition.checkpoint` events without a subsequent `expedition.completed`
-2. If matching worktree still exists on disk and git state is valid, resume that expedition
-3. Claude subprocess receives resume context: `git log --oneline` + `git diff --stat`
-4. Claude reads files as needed via its `Read` tool (lightweight context injection)
+2. Returns `[]IncompleteExpedition` — one per unfinished worker. Under `--workers=N`, up to N incomplete expeditions may exist
+3. For each incomplete: if worktree still exists on disk and git state is valid, resume that expedition
+4. Claude subprocess receives resume context: `git log --oneline` + `git diff --stat`
+5. Claude reads files as needed via its `Read` tool (lightweight context injection)
+6. Expeditions that cannot be resumed (missing worktree, corrupted git) are logged and their worktrees cleaned up
 
 ## Domain Types
 
@@ -135,9 +175,9 @@ type RecoveryDecision struct {
 ```
 
 ### `ExpeditionAggregate` changes
-- New field: `recoveryAttempts int`
+- New field: `recoveryAttempts int` — scoped to current failure streak, resets when `consecutiveFailures` resets (on any success). In-memory only, not event-sourced (derived from streak state).
 - New method: `DecideRecovery(reasons []string) RecoveryDecision`
-- New method: `ResetRecovery()` — called on expedition success
+- New method: `ResetRecovery()` — called when `consecutiveFailures` resets (success or manual reset). Clears `recoveryAttempts` to 0.
 
 ### Event data extensions
 - `GommageTriggeredData`: adds `Class`, `RecoveryAction`, `RetryNum` (all `omitempty`)
@@ -152,7 +192,7 @@ type RecoveryDecision struct {
 
 ### `gommage_checkpoint.go`
 - `saveCheckpoint(exp, phase, workDir)` — records progress event
-- `resumeIncompleteExpedition() (workDir string, exp int, ok bool)` — startup resume
+- `resumeIncompleteExpeditions() []IncompleteExpedition` — startup resume (returns all incomplete, one per worker)
 - `buildResumeContext(workDir string) string` — `git log --oneline` + `git diff --stat`
 - `cleanOrphanWorktrees()` — startup cleanup
 
