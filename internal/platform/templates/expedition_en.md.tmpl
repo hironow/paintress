@@ -27,7 +27,19 @@ Patterns auto-extracted from past Expeditions. Apply these as constraints — av
 
 {{.GradientSection}}
 
-{{- if .LinearTeam}}
+{{- if .WaveTarget}}
+
+## Wave Target
+
+- **Step:** {{.Bt}}{{.WaveTarget.ID}}{{.Bt}} — {{.WaveTarget.Title}}
+{{- if .WaveTarget.Description}}
+- **Wave:** {{.WaveTarget.Description}}
+{{- end}}
+{{- if .WaveTarget.Acceptance}}
+- **Acceptance Criteria:** {{.WaveTarget.Acceptance}}
+{{- end}}
+- Implement ONLY this step. Do not work on other steps or unrelated issues.
+{{- else if .LinearTeam}}
 
 ## Linear Scope
 

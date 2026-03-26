@@ -10,6 +10,7 @@ import (
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"github.com/spf13/cobra"
 )
 
@@ -224,8 +225,20 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if rpErr != nil {
 		return rpErr
 	}
-	logger.Info("paintress run: starting initial expedition cycle...")
-	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries)
+
+	// Resolve tracking mode from --linear flag
+	linearFlag, _ := cmd.Flags().GetBool("linear")
+	mode := domain.NewTrackingMode(linearFlag)
+
+	// Build target provider for wave mode
+	var targetProvider port.TargetProvider
+	if mode.IsWave() {
+		archiveDir := domain.ArchiveDir(continent)
+		targetProvider = usecase.NewWaveTargetProvider(session.NewArchiveReader(archiveDir))
+	}
+
+	logger.Info("paintress run: starting initial expedition cycle (mode=%s)...", mode)
+	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)
 	if ucErr != nil {
 		summary := p.HandoverSummary()
 		return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
@@ -288,7 +301,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		// Re-run expeditions on D-Mail arrival
 		logger.Info("paintress run: D-Mail received, re-running expedition cycle...")
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil, approver)
-		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries)
+		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)
 		if ucErr != nil {
 			summary := p.HandoverSummary()
 			return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{

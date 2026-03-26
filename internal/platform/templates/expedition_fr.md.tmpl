@@ -27,7 +27,19 @@ Patterns extraits automatiquement des Expéditions passées. Appliquer comme con
 
 {{.GradientSection}}
 
-{{- if .LinearTeam}}
+{{- if .WaveTarget}}
+
+## Cible Wave
+
+- **Étape :** {{.Bt}}{{.WaveTarget.ID}}{{.Bt}} — {{.WaveTarget.Title}}
+{{- if .WaveTarget.Description}}
+- **Wave :** {{.WaveTarget.Description}}
+{{- end}}
+{{- if .WaveTarget.Acceptance}}
+- **Critères d'acceptation :** {{.WaveTarget.Acceptance}}
+{{- end}}
+- Implémenter UNIQUEMENT cette étape. Ne pas toucher aux autres étapes.
+{{- else if .LinearTeam}}
 
 ## Scope Linear
 

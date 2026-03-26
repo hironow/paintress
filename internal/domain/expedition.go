@@ -20,6 +20,7 @@ type PromptData struct {
 	LinearTeam      string
 	LinearProject   string
 	MissionSection  string
+	WaveTarget      *ExpeditionTarget // non-nil in wave mode
 }
 
 // ContextDir returns the path to the context injection directory.

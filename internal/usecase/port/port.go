@@ -91,6 +91,19 @@ type ArchiveOps interface {
 	PruneFlushedOutbox(ctx context.Context, repoPath string) (int, error)
 }
 
+// ArchiveReader reads D-Mails from the archive directory.
+// Implemented in session layer (filesystem I/O), injected by cmd.
+type ArchiveReader interface {
+	ReadArchiveDMails(ctx context.Context) ([]domain.DMail, error)
+}
+
+// TargetProvider supplies expedition targets based on tracking mode.
+// Wave mode: reads archive, projects wave state, returns pending steps.
+// Linear mode: fetches issues from Linear MCP.
+type TargetProvider interface {
+	FetchTargets(ctx context.Context) ([]domain.ExpeditionTarget, error)
+}
+
 // PreFlightTriager processes inbox D-Mails before expedition creation.
 // Implemented in usecase layer, injected into session by cmd (composition root).
 type PreFlightTriager interface {
@@ -159,6 +172,8 @@ type ExpeditionRunner interface {
 	SetEmitter(emitter ExpeditionEventEmitter)
 	SetPreFlightTriager(triager PreFlightTriager)
 	SetFeedbackHandler(handler FeedbackActionHandler)
+	SetTargetProvider(tp TargetProvider)
+	SetTrackingMode(mode domain.TrackingMode)
 	Run(ctx context.Context) int
 }
 

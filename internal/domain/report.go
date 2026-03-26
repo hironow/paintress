@@ -30,6 +30,10 @@ type ExpeditionReport struct {
 	Insight            string
 	FailureType        string
 	HighSeverityDMails string // comma-separated names of mid-expedition HIGH severity d-mails
+
+	// Wave-centric mode fields (empty in Linear mode)
+	WaveID string
+	StepID string
 }
 
 // PRIndexEntry represents a single PR URL entry extracted from an expedition report.
