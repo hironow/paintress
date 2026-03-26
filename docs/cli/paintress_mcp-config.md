@@ -38,5 +38,6 @@ this allowlist when the file exists.
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
-* [paintress mcp-config generate](paintress_mcp-config_generate.md)  - Generate mcp-config.json for --strict-mcp-config isolation
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress mcp-config generate](paintress_mcp-config_generate.md)	 - Generate mcp-config.json for --strict-mcp-config isolation
+

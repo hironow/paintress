@@ -32,6 +32,7 @@ View or update the .expedition/config.yaml project configuration file.
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
-* [paintress config set](paintress_config_set.md)  - Update a project configuration value
-* [paintress config show](paintress_config_show.md)  - Display project configuration
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress config set](paintress_config_set.md)	 - Update a project configuration value
+* [paintress config show](paintress_config_show.md)	 - Display project configuration
+
