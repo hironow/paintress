@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests ProjectWaveState pure function — archive D-Mail to wave progress projection
+
 import "testing"
 
 func TestProjectWaveState_EmptyArchive(t *testing.T) {

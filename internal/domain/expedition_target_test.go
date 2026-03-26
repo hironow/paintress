@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests ExpeditionTargetsFromWaves pure function with various wave/step combinations
+
 import "testing"
 
 func TestExpeditionTargetsFromWaves_PendingOnly(t *testing.T) {
