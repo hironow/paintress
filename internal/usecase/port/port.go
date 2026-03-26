@@ -11,6 +11,21 @@ import (
 // ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
 var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
+// RecoveryDecider classifies failure streaks and decides retry vs halt.
+// Implemented by domain.ExpeditionAggregate, injected into session.
+type RecoveryDecider interface {
+	DecideRecovery(reasons []string) domain.RecoveryDecision
+	ResetRecovery()
+}
+
+// NopRecoveryDecider always halts (no recovery). Used as default when no aggregate is provided.
+type NopRecoveryDecider struct{}
+
+func (*NopRecoveryDecider) DecideRecovery(_ []string) domain.RecoveryDecision {
+	return domain.RecoveryDecision{RecoveryKind: domain.RecoveryHalt, Class: domain.GommageClassSystematic}
+}
+func (*NopRecoveryDecider) ResetRecovery() {}
+
 // InitRunner handles project initialization I/O.
 type InitRunner interface {
 	InitProject(repoPath, team, project string) error

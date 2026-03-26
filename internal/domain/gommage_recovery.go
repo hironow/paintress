@@ -12,7 +12,7 @@ const (
 
 // RecoveryDecision is the aggregate's verdict on what to do after Gommage.
 type RecoveryDecision struct {
-	Action      RecoveryAction
+	RecoveryKind RecoveryAction
 	Class       GommageClass
 	Cooldown    time.Duration
 	RetryNum    int
@@ -22,7 +22,7 @@ type RecoveryDecision struct {
 
 // IsRetry returns true if the decision is to retry.
 func (d RecoveryDecision) IsRetry() bool {
-	return d.Action == RecoveryRetry
+	return d.RecoveryKind == RecoveryRetry
 }
 
 // cooldown base values per class: [retry1, retry2].

@@ -21,19 +21,19 @@ type EventApplier interface {
 type EventType string
 
 const (
-	EventExpeditionStarted   EventType = "expedition.started"
-	EventExpeditionCompleted EventType = "expedition.completed"
-	EventDMailStaged         EventType = "dmail.staged"
-	EventDMailFlushed        EventType = "dmail.flushed"
-	EventDMailArchived       EventType = "dmail.archived"
-	EventGradientChanged     EventType = "gradient.changed"
+	EventExpeditionStarted    EventType = "expedition.started"
+	EventExpeditionCompleted  EventType = "expedition.completed"
+	EventDMailStaged          EventType = "dmail.staged"
+	EventDMailFlushed         EventType = "dmail.flushed"
+	EventDMailArchived        EventType = "dmail.archived"
+	EventGradientChanged      EventType = "gradient.changed"
 	EventGommageTriggered     EventType = "gommage.triggered"
 	EventGommageRecovery      EventType = "gommage.recovery"
 	EventExpeditionCheckpoint EventType = "expedition.checkpoint"
 	EventInboxReceived        EventType = "inbox.received"
-	EventRetryAttempted      EventType = "retry.attempted"
-	EventEscalated           EventType = "escalated"
-	EventResolved            EventType = "resolved"
+	EventRetryAttempted       EventType = "retry.attempted"
+	EventEscalated            EventType = "escalated"
+	EventResolved             EventType = "resolved"
 )
 
 // Event is the envelope for all domain events in the event store.

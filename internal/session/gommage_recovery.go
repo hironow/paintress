@@ -9,7 +9,7 @@ import (
 
 // executeRecovery performs class-specific recovery. Returns true to retry same issue.
 func (p *Paintress) executeRecovery(ctx context.Context, decision domain.RecoveryDecision, exp int, _ *Expedition) bool {
-	switch decision.Action {
+	switch decision.RecoveryKind {
 	case domain.RecoveryRetry:
 		p.Logger.Warn("gommage recovery: %s (retry %d/%d, cooldown %s)",
 			decision.Class, decision.RetryNum, decision.MaxRetry, decision.Cooldown)
@@ -22,7 +22,7 @@ func (p *Paintress) executeRecovery(ctx context.Context, decision domain.Recover
 		}
 
 		_ = p.Emitter.EmitGommageRecovery(exp, string(decision.Class),
-			string(decision.Action), decision.RetryNum, decision.Cooldown.String(), time.Now())
+			string(decision.RecoveryKind), decision.RetryNum, decision.Cooldown.String(), time.Now())
 
 		select {
 		case <-time.After(decision.Cooldown):

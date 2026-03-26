@@ -280,8 +280,8 @@ func TestDecideRecovery_RetryOnTimeout(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	reasons := []string{"timeout", "timeout", "timeout"}
 	d := agg.DecideRecovery(reasons)
-	if d.Action != domain.RecoveryRetry {
-		t.Errorf("expected retry, got %s", d.Action)
+	if d.RecoveryKind != domain.RecoveryRetry {
+		t.Errorf("expected retry, got %s", d.RecoveryKind)
 	}
 	if d.Class != domain.GommageClassTimeout {
 		t.Errorf("expected timeout class, got %s", d.Class)
@@ -295,8 +295,8 @@ func TestDecideRecovery_RetryOnRateLimit(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	reasons := []string{"rate_limit: 429", "rate_limit: 429", "rate_limit: 429"}
 	d := agg.DecideRecovery(reasons)
-	if d.Action != domain.RecoveryRetry {
-		t.Errorf("expected retry, got %s", d.Action)
+	if d.RecoveryKind != domain.RecoveryRetry {
+		t.Errorf("expected retry, got %s", d.RecoveryKind)
 	}
 	if d.Class != domain.GommageClassRateLimit {
 		t.Errorf("expected rate_limit, got %s", d.Class)
@@ -307,27 +307,27 @@ func TestDecideRecovery_HaltOnBlocker(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	reasons := []string{"blocker: stuck", "blocker: stuck", "blocker: stuck"}
 	d := agg.DecideRecovery(reasons)
-	if d.Action != domain.RecoveryHalt {
-		t.Errorf("expected halt for blocker, got %s", d.Action)
+	if d.RecoveryKind != domain.RecoveryHalt {
+		t.Errorf("expected halt for blocker, got %s", d.RecoveryKind)
 	}
 }
 
 func TestDecideRecovery_HaltAfterMaxRetries(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	reasons := []string{"timeout", "timeout", "timeout"}
-	agg.DecideRecovery(reasons) // retry 1
-	agg.DecideRecovery(reasons) // retry 2
+	agg.DecideRecovery(reasons)      // retry 1
+	agg.DecideRecovery(reasons)      // retry 2
 	d := agg.DecideRecovery(reasons) // should halt
-	if d.Action != domain.RecoveryHalt {
-		t.Errorf("expected halt after max retries, got %s", d.Action)
+	if d.RecoveryKind != domain.RecoveryHalt {
+		t.Errorf("expected halt after max retries, got %s", d.RecoveryKind)
 	}
 }
 
 func TestDecideRecovery_ResetOnSuccess(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	reasons := []string{"timeout", "timeout", "timeout"}
-	agg.DecideRecovery(reasons) // retry 1
-	agg.ResetRecovery()         // success happened
+	agg.DecideRecovery(reasons)      // retry 1
+	agg.ResetRecovery()              // success happened
 	d := agg.DecideRecovery(reasons) // should be retry 1 again
 	if d.RetryNum != 1 {
 		t.Errorf("expected retryNum=1 after reset, got %d", d.RetryNum)

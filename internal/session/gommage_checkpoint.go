@@ -30,7 +30,6 @@ func (p *Paintress) saveCheckpoint(exp int, phase CheckpointPhase, workDir strin
 // countCommitsInDir returns the number of commits on HEAD.
 // Best-effort: returns 0 on any error.
 func countCommitsInDir(workDir string) int {
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	// workDir is an internal worktree path, not user input.
 	cmd := exec.Command("git", "rev-list", "--count", "HEAD") //nolint:gosec // internal path
 	cmd.Dir = workDir
@@ -54,7 +53,6 @@ func buildResumeContext(workDir string) string {
 	var b strings.Builder
 	b.WriteString("Previous progress in worktree:\n")
 
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	// workDir is an internal worktree path, not user input.
 	logCmd := exec.Command("git", "log", "--oneline", "-10") //nolint:gosec // internal path
 	logCmd.Dir = workDir
@@ -63,7 +61,6 @@ func buildResumeContext(workDir string) string {
 		b.Write(out)
 	}
 
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	statCmd := exec.Command("git", "diff", "--stat") //nolint:gosec // internal path
 	statCmd.Dir = workDir
 	if out, err := statCmd.Output(); err == nil && len(out) > 0 {
@@ -77,7 +74,6 @@ func buildResumeContext(workDir string) string {
 // cleanOrphanWorktrees removes worktrees from previous sessions.
 // Best-effort: errors are logged but do not block startup.
 func (p *Paintress) cleanOrphanWorktrees() {
-	// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 	cmd := exec.Command("git", "worktree", "list", "--porcelain") //nolint:gosec // internal path
 	cmd.Dir = p.config.Continent
 	out, err := cmd.Output()
@@ -88,7 +84,6 @@ func (p *Paintress) cleanOrphanWorktrees() {
 		if strings.HasPrefix(line, "worktree ") {
 			path := strings.TrimPrefix(line, "worktree ")
 			if strings.Contains(path, "paintress-wt-") {
-				// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
 				rmCmd := exec.Command("git", "worktree", "remove", "--force", path) //nolint:gosec // internal path
 				rmCmd.Dir = p.config.Continent
 				if rmErr := rmCmd.Run(); rmErr != nil {

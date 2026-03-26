@@ -59,8 +59,8 @@ type Paintress struct {
 	targetProvider port.TargetProvider
 	trackingMode   domain.TrackingMode
 
-	// Gommage recovery: aggregate tracks retry attempts per streak
-	aggregate *domain.ExpeditionAggregate
+	// Gommage recovery: tracks retry attempts per failure streak
+	recoveryDecider port.RecoveryDecider
 
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
@@ -78,7 +78,7 @@ type Paintress struct {
 	escalationFired      atomic.Bool
 }
 
-func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver) *Paintress {
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver, recoveryDecider port.RecoveryDecider) *Paintress {
 	if stdinIn == nil {
 		stdinIn = strings.NewReader("")
 	}
@@ -87,6 +87,9 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	}
 	if approver == nil {
 		approver = &port.AutoApprover{}
+	}
+	if recoveryDecider == nil {
+		recoveryDecider = &port.NopRecoveryDecider{}
 	}
 	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -133,7 +136,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		notifier:     notifier,
 		approver:     approver,
 		retryTracker: domain.NewRetryTracker(),
-		aggregate:    domain.NewExpeditionAggregate(),
+		recoveryDecider: recoveryDecider,
 		claude: &ClaudeAdapter{
 			ClaudeCmd:  cfgCopy.ClaudeCmd,
 			Model:      primary,

@@ -41,11 +41,11 @@ func TestCooldownForClass_ParseError(t *testing.T) {
 }
 
 func TestRecoveryDecision_IsRetry(t *testing.T) {
-	d := domain.RecoveryDecision{Action: domain.RecoveryRetry}
+	d := domain.RecoveryDecision{RecoveryKind: domain.RecoveryRetry}
 	if !d.IsRetry() {
 		t.Error("expected IsRetry true")
 	}
-	d2 := domain.RecoveryDecision{Action: domain.RecoveryHalt}
+	d2 := domain.RecoveryDecision{RecoveryKind: domain.RecoveryHalt}
 	if d2.IsRetry() {
 		t.Error("expected IsRetry false for halt")
 	}

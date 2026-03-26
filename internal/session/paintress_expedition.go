@@ -214,7 +214,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && p.escalationFired.CompareAndSwap(false, true) {
 			reasons := recentFailureReasons(p.config.Continent, 5)
-			decision := p.aggregate.DecideRecovery(reasons)
+			decision := p.recoveryDecider.DecideRecovery(reasons)
 
 			// Best-effort: write Gommage insight for cross-tool observability
 			gommageWriter := NewInsightWriter(
@@ -230,8 +230,8 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			expSpan.AddEvent("gommage",
 				trace.WithAttributes(
 					attribute.Int("consecutive_failures", maxConsecutiveFailures),
-					attribute.String("gommage.class", string(decision.Class)),
-					attribute.String("gommage.action", string(decision.Action)),
+					attribute.String("gommage.class", platform.SanitizeUTF8(string(decision.Class))),
+					attribute.String("gommage.action", platform.SanitizeUTF8(string(decision.RecoveryKind))),
 					attribute.Int("gommage.retry_num", decision.RetryNum),
 				),
 			)
@@ -454,7 +454,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		p.consecutiveFailures.Store(0)
 		p.consecutiveSkips.Store(0)
 		p.escalationFired.Store(false)
-		p.aggregate.ResetRecovery()
+		p.recoveryDecider.ResetRecovery()
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))

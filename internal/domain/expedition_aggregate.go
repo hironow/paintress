@@ -176,11 +176,11 @@ func (a *ExpeditionAggregate) DecideRecovery(reasons []string) RecoveryDecision 
 	switch class {
 	case GommageClassTimeout, GommageClassRateLimit, GommageClassParseError:
 		if a.recoveryAttempts >= maxRecoveryAttempts {
-			return RecoveryDecision{Action: RecoveryHalt, Class: class}
+			return RecoveryDecision{RecoveryKind: RecoveryHalt, Class: class}
 		}
 		a.recoveryAttempts++
 		return RecoveryDecision{
-			Action:      RecoveryRetry,
+			RecoveryKind: RecoveryRetry,
 			Class:       class,
 			Cooldown:    CooldownForClass(class, a.recoveryAttempts),
 			RetryNum:    a.recoveryAttempts,
@@ -188,7 +188,7 @@ func (a *ExpeditionAggregate) DecideRecovery(reasons []string) RecoveryDecision 
 			KeepWorkDir: true,
 		}
 	default:
-		return RecoveryDecision{Action: RecoveryHalt, Class: class}
+		return RecoveryDecision{RecoveryKind: RecoveryHalt, Class: class}
 	}
 }
 

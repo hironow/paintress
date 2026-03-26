@@ -34,7 +34,7 @@ func TestHighSeverityGate_NoHighSeverity(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &failApprover{t: t}
 	p.notifier = &port.NopNotifier{}
 
@@ -65,7 +65,7 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &port.AutoApprover{}
 	p.notifier = &port.NopNotifier{}
 
@@ -96,7 +96,7 @@ func TestHighSeverityGate_Denied(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &denyApprover{}
 	p.notifier = &port.NopNotifier{}
 
@@ -131,7 +131,7 @@ func TestHighSeverityGate_AutoApprove(t *testing.T) {
 		AutoApprove:    true,
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 
 	code := p.Run(context.Background())
 	if code != 0 {
@@ -161,7 +161,7 @@ func TestHighSeverityGate_ApproverCalledOnce(t *testing.T) {
 	}
 
 	var callCount atomic.Int32
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &countingApprover{count: &callCount, approve: true}
 	p.notifier = &port.NopNotifier{}
 
@@ -190,7 +190,7 @@ func TestHighSeverityGate_DeniedAbortsAllExpeditions(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &denyApprover{}
 	p.notifier = &port.NopNotifier{}
 
@@ -223,7 +223,7 @@ func TestHighSeverityGate_ScanError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &failApprover{t: t}
 	p.notifier = &port.NopNotifier{}
 
@@ -254,7 +254,7 @@ func TestHighSeverityGate_ApprovalError_FailsClosed(t *testing.T) {
 		Model:          "opus",
 	}
 
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	p.approver = &errorApprover{err: fmt.Errorf("exec: command not found")}
 	p.notifier = &port.NopNotifier{}
 
