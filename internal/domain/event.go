@@ -27,8 +27,10 @@ const (
 	EventDMailFlushed        EventType = "dmail.flushed"
 	EventDMailArchived       EventType = "dmail.archived"
 	EventGradientChanged     EventType = "gradient.changed"
-	EventGommageTriggered    EventType = "gommage.triggered"
-	EventInboxReceived       EventType = "inbox.received"
+	EventGommageTriggered     EventType = "gommage.triggered"
+	EventGommageRecovery      EventType = "gommage.recovery"
+	EventExpeditionCheckpoint EventType = "expedition.checkpoint"
+	EventInboxReceived        EventType = "inbox.received"
 	EventRetryAttempted      EventType = "retry.attempted"
 	EventEscalated           EventType = "escalated"
 	EventResolved            EventType = "resolved"
@@ -136,8 +138,28 @@ type GradientChangedData struct {
 
 // GommageTriggeredData is the payload for EventGommageTriggered.
 type GommageTriggeredData struct {
-	Expedition          int `json:"expedition"`
-	ConsecutiveFailures int `json:"consecutive_failures"`
+	Expedition          int          `json:"expedition"`
+	ConsecutiveFailures int          `json:"consecutive_failures"`
+	Class               GommageClass `json:"class,omitempty"`
+	RecoveryAction      string       `json:"recovery_action,omitempty"`
+	RetryNum            int          `json:"retry_num,omitempty"`
+}
+
+// GommageRecoveryData is the payload for EventGommageRecovery.
+type GommageRecoveryData struct {
+	Expedition int          `json:"expedition"`
+	Class      GommageClass `json:"class"`
+	Action     string       `json:"action"`
+	RetryNum   int          `json:"retry_num"`
+	Cooldown   string       `json:"cooldown"`
+}
+
+// ExpeditionCheckpointData is the payload for EventExpeditionCheckpoint.
+type ExpeditionCheckpointData struct {
+	Expedition  int    `json:"expedition"`
+	Phase       string `json:"phase"`
+	WorkDir     string `json:"work_dir"`
+	CommitCount int    `json:"commit_count"`
 }
 
 // InboxReceivedData is the payload for EventInboxReceived.

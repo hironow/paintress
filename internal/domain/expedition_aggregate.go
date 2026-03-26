@@ -13,6 +13,7 @@ const AggregateTypeExpedition = "expedition"
 type ExpeditionAggregate struct {
 	consecutiveFailures int
 	escalationFired     bool
+	recoveryAttempts    int
 	seqNr               uint64
 }
 
@@ -164,4 +165,55 @@ func (a *ExpeditionAggregate) RecordDMailFlushed(count int, now time.Time) (Even
 // RecordDMailArchived produces a dmail.archived event.
 func (a *ExpeditionAggregate) RecordDMailArchived(name string, now time.Time) (Event, error) {
 	return a.nextEvent(EventDMailArchived, DMailArchivedData{Name: name}, now)
+}
+
+const maxRecoveryAttempts = 2
+
+// DecideRecovery classifies the failure streak and decides retry vs halt.
+// Tracks recovery attempts; after maxRecoveryAttempts, forces halt.
+func (a *ExpeditionAggregate) DecideRecovery(reasons []string) RecoveryDecision {
+	class := ClassifyGommage(reasons)
+	switch class {
+	case GommageClassTimeout, GommageClassRateLimit, GommageClassParseError:
+		if a.recoveryAttempts >= maxRecoveryAttempts {
+			return RecoveryDecision{Action: RecoveryHalt, Class: class}
+		}
+		a.recoveryAttempts++
+		return RecoveryDecision{
+			Action:      RecoveryRetry,
+			Class:       class,
+			Cooldown:    CooldownForClass(class, a.recoveryAttempts),
+			RetryNum:    a.recoveryAttempts,
+			MaxRetry:    maxRecoveryAttempts,
+			KeepWorkDir: true,
+		}
+	default:
+		return RecoveryDecision{Action: RecoveryHalt, Class: class}
+	}
+}
+
+// ResetRecovery clears recovery attempts. Called when consecutiveFailures resets.
+func (a *ExpeditionAggregate) ResetRecovery() {
+	a.recoveryAttempts = 0
+}
+
+// RecordGommageRecovery produces a gommage.recovery event.
+func (a *ExpeditionAggregate) RecordGommageRecovery(expedition int, class GommageClass, action string, retryNum int, cooldown string, now time.Time) (Event, error) {
+	return a.nextEvent(EventGommageRecovery, GommageRecoveryData{
+		Expedition: expedition,
+		Class:      class,
+		Action:     action,
+		RetryNum:   retryNum,
+		Cooldown:   cooldown,
+	}, now)
+}
+
+// RecordCheckpoint produces an expedition.checkpoint event.
+func (a *ExpeditionAggregate) RecordCheckpoint(expedition int, phase, workDir string, commitCount int, now time.Time) (Event, error) {
+	return a.nextEvent(EventExpeditionCheckpoint, ExpeditionCheckpointData{
+		Expedition:  expedition,
+		Phase:       phase,
+		WorkDir:     workDir,
+		CommitCount: commitCount,
+	}, now)
 }
