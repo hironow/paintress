@@ -50,6 +50,14 @@ Domain command types use the Parse-Don't-Validate pattern:
 
 Ref: `.semgrep/layers.yaml`, ADR S0029
 
+## Tracking Mode (Wave vs Linear)
+
+- **Wave mode** (default, `--linear` not set): `ProjectWaveState()` builds wave progress from D-Mail archive. `ExpeditionTargetsFromWaves()` extracts pending steps as expedition targets. Claim keys use step IDs. Prompt templates inject step title and acceptance criteria. Report D-Mails include `WaveReference{ID, Step}` for archive projection.
+- **Linear mode** (`--linear`): Existing behavior — `FetchIssuesViaMCP` via Linear MCP, issue-based claims, Linear team/project in prompts.
+- `TargetProvider` port interface abstracts the source; `WaveTargetProvider` (wave) and `FetchIssuesViaMCP` (linear) are the two implementations.
+
+Ref: ADR S0035, `internal/domain/wave_projection.go`, `internal/domain/expedition_target.go`, `internal/usecase/wave_targets.go`
+
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.
