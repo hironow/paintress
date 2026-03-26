@@ -1,10 +1,14 @@
 package session
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/platform"
 )
 
 // white-box-reason: tests internal buildResumeContext and countCommitsInDir functions
@@ -32,7 +36,7 @@ func TestBuildResumeContext_WithCommits(t *testing.T) {
 	if ctx == "" {
 		t.Error("expected non-empty resume context")
 	}
-	if !contains(ctx, "initial") {
+	if !containsStr(ctx, "initial") {
 		t.Errorf("expected commit message in context, got: %s", ctx)
 	}
 }
@@ -75,15 +79,52 @@ func TestCountCommitsInDir_WithCommits(t *testing.T) {
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) > 0 && len(substr) > 0 && indexOf(s, substr) >= 0
+func TestCleanOrphanWorktrees_NoOrphans(t *testing.T) {
+	// white-box-reason: tests cleanOrphanWorktrees on Paintress struct
+	continent := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, domain.StateDir, ".run", "logs"), 0755)
+	// Initialize git repo so git worktree list works
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = continent
+		cmd.Run()
+	}
+	run("init")
+	run("config", "user.email", "test@test.com")
+	run("config", "user.name", "test")
+	os.WriteFile(filepath.Join(continent, "dummy.go"), []byte("package main"), 0644)
+	run("add", ".")
+	run("commit", "-m", "init")
+
+	cfg := domain.Config{Continent: continent, Model: "opus"}
+	logger := platform.NewLogger(io.Discard, false)
+	p := NewPaintress(cfg, logger, io.Discard, io.Discard, nil, nil, nil, nil)
+	// Should not panic with no worktrees
+	p.cleanOrphanWorktrees()
 }
 
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
+func TestSaveCheckpoint_EmitsEvent(t *testing.T) {
+	// white-box-reason: tests saveCheckpoint method on Paintress struct
+	continent := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, domain.StateDir, ".run", "logs"), 0755)
+	// Create git repo for countCommitsInDir
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = continent
+		cmd.Run()
 	}
-	return -1
+	run("init")
+	run("config", "user.email", "test@test.com")
+	run("config", "user.name", "test")
+	os.WriteFile(filepath.Join(continent, "file.go"), []byte("package main"), 0644)
+	run("add", ".")
+	run("commit", "-m", "init")
+
+	cfg := domain.Config{Continent: continent, Model: "opus"}
+	logger := platform.NewLogger(io.Discard, false)
+	p := NewPaintress(cfg, logger, io.Discard, io.Discard, nil, nil, nil, nil)
+	// Should not panic — emitter is NopExpeditionEventEmitter
+	p.saveCheckpoint(1, CheckpointSubprocessStart, continent)
 }
+
+// containsStr and indexOfStr are defined in test_helpers_test.go
