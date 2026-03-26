@@ -37,5 +37,4 @@ paintress mcp-config generate [path] [flags]
 
 ### SEE ALSO
 
-* [paintress mcp-config](paintress_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
-
+* [paintress mcp-config](paintress_mcp-config.md)  - Manage MCP configuration for Claude subprocess isolation

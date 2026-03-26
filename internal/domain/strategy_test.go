@@ -55,10 +55,10 @@ func TestStrategyForCycle_RotatesAfterCycle3(t *testing.T) {
 func TestStrategyForCycle_RotationPattern(t *testing.T) {
 	// given: expected rotation
 	expected := []domain.FixStrategy{
-		domain.StrategyDirect,   // 1
+		domain.StrategyDirect,    // 1
 		domain.StrategyDecompose, // 2
 		domain.StrategyRewrite,   // 3
-		domain.StrategyDirect,   // 4
+		domain.StrategyDirect,    // 4
 		domain.StrategyDecompose, // 5
 		domain.StrategyRewrite,   // 6
 	}

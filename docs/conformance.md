@@ -59,7 +59,6 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 - `--strict-mcp-config --mcp-config` enforced when mcp-config.json exists
 - User can edit mcp-config.json to add custom MCP servers
 
-
 - **Wave mode** (default, `--linear` not set): `ProjectWaveState()` builds wave progress from D-Mail archive. `ExpeditionTargetsFromWaves()` extracts pending steps as expedition targets. Claim keys use step IDs. Prompt templates inject step title and acceptance criteria. Report D-Mails include `WaveReference{ID, Step}` for archive projection.
 - **Linear mode** (`--linear`): Existing behavior — `FetchIssuesViaMCP` via Linear MCP, issue-based claims, Linear team/project in prompts.
 - `TargetProvider` port interface abstracts the source; `WaveTargetProvider` (wave) and `FetchIssuesViaMCP` (linear) are the two implementations.
