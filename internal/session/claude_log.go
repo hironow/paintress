@@ -11,7 +11,7 @@ import (
 )
 
 // WriteClaudeLog persists raw stream-json events to .run/claude-logs/.
-// Each invocation creates a new timestamped .jsonl file.
+// Each invocation creates a new timestamped .jsonl file.  nosemgrep: layer-session-no-event-persistence [permanent]
 func WriteClaudeLog(continent string, rawEvents []string) error {
 	if len(rawEvents) == 0 {
 		return nil
@@ -22,7 +22,7 @@ func WriteClaudeLog(continent string, rawEvents []string) error {
 		return fmt.Errorf("mkdir claude-logs: %w", err)
 	}
 
-	filename := fmt.Sprintf("%s.jsonl", time.Now().UTC().Format("20060102-150405"))
+	filename := fmt.Sprintf("%s.jsonl" // nosemgrep: layer-session-no-event-persistence — log file, not event store [permanent], time.Now().UTC().Format("20060102-150405"))
 	path := filepath.Join(logDir, filename)
 
 	var buf strings.Builder
