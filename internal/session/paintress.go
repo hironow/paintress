@@ -271,11 +271,15 @@ func (p *Paintress) Run(ctx context.Context) int {
 	fmt.Fprintln(p.ErrOut)
 
 	// Resume incomplete expeditions from previous session (checkpoint/restart support).
-	if incompletes := p.resumeIncompleteExpeditions(); len(incompletes) > 0 {
-		for _, inc := range incompletes {
-			p.Logger.Info("found incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
+	// Only meaningful when workers=0 (no pool): pool.Init() hard-resets all worktrees
+	// to base branch, making checkpoint-preserved worktrees irrecoverable.
+	if p.pool == nil {
+		if incompletes := p.resumeIncompleteExpeditions(); len(incompletes) > 0 {
+			for _, inc := range incompletes {
+				p.Logger.Info("found incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
+			}
+			p.Logger.Info("%d incomplete expedition(s) found — worktrees preserved for retry", len(incompletes))
 		}
-		p.Logger.Info("%d incomplete expedition(s) found — worktrees preserved for retry", len(incompletes))
 	}
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===

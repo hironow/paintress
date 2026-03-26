@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -47,4 +48,14 @@ func injectParseErrorLumina(continent string, logger domain.Logger) {
 	}
 	_ = w.Append("lumina-recovery.md", "recovery", "paintress", entry)
 	logger.Warn("injected parse-error recovery hint into Lumina")
+}
+
+// isRateLimitError returns true if the error message indicates an API rate limit,
+// not a functional failure like a merge conflict or test failure.
+func isRateLimitError(errMsg string) bool {
+	lower := strings.ToLower(errMsg)
+	return strings.Contains(lower, "rate_limit") ||
+		strings.Contains(lower, "429") ||
+		strings.Contains(lower, "quota") ||
+		strings.Contains(lower, "too many requests")
 }

@@ -120,5 +120,30 @@ func TestExecuteRecovery_TimeoutSwitchesModel(t *testing.T) {
 	}
 }
 
+func TestIsRateLimitError(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want bool
+	}{
+		{"rate_limit keyword", "rate_limit: 429 too many requests", true},
+		{"429 status", "HTTP 429 response", true},
+		{"quota exhausted", "API quota exceeded", true},
+		{"too many requests", "Too Many Requests from API", true},
+		{"merge conflict", "merge conflict in main.go", false},
+		{"test failure", "exit status 1: tests failed", false},
+		{"timeout", "context deadline exceeded", false},
+		{"blocker", "PR is stuck due to CI failure", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isRateLimitError(tt.msg)
+			if got != tt.want {
+				t.Errorf("isRateLimitError(%q) = %v, want %v", tt.msg, got, tt.want)
+			}
+		})
+	}
+}
+
 // newRecoveryTestPaintress uses NopExpeditionEventEmitter via nil (falls back in constructor)
 var _ port.RecoveryDecider = (*domain.ExpeditionAggregate)(nil) // compile-time interface check

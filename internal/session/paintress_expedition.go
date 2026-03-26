@@ -237,11 +237,13 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			)
 
 			if p.executeRecovery(ctx, decision, exp, expedition) {
-				// Recovery says retry: save checkpoint, release worktree + claim, reset counter
-				p.saveCheckpoint(exp, CheckpointSubprocessStart, workDir)
+				// Recovery says retry: release worktree + claim, reset counter.
+				// Note: worktree is reset on release (pool hard-resets to base branch).
+				// For transient failures (timeout/rate_limit/parse_error) this is
+				// acceptable — partial progress is minimal and the retry starts fresh.
 				p.consecutiveFailures.Store(0)
 				p.escalationFired.Store(false)
-				releaseWorkDir() // return worktree to pool before re-acquiring on next iteration
+				releaseWorkDir()
 				expSpan.End()
 				continue // retry same issue
 			}
@@ -309,9 +311,12 @@ func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.
 		p.totalMidHighSeverity.Add(int64(midHighCount))
 	}
 
-	// Inject rate_limit marker if reserve model is active (enables ClassifyGommage detection)
+	// Inject rate_limit marker only when the error itself signals a rate limit.
+	// Previous logic blindly tagged all non-timeout reserve-model errors as rate_limit,
+	// which misclassified real blockers (merge conflicts, test failures) and caused
+	// ClassifyGommage to retry instead of halt.
 	reason := runErr.Error()
-	if p.reserve.IsOnReserve() && !strings.Contains(reason, "timeout") {
+	if p.reserve.IsOnReserve() && isRateLimitError(reason) {
 		reason = "rate_limit: " + reason
 	}
 
