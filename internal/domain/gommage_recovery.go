@@ -13,11 +13,11 @@ const (
 // RecoveryDecision is the aggregate's verdict on what to do after Gommage.
 type RecoveryDecision struct {
 	RecoveryKind RecoveryAction
-	Class       GommageClass
-	Cooldown    time.Duration
-	RetryNum    int
-	MaxRetry    int
-	KeepWorkDir bool
+	Class        GommageClass
+	Cooldown     time.Duration
+	RetryNum     int
+	MaxRetry     int
+	KeepWorkDir  bool
 }
 
 // IsRetry returns true if the decision is to retry.

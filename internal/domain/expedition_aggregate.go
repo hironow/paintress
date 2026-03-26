@@ -181,11 +181,11 @@ func (a *ExpeditionAggregate) DecideRecovery(reasons []string) RecoveryDecision 
 		a.recoveryAttempts++
 		return RecoveryDecision{
 			RecoveryKind: RecoveryRetry,
-			Class:       class,
-			Cooldown:    CooldownForClass(class, a.recoveryAttempts),
-			RetryNum:    a.recoveryAttempts,
-			MaxRetry:    maxRecoveryAttempts,
-			KeepWorkDir: true,
+			Class:        class,
+			Cooldown:     CooldownForClass(class, a.recoveryAttempts),
+			RetryNum:     a.recoveryAttempts,
+			MaxRetry:     maxRecoveryAttempts,
+			KeepWorkDir:  true,
 		}
 	default:
 		return RecoveryDecision{RecoveryKind: RecoveryHalt, Class: class}
