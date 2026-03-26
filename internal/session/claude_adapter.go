@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -55,6 +56,11 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	args = append(args, "--disable-slash-commands")
+	if mcpPath := MCPConfigPath(effectiveDir(rc.WorkDir)); mcpPath != "" {
+		if _, statErr := os.Stat(mcpPath); statErr == nil {
+			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
+		}
+	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 
 	cmd := platform.NewShellCmd(ctx, a.ClaudeCmd, args...)
@@ -126,4 +132,12 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		return output.String(), streamErr
 	}
 	return output.String(), nil
+}
+
+// effectiveDir returns dir if non-empty, otherwise ".".
+func effectiveDir(dir string) string {
+	if dir != "" {
+		return dir
+	}
+	return "."
 }
