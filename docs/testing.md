@@ -72,6 +72,8 @@ The `Observer` type (`tests/scenario/observer_test.go`) provides high-level asse
 | `AssertBugsFoundInJSONL` | Verify bug events in the JSONL store |
 | `AssertNotifyArgvContains` | Verify notification command arguments |
 | `AssertReportDMailFields` | Verify report D-Mail contains required fields |
+| `AssertGommageRecoveryEvent` | Verify gommage.recovery event with class and retry count |
+| `AssertCheckpointEvent` | Verify expedition.checkpoint event with phase and workdir |
 
 ### SPRT Regression Detection
 

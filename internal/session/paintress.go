@@ -60,8 +60,8 @@ type Paintress struct {
 	trackingMode   domain.TrackingMode
 
 	// Gommage recovery: tracks retry attempts per failure streak
-	recoveryDecider    port.RecoveryDecider
-	checkpointScanner  port.CheckpointScanner
+	recoveryDecider   port.RecoveryDecider
+	checkpointScanner port.CheckpointScanner
 
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
@@ -125,18 +125,18 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	cfgCopy.MaxRetries = maxRetries
 
 	p := &Paintress{
-		Emitter:      emitter,
-		config:       cfgCopy,
-		logDir:       logDir,
-		Logger:       logger,
-		DataOut:      dataOut,
-		ErrOut:       errOut,
-		StdinIn:      stdinIn,
-		gradient:     domain.NewGradientGauge(gradientMax),
-		reserve:      domain.NewReserveParty(primary, reserves, logger),
-		notifier:     notifier,
-		approver:     approver,
-		retryTracker: domain.NewRetryTracker(),
+		Emitter:         emitter,
+		config:          cfgCopy,
+		logDir:          logDir,
+		Logger:          logger,
+		DataOut:         dataOut,
+		ErrOut:          errOut,
+		StdinIn:         stdinIn,
+		gradient:        domain.NewGradientGauge(gradientMax),
+		reserve:         domain.NewReserveParty(primary, reserves, logger),
+		notifier:        notifier,
+		approver:        approver,
+		retryTracker:    domain.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
 		claude: &ClaudeAdapter{
 			ClaudeCmd:  cfgCopy.ClaudeCmd,
