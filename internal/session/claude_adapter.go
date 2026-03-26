@@ -54,6 +54,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
+	args = append(args, "--disable-slash-commands")
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 
 	cmd := platform.NewShellCmd(ctx, a.ClaudeCmd, args...)
