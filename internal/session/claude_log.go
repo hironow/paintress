@@ -22,7 +22,8 @@ func WriteClaudeLog(continent string, rawEvents []string) error {
 		return fmt.Errorf("mkdir claude-logs: %w", err)
 	}
 
-	filename := fmt.Sprintf("%s.jsonl" // nosemgrep: layer-session-no-event-persistence — log file, not event store [permanent], time.Now().UTC().Format("20060102-150405"))
+	// nosemgrep: layer-session-no-event-persistence — log file, not event store [permanent]
+	filename := fmt.Sprintf("%s.jsonl", time.Now().UTC().Format("20060102-150405"))
 	path := filepath.Join(logDir, filename)
 
 	var buf strings.Builder
