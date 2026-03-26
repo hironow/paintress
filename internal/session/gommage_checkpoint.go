@@ -1,7 +1,9 @@
 package session
 
 import (
+	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 )
@@ -69,6 +71,40 @@ func buildResumeContext(workDir string) string {
 	}
 
 	return b.String()
+}
+
+// resumeIncompleteExpeditions uses the CheckpointScanner port to find
+// checkpoint events without subsequent completion, then validates that
+// the referenced worktrees still exist on disk.
+// Best-effort: returns nil if scanner is nil or returns no results.
+func (p *Paintress) resumeIncompleteExpeditions() []IncompleteExpedition {
+	if p.checkpointScanner == nil {
+		return nil
+	}
+	candidates := p.checkpointScanner.FindIncompleteCheckpoints()
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	var result []IncompleteExpedition
+	for _, cp := range candidates {
+		// Verify worktree still exists on disk
+		if info, statErr := os.Stat(cp.WorkDir); statErr != nil || !info.IsDir() {
+			p.Logger.Debug("checkpoint %d: worktree %s not found, skipping", cp.Expedition, cp.WorkDir)
+			continue
+		}
+		result = append(result, IncompleteExpedition{
+			Expedition: cp.Expedition,
+			WorkDir:    cp.WorkDir,
+			Phase:      CheckpointPhase(cp.Phase),
+		})
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Expedition < result[j].Expedition
+	})
+
+	return result
 }
 
 // cleanOrphanWorktrees removes worktrees from previous sessions.

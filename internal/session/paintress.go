@@ -60,7 +60,8 @@ type Paintress struct {
 	trackingMode   domain.TrackingMode
 
 	// Gommage recovery: tracks retry attempts per failure streak
-	recoveryDecider port.RecoveryDecider
+	recoveryDecider    port.RecoveryDecider
+	checkpointScanner  port.CheckpointScanner
 
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry

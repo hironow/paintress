@@ -11,6 +11,21 @@ import (
 // ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
 var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
+// CheckpointScanner finds incomplete expeditions from the event store.
+// Implemented in eventsource layer, injected into session.
+type CheckpointScanner interface {
+	// FindIncompleteCheckpoints returns checkpoint events that have no
+	// subsequent expedition.completed event for the same expedition number.
+	FindIncompleteCheckpoints() []domain.ExpeditionCheckpointData
+}
+
+// NopCheckpointScanner returns no incomplete checkpoints.
+type NopCheckpointScanner struct{}
+
+func (*NopCheckpointScanner) FindIncompleteCheckpoints() []domain.ExpeditionCheckpointData {
+	return nil
+}
+
 // RecoveryDecider classifies failure streaks and decides retry vs halt.
 // Implemented by domain.ExpeditionAggregate, injected into session.
 type RecoveryDecider interface {
