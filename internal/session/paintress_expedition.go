@@ -212,26 +212,44 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
-		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && !p.escalationFired.Load() {
-			p.escalationFired.Store(true)
-			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
+		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && p.escalationFired.CompareAndSwap(false, true) {
+			reasons := recentFailureReasons(p.config.Continent, 5)
+			decision := p.aggregate.DecideRecovery(reasons)
 
 			// Best-effort: write Gommage insight for cross-tool observability
 			gommageWriter := NewInsightWriter(
 				domain.InsightsDir(p.config.Continent),
 				domain.RunDir(p.config.Continent),
 			)
-			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent, domain.GommageClassSystematic)
+			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent, decision.Class)
 
-			expSpan.AddEvent("gommage",
-				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
-			)
-			releaseWorkDir()
-			expSpan.End()
-			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
 			if emitErr := p.Emitter.EmitGommage(exp, time.Now()); emitErr != nil {
 				p.Logger.Error("gommage event lost: %v", emitErr)
 			}
+
+			expSpan.AddEvent("gommage",
+				trace.WithAttributes(
+					attribute.Int("consecutive_failures", maxConsecutiveFailures),
+					attribute.String("gommage.class", string(decision.Class)),
+					attribute.String("gommage.action", string(decision.Action)),
+					attribute.Int("gommage.retry_num", decision.RetryNum),
+				),
+			)
+
+			if p.executeRecovery(ctx, decision, exp, expedition) {
+				// Recovery says retry: save checkpoint, keep worktree, reset counter
+				p.saveCheckpoint(exp, CheckpointSubprocessStart, workDir)
+				p.consecutiveFailures.Store(0)
+				p.escalationFired.Store(false)
+				expSpan.End()
+				continue // retry same issue
+			}
+
+			// Halt path (unchanged behavior)
+			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
+			releaseWorkDir()
+			expSpan.End()
+			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
 			return errGommage
 		}
 
@@ -290,10 +308,16 @@ func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.
 		p.totalMidHighSeverity.Add(int64(midHighCount))
 	}
 
+	// Inject rate_limit marker if reserve model is active (enables ClassifyGommage detection)
+	reason := runErr.Error()
+	if p.reserve.IsOnReserve() && !strings.Contains(reason, "timeout") {
+		reason = "rate_limit: " + reason
+	}
+
 	p.writeFlag(flagDir, exp, "error", "failed", "?", midHighCount)
 	errReport := &domain.ExpeditionReport{
 		Expedition: exp, IssueID: "?", IssueTitle: "?",
-		MissionType: "?", Status: "failed", Reason: runErr.Error(),
+		MissionType: "?", Status: "failed", Reason: reason,
 		FailureType: "blocker",
 		PRUrl:       "none", BugIssues: "none",
 	}
@@ -430,6 +454,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		p.consecutiveFailures.Store(0)
 		p.consecutiveSkips.Store(0)
 		p.escalationFired.Store(false)
+		p.aggregate.ResetRecovery()
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))

@@ -59,6 +59,9 @@ type Paintress struct {
 	targetProvider port.TargetProvider
 	trackingMode   domain.TrackingMode
 
+	// Gommage recovery: aggregate tracks retry attempts per streak
+	aggregate *domain.ExpeditionAggregate
+
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 
@@ -130,6 +133,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		notifier:     notifier,
 		approver:     approver,
 		retryTracker: domain.NewRetryTracker(),
+		aggregate:    domain.NewExpeditionAggregate(),
 		claude: &ClaudeAdapter{
 			ClaudeCmd:  cfgCopy.ClaudeCmd,
 			Model:      primary,
@@ -182,6 +186,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 		),
 	)
 	defer rootSpan.End()
+
+	// Best-effort: clean orphan worktrees from previous crashed sessions
+	p.cleanOrphanWorktrees()
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
