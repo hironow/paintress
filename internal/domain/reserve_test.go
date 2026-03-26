@@ -525,3 +525,18 @@ func TestReserve_ConcurrentStatusAndCheckOutput(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestIsOnReserve_Primary(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, nil)
+	if rp.IsOnReserve() {
+		t.Error("should not be on reserve when using primary")
+	}
+}
+
+func TestIsOnReserve_AfterForceReserve(t *testing.T) {
+	rp := NewReserveParty("opus", []string{"sonnet"}, nil)
+	rp.ForceReserve()
+	if !rp.IsOnReserve() {
+		t.Error("should be on reserve after ForceReserve")
+	}
+}
