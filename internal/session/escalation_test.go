@@ -176,3 +176,7 @@ func (n *nopEmitter) EmitResolved(_ string, _ []string, _ time.Time) error  { re
 func (n *nopEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
 func (n *nopEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
 func (n *nopEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }
+func (n *nopEmitter) EmitGommageRecovery(_ int, _, _ string, _ int, _ string, _ time.Time) error {
+	return nil
+}
+func (n *nopEmitter) EmitCheckpoint(_ int, _, _ string, _ int, _ time.Time) error { return nil }

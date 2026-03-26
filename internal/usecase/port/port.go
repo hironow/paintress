@@ -143,6 +143,8 @@ type ExpeditionEventEmitter interface {
 	EmitDMailStaged(name string, now time.Time) error
 	EmitDMailFlushed(count int, now time.Time) error
 	EmitDMailArchived(name string, now time.Time) error
+	EmitGommageRecovery(expedition int, class, action string, retryNum int, cooldown string, now time.Time) error
+	EmitCheckpoint(expedition int, phase, workDir string, commitCount int, now time.Time) error
 }
 
 // NopExpeditionEventEmitter is a no-op emitter for tests and when event
@@ -166,6 +168,12 @@ func (*NopExpeditionEventEmitter) EmitResolved(_ string, _ []string, _ time.Time
 func (*NopExpeditionEventEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }
+func (*NopExpeditionEventEmitter) EmitGommageRecovery(_ int, _, _ string, _ int, _ string, _ time.Time) error {
+	return nil
+}
+func (*NopExpeditionEventEmitter) EmitCheckpoint(_ int, _, _ string, _ int, _ time.Time) error {
+	return nil
+}
 
 // ExpeditionRunner wraps the session-layer expedition orchestrator.
 type ExpeditionRunner interface {
