@@ -60,3 +60,30 @@ func TestClassifyGommage_Empty(t *testing.T) {
 		t.Errorf("empty reasons should be systematic, got %q", got)
 	}
 }
+
+func TestClassifyGommage_EvenSplit_FallsBackToSystematic(t *testing.T) {
+	// 2 reasons: 1 timeout + 1 blocker → no strict majority → systematic
+	reasons := []string{"timeout after 120s", "blocker: stuck"}
+	got := domain.ClassifyGommage(reasons)
+	if got != domain.GommageClassSystematic {
+		t.Errorf("even split (1/2) should be systematic, got %q", got)
+	}
+}
+
+func TestClassifyGommage_StrictMajority_ThreeOfFive(t *testing.T) {
+	// 3 of 5 = strict majority
+	reasons := []string{"timeout x", "timeout y", "timeout z", "blocker a", "rate_limit b"}
+	got := domain.ClassifyGommage(reasons)
+	if got != domain.GommageClassTimeout {
+		t.Errorf("3/5 timeout should be timeout, got %q", got)
+	}
+}
+
+func TestClassifyGommage_TwoOfFour_NotMajority(t *testing.T) {
+	// 2 of 4 = exactly half, NOT majority → systematic
+	reasons := []string{"timeout x", "timeout y", "blocker a", "blocker b"}
+	got := domain.ClassifyGommage(reasons)
+	if got != domain.GommageClassSystematic {
+		t.Errorf("2/4 split should be systematic, got %q", got)
+	}
+}

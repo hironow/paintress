@@ -32,6 +32,12 @@ func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return NewSpanEventStore(raw)
 }
 
+// NewCheckpointScanner creates a checkpoint scanner for the given continent.
+// cmd layer should use this instead of importing eventsource directly (ADR S0008).
+func NewCheckpointScanner(continent string) port.CheckpointScanner {
+	return eventsource.NewCheckpointScanner(continent)
+}
+
 // ListExpiredEventFiles returns .jsonl files older than the given days.
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
 func ListExpiredEventFiles(ctx context.Context, stateDir string, days int) ([]string, error) {

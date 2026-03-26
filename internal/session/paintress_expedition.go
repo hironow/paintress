@@ -237,10 +237,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			)
 
 			if p.executeRecovery(ctx, decision, exp, expedition) {
-				// Recovery says retry: save checkpoint, keep worktree, reset counter
+				// Recovery says retry: save checkpoint, release worktree + claim, reset counter
 				p.saveCheckpoint(exp, CheckpointSubprocessStart, workDir)
 				p.consecutiveFailures.Store(0)
 				p.escalationFired.Store(false)
+				releaseWorkDir() // return worktree to pool before re-acquiring on next iteration
 				expSpan.End()
 				continue // retry same issue
 			}

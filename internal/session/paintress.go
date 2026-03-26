@@ -179,6 +179,11 @@ func (p *Paintress) SetTrackingMode(mode domain.TrackingMode) {
 	p.trackingMode = mode
 }
 
+// SetCheckpointScanner injects the checkpoint scanner for resume-on-restart.
+func (p *Paintress) SetCheckpointScanner(s port.CheckpointScanner) {
+	p.checkpointScanner = s
+}
+
 func (p *Paintress) Run(ctx context.Context) int {
 	ctx, rootSpan := platform.Tracer.Start(ctx, "paintress.run",
 		trace.WithAttributes(
@@ -264,6 +269,14 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.Warn("%s", domain.Msg("dry_run"))
 	}
 	fmt.Fprintln(p.ErrOut)
+
+	// Resume incomplete expeditions from previous session (checkpoint/restart support).
+	if incompletes := p.resumeIncompleteExpeditions(); len(incompletes) > 0 {
+		for _, inc := range incompletes {
+			p.Logger.Info("found incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
+		}
+		p.Logger.Info("%d incomplete expedition(s) found — worktrees preserved for retry", len(incompletes))
+	}
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===
 	p.totalAttempted.Store(0)

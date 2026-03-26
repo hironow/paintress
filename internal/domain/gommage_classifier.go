@@ -37,9 +37,11 @@ func ClassifyGommage(reasons []string) GommageClass {
 			}
 		}
 	}
-	majority := (len(reasons) + 1) / 2
+	// Strict majority: more than half. For len=2, need >1; for len=4, need >2.
+	// This prevents nondeterministic classification from map iteration order.
+	half := len(reasons) / 2
 	for class, count := range counts {
-		if count >= majority {
+		if count > half {
 			return class
 		}
 	}
