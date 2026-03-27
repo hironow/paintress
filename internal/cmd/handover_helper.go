@@ -36,7 +36,7 @@ func tryWriteHandover(ctx context.Context, err error, repoDir string, state doma
 }
 
 // writeHandoverOnCancel writes a handover document when ctx is cancelled
-// but the error is nil (e.g. WaitForDMail returns (false, nil) on cancel).
+// but the error is nil (e.g. WaitForDMail returns (nil, nil) on cancel).
 func writeHandoverOnCancel(ctx context.Context, repoDir string, state domain.HandoverState, logger domain.Logger) {
 	if ctx.Err() != context.Canceled {
 		return
