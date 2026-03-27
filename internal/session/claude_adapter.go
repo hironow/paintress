@@ -54,6 +54,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
+	args = append(args, "--bare") // Skip hooks, plugins, skills, CLAUDE.md auto-discovery
 	args = append(args, "--disable-slash-commands")
 	if mcpPath := MCPConfigPath(effectiveDir(rc.WorkDir)); mcpPath != "" {
 		if _, statErr := os.Stat(mcpPath); statErr == nil {
