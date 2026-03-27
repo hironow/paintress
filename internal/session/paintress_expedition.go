@@ -237,15 +237,17 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			)
 
 			if p.executeRecovery(ctx, decision, exp, expedition) {
-				// Recovery says retry: release worktree + claim, reset counter.
-				// Note: worktree is reset on release (pool hard-resets to base branch).
-				// For transient failures (timeout/rate_limit/parse_error) this is
-				// acceptable — partial progress is minimal and the retry starts fresh.
+				// Recovery says retry: release worktree + claim, reset counter,
+				// and reclaim the expedition slot so the retry uses the same exp number.
+				// Without this, expCounter.Add(1) at loop top would consume a fresh slot,
+				// potentially hitting MaxExpeditions before the retry runs.
 				p.consecutiveFailures.Store(0)
 				p.escalationFired.Store(false)
+				p.expCounter.Add(-1)     // reclaim slot so retry doesn't consume an expedition
+				p.totalAttempted.Add(-1) // don't double-count the failed attempt
 				releaseWorkDir()
 				expSpan.End()
-				continue // retry same issue
+				continue // retry same issue with same exp number
 			}
 
 			// Halt path (unchanged behavior)

@@ -270,15 +270,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 	fmt.Fprintln(p.ErrOut)
 
-	// Resume incomplete expeditions from previous session (checkpoint/restart support).
-	// Only meaningful when workers=0 (no pool): pool.Init() hard-resets all worktrees
-	// to base branch, making checkpoint-preserved worktrees irrecoverable.
+	// Checkpoint scanning: detect incomplete expeditions from previous session.
+	// Currently log-only — actual resume (feeding checkpoints back into the run loop
+	// via buildResumeContext/--continue) is not yet implemented. The checkpoint events
+	// are recorded for observability and future resume support.
 	if p.pool == nil {
 		if incompletes := p.resumeIncompleteExpeditions(); len(incompletes) > 0 {
 			for _, inc := range incompletes {
 				p.Logger.Info("found incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
 			}
-			p.Logger.Info("%d incomplete expedition(s) found — worktrees preserved for retry", len(incompletes))
+			p.Logger.Warn("%d incomplete expedition(s) detected (resume not yet implemented — starting fresh)", len(incompletes))
 		}
 	}
 

@@ -30,6 +30,15 @@ func TestClassifyGommage_ParseError(t *testing.T) {
 	}
 }
 
+func TestClassifyGommage_ParseError_JournalReason(t *testing.T) {
+	// Real journal reason text: "report markers not found"
+	reasons := []string{"report markers not found", "report markers not found", "report markers not found"}
+	got := domain.ClassifyGommage(reasons)
+	if got != domain.GommageClassParseError {
+		t.Errorf("journal reason 'markers not found' should classify as parse_error, got %q", got)
+	}
+}
+
 func TestClassifyGommage_Blocker(t *testing.T) {
 	reasons := []string{"blocker: PR stuck", "blocker: merge conflict", "blocker: CI failed"}
 	got := domain.ClassifyGommage(reasons)

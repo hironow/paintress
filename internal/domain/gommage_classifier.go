@@ -13,12 +13,13 @@ const (
 	GommageClassSystematic GommageClass = "systematic"
 )
 
-// classKeywords maps each class to its detection keyword.
-var classKeywords = map[GommageClass]string{
-	GommageClassTimeout:    "timeout",
-	GommageClassRateLimit:  "rate_limit",
-	GommageClassParseError: "parse_error",
-	GommageClassBlocker:    "blocker",
+// classKeywords maps each class to its detection keywords.
+// A reason matches a class if it contains ANY of the keywords.
+var classKeywords = map[GommageClass][]string{
+	GommageClassTimeout:    {"timeout"},
+	GommageClassRateLimit:  {"rate_limit"},
+	GommageClassParseError: {"parse_error", "markers not found"},
+	GommageClassBlocker:    {"blocker"},
 }
 
 // ClassifyGommage inspects recent failure reasons and returns the dominant class.
@@ -30,8 +31,15 @@ func ClassifyGommage(reasons []string) GommageClass {
 	counts := make(map[GommageClass]int)
 	for _, reason := range reasons {
 		lower := strings.ToLower(reason)
-		for class, keyword := range classKeywords {
-			if strings.Contains(lower, keyword) {
+		for class, keywords := range classKeywords {
+			matched := false
+			for _, kw := range keywords {
+				if strings.Contains(lower, kw) {
+					matched = true
+					break
+				}
+			}
+			if matched {
 				counts[class]++
 				break // one class per reason
 			}
