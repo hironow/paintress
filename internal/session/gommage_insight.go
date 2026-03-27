@@ -37,7 +37,10 @@ func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, contine
 }
 
 // recentFailureReasons reads the last `limit` journal files and extracts
-// deduplicated failure reason strings. Best-effort: returns nil on any error.
+// raw (non-deduplicated) failure reason strings from the last N journals.
+// Deduplication was removed because ClassifyGommage needs frequency counts
+// to determine the majority class (e.g. 3× "timeout" out of 5 reasons).
+// Best-effort: returns nil on any error.
 func recentFailureReasons(continent string, limit int) []string {
 	files, err := ListJournalFiles(continent)
 	if err != nil {
@@ -49,7 +52,6 @@ func recentFailureReasons(continent string, limit int) []string {
 		files = files[len(files)-limit:]
 	}
 
-	seen := make(map[string]struct{})
 	var reasons []string
 	for _, f := range files {
 		data, err := os.ReadFile(f)
@@ -62,10 +64,6 @@ func recentFailureReasons(continent string, limit int) []string {
 				if reason == "" {
 					continue
 				}
-				if _, ok := seen[reason]; ok {
-					continue
-				}
-				seen[reason] = struct{}{}
 				reasons = append(reasons, reason)
 			}
 		}
