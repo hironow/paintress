@@ -57,9 +57,11 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
 
-	// Warn when Claude subprocess settings are missing
-	if !ClaudeSettingsExists(effectiveDir(rc.WorkDir)) && a.Logger != nil {
-		a.Logger.Warn("Claude subprocess settings not found at %s", ClaudeSettingsPath(effectiveDir(rc.WorkDir)))
+	// Load tool-specific settings when available; warn if missing
+	if settingsPath := ClaudeSettingsPath(effectiveDir(rc.WorkDir)); ClaudeSettingsExists(effectiveDir(rc.WorkDir)) {
+		args = append(args, "--settings", settingsPath)
+	} else if a.Logger != nil {
+		a.Logger.Warn("Claude subprocess settings not found at %s", settingsPath)
 		a.Logger.Warn("Run 'paintress mcp-config generate' to create settings.")
 	}
 
