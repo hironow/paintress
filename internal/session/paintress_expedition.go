@@ -242,11 +242,21 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				// at loop top — this is safe under concurrent workers (no counter reversal).
 				// The retry consumes a MaxExpeditions slot; this is intentional to bound
 				// total work and avoid unbounded retry loops.
+				// Note: pool.Release resets the worktree (hard reset + clean); the retry
+				// starts from a fresh base branch checkout, not from preserved progress.
 				p.consecutiveFailures.Store(0)
 				p.escalationFired.Store(false)
 				releaseWorkDir()
 				expSpan.End()
 				continue
+			}
+
+			// Context cancellation during recovery cooldown should exit cleanly,
+			// not be treated as a gommage halt + escalation.
+			if ctx.Err() != nil {
+				releaseWorkDir()
+				expSpan.End()
+				return nil
 			}
 
 			// Halt path (unchanged behavior)
@@ -312,12 +322,11 @@ func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.
 		p.totalMidHighSeverity.Add(int64(midHighCount))
 	}
 
-	// Inject rate_limit marker only when the error itself signals a rate limit.
-	// Previous logic blindly tagged all non-timeout reserve-model errors as rate_limit,
-	// which misclassified real blockers (merge conflicts, test failures) and caused
-	// ClassifyGommage to retry instead of halt.
+	// Inject rate_limit marker when the error itself signals a rate limit,
+	// regardless of whether the reserve model is active. This ensures
+	// ClassifyGommage detects rate limits from both primary and reserve models.
 	reason := runErr.Error()
-	if p.reserve.IsOnReserve() && isRateLimitError(reason) {
+	if isRateLimitError(reason) {
 		reason = "rate_limit: " + reason
 	}
 
