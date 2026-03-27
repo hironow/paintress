@@ -212,26 +212,63 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
-		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && !p.escalationFired.Load() {
-			p.escalationFired.Store(true)
-			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
+		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && p.escalationFired.CompareAndSwap(false, true) {
+			// Read exactly the streak length (not a fixed window) so the classifier
+			// only sees the current consecutive-failure journals, not older successes.
+			reasons := recentFailureReasons(p.config.Continent, maxConsecutiveFailures)
+			decision := p.recoveryDecider.DecideRecovery(reasons)
 
 			// Best-effort: write Gommage insight for cross-tool observability
 			gommageWriter := NewInsightWriter(
 				domain.InsightsDir(p.config.Continent),
 				domain.RunDir(p.config.Continent),
 			)
-			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent)
+			WriteGommageInsight(gommageWriter, exp, maxConsecutiveFailures, p.config.Continent, decision.Class)
 
-			expSpan.AddEvent("gommage",
-				trace.WithAttributes(attribute.Int("consecutive_failures", maxConsecutiveFailures)),
-			)
-			releaseWorkDir()
-			expSpan.End()
-			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
 			if emitErr := p.Emitter.EmitGommage(exp, time.Now()); emitErr != nil {
 				p.Logger.Error("gommage event lost: %v", emitErr)
 			}
+
+			expSpan.AddEvent("gommage",
+				trace.WithAttributes(
+					attribute.Int("consecutive_failures", maxConsecutiveFailures),
+					attribute.String("gommage.class", platform.SanitizeUTF8(string(decision.Class))),
+					attribute.String("gommage.action", platform.SanitizeUTF8(string(decision.RecoveryKind))),
+					attribute.Int("gommage.retry_num", decision.RetryNum),
+				),
+			)
+
+			if p.executeRecovery(ctx, decision, exp, expedition) {
+				// Recovery says retry: reset counters and release worktree.
+				// The retry gets a new expedition number via the normal expCounter.Add(1)
+				// at loop top — this is safe under concurrent workers (no counter reversal).
+				// The retry consumes a MaxExpeditions slot; this is intentional to bound
+				// total work and avoid unbounded retry loops.
+				// Note: pool.Release resets the worktree (hard reset + clean); the retry
+				// starts from a fresh base branch checkout, not from preserved progress.
+				p.consecutiveFailures.Store(0)
+				p.escalationFired.Store(false)
+				// Re-scan Lumina so recovery hints (e.g. parse-error Lumina) are
+				// visible to the next expedition's BuildPrompt.
+				luminas = ScanJournalsForLumina(p.config.Continent)
+				releaseWorkDir()
+				expSpan.End()
+				continue
+			}
+
+			// Context cancellation during recovery cooldown should exit cleanly,
+			// not be treated as a gommage halt + escalation.
+			if ctx.Err() != nil {
+				releaseWorkDir()
+				expSpan.End()
+				return nil
+			}
+
+			// Halt path (unchanged behavior)
+			p.stageEscalation(ctx, exp, maxConsecutiveFailures)
+			releaseWorkDir()
+			expSpan.End()
+			p.Logger.Error("%s", fmt.Sprintf(domain.Msg("gommage"), maxConsecutiveFailures))
 			return errGommage
 		}
 
@@ -290,10 +327,18 @@ func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.
 		p.totalMidHighSeverity.Add(int64(midHighCount))
 	}
 
+	// Inject rate_limit marker when the error itself signals a rate limit,
+	// regardless of whether the reserve model is active. This ensures
+	// ClassifyGommage detects rate limits from both primary and reserve models.
+	reason := runErr.Error()
+	if isRateLimitError(reason) {
+		reason = "rate_limit: " + reason
+	}
+
 	p.writeFlag(flagDir, exp, "error", "failed", "?", midHighCount)
 	errReport := &domain.ExpeditionReport{
 		Expedition: exp, IssueID: "?", IssueTitle: "?",
-		MissionType: "?", Status: "failed", Reason: runErr.Error(),
+		MissionType: "?", Status: "failed", Reason: reason,
 		FailureType: "blocker",
 		PRUrl:       "none", BugIssues: "none",
 	}
@@ -430,6 +475,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		p.consecutiveFailures.Store(0)
 		p.consecutiveSkips.Store(0)
 		p.escalationFired.Store(false)
+		p.recoveryDecider.ResetRecovery()
 		p.totalSuccess.Add(1)
 	case domain.StatusSkipped:
 		p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("issue_skipped"), report.IssueID, report.Reason))

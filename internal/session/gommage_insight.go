@@ -11,10 +11,11 @@ import (
 // WriteGommageInsight writes a gommage insight when consecutive failures trigger escalation.
 // Best-effort: silent on failure, does not propagate errors.
 // Idempotent: InsightWriter deduplicates by title.
-func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, continent string) {
+func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, continent string, class domain.GommageClass) {
 	why := "Consecutive failures indicate systematic issue requiring intervention"
 	if reasons := recentFailureReasons(continent, 5); len(reasons) > 0 {
-		why = fmt.Sprintf("Recent failure reasons: %s", strings.Join(reasons, "; "))
+		// Deduplicate for human-readable insight output (raw reasons used by classifier)
+		why = fmt.Sprintf("Recent failure reasons: %s", strings.Join(dedupStrings(reasons), "; "))
 	}
 
 	entry := domain.InsightEntry{
@@ -28,6 +29,7 @@ func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, contine
 		Extra: map[string]string{
 			"failure-type":   "gommage",
 			"gradient-level": "0",
+			"gommage-class":  string(class),
 		},
 	}
 
@@ -36,7 +38,10 @@ func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, contine
 }
 
 // recentFailureReasons reads the last `limit` journal files and extracts
-// deduplicated failure reason strings. Best-effort: returns nil on any error.
+// raw (non-deduplicated) failure reason strings from the last N journals.
+// Deduplication was removed because ClassifyGommage needs frequency counts
+// to determine the majority class (e.g. 3× "timeout" out of 5 reasons).
+// Best-effort: returns nil on any error.
 func recentFailureReasons(continent string, limit int) []string {
 	files, err := ListJournalFiles(continent)
 	if err != nil {
@@ -48,7 +53,6 @@ func recentFailureReasons(continent string, limit int) []string {
 		files = files[len(files)-limit:]
 	}
 
-	seen := make(map[string]struct{})
 	var reasons []string
 	for _, f := range files {
 		data, err := os.ReadFile(f)
@@ -61,13 +65,23 @@ func recentFailureReasons(continent string, limit int) []string {
 				if reason == "" {
 					continue
 				}
-				if _, ok := seen[reason]; ok {
-					continue
-				}
-				seen[reason] = struct{}{}
 				reasons = append(reasons, reason)
 			}
 		}
 	}
 	return reasons
+}
+
+// dedupStrings returns unique strings preserving first-seen order.
+func dedupStrings(ss []string) []string {
+	seen := make(map[string]struct{}, len(ss))
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }

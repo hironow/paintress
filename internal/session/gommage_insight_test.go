@@ -22,7 +22,7 @@ func TestWriteGommageInsight_CreatesFile(t *testing.T) {
 	w := session.NewInsightWriter(insightsDir, runDir)
 
 	// when
-	session.WriteGommageInsight(w, 5, 3, t.TempDir())
+	session.WriteGommageInsight(w, 5, 3, t.TempDir(), domain.GommageClassSystematic)
 
 	// then
 	data, err := os.ReadFile(filepath.Join(insightsDir, "gommage.md"))
@@ -55,7 +55,7 @@ func TestWriteGommageInsight_FieldMapping(t *testing.T) {
 	w := session.NewInsightWriter(insightsDir, runDir)
 
 	// when
-	session.WriteGommageInsight(w, 7, 3, t.TempDir())
+	session.WriteGommageInsight(w, 7, 3, t.TempDir(), domain.GommageClassSystematic)
 
 	// then
 	file, _ := w.Read("gommage.md")
@@ -92,8 +92,8 @@ func TestWriteGommageInsight_Idempotent(t *testing.T) {
 	w := session.NewInsightWriter(insightsDir, runDir)
 
 	// when — write same expedition twice
-	session.WriteGommageInsight(w, 5, 3, t.TempDir())
-	session.WriteGommageInsight(w, 5, 3, t.TempDir())
+	session.WriteGommageInsight(w, 5, 3, t.TempDir(), domain.GommageClassSystematic)
+	session.WriteGommageInsight(w, 5, 3, t.TempDir(), domain.GommageClassSystematic)
 
 	// then — idempotent by title
 	file, _ := w.Read("gommage.md")
@@ -113,8 +113,8 @@ func TestWriteGommageInsight_DifferentExpeditions(t *testing.T) {
 	w := session.NewInsightWriter(insightsDir, runDir)
 
 	// when — different expeditions create different entries
-	session.WriteGommageInsight(w, 5, 3, t.TempDir())
-	session.WriteGommageInsight(w, 8, 3, t.TempDir())
+	session.WriteGommageInsight(w, 5, 3, t.TempDir(), domain.GommageClassSystematic)
+	session.WriteGommageInsight(w, 8, 3, t.TempDir(), domain.GommageClassSystematic)
 
 	// then
 	file, _ := w.Read("gommage.md")
@@ -149,7 +149,7 @@ func TestWriteGommageInsight_IncludesFailureReasons(t *testing.T) {
 	w := session.NewInsightWriter(insightsDir, runDir)
 
 	// when
-	session.WriteGommageInsight(w, 10, 3, continent)
+	session.WriteGommageInsight(w, 10, 3, continent, domain.GommageClassSystematic)
 
 	// then
 	file, err := w.Read("gommage.md")
@@ -197,7 +197,7 @@ func TestWriteGommageInsight_DeduplicatesReasons(t *testing.T) {
 	w := session.NewInsightWriter(insightsDir, runDir)
 
 	// when
-	session.WriteGommageInsight(w, 10, 3, continent)
+	session.WriteGommageInsight(w, 10, 3, continent, domain.GommageClassSystematic)
 
 	// then — "compile error" should appear only once
 	file, _ := w.Read("gommage.md")

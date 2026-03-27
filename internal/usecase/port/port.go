@@ -11,6 +11,36 @@ import (
 // ErrUnsupportedOS is returned by LocalNotifier on unsupported platforms.
 var ErrUnsupportedOS = errors.New("notify: unsupported OS for local notifications")
 
+// CheckpointScanner finds incomplete expeditions from the event store.
+// Implemented in eventsource layer, injected into session.
+type CheckpointScanner interface {
+	// FindIncompleteCheckpoints returns checkpoint events that have no
+	// subsequent expedition.completed event for the same expedition number.
+	FindIncompleteCheckpoints() []domain.ExpeditionCheckpointData
+}
+
+// NopCheckpointScanner returns no incomplete checkpoints.
+type NopCheckpointScanner struct{}
+
+func (*NopCheckpointScanner) FindIncompleteCheckpoints() []domain.ExpeditionCheckpointData {
+	return nil
+}
+
+// RecoveryDecider classifies failure streaks and decides retry vs halt.
+// Implemented by domain.ExpeditionAggregate, injected into session.
+type RecoveryDecider interface {
+	DecideRecovery(reasons []string) domain.RecoveryDecision
+	ResetRecovery()
+}
+
+// NopRecoveryDecider always halts (no recovery). Used as default when no aggregate is provided.
+type NopRecoveryDecider struct{}
+
+func (*NopRecoveryDecider) DecideRecovery(_ []string) domain.RecoveryDecision {
+	return domain.RecoveryDecision{RecoveryKind: domain.RecoveryHalt, Class: domain.GommageClassSystematic}
+}
+func (*NopRecoveryDecider) ResetRecovery() {}
+
 // InitRunner handles project initialization I/O.
 type InitRunner interface {
 	InitProject(repoPath, team, project string) error
@@ -143,6 +173,8 @@ type ExpeditionEventEmitter interface {
 	EmitDMailStaged(name string, now time.Time) error
 	EmitDMailFlushed(count int, now time.Time) error
 	EmitDMailArchived(name string, now time.Time) error
+	EmitGommageRecovery(expedition int, class, action string, retryNum int, cooldown string, now time.Time) error
+	EmitCheckpoint(expedition int, phase, workDir string, commitCount int, now time.Time) error
 }
 
 // NopExpeditionEventEmitter is a no-op emitter for tests and when event
@@ -166,6 +198,12 @@ func (*NopExpeditionEventEmitter) EmitResolved(_ string, _ []string, _ time.Time
 func (*NopExpeditionEventEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
 func (*NopExpeditionEventEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }
+func (*NopExpeditionEventEmitter) EmitGommageRecovery(_ int, _, _ string, _ int, _ string, _ time.Time) error {
+	return nil
+}
+func (*NopExpeditionEventEmitter) EmitCheckpoint(_ int, _, _ string, _ int, _ time.Time) error {
+	return nil
+}
 
 // ExpeditionRunner wraps the session-layer expedition orchestrator.
 type ExpeditionRunner interface {

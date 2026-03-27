@@ -4,7 +4,7 @@
 
 - [conformance.md](conformance.md) — What/Why/How conformance table (single source)
 - [expedition-directory.md](expedition-directory.md) — `.expedition/` directory structure specification
-- [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command)
+- [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command), Gommage recovery class-aware dispatch
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
 - Claude subprocess isolation: `mcp-config generate` creates MCP allowlist, `--strict-mcp-config` enforces it
 - Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation

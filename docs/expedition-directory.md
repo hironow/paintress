@@ -86,7 +86,8 @@ Insight files in `insights/` use YAML frontmatter + Markdown body format (same p
 | File | Kind | Content |
 |------|------|---------|
 | `lumina.md` | `lumina` | Offensive insights — proven patterns from successful expeditions |
-| `gommage.md` | `gommage` | Defensive insights — failure patterns and warnings (Why field enriched with actual failure reasons from recent journals) |
+| `gommage.md` | `gommage` | Defensive insights — failure patterns and warnings (Why field enriched with actual failure reasons from recent journals; includes `gommage-class` in Extra) |
+| `lumina-recovery.md` | `recovery` | Corrective hints injected by Gommage recovery when parse_error class is detected |
 
 Each entry has 6 required axes: **what**, **why**, **how**, **when**, **who**, **constraints**. Optional tool-specific fields go under extra keys.
 
@@ -171,7 +172,8 @@ For full protocol details (wire format, schema versioning, function map), see [d
 | `context/*.md` | User | Manual placement |
 | `skills/*/SKILL.md` | `ValidateContinent` | CLI startup (created from embedded templates, updated when template changes) |
 | `insights/lumina.md` | `InsightWriter.Append` | After expedition feedback (offensive insights from successes) |
-| `insights/gommage.md` | `InsightWriter.Append` | After expedition feedback (defensive insights from failures) |
+| `insights/gommage.md` | `InsightWriter.Append` | After expedition feedback (defensive insights from failures, enriched with `gommage-class`) |
+| `insights/lumina-recovery.md` | `injectParseErrorLumina` | During Gommage recovery for `parse_error` class |
 | `events/YYYY-MM-DD.jsonl` | `ExpeditionEventEmitter` | During expedition lifecycle (append-only) |
 | `inbox/*.md` | External tool (courier/sightjack) | Before expedition |
 | `outbox/*.md` | `SendDMail` | After successful expedition |

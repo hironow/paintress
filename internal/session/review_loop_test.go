@@ -54,7 +54,7 @@ func newTestPaintress(t *testing.T, dir string, timeoutSec int, reviewCmd string
 		BaseBranch: "main",
 		Model:      "opus",
 	}
-	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil)
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
 	// Replace ClaudeAdapter with a simple shell runner for test scripts
 	if claudeCmd != "" {
 		p.claude = &shellRunner{script: claudeCmd}

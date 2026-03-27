@@ -23,5 +23,5 @@ func TestWriteGommageInsight_FailureDoesNotPanic(t *testing.T) {
 	w := session.NewInsightWriter("/nonexistent/insights", "/nonexistent/run")
 
 	// when / then — should not panic (best-effort)
-	session.WriteGommageInsight(w, 5, 3, "/nonexistent")
+	session.WriteGommageInsight(w, 5, 3, "/nonexistent", domain.GommageClassSystematic)
 }

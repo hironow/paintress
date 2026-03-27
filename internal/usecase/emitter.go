@@ -138,3 +138,19 @@ func (e *expeditionEventEmitter) EmitDMailArchived(name string, now time.Time) e
 	}
 	return e.emit(ev)
 }
+
+func (e *expeditionEventEmitter) EmitGommageRecovery(expedition int, class, action string, retryNum int, cooldown string, now time.Time) error {
+	ev, err := e.agg.RecordGommageRecovery(expedition, domain.GommageClass(class), action, retryNum, cooldown, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}
+
+func (e *expeditionEventEmitter) EmitCheckpoint(expedition int, phase, workDir string, commitCount int, now time.Time) error {
+	ev, err := e.agg.RecordCheckpoint(expedition, phase, workDir, commitCount, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
+}

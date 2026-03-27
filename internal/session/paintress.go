@@ -59,6 +59,10 @@ type Paintress struct {
 	targetProvider port.TargetProvider
 	trackingMode   domain.TrackingMode
 
+	// Gommage recovery: tracks retry attempts per failure streak
+	recoveryDecider   port.RecoveryDecider
+	checkpointScanner port.CheckpointScanner
+
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 
@@ -75,7 +79,7 @@ type Paintress struct {
 	escalationFired      atomic.Bool
 }
 
-func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver) *Paintress {
+func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, errOut io.Writer, stdinIn io.Reader, emitter port.ExpeditionEventEmitter, approver port.Approver, recoveryDecider port.RecoveryDecider) *Paintress {
 	if stdinIn == nil {
 		stdinIn = strings.NewReader("")
 	}
@@ -84,6 +88,9 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	}
 	if approver == nil {
 		approver = &port.AutoApprover{}
+	}
+	if recoveryDecider == nil {
+		recoveryDecider = &port.NopRecoveryDecider{}
 	}
 	logDir := filepath.Join(cfg.Continent, domain.StateDir, ".run", "logs")
 	os.MkdirAll(logDir, 0755)
@@ -118,18 +125,19 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	cfgCopy.MaxRetries = maxRetries
 
 	p := &Paintress{
-		Emitter:      emitter,
-		config:       cfgCopy,
-		logDir:       logDir,
-		Logger:       logger,
-		DataOut:      dataOut,
-		ErrOut:       errOut,
-		StdinIn:      stdinIn,
-		gradient:     domain.NewGradientGauge(gradientMax),
-		reserve:      domain.NewReserveParty(primary, reserves, logger),
-		notifier:     notifier,
-		approver:     approver,
-		retryTracker: domain.NewRetryTracker(),
+		Emitter:         emitter,
+		config:          cfgCopy,
+		logDir:          logDir,
+		Logger:          logger,
+		DataOut:         dataOut,
+		ErrOut:          errOut,
+		StdinIn:         stdinIn,
+		gradient:        domain.NewGradientGauge(gradientMax),
+		reserve:         domain.NewReserveParty(primary, reserves, logger),
+		notifier:        notifier,
+		approver:        approver,
+		retryTracker:    domain.NewRetryTracker(),
+		recoveryDecider: recoveryDecider,
 		claude: &ClaudeAdapter{
 			ClaudeCmd:  cfgCopy.ClaudeCmd,
 			Model:      primary,
@@ -171,6 +179,11 @@ func (p *Paintress) SetTrackingMode(mode domain.TrackingMode) {
 	p.trackingMode = mode
 }
 
+// SetCheckpointScanner injects the checkpoint scanner for resume-on-restart.
+func (p *Paintress) SetCheckpointScanner(s port.CheckpointScanner) {
+	p.checkpointScanner = s
+}
+
 func (p *Paintress) Run(ctx context.Context) int {
 	ctx, rootSpan := platform.Tracer.Start(ctx, "paintress.run",
 		trace.WithAttributes(
@@ -182,6 +195,9 @@ func (p *Paintress) Run(ctx context.Context) int {
 		),
 	)
 	defer rootSpan.End()
+
+	// Best-effort: clean orphan worktrees from previous crashed sessions
+	p.cleanOrphanWorktrees()
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
@@ -253,6 +269,19 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.Warn("%s", domain.Msg("dry_run"))
 	}
 	fmt.Fprintln(p.ErrOut)
+
+	// Checkpoint scanning: detect incomplete expeditions from previous session.
+	// Currently log-only — actual resume (feeding checkpoints back into the run loop
+	// via buildResumeContext/--continue) is not yet implemented. The checkpoint events
+	// are recorded for observability and future resume support.
+	if p.pool == nil {
+		if incompletes := p.resumeIncompleteExpeditions(); len(incompletes) > 0 {
+			for _, inc := range incompletes {
+				p.Logger.Info("found incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
+			}
+			p.Logger.Warn("%d incomplete expedition(s) detected (resume not yet implemented — starting fresh)", len(incompletes))
+		}
+	}
 
 	// === Swarm Mode: reset run-scoped counters and launch workers ===
 	p.totalAttempted.Store(0)

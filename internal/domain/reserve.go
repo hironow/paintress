@@ -47,6 +47,13 @@ func (rp *ReserveParty) ActiveModel() string {
 	return rp.active
 }
 
+// IsOnReserve returns true if the active model is not the primary.
+func (rp *ReserveParty) IsOnReserve() bool {
+	rp.mu.RLock()
+	defer rp.mu.RUnlock()
+	return rp.active != rp.primary
+}
+
 // CheckOutput scans Claude's output for rate limit signals.
 // Called from the output streaming goroutine.
 // Returns true if a rate limit was detected.
