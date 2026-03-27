@@ -213,7 +213,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		if p.consecutiveFailures.Load() >= int64(maxConsecutiveFailures) && p.escalationFired.CompareAndSwap(false, true) {
-			reasons := recentFailureReasons(p.config.Continent, 5)
+			// Read exactly the streak length (not a fixed window) so the classifier
+			// only sees the current consecutive-failure journals, not older successes.
+			reasons := recentFailureReasons(p.config.Continent, maxConsecutiveFailures)
 			decision := p.recoveryDecider.DecideRecovery(reasons)
 
 			// Best-effort: write Gommage insight for cross-tool observability
