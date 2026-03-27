@@ -12,6 +12,7 @@ type RunOption func(*RunConfig)
 type RunConfig struct {
 	AllowedTools []string
 	WorkDir      string // sets cmd.Dir for the subprocess
+	ConfigBase   string // base directory for resolving stateDir settings (defaults to WorkDir)
 	Continue     bool   // passes --continue to resume a prior session
 	Model        string // overrides the default model for this invocation
 }
@@ -43,6 +44,15 @@ func WithWorkDir(dir string) RunOption {
 func WithContinue() RunOption {
 	return func(c *RunConfig) {
 		c.Continue = true
+	}
+}
+
+// WithConfigBase sets the base directory for resolving tool stateDir settings
+// (e.g. .expedition/.claude/settings.json). When unset, WorkDir is used.
+// Use this when WorkDir is a worktree that doesn't contain the stateDir.
+func WithConfigBase(dir string) RunOption {
+	return func(c *RunConfig) {
+		c.ConfigBase = dir
 	}
 }
 

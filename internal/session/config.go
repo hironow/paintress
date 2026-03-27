@@ -69,11 +69,11 @@ func ValidateContinent(continent string, logger domain.Logger) error {
 		if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		if err := os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n.otel.env\nevents/\n"), 0644); err != nil {
+		if err := os.WriteFile(gitignore, []byte(".run/\ninbox/\noutbox/\n.otel.env\nevents/\n.mcp.json\n.claude/\n"), 0644); err != nil {
 			return err
 		}
 	} else {
-		entries := []string{".run/", "inbox/", "outbox/", ".otel.env", "events/"}
+		entries := []string{".run/", "inbox/", "outbox/", ".otel.env", "events/", ".mcp.json", ".claude/"}
 		var missing []string
 		for _, entry := range entries {
 			if !strings.Contains(string(content), entry) {

@@ -275,6 +275,9 @@ just install
 # Initialize project config (Linear team key, etc.)
 paintress init /path/to/your/repo
 
+# Generate Claude subprocess isolation settings
+paintress mcp-config generate /path/to/your/repo
+
 # Upgrade existing project (regenerate SKILL.md, etc.)
 paintress init --force /path/to/your/repo
 
@@ -307,6 +310,7 @@ Running `paintress` without a subcommand defaults to `run` (expedition loop).
 | `rebuild` | Rebuild projections from event store |
 | `archive-prune` | Prune old archived D-Mail files |
 | `version` | Print version info |
+| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
 | `update` | Self-update to the latest release |
 
 All commands accept an optional `[path]` argument (defaults to cwd). For flags, examples, and full reference per subcommand, see [docs/cli/](docs/cli/).
@@ -315,6 +319,7 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 
 ```bash
 paintress init                          # set up .expedition/
+paintress mcp-config generate           # Claude subprocess isolation settings
 paintress run                           # expedition loop
 paintress run -n                        # dry run
 paintress run -m opus,sonnet -w 3       # swarm mode
