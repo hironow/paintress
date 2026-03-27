@@ -195,6 +195,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 		out, err := p.claude.Run(fixCtx, prompt, io.Discard,
 			port.WithContinue(),
 			port.WithWorkDir(reviewDir),
+			port.WithConfigBase(p.config.Continent),
 			port.WithAllowedTools(ReviewFixAllowedTools...),
 			port.WithModel(model),
 		)
@@ -312,6 +313,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 	out, err := p.claude.Run(followCtx, prompt, io.Discard,
 		port.WithContinue(),
 		port.WithWorkDir(dir),
+		port.WithConfigBase(p.config.Continent),
 		port.WithAllowedTools(ReviewFixAllowedTools...),
 		port.WithModel(model),
 	)
