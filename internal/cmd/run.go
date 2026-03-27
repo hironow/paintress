@@ -278,7 +278,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	// Waiting loop: wait for D-Mail → re-run expeditions → repeat
 	for {
-		arrived, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
+		arrivedDMail, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
 		if waitErr != nil {
 			return tryWriteHandover(ctx, waitErr, continent, domain.HandoverState{
 				Tool:         "paintress",
@@ -288,7 +288,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 				PartialState: map[string]string{"Phase": "waiting"},
 			}, logger)
 		}
-		if !arrived {
+		if arrivedDMail == nil {
 			writeHandoverOnCancel(ctx, continent, domain.HandoverState{
 				Tool:         "paintress",
 				Operation:    "expedition",
@@ -300,7 +300,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		}
 
 		// Re-run expeditions on D-Mail arrival
-		logger.Info("paintress run: D-Mail received, re-running expedition cycle...")
+		logger.Info("paintress run: D-Mail received (kind=%s, name=%s), re-running expedition cycle...", arrivedDMail.Kind, arrivedDMail.Name)
 		p = session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil, approver, domain.NewExpeditionAggregate())
 		p.SetCheckpointScanner(session.NewCheckpointScanner(continent))
 		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)

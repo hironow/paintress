@@ -13,9 +13,9 @@ import (
 var maxWaitDuration = 24 * time.Hour
 
 // WaitForDMail blocks until a D-Mail arrives, the timeout expires, or the context is cancelled.
-// Returns (true, nil) if a D-Mail arrived, (false, nil) on timeout or cancellation.
+// Returns (*DMail, nil) if a D-Mail arrived, (nil, nil) on timeout or cancellation.
 // When timeout is 0 (no timeout), maxWaitDuration is used as a safety cap.
-func WaitForDMail(ctx context.Context, inboxCh <-chan domain.DMail, timeout time.Duration, logger domain.Logger) (arrived bool, err error) {
+func WaitForDMail(ctx context.Context, inboxCh <-chan domain.DMail, timeout time.Duration, logger domain.Logger) (*domain.DMail, error) {
 	logger.OK("Expeditions completed. Entering D-Mail waiting mode.")
 
 	effective := timeout
@@ -32,14 +32,14 @@ func WaitForDMail(ctx context.Context, inboxCh <-chan domain.DMail, timeout time
 
 	select {
 	case <-ctx.Done():
-		return false, nil
+		return nil, nil
 	case <-t.C:
 		logger.Info("No D-Mails received for %s. Exiting.", effective)
-		return false, nil
-	case _, ok := <-inboxCh:
+		return nil, nil
+	case dm, ok := <-inboxCh:
 		if !ok {
-			return false, nil
+			return nil, nil
 		}
-		return true, nil
+		return &dm, nil
 	}
 }

@@ -36,12 +36,19 @@ const (
 	EventResolved             EventType = "resolved"
 )
 
+// CurrentEventSchemaVersion is the schema version set by NewEvent.
+// Version 0 represents pre-Phase2 legacy events.
+const CurrentEventSchemaVersion uint8 = 1
+
 // Event is the envelope for all domain events in the event store.
 type Event struct {
+	SchemaVersion uint8           `json:"schema_version,omitempty"`
 	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
 	Timestamp     time.Time       `json:"timestamp"`
 	Data          json.RawMessage `json:"data"`
+	CorrelationID string          `json:"correlation_id,omitempty"`
+	CausationID   string          `json:"causation_id,omitempty"`
 	AggregateID   string          `json:"aggregate_id,omitempty"`
 	AggregateType string          `json:"aggregate_type,omitempty"`
 	SeqNr         uint64          `json:"seq_nr,omitempty"`
@@ -62,6 +69,9 @@ func ValidateEvent(e Event) error {
 	if len(e.Data) == 0 {
 		errs = append(errs, "Data must not be empty")
 	}
+	if e.SchemaVersion > CurrentEventSchemaVersion {
+		errs = append(errs, fmt.Sprintf("schema_version %d exceeds supported version %d", e.SchemaVersion, CurrentEventSchemaVersion))
+	}
 	if len(errs) > 0 {
 		return errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
@@ -75,10 +85,11 @@ func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error)
 		return Event{}, fmt.Errorf("marshal event data: %w", err)
 	}
 	return Event{
-		ID:        uuid.NewString(),
-		Type:      eventType,
-		Timestamp: timestamp,
-		Data:      raw,
+		SchemaVersion: CurrentEventSchemaVersion,
+		ID:            uuid.NewString(),
+		Type:          eventType,
+		Timestamp:     timestamp,
+		Data:          raw,
 	}, nil
 }
 
