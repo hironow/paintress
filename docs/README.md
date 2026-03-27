@@ -6,7 +6,7 @@
 - [expedition-directory.md](expedition-directory.md) — `.expedition/` directory structure specification
 - [policies.md](policies.md) — Event → Policy mapping (WHEN event THEN command), Gommage recovery class-aware dispatch
 - [otel-backends.md](otel-backends.md) — OpenTelemetry backend configuration (Jaeger, Weave)
-- Claude subprocess isolation: `mcp-config generate` creates MCP allowlist, `--strict-mcp-config` enforces it
+- Claude subprocess isolation: `mcp-config generate` creates `.mcp.json` (MCP allowlist) and `.claude/settings.json` (plugin isolation); `--setting-sources ""` + `--settings` + `--strict-mcp-config` enforces it
 - Claude log persistence: raw NDJSON saved to `.run/claude-logs/` after each invocation
 
 - [approval-contract.md](approval-contract.md) — Three-way approval contract design

@@ -54,17 +54,20 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ### Claude Subprocess Isolation
 
+Claude subprocess uses layered isolation to prevent parent session context (266+ skills, 66+ plugins) from inflating token usage:
+
+- `--setting-sources ""` skips all user/project settings (hooks, plugins, auto-memory) while preserving OAuth authentication
+- `--settings <stateDir>/.claude/settings.json` loads tool-specific settings (empty `enabledPlugins`)
+- `--disable-slash-commands` prevents user skills from inflating context
+- `--strict-mcp-config --mcp-config <stateDir>/.mcp.json` enforces MCP server allowlist
+- `mcp-config generate` creates both `.mcp.json` (wave: empty, linear: Linear MCP) and `.claude/settings.json`
+- User can edit `.mcp.json` to add custom MCP servers, `.claude/settings.json` for env vars or permissions
+
 ### Claude Log Persistence
 
 - `WriteClaudeLog` saves raw NDJSON to `.run/claude-logs/{timestamp}.jsonl` after each invocation
 - Enables post-hoc debugging and audit of Claude subprocess interactions
 - Managed by archive-prune lifecycle
-
-
-- `--disable-slash-commands` prevents user skills from inflating context
-- `mcp-config generate` creates `.run/mcp-config.json` (wave: empty, linear: Linear MCP)
-- `--strict-mcp-config --mcp-config` enforced when mcp-config.json exists
-- User can edit mcp-config.json to add custom MCP servers
 
 - **Wave mode** (default, `--linear` not set): `ProjectWaveState()` builds wave progress from D-Mail archive. `ExpeditionTargetsFromWaves()` extracts pending steps as expedition targets. Claim keys use step IDs. Prompt templates inject step title and acceptance criteria. Report D-Mails include `WaveReference{ID, Step}` for archive projection.
 - **Linear mode** (`--linear`): Existing behavior — `FetchIssuesViaMCP` via Linear MCP, issue-based claims, Linear team/project in prompts.
