@@ -246,6 +246,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				// starts from a fresh base branch checkout, not from preserved progress.
 				p.consecutiveFailures.Store(0)
 				p.escalationFired.Store(false)
+				// Re-scan Lumina so recovery hints (e.g. parse-error Lumina) are
+				// visible to the next expedition's BuildPrompt.
+				luminas = ScanJournalsForLumina(p.config.Continent)
 				releaseWorkDir()
 				expSpan.End()
 				continue

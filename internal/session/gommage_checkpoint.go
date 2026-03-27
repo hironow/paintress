@@ -119,7 +119,8 @@ func (p *Paintress) cleanOrphanWorktrees() {
 	for _, line := range strings.Split(string(out), "\n") {
 		if strings.HasPrefix(line, "worktree ") {
 			path := strings.TrimPrefix(line, "worktree ")
-			if strings.Contains(path, "paintress-wt-") {
+			// Match pooled worktrees: .expedition/.run/worktrees/worker-NNN
+			if strings.Contains(path, "worker-") {
 				rmCmd := exec.Command("git", "worktree", "remove", "--force", path) //nolint:gosec // internal path
 				rmCmd.Dir = p.config.Continent
 				if rmErr := rmCmd.Run(); rmErr != nil {
