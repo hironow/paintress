@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -54,6 +53,10 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
 	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
+	// NOTE: --setting-sources "" skips settings loading but does NOT suppress CLAUDE.md auto-discovery.
+	// --bare would suppress it but also disables OAuth. No individual flag exists to disable CLAUDE.md
+	// discovery without disabling OAuth. Acceptable tradeoff: CLAUDE.md adds context but doesn't
+	// cause context budget issues in practice.
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
 
@@ -65,10 +68,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 		a.Logger.Warn("Run 'paintress mcp-config generate' to create settings.")
 	}
 
-	if mcpPath := MCPConfigPath(effectiveDir(rc.WorkDir)); mcpPath != "" {
-		if _, statErr := os.Stat(mcpPath); statErr == nil {
-			args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
-		}
+	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
+	if mcpPath := ResolveMCPConfigPath(effectiveDir(rc.WorkDir)); mcpPath != "" {
+		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
 	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
 
