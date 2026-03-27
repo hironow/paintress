@@ -17,7 +17,7 @@ const (
 // A reason matches a class if it contains ANY of the keywords.
 var classKeywords = map[GommageClass][]string{
 	GommageClassTimeout:    {"timeout"},
-	GommageClassRateLimit:  {"rate_limit"},
+	GommageClassRateLimit:  {"rate_limit", "429", "quota", "too many requests"},
 	GommageClassParseError: {"parse_error", "markers not found"},
 	GommageClassBlocker:    {"blocker"},
 }

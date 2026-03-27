@@ -14,7 +14,8 @@ import (
 func WriteGommageInsight(w *InsightWriter, expedition, failureCount int, continent string, class domain.GommageClass) {
 	why := "Consecutive failures indicate systematic issue requiring intervention"
 	if reasons := recentFailureReasons(continent, 5); len(reasons) > 0 {
-		why = fmt.Sprintf("Recent failure reasons: %s", strings.Join(reasons, "; "))
+		// Deduplicate for human-readable insight output (raw reasons used by classifier)
+		why = fmt.Sprintf("Recent failure reasons: %s", strings.Join(dedupStrings(reasons), "; "))
 	}
 
 	entry := domain.InsightEntry{
@@ -69,4 +70,18 @@ func recentFailureReasons(continent string, limit int) []string {
 		}
 	}
 	return reasons
+}
+
+// dedupStrings returns unique strings preserving first-seen order.
+func dedupStrings(ss []string) []string {
+	seen := make(map[string]struct{}, len(ss))
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
