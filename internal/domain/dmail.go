@@ -2,12 +2,14 @@ package domain
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -43,7 +45,7 @@ func FormatDMailForPrompt(dmails []DMail) string {
 // NewReportDMail creates a report d-mail from an ExpeditionReport.
 // gaugeLevel is the current GradientGauge level and determines the Severity field.
 func NewReportDMail(report *ExpeditionReport, gaugeLevel int) DMail {
-	name := "report-" + strings.ToLower(report.IssueID)
+	name := "pt-report-" + sanitizeDMailKey(report.IssueID) + "_" + DMailUUIDFunc()
 
 	var body strings.Builder
 	fmt.Fprintf(&body, "# Expedition #%d Report: %s\n\n", report.Expedition, report.IssueTitle)
@@ -83,9 +85,9 @@ func NewReportDMail(report *ExpeditionReport, gaugeLevel int) DMail {
 		}
 		// Override name to include wave/step for uniqueness
 		if report.StepID != "" {
-			dm.Name = fmt.Sprintf("report-%s-%s", report.WaveID, report.StepID)
+			dm.Name = "pt-report-" + sanitizeDMailKey(report.WaveID+"-"+report.StepID) + "_" + DMailUUIDFunc()
 		} else {
-			dm.Name = fmt.Sprintf("report-%s", report.WaveID)
+			dm.Name = "pt-report-" + sanitizeDMailKey(report.WaveID) + "_" + DMailUUIDFunc()
 		}
 	}
 
@@ -290,4 +292,37 @@ func FilterHighSeverity(dmails []DMail) []DMail {
 		}
 	}
 	return high
+}
+
+// DMailUUIDFunc is the UUID generator for D-Mail filenames. Override in tests.
+var DMailUUIDFunc = shortDMailUUID
+
+func shortDMailUUID() string {
+	var buf [16]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+	}
+	buf[6] = (buf[6] & 0x0f) | 0x40
+	buf[8] = (buf[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x", buf[:4])
+}
+
+func sanitizeDMailKey(key string) string {
+	var b strings.Builder
+	prev := rune(0)
+	for _, r := range strings.ToLower(key) {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prev = r
+		case r == '-', r == ':', r == ' ', r == '_':
+			if prev != '-' {
+				b.WriteRune('-')
+				prev = '-'
+			}
+		default:
+			// skip non-ascii
+		}
+	}
+	return strings.Trim(b.String(), "-")
 }
