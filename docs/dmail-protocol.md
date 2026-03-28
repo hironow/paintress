@@ -8,7 +8,7 @@ A D-Mail is a Markdown file with Jekyll/Hugo-style YAML frontmatter delimiters (
 
 ```
 ---
-name: report-my-42
+name: pt-report-my-42_9e1d4f8a
 kind: report
 description: "Expedition #1 completed implement for MY-42"
 issues:
@@ -28,7 +28,7 @@ dmail-schema-version: "1"
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | Yes | Unique message identifier (e.g., `report-my-42`) |
+| `name` | string | Yes | Unique message identifier (e.g., `pt-report-my-42_9e1d4f8a`) |
 | `kind` | string | Yes | Message type: `report`, `specification`, `design-feedback`, `implementation-feedback` |
 | `description` | string | Yes | Human-readable summary |
 | `issues` | string[] | No | Related Linear issue IDs |
@@ -45,7 +45,7 @@ The optional `context` field carries insight summaries from the Insight Ledger, 
 
 ```yaml
 ---
-name: report-my-42
+name: pt-report-my-42_9e1d4f8a
 kind: report
 description: "Expedition #1 completed implement for MY-42"
 issues:
