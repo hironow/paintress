@@ -15,6 +15,11 @@ import (
 	"github.com/hironow/paintress/internal/session"
 )
 
+func init() {
+	// Fix UUID for deterministic D-Mail filenames in tests.
+	domain.DMailUUIDFunc = func() string { return "00000000" }
+}
+
 func TestParseDMail_ValidFrontmatter(t *testing.T) {
 	// given — full d-mail with all fields populated
 	input := []byte(`---
@@ -219,7 +224,7 @@ func TestDMailMarshal_RoundTrip(t *testing.T) {
 func TestDMailMarshal_EmptyBody(t *testing.T) {
 	// given — DMail with no body
 	dm := domain.DMail{
-		Name:        "report-my-10",
+		Name:        "pt-report-my-10_00000000",
 		Kind:        "report",
 		Description: "Empty body report",
 	}
@@ -316,7 +321,7 @@ func TestFormatDMailForPrompt_MultipleDMails(t *testing.T) {
 func TestFormatDMailForPrompt_BodylessDMail(t *testing.T) {
 	// given — d-mail with no body (frontmatter only)
 	dmails := []domain.DMail{
-		{Name: "report-my-99", Kind: "report", Description: "Minimal report"},
+		{Name: "pt-report-my-99_00000000", Kind: "report", Description: "Minimal report"},
 	}
 
 	// when
@@ -352,8 +357,8 @@ func TestNewReportDMail_BasicFields(t *testing.T) {
 	if dm.Kind != "report" {
 		t.Errorf("Kind = %q, want %q", dm.Kind, "report")
 	}
-	if dm.Name != "report-my-42" {
-		t.Errorf("Name = %q, want %q", dm.Name, "report-my-42")
+	if dm.Name != "pt-report-my-42_00000000" {
+		t.Errorf("Name = %q, want %q", dm.Name, "pt-report-my-42_00000000")
 	}
 	if len(dm.Issues) != 1 || dm.Issues[0] != "MY-42" {
 		t.Errorf("Issues = %v, want [MY-42]", dm.Issues)
@@ -379,8 +384,8 @@ func TestNewReportDMail_NameNormalization(t *testing.T) {
 	dm := domain.NewReportDMail(report, 0)
 
 	// then — name should be lowercase
-	if dm.Name != "report-my-100" {
-		t.Errorf("Name = %q, want %q", dm.Name, "report-my-100")
+	if dm.Name != "pt-report-my-100_00000000" {
+		t.Errorf("Name = %q, want %q", dm.Name, "pt-report-my-100_00000000")
 	}
 }
 
@@ -632,8 +637,8 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 		t.Fatalf("SendDMail error: %v", err)
 	}
 
-	outboxPath := filepath.Join(domain.OutboxDir(continent), "spec-my-42.md")
-	archivePath := filepath.Join(domain.ArchiveDir(continent), "spec-my-42.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), "pt-spec-my-42_00000000.md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), "pt-spec-my-42_00000000.md")
 
 	outboxData, err := os.ReadFile(outboxPath)
 	if err != nil {
@@ -668,7 +673,7 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
 	dm := domain.DMail{
-		Name:        "report-create-dirs",
+		Name:        "pt-report-create-dirs_00000000",
 		Kind:        "report",
 		Description: "Dirs should be auto-created",
 	}
@@ -681,9 +686,9 @@ func TestSendDMail_CreatesDirectories(t *testing.T) {
 		t.Fatalf("SendDMail error: %v", err)
 	}
 
-	// Both files must exist
-	outboxPath := filepath.Join(domain.OutboxDir(continent), "report-create-dirs.md")
-	archivePath := filepath.Join(domain.ArchiveDir(continent), "report-create-dirs.md")
+	// Both files must exist (use Name + .md as filename)
+	outboxPath := filepath.Join(domain.OutboxDir(continent), dm.Name+".md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), dm.Name+".md")
 
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("outbox file not found: %v", err)
@@ -699,7 +704,7 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 	ensureExpeditionDirs(t, continent)
 	store := testOutboxStore(t, continent)
 	dm := domain.DMail{
-		Name:        "report-order-test",
+		Name:        "pt-report-order-test_00000000",
 		Kind:        "report",
 		Description: "Verify both archive and outbox are written",
 	}
@@ -712,12 +717,12 @@ func TestSendDMail_WritesArchiveAndOutbox(t *testing.T) {
 		t.Fatalf("SendDMail error: %v", err)
 	}
 
-	// Both files must exist after Flush
-	archivePath := filepath.Join(domain.ArchiveDir(continent), "report-order-test.md")
+	// Both files must exist after Flush (use Name + .md as filename)
+	archivePath := filepath.Join(domain.ArchiveDir(continent), dm.Name+".md")
 	if _, err := os.Stat(archivePath); err != nil {
 		t.Errorf("archive file should exist: %v", err)
 	}
-	outboxPath := filepath.Join(domain.OutboxDir(continent), "report-order-test.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), dm.Name+".md")
 	if _, err := os.Stat(outboxPath); err != nil {
 		t.Errorf("outbox file should exist: %v", err)
 	}
@@ -1151,8 +1156,8 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 	}
 
 	// then
-	if parsed.Name != "report-my-77" {
-		t.Errorf("Name = %q, want %q", parsed.Name, "report-my-77")
+	if parsed.Name != "pt-report-my-77_00000000" {
+		t.Errorf("Name = %q, want %q", parsed.Name, "pt-report-my-77_00000000")
 	}
 	if parsed.Kind != "report" {
 		t.Errorf("Kind = %q, want %q", parsed.Kind, "report")
@@ -1430,7 +1435,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	}
 	reportDMail := domain.NewReportDMail(report, 0)
 
-	if reportDMail.Name != "report-my-42" {
+	if reportDMail.Name != "pt-report-my-42_00000000" {
 		t.Errorf("report Name = %q, want report-my-42", reportDMail.Name)
 	}
 	if reportDMail.Kind != "report" {
@@ -1444,7 +1449,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// Verify report exists in both outbox and archive
 	for _, dir := range []string{outboxDir, archiveDir} {
-		path := filepath.Join(dir, "report-my-42.md")
+		path := filepath.Join(dir, "pt-report-my-42_00000000.md")
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("report not found in %s: %v", dir, err)
@@ -1453,7 +1458,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("report in %s not parseable: %v", dir, err)
 		}
-		if parsed.Name != "report-my-42" {
+		if parsed.Name != "pt-report-my-42_00000000" {
 			t.Errorf("%s: parsed.Name = %q, want report-my-42", dir, parsed.Name)
 		}
 	}
@@ -1489,7 +1494,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	if len(outboxEntries) != 1 {
 		t.Errorf("outbox should have 1 file (report), got %d", len(outboxEntries))
 	}
-	if outboxEntries[0].Name() != "report-my-42.md" {
+	if outboxEntries[0].Name() != "pt-report-my-42_00000000.md" {
 		t.Errorf("outbox file = %q, want report-my-42.md", outboxEntries[0].Name())
 	}
 
@@ -1508,9 +1513,9 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// Verify each archived file is parseable and content-correct
 	wantArchived := map[string]string{
-		"feedback-d-071.md": "implementation-feedback",
-		"report-my-42.md":   "report",
-		"spec-my-42.md":     "specification",
+		"pt-feedback-d-071_00000000.md": "implementation-feedback",
+		"pt-report-my-42_00000000.md":   "report",
+		"pt-spec-my-42_00000000.md":     "specification",
 	}
 	for _, entry := range archiveEntries {
 		expectedKind, ok := wantArchived[entry.Name()]
@@ -1574,7 +1579,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 
 	// outbox and archive should each have the report
 	for _, dirFn := range []func(string) string{domain.OutboxDir, domain.ArchiveDir} {
-		path := filepath.Join(dirFn(continent), "report-my-10.md")
+		path := filepath.Join(dirFn(continent), "pt-report-my-10_00000000.md")
 		if _, err := os.Stat(path); err != nil {
 			t.Errorf("report not found at %s: %v", path, err)
 		}
@@ -1596,7 +1601,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	spec := domain.DMail{Name: "spec-my-1", Kind: "specification", Description: "First task"}
 	data, _ := spec.Marshal()
-	os.WriteFile(filepath.Join(inboxDir, "spec-my-1.md"), data, 0644)
+	os.WriteFile(filepath.Join(inboxDir, "pt-spec-my-1_00000000.md"), data, 0644)
 
 	scanned1, err := session.ScanInbox(context.Background(), continent)
 	if err != nil {
@@ -1627,7 +1632,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	fb := domain.DMail{Name: "feedback-d-001", Kind: "implementation-feedback", Description: "Review feedback", Severity: "medium"}
 	data, _ = fb.Marshal()
-	os.WriteFile(filepath.Join(inboxDir, "feedback-d-001.md"), data, 0644)
+	os.WriteFile(filepath.Join(inboxDir, "pt-feedback-d-001_00000000.md"), data, 0644)
 
 	// ── Expedition 2: feedback in inbox ──
 
@@ -1720,7 +1725,7 @@ func TestBuildFollowUpPrompt_EmptySlice(t *testing.T) {
 func TestFilterHighSeverity_NoHighSeverity(t *testing.T) {
 	// given
 	dmails := []domain.DMail{
-		{Name: "report-1", Kind: "report", Severity: ""},
+		{Name: "pt-report-1_00000000", Kind: "report", Severity: ""},
 		{Name: "spec-2", Kind: "specification", Severity: "low"},
 	}
 
@@ -1736,7 +1741,7 @@ func TestFilterHighSeverity_NoHighSeverity(t *testing.T) {
 func TestFilterHighSeverity_MixedSeverity(t *testing.T) {
 	// given
 	dmails := []domain.DMail{
-		{Name: "report-1", Kind: "report", Severity: ""},
+		{Name: "pt-report-1_00000000", Kind: "report", Severity: ""},
 		{Name: "alert-1", Kind: "alert", Severity: "high"},
 		{Name: "spec-1", Kind: "specification", Severity: "low"},
 		{Name: "alert-2", Kind: "alert", Severity: "high"},
@@ -1805,7 +1810,7 @@ func TestSendDMail_PropagatesEmitterError(t *testing.T) {
 	emitter := &failingEmitter{err: fmt.Errorf("disk full")}
 
 	dm := domain.DMail{
-		Name:        "report-es-fail",
+		Name:        "pt-report-es-fail_00000000",
 		Kind:        "report",
 		Description: "Test that emitter errors propagate",
 	}
@@ -1838,7 +1843,7 @@ func TestArchiveInboxDMail_PropagatesEmitterError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(domain.InboxDir(continent), "spec-es-fail.md"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(domain.InboxDir(continent), "pt-spec-es-fail_00000000.md"), data, 0644); err != nil {
 		t.Fatalf("write inbox: %v", err)
 	}
 
