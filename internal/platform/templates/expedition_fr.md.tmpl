@@ -56,8 +56,12 @@ Patterns extraits automatiquement des Expéditions passées. Appliquer comme con
 {{- if .DevURL}}
 - Serveur dev : {{.Bt}}{{.DevURL}}{{.Bt}} (utilisé pour les missions verify, déjà lancé)
 {{- end}}
+{{- if .WaveTarget}}
+- GitHub : utiliser pour les Pull Requests et les Issues
+{{- else}}
 - GitHub : utiliser uniquement pour les Pull Requests (ne PAS utiliser les GitHub Issues)
 - Linear : utiliser uniquement pour les Issues (récupérer, mettre à jour le statut, commenter)
+{{- end}}
 - Note : les outils MCP sont en chargement différé — utiliser {{.Bt}}ToolSearch{{.Bt}} pour découvrir les outils disponibles avant utilisation
 {{- if .ContextSection}}
 

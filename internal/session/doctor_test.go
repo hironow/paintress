@@ -39,7 +39,7 @@ func buildFakeClaude(t *testing.T) string {
 
 func TestRunDoctor_GitFound(t *testing.T) {
 	// given/when
-	checks := session.RunDoctor("claude", "", false)
+	checks := session.RunDoctor("claude", "", false, domain.ModeWave)
 	var gitCheck *domain.DoctorCheck
 	for i := range checks {
 		if checks[i].Name == "git" {
@@ -62,7 +62,7 @@ func TestRunDoctor_GitFound(t *testing.T) {
 
 func TestRunDoctor_DockerIsOptional(t *testing.T) {
 	// given/when
-	checks := session.RunDoctor("claude", "", false)
+	checks := session.RunDoctor("claude", "", false, domain.ModeWave)
 
 	// then
 	for i := range checks {
@@ -78,7 +78,7 @@ func TestRunDoctor_DockerIsOptional(t *testing.T) {
 
 func TestRunDoctor_MissingCommand(t *testing.T) {
 	// given/when
-	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", "", false)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", "", false, domain.ModeWave)
 
 	// then
 	for i := range checks {
@@ -100,7 +100,7 @@ func TestRunDoctor_CheckContinent_ValidStructure(t *testing.T) {
 	}
 
 	// when — use nonexistent cmd to skip slow external checks (continent is the SUT)
-	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false, domain.ModeWave)
 
 	// then — continent check should be OK
 	for _, c := range checks {
@@ -122,7 +122,7 @@ func TestRunDoctor_CheckContinent_MissingDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when — use nonexistent cmd to skip slow external checks
-	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false, domain.ModeWave)
 
 	// then — continent check should be NOT OK but NOT required (warning)
 	for _, c := range checks {
@@ -142,7 +142,7 @@ func TestRunDoctor_CheckContinent_MissingDir(t *testing.T) {
 func TestRunDoctor_CheckContinent_Empty_Skipped(t *testing.T) {
 	// given — no continent path provided
 	// when
-	checks := session.RunDoctor("claude", "", false)
+	checks := session.RunDoctor("claude", "", false, domain.ModeWave)
 
 	// then — no continent check should appear
 	for _, c := range checks {
@@ -159,7 +159,7 @@ func TestRunDoctor_CheckConfig_ValidConfig(t *testing.T) {
 	os.WriteFile(domain.ProjectConfigPath(dir), []byte("tracker:\n  team: TEST\n"), 0644)
 
 	// when — use nonexistent cmd to skip slow external checks
-	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false, domain.ModeWave)
 
 	// then — config check should be OK
 	for _, c := range checks {
@@ -182,7 +182,7 @@ func TestRunDoctor_CheckConfig_MissingConfig(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".expedition"), 0755)
 
 	// when — use nonexistent cmd to skip slow external checks
-	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false, domain.ModeWave)
 
 	// then — config check should NOT be OK but NOT required (warning)
 	for _, c := range checks {
@@ -526,7 +526,7 @@ func TestRunDoctor_MCPChecks_SkippedWhenClaudeUnavailable(t *testing.T) {
 	}
 
 	// when
-	checks := session.RunDoctor("nonexistent-claude-xyz-12345", dir, false)
+	checks := session.RunDoctor("nonexistent-claude-xyz-12345", dir, false, domain.ModeWave)
 
 	// then — claude-auth, linear-mcp, claude-inference, and context-budget should exist with skip message
 	var authFound, mcpFound, inferFound, budgetFound bool
@@ -665,7 +665,7 @@ func TestCheckGitRemote_IncludedInDoctorWithContinent(t *testing.T) {
 	}
 
 	// when — use nonexistent cmd to skip slow external checks (git-remote is the SUT)
-	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false)
+	checks := session.RunDoctor("nonexistent-paintress-cmd-12345", dir, false, domain.ModeWave)
 
 	// then — git-remote check should be present
 	for _, c := range checks {
@@ -688,7 +688,7 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	}
 
 	// when
-	checks := session.RunDoctor(fakeClaude, dir, false)
+	checks := session.RunDoctor(fakeClaude, dir, false, domain.ModeLinear)
 
 	// then — claude binary check should pass (fake-claude supports --version)
 	var claudeFound, authFound, mcpFound, inferFound, budgetFound bool
@@ -741,7 +741,7 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 func TestRunDoctor_MCPChecks_NotPresentWithoutContinent(t *testing.T) {
 	// given — no continent path
 	// when
-	checks := session.RunDoctor("claude", "", false)
+	checks := session.RunDoctor("claude", "", false, domain.ModeWave)
 
 	// then — MCP/inference/budget checks should not appear
 	for _, c := range checks {

@@ -7,8 +7,13 @@ All Expeditioners must read this file and carry out their mission.
 
 ## Obtaining the Mission
 
+{{- if .IsWaveMode}}
+1. The target issue is provided via the Wave specification — do not search for issues yourself
+2. If a **Gradient Gauge** is provided, use it as a hint for how much complexity to take on
+{{- else}}
 1. Use Linear to retrieve unfinished issues (all statuses except Done — including issues stalled in Testing or In Review from previous Expeditions)
 2. If a **Gradient Gauge** is provided, use it as a hint for how much complexity to take on; otherwise, pick an appropriate issue based on your own judgment
+{{- end}}
 
 ## Mission Assessment
 
@@ -37,34 +42,59 @@ Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-
 ## implement Procedure
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
+{{- if .IsWaveMode}}
+2. Create branch: `feat/<step-id>-<short-description>` (replace `:` with `-` in the step ID for valid git refs, e.g. `auth-w1:s1` → `auth-w1-s1`)
+{{- else}}
 2. Update the issue to a started/in-progress status in Linear (e.g. "In Progress")
 3. Create branch: `feat/<issue-id>-<short-description>`
+{{- end}}
 4. TDD: write tests -> implement -> make tests pass
-5. Commit frequently (include issue ID in commit messages)
+5. Commit frequently (include step/issue ID in commit messages)
 6. Run lint / format checks
 7. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+{{- if .IsWaveMode}}
+8. Create PR via GitHub (body references the wave step being implemented)
+{{- else}}
 8. Create PR via GitHub (body includes `Closes <issue-id>`)
 9. Update the issue to a review status in Linear (e.g. "In Review")
+{{- end}}
 10. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
 
 ## verify Procedure
 
+{{- if .IsWaveMode}}
+1. Confirm dev server is running (check URL accessibility)
+{{- else}}
 1. Update the issue to a testing/QA status in Linear (e.g. "Testing") if not already in one
 2. Confirm dev server is running (check URL accessibility)
+{{- end}}
 3. If browser automation tools are available (Playwright, Chrome DevTools, etc.), use them to open a browser and navigate to the target page
 4. Execute checklist items **one by one**:
    a. Interact with UI
    b. Compare expected vs actual results
    c. Take screenshot if browser automation is available
    d. Record result (Pass / Fail + details)
+{{- if .IsWaveMode}}
+5. Create QA report and include results in the expedition report (D-Mail)
+6. **If no defects**: mark the step as completed in the report
+{{- else}}
 5. Create QA report and comment on issue via Linear
 6. **If no defects**: update the issue to a completed status in Linear (e.g. "Done")
+{{- end}}
 7. **If defects found**: -> transition to fix
 
 ## fix Procedure (auto-transition from verify)
 
 For each defect:
 
+{{- if .IsWaveMode}}
+1. Record the defect in the expedition report (D-Mail) — do NOT create a GitHub issue
+2. `git checkout <base-branch> && git pull origin <base-branch>`
+3. Branch: `fix/<step-id>-<short-description>`
+4. Implement fix and write tests
+5. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+6. Create PR via GitHub (body references the defect found during verify)
+{{- else}}
 1. File a bug issue via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`
 3. Update the bug issue to a started/in-progress status in Linear (e.g. "In Progress")
@@ -73,6 +103,7 @@ For each defect:
 6. If it still fails after 3 fix attempts -> skip (record lesson in journal)
 7. Create PR via GitHub (body includes `Closes <bug-issue-id>`)
 8. Update the bug issue to a review status in Linear (e.g. "In Review")
+{{- end}}
 9. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
 
 ## consolidate Procedure
@@ -83,7 +114,11 @@ When inbox contains impl-feedback D-Mails describing PR chain convergence issues
 2. **Create branch**: `git checkout -b consolidate/<PR-numbers> <base-branch>` where `<PR-numbers>` lists original PR numbers in descending order (e.g. `consolidate/pr-35-34-33 main`). If the list is too long, truncate with the most recent PRs.
 3. **Apply changes root-first**: For each PR in the chain, starting from the root (closest to base branch):
    - Fetch the PR's changes: `gh pr diff <PR-number> | git apply` or cherry-pick the commits
+{{- if .IsWaveMode}}
+   - If conflict occurs: resolve it by consulting the wave step's DoD and implementation intent
+{{- else}}
    - If conflict occurs: resolve it by consulting the associated Linear issue's DoD and implementation intent
+{{- end}}
    - Commit after each PR's changes are applied: `git commit -m "consolidate: apply <PR-number> (<issue-id>)"`
 4. **Create new PR**: `gh pr create --base <base-branch>` — both the **title** and **body** must include the consolidated PR numbers (e.g. title: `consolidate: unify #33, #34, #35`)
 5. **Close old PRs**: For each old PR whose changes are fully contained in the new PR:
@@ -96,7 +131,11 @@ When inbox contains impl-feedback D-Mails describing PR chain convergence issues
 - **Protected branches**: Never directly modify or checkout from these branches as working branches: main, master, develop, staging, dev, stg, prod, production. Only use them as `--base` for the new PR.
 - **Do not merge**: Create the consolidated PR but do NOT merge it. Let the normal review flow handle merging.
 - **Do not close unless contained**: Only close old PRs if their changes are fully present in the new PR.
+{{- if .IsWaveMode}}
+- **Step status unchanged**: Do not modify the wave step status — the PR linkage changes with the new PR, but the step remains as-is.
+{{- else}}
 - **Linear status unchanged**: Do not change issue status — the issue linkage changes with the new PR, but the status stays as-is.
+{{- end}}
 - **Partial completion**: If you cannot complete the full chain before timeout, include progress in the reason field (applied PRs, remaining PRs) so the next expedition can continue from the pushed branch.
 
 ---

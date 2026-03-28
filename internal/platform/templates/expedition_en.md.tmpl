@@ -56,8 +56,12 @@ Patterns auto-extracted from past Expeditions. Apply these as constraints — av
 {{- if .DevURL}}
 - Dev server: {{.Bt}}{{.DevURL}}{{.Bt}} (used for verify missions, already running)
 {{- end}}
+{{- if .WaveTarget}}
+- GitHub: use for both Pull Requests and Issues
+{{- else}}
 - GitHub: use for Pull Requests only (do NOT use GitHub Issues)
 - Linear: use for Issues only (retrieve, update status, comment)
+{{- end}}
 - Note: MCP tools are lazy-loaded — use {{.Bt}}ToolSearch{{.Bt}} to discover available tools before use
 {{- if .ContextSection}}
 

@@ -40,8 +40,13 @@ func RenderExpeditionPrompt(lang string, data domain.PromptData) string {
 	return buf.String()
 }
 
+// MissionData holds mode-conditional data for mission templates.
+type MissionData struct {
+	IsWaveMode bool
+}
+
 // MissionText returns the mission rules of engagement for the given language.
-func MissionText(lang string) string {
+func MissionText(lang string, isWaveMode bool) string {
 	tmplName := "mission_en.md.tmpl"
 	switch lang {
 	case "ja":
@@ -51,7 +56,7 @@ func MissionText(lang string) string {
 	}
 
 	var buf strings.Builder
-	if err := missionTemplates.ExecuteTemplate(&buf, tmplName, nil); err != nil {
+	if err := missionTemplates.ExecuteTemplate(&buf, tmplName, MissionData{IsWaveMode: isWaveMode}); err != nil {
 		panic(fmt.Sprintf("mission template execution failed: %v", err))
 	}
 	return buf.String()

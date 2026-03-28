@@ -96,7 +96,7 @@ func OverrideLookPath(fn func(cmd string) (string, error)) func() {
 // additional checks for .expedition/ structure and config.yaml are included
 // as warnings (not required).
 // When repair is true, auto-fixable issues are repaired in-place.
-func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorCheck {
+func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
 	commands := []struct {
 		name     string
 		required bool
@@ -225,8 +225,14 @@ func RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorC
 			authCheck := checkClaudeAuth(mcpOutput, err, claudeCmd)
 			checks = append(checks, authCheck)
 
-			// Linear MCP: skip if auth failed (mcp list output unreliable)
-			if authCheck.Status != domain.CheckOK {
+			// Linear MCP: skip in wave mode (no Linear dependency)
+			if mode.IsWave() {
+				checks = append(checks, domain.DoctorCheck{
+					Name:    "linear-mcp",
+					Status:  domain.CheckSkip,
+					Message: "skipped (wave mode)",
+				})
+			} else if authCheck.Status != domain.CheckOK {
 				checks = append(checks, domain.DoctorCheck{
 					Name:    "linear-mcp",
 					Status:  domain.CheckSkip,
