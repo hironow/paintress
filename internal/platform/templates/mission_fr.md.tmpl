@@ -43,7 +43,7 @@ Unifier une chaîne de PRs empilées en une seule PR. Choisir cette option lorsq
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
 {{- if .IsWaveMode}}
-2. Créer la branche : `feat/<step-id>-<description-courte>` (l'ID de step est fourni par le wave target, ex. `auth-w1-s1`)
+2. Créer la branche : `feat/<step-id>-<description-courte>` (remplacer `:` par `-` dans l'ID de step, ex. `auth-w1:s1` → `auth-w1-s1`)
 {{- else}}
 2. Mettre à jour l'issue vers un statut de travail en cours dans Linear (ex. « In Progress »)
 3. Créer la branche : `feat/<issue-id>-<description-courte>`
@@ -75,8 +75,8 @@ Unifier une chaîne de PRs empilées en une seule PR. Choisir cette option lorsq
    c. Capture d'écran si l'automatisation du navigateur est disponible
    d. Enregistrer le résultat (Pass / Fail + détails)
 {{- if .IsWaveMode}}
-5. Créer un rapport QA et commenter l'issue via `gh issue comment`
-6. **Aucun défaut** : fermer l'issue via `gh issue close` si approprié
+5. Créer un rapport QA et inclure les résultats dans le rapport d'expédition (D-Mail)
+6. **Aucun défaut** : marquer le step comme complété dans le rapport
 {{- else}}
 5. Créer un rapport QA et commenter l'issue via Linear
 6. **Aucun défaut** : mettre à jour l'issue vers un statut complété dans Linear (ex. « Done »)

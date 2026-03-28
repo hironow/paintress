@@ -43,7 +43,7 @@ Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
 {{- if .IsWaveMode}}
-2. Create branch: `feat/<step-id>-<short-description>` (step ID is provided in the wave target, e.g. `auth-w1-s1`)
+2. Create branch: `feat/<step-id>-<short-description>` (replace `:` with `-` in the step ID for valid git refs, e.g. `auth-w1:s1` → `auth-w1-s1`)
 {{- else}}
 2. Update the issue to a started/in-progress status in Linear (e.g. "In Progress")
 3. Create branch: `feat/<issue-id>-<short-description>`
@@ -75,8 +75,8 @@ Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-
    c. Take screenshot if browser automation is available
    d. Record result (Pass / Fail + details)
 {{- if .IsWaveMode}}
-5. Create QA report and comment on issue via `gh issue comment`
-6. **If no defects**: close the issue via `gh issue close` if appropriate
+5. Create QA report and include results in the expedition report (D-Mail)
+6. **If no defects**: mark the step as completed in the report
 {{- else}}
 5. Create QA report and comment on issue via Linear
 6. **If no defects**: update the issue to a completed status in Linear (e.g. "Done")
