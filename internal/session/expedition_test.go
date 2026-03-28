@@ -1891,6 +1891,59 @@ func TestExpeditionPrompt_ContainsConsolidateMissionType(t *testing.T) {
 	}
 }
 
+func TestMissionText_WaveMode_NoLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			// when
+			text := platform.MissionText(lang, true)
+
+			// then
+			if strings.Contains(text, "Linear") {
+				t.Errorf("lang=%s: wave mode mission should not reference Linear", lang)
+			}
+			if !strings.Contains(text, "gh") && !strings.Contains(text, "Wave") {
+				t.Errorf("lang=%s: wave mode mission should reference gh CLI or Wave", lang)
+			}
+		})
+	}
+}
+
+func TestMissionText_LinearMode_HasLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			// when
+			text := platform.MissionText(lang, false)
+
+			// then
+			if !strings.Contains(text, "Linear") {
+				t.Errorf("lang=%s: linear mode mission should reference Linear", lang)
+			}
+		})
+	}
+}
+
+func TestExpeditionPrompt_WaveMode_NoLinearReference(t *testing.T) {
+	for _, lang := range []string{"en", "ja", "fr"} {
+		t.Run(lang, func(t *testing.T) {
+			data := domain.PromptData{
+				Number:         1,
+				Timestamp:      "2026-03-11",
+				Bt:             "`",
+				Cb:             "```",
+				BaseBranch:     "main",
+				ReserveSection: "Model: opus",
+				MissionSection: platform.MissionText(lang, true),
+				WaveTarget:     &domain.ExpeditionTarget{Title: "Test Step"},
+			}
+
+			result := platform.RenderExpeditionPrompt(lang, data)
+			if strings.Contains(result, "Linear MCP") {
+				t.Errorf("lang=%s: wave mode expedition should not reference Linear MCP", lang)
+			}
+		})
+	}
+}
+
 func TestExpedition_Run_ShortTimeout(t *testing.T) {
 	exp := newTestExpedition(t, "output", 0)
 	exp.Config.TimeoutSec = 1 // very short timeout
