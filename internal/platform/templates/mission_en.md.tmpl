@@ -43,17 +43,17 @@ Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
 {{- if .IsWaveMode}}
-2. Create branch: `feat/<issue-number>-<short-description>`
+2. Create branch: `feat/<step-id>-<short-description>` (step ID is provided in the wave target, e.g. `auth-w1-s1`)
 {{- else}}
 2. Update the issue to a started/in-progress status in Linear (e.g. "In Progress")
 3. Create branch: `feat/<issue-id>-<short-description>`
 {{- end}}
 4. TDD: write tests -> implement -> make tests pass
-5. Commit frequently (include issue ID in commit messages)
+5. Commit frequently (include step/issue ID in commit messages)
 6. Run lint / format checks
 7. If it still fails after 3 fix attempts -> skip (record lesson in journal)
 {{- if .IsWaveMode}}
-8. Create PR via GitHub (body includes `Closes #<issue-number>`)
+8. Create PR via GitHub (body references the wave step being implemented)
 {{- else}}
 8. Create PR via GitHub (body includes `Closes <issue-id>`)
 9. Update the issue to a review status in Linear (e.g. "In Review")
@@ -88,12 +88,12 @@ Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-
 For each defect:
 
 {{- if .IsWaveMode}}
-1. Create a bug issue via `gh issue create`
+1. Record the defect in the expedition report (D-Mail) — do NOT create a GitHub issue
 2. `git checkout <base-branch> && git pull origin <base-branch>`
-3. Branch: `fix/<bug-issue-number>-<short-description>`
+3. Branch: `fix/<step-id>-<short-description>`
 4. Implement fix and write tests
 5. If it still fails after 3 fix attempts -> skip (record lesson in journal)
-6. Create PR via GitHub (body includes `Closes #<bug-issue-number>`)
+6. Create PR via GitHub (body references the defect found during verify)
 {{- else}}
 1. File a bug issue via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`

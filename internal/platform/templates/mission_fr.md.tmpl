@@ -43,7 +43,7 @@ Unifier une chaîne de PRs empilées en une seule PR. Choisir cette option lorsq
 
 1. `git checkout <base-branch> && git pull origin <base-branch>`
 {{- if .IsWaveMode}}
-2. Créer la branche : `feat/<numéro-issue>-<description-courte>`
+2. Créer la branche : `feat/<step-id>-<description-courte>` (l'ID de step est fourni par le wave target, ex. `auth-w1-s1`)
 {{- else}}
 2. Mettre à jour l'issue vers un statut de travail en cours dans Linear (ex. « In Progress »)
 3. Créer la branche : `feat/<issue-id>-<description-courte>`
@@ -53,7 +53,7 @@ Unifier une chaîne de PRs empilées en une seule PR. Choisir cette option lorsq
 6. Vérification lint / format
 7. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
 {{- if .IsWaveMode}}
-8. Créer la PR via GitHub (corps incluant `Closes #<numéro-issue>`)
+8. Créer la PR via GitHub (corps référençant le step wave implémenté)
 {{- else}}
 8. Créer la PR via GitHub (corps incluant `Closes <issue-id>`)
 9. Mettre à jour l'issue vers un statut de revue dans Linear (ex. « In Review »)
@@ -88,12 +88,12 @@ Unifier une chaîne de PRs empilées en une seule PR. Choisir cette option lorsq
 Pour chaque défaut :
 
 {{- if .IsWaveMode}}
-1. Créer une issue bug via `gh issue create`
+1. Enregistrer le défaut dans le rapport d'expédition (D-Mail) — ne PAS créer d'issue GitHub
 2. `git checkout <base-branch> && git pull origin <base-branch>`
-3. Branche : `fix/<numéro-bug-issue>-<description-courte>`
+3. Branche : `fix/<step-id>-<description-courte>`
 4. Implémenter la correction et écrire les tests
 5. Si l'échec persiste après 3 tentatives de correction -> ignorer (consigner la leçon dans le journal)
-6. Créer la PR via GitHub (corps incluant `Closes #<numéro-bug-issue>`)
+6. Créer la PR via GitHub (corps référençant le défaut trouvé pendant verify)
 {{- else}}
 1. Créer une issue bug via Linear
 2. `git checkout <base-branch> && git pull origin <base-branch>`
