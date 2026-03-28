@@ -9,6 +9,6 @@ func NewDoctorOps() *doctorOps {
 	return &doctorOps{}
 }
 
-func (*doctorOps) RunDoctor(claudeCmd string, continent string, repair bool) []domain.DoctorCheck {
-	return RunDoctor(claudeCmd, continent, repair)
+func (*doctorOps) RunDoctor(claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
+	return RunDoctor(claudeCmd, continent, repair, mode)
 }

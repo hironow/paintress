@@ -137,7 +137,7 @@ func (e *Expedition) BuildPrompt() string {
 		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.TrackerTeam(),
 		LinearProject:   projCfg.TrackerProject(),
-		MissionSection:  platform.MissionText(domain.Lang),
+		MissionSection:  platform.MissionText(domain.Lang, e.Target != nil),
 		WaveTarget:      e.Target,
 	}
 

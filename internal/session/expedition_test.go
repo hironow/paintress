@@ -1785,7 +1785,7 @@ func TestReadContextFiles_EmptyFileStillCreatesHeader(t *testing.T) {
 // --- MissionText tests (merged from mission_test.go) ---
 
 func TestMissionText_English(t *testing.T) {
-	text := platform.MissionText("en")
+	text := platform.MissionText("en", false)
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("English mission should contain 'Rules of Engagement'")
 	}
@@ -1804,7 +1804,7 @@ func TestMissionText_English(t *testing.T) {
 }
 
 func TestMissionText_Japanese(t *testing.T) {
-	text := platform.MissionText("ja")
+	text := platform.MissionText("ja", false)
 	if !containsStr(text, "行動規範") {
 		t.Error("Japanese mission should contain '行動規範'")
 	}
@@ -1817,7 +1817,7 @@ func TestMissionText_Japanese(t *testing.T) {
 }
 
 func TestMissionText_French(t *testing.T) {
-	text := platform.MissionText("fr")
+	text := platform.MissionText("fr", false)
 	if !containsStr(text, "engagement") {
 		t.Error("French mission should contain 'engagement'")
 	}
@@ -1827,14 +1827,14 @@ func TestMissionText_French(t *testing.T) {
 }
 
 func TestMissionText_FallbackToEnglish(t *testing.T) {
-	text := platform.MissionText("de")
+	text := platform.MissionText("de", false)
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("unsupported lang should fall back to English")
 	}
 }
 
 func TestMissionText_English_ContainsConsolidate(t *testing.T) {
-	text := platform.MissionText("en")
+	text := platform.MissionText("en", false)
 	if !containsStr(text, "consolidate") {
 		t.Error("English mission should contain 'consolidate'")
 	}
@@ -1847,7 +1847,7 @@ func TestMissionText_English_ContainsConsolidate(t *testing.T) {
 }
 
 func TestMissionText_Japanese_ContainsConsolidate(t *testing.T) {
-	text := platform.MissionText("ja")
+	text := platform.MissionText("ja", false)
 	if !containsStr(text, "consolidate") {
 		t.Error("Japanese mission should contain 'consolidate'")
 	}
@@ -1857,7 +1857,7 @@ func TestMissionText_Japanese_ContainsConsolidate(t *testing.T) {
 }
 
 func TestMissionText_French_ContainsConsolidate(t *testing.T) {
-	text := platform.MissionText("fr")
+	text := platform.MissionText("fr", false)
 	if !containsStr(text, "consolidate") {
 		t.Error("French mission should contain 'consolidate'")
 	}
@@ -1880,7 +1880,7 @@ func TestExpeditionPrompt_ContainsConsolidateMissionType(t *testing.T) {
 				Cb:             "```",
 				BaseBranch:     "main",
 				ReserveSection: "Model: opus",
-				MissionSection: platform.MissionText(lang),
+				MissionSection: platform.MissionText(lang, false),
 			}
 
 			result := platform.RenderExpeditionPrompt(lang, data)

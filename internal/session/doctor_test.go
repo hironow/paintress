@@ -688,7 +688,7 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 	}
 
 	// when
-	checks := session.RunDoctor(fakeClaude, dir, false)
+	checks := session.RunDoctor(fakeClaude, dir, false, domain.ModeWave)
 
 	// then — claude binary check should pass (fake-claude supports --version)
 	var claudeFound, authFound, mcpFound, inferFound, budgetFound bool
