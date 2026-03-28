@@ -637,8 +637,8 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 		t.Fatalf("SendDMail error: %v", err)
 	}
 
-	outboxPath := filepath.Join(domain.OutboxDir(continent), "pt-spec-my-42_00000000.md")
-	archivePath := filepath.Join(domain.ArchiveDir(continent), "pt-spec-my-42_00000000.md")
+	outboxPath := filepath.Join(domain.OutboxDir(continent), dm.Name+".md")
+	archivePath := filepath.Join(domain.ArchiveDir(continent), dm.Name+".md")
 
 	outboxData, err := os.ReadFile(outboxPath)
 	if err != nil {
@@ -659,8 +659,8 @@ func TestSendDMail_WritesToOutboxAndArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail on outbox file: %v", err)
 	}
-	if parsed.Name != "spec-my-42" {
-		t.Errorf("parsed Name = %q, want %q", parsed.Name, "spec-my-42")
+	if parsed.Name != dm.Name {
+		t.Errorf("parsed Name = %q, want %q", parsed.Name, dm.Name)
 	}
 	if parsed.Body != "# Hello\n" {
 		t.Errorf("parsed Body = %q, want %q", parsed.Body, "# Hello\n")
@@ -1513,9 +1513,9 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// Verify each archived file is parseable and content-correct
 	wantArchived := map[string]string{
-		"pt-feedback-d-071_00000000.md": "implementation-feedback",
-		"pt-report-my-42_00000000.md":   "report",
-		"pt-spec-my-42_00000000.md":     "specification",
+		"feedback-d-071.md":           "implementation-feedback",
+		"pt-report-my-42_00000000.md": "report",
+		"spec-my-42.md":              "specification",
 	}
 	for _, entry := range archiveEntries {
 		expectedKind, ok := wantArchived[entry.Name()]
@@ -1601,7 +1601,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	spec := domain.DMail{Name: "spec-my-1", Kind: "specification", Description: "First task"}
 	data, _ := spec.Marshal()
-	os.WriteFile(filepath.Join(inboxDir, "pt-spec-my-1_00000000.md"), data, 0644)
+	os.WriteFile(filepath.Join(inboxDir, spec.Name+".md"), data, 0644)
 
 	scanned1, err := session.ScanInbox(context.Background(), continent)
 	if err != nil {
@@ -1632,7 +1632,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 
 	fb := domain.DMail{Name: "feedback-d-001", Kind: "implementation-feedback", Description: "Review feedback", Severity: "medium"}
 	data, _ = fb.Marshal()
-	os.WriteFile(filepath.Join(inboxDir, "pt-feedback-d-001_00000000.md"), data, 0644)
+	os.WriteFile(filepath.Join(inboxDir, fb.Name+".md"), data, 0644)
 
 	// ── Expedition 2: feedback in inbox ──
 
@@ -1843,7 +1843,7 @@ func TestArchiveInboxDMail_PropagatesEmitterError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(domain.InboxDir(continent), "pt-spec-es-fail_00000000.md"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(domain.InboxDir(continent), dm.Name+".md"), data, 0644); err != nil {
 		t.Fatalf("write inbox: %v", err)
 	}
 
