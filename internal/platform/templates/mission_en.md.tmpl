@@ -115,7 +115,7 @@ When inbox contains impl-feedback D-Mails describing PR chain convergence issues
 3. **Apply changes root-first**: For each PR in the chain, starting from the root (closest to base branch):
    - Fetch the PR's changes: `gh pr diff <PR-number> | git apply` or cherry-pick the commits
 {{- if .IsWaveMode}}
-   - If conflict occurs: resolve it by consulting the associated GitHub issue's DoD and implementation intent
+   - If conflict occurs: resolve it by consulting the wave step's DoD and implementation intent
 {{- else}}
    - If conflict occurs: resolve it by consulting the associated Linear issue's DoD and implementation intent
 {{- end}}
@@ -132,7 +132,7 @@ When inbox contains impl-feedback D-Mails describing PR chain convergence issues
 - **Do not merge**: Create the consolidated PR but do NOT merge it. Let the normal review flow handle merging.
 - **Do not close unless contained**: Only close old PRs if their changes are fully present in the new PR.
 {{- if .IsWaveMode}}
-- **Issue status unchanged**: Do not close the GitHub issue — the issue linkage changes with the new PR, but the status stays as-is.
+- **Step status unchanged**: Do not modify the wave step status — the PR linkage changes with the new PR, but the step remains as-is.
 {{- else}}
 - **Linear status unchanged**: Do not change issue status — the issue linkage changes with the new PR, but the status stays as-is.
 {{- end}}

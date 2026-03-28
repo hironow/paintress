@@ -115,7 +115,7 @@ Lorsque la boîte de réception contient des D-Mails impl-feedback décrivant de
 3. **Appliquer les changements depuis la racine** : Pour chaque PR dans la chaîne, en commençant par la racine (la plus proche de la branche de base) :
    - Récupérer les changements de la PR : `gh pr diff <numéro-PR> | git apply` ou cherry-pick des commits
 {{- if .IsWaveMode}}
-   - En cas de conflit : résoudre en consultant le DoD et l'intention d'implémentation de l'issue GitHub associée
+   - En cas de conflit : résoudre en consultant le DoD et l'intention d'implémentation du step wave
 {{- else}}
    - En cas de conflit : résoudre en consultant le DoD et l'intention d'implémentation de l'issue Linear associée
 {{- end}}
@@ -132,7 +132,7 @@ Lorsque la boîte de réception contient des D-Mails impl-feedback décrivant de
 - **Ne pas fusionner** : Créer la PR consolidée mais ne PAS la fusionner. Laisser le flux de revue normal gérer la fusion.
 - **Ne fermer que si contenu** : Ne fermer les anciennes PRs que si leurs changements sont entièrement présents dans la nouvelle PR.
 {{- if .IsWaveMode}}
-- **Statut issue inchangé** : Ne pas fermer l'issue GitHub — le lien PR change avec la nouvelle PR, mais le statut reste tel quel.
+- **Statut step inchangé** : Ne pas modifier le statut du step wave — le lien PR change avec la nouvelle PR, mais le step reste tel quel.
 {{- else}}
 - **Statut Linear inchangé** : Ne pas changer le statut de l'issue — le lien PR change avec la nouvelle PR, mais le statut reste tel quel.
 {{- end}}
