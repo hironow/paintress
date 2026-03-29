@@ -488,9 +488,16 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := p.emitExpeditionCompleted(expCtx, exp, "skipped", report.IssueID, "", model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
+		// Wave mode: transfer wave/step context to report for D-Mail projection
+		if expedition.Target != nil {
+			report.WaveID = expedition.Target.WaveID
+			report.StepID = expedition.Target.StepID
+		}
 		// Send report D-Mail so ProjectWaveState marks the step as completed.
 		// Without this, skipped steps remain pending and cause infinite loops.
+		// Skipped = already done, so override severity to empty (= StepCompleted).
 		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
+			dm.Severity = "" // force StepCompleted in ProjectWaveState
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send (skipped): %v", err)
