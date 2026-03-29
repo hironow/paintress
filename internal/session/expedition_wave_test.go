@@ -81,8 +81,8 @@ func TestNewReportDMail_WaveReference(t *testing.T) {
 	if dm.Wave.Step != "s1" {
 		t.Errorf("wave.step = %q, want s1", dm.Wave.Step)
 	}
-	if dm.Name != "report-auth-w1-s1" {
-		t.Errorf("name = %q, want report-auth-w1-s1", dm.Name)
+	if dm.Name != "pt-report-auth-w1-s1_00000000" {
+		t.Errorf("name = %q, want pt-report-auth-w1-s1_00000000", dm.Name)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestNewReportDMail_NoWaveReference_LinearMode(t *testing.T) {
 	if dm.Wave != nil {
 		t.Error("expected no wave reference in linear mode report")
 	}
-	if !strings.HasPrefix(dm.Name, "report-my-42") {
-		t.Errorf("name = %q, want report-my-42 prefix", dm.Name)
+	if !strings.HasPrefix(dm.Name, "pt-report-my-42") {
+		t.Errorf("name = %q, want pt-report-my-42 prefix", dm.Name)
 	}
 }
