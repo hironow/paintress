@@ -190,6 +190,34 @@ func TestProjectWaveState_DMailsWithoutWaveIgnored(t *testing.T) {
 	}
 }
 
+func TestProjectWaveState_SkippedReportCompletesStep(t *testing.T) {
+	// given: spec + skipped report (Claude determined issue was already done)
+	dmails := []DMail{
+		{
+			Kind: "specification",
+			Wave: &WaveReference{ID: "auth-w1", Steps: []WaveStepDef{{ID: "s1", Title: "Step 1"}, {ID: "s2", Title: "Step 2"}}},
+		},
+		{
+			Kind:     "report",
+			Wave:     &WaveReference{ID: "auth-w1", Step: "s1"},
+			Metadata: map[string]string{"status": "skipped"},
+			// severity empty → currently treated as success (completed)
+		},
+	}
+
+	// when
+	result := ProjectWaveState(dmails)
+
+	// then: s1 should be completed (skipped = already done)
+	w := result[0]
+	if w.Steps[0].Status != StepCompleted {
+		t.Errorf("s1 status = %q, want completed (skipped should mark as completed)", w.Steps[0].Status)
+	}
+	if w.Steps[1].Status != StepPending {
+		t.Errorf("s2 status = %q, want pending", w.Steps[1].Status)
+	}
+}
+
 func TestProjectWaveState_ReportWithoutSpec_Ignored(t *testing.T) {
 	// given: report for unknown wave
 	dmails := []DMail{
