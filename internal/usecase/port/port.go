@@ -127,8 +127,14 @@ type ArchiveReader interface {
 	ReadArchiveDMails(ctx context.Context) ([]domain.DMail, error)
 }
 
+// InboxReader reads D-Mails from the inbox directory.
+// Implemented in session layer (filesystem I/O), injected by cmd.
+type InboxReader interface {
+	ReadInboxDMails(ctx context.Context) ([]domain.DMail, error)
+}
+
 // TargetProvider supplies expedition targets based on tracking mode.
-// Wave mode: reads archive, projects wave state, returns pending steps.
+// Wave mode: reads archive + inbox, projects wave state, returns pending steps.
 // Linear mode: fetches issues from Linear MCP.
 type TargetProvider interface {
 	FetchTargets(ctx context.Context) ([]domain.ExpeditionTarget, error)
