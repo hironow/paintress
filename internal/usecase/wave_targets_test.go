@@ -1,5 +1,7 @@
 package usecase
 
+// white-box-reason: tests waveTargetProvider using unexported struct and verifies inbox+archive merge logic
+
 import (
 	"context"
 	"testing"
