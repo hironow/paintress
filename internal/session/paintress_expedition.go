@@ -488,6 +488,14 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := p.emitExpeditionCompleted(expCtx, exp, "skipped", report.IssueID, "", model); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
+		// Send report D-Mail so ProjectWaveState marks the step as completed.
+		// Without this, skipped steps remain pending and cause infinite loops.
+		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
+			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
+			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
+				p.Logger.Warn("dmail send (skipped): %v", err)
+			}
+		}
 		// Re-review past PRs when skipped and review_cmd is configured.
 		if p.config.ReviewCmd != "" {
 			p.runSkipReview(ctx, workDir, expStart)
