@@ -22,12 +22,22 @@ var expeditionCooldown = 10 * time.Second
 // worktreeReleaseTimeout is the per-call timeout for worktree release operations.
 var worktreeReleaseTimeout = 10 * time.Second
 
+// expeditionWaveRef extracts waveID and stepID from an expedition's target.
+// Returns empty strings if no target is set (non-wave mode or pre-target).
+func expeditionWaveRef(e *Expedition) (waveID, stepID string) {
+	if e != nil && e.Target != nil {
+		return e.Target.WaveID, e.Target.StepID
+	}
+	return "", ""
+}
+
 // emitExpeditionCompleted emits an expedition.completed event via the emitter.
 // OTel metric is recorded directly with model attribution.
+// waveID and stepID are set from the expedition target when available.
 // Returns an error if event persistence fails — expedition completion is critical.
-func (p *Paintress) emitExpeditionCompleted(ctx context.Context, exp int, status, issueID, bugsFound, model string) error {
+func (p *Paintress) emitExpeditionCompleted(ctx context.Context, exp int, status, issueID, bugsFound, model, waveID, stepID string) error {
 	platform.RecordExpedition(ctx, status, model)
-	return p.Emitter.EmitCompleteExpedition(exp, status, issueID, bugsFound, time.Now())
+	return p.Emitter.EmitCompleteExpedition(exp, status, issueID, bugsFound, waveID, stepID, time.Now())
 }
 
 func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, luminas []domain.Lumina) error {
@@ -86,6 +96,16 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			domain.LogBanner(p.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
 			if err := p.Emitter.EmitInboxReceived(dm.Name, dm.Severity, time.Now()); err != nil {
 				p.Logger.Warn("inbox received event: %v", err)
+			}
+		}
+
+		// Register specification D-Mails in event store before triage/archiving.
+		// This persists wave/step definitions so the Read Model survives D-Mail archival.
+		for _, dm := range inboxDMails {
+			if dm.Kind == "specification" && dm.Wave != nil && dm.Wave.ID != "" {
+				if err := p.Emitter.EmitSpecRegistered(dm.Wave.ID, dm.Wave.Steps, dm.Name, time.Now()); err != nil {
+					p.Logger.Warn("spec registration event: %v", err)
+				}
 			}
 		}
 
@@ -346,7 +366,7 @@ func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.
 		errReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 	}
 	WriteJournal(p.config.Continent, errReport)
-	if err := p.emitExpeditionCompleted(expCtx, exp, "failed", "", "", model); err != nil {
+	if err := p.emitExpeditionCompleted(expCtx, exp, "failed", "", "", model, "", ""); err != nil {
 		p.Logger.Error("expedition completion event lost: %v", err)
 	}
 	if midHighCount > 0 {
@@ -409,7 +429,8 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			parseErrReport.HighSeverityDMails = strings.Join(midHighNames, ", ")
 		}
 		WriteJournal(p.config.Continent, parseErrReport)
-		if err := p.emitExpeditionCompleted(expCtx, exp, "parse_error", "", "", model); err != nil {
+		waveIDPE, stepIDPE := expeditionWaveRef(expedition)
+		if err := p.emitExpeditionCompleted(expCtx, exp, "parse_error", "", "", model, waveIDPE, stepIDPE); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		p.consecutiveFailures.Add(1)
@@ -463,7 +484,8 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := WritePRIndex(p.config.Continent, report); err != nil {
 			p.Logger.Warn("pr index: %v", err)
 		}
-		if err := p.emitExpeditionCompleted(expCtx, exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound), model); err != nil {
+		waveID, stepID := expeditionWaveRef(expedition)
+		if err := p.emitExpeditionCompleted(expCtx, exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound), model, waveID, stepID); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
@@ -485,7 +507,8 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "skipped", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		if err := p.emitExpeditionCompleted(expCtx, exp, "skipped", report.IssueID, "", model); err != nil {
+		waveID, stepID := expeditionWaveRef(expedition)
+		if err := p.emitExpeditionCompleted(expCtx, exp, "skipped", report.IssueID, "", model, waveID, stepID); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		// Wave mode: transfer wave/step context to report for D-Mail projection
@@ -517,7 +540,8 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "failed", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
-		if err := p.emitExpeditionCompleted(expCtx, exp, "failed", report.IssueID, "", model); err != nil {
+		waveID3, stepID3 := expeditionWaveRef(expedition)
+		if err := p.emitExpeditionCompleted(expCtx, exp, "failed", report.IssueID, "", model, waveID3, stepID3); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		p.consecutiveFailures.Add(1)

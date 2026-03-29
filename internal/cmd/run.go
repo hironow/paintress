@@ -234,8 +234,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	// Build target provider for wave mode
 	var targetProvider port.TargetProvider
 	if mode.IsWave() {
-		archiveDir := domain.ArchiveDir(continent)
-		targetProvider = usecase.NewWaveTargetProvider(session.NewArchiveReader(archiveDir), session.NewInboxReader(continent))
+		stepProgressReader := session.NewStepProgressReader(eventStore)
+		targetProvider = usecase.NewWaveTargetProvider(stepProgressReader, session.NewInboxReader(continent))
 	}
 
 	logger.Info("paintress run: starting initial expedition cycle (mode=%s)...", mode)

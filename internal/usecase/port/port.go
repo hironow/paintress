@@ -133,6 +133,12 @@ type InboxReader interface {
 	ReadInboxDMails(ctx context.Context) ([]domain.DMail, error)
 }
 
+// StepProgressReader reads the WaveStepProgress Read Model from the event store.
+// Replays spec.registered and expedition.completed events to build step completion state.
+type StepProgressReader interface {
+	ReadStepProgress(ctx context.Context) (*domain.WaveStepProgress, error)
+}
+
 // TargetProvider supplies expedition targets based on tracking mode.
 // Wave mode: reads archive + inbox, projects wave state, returns pending steps.
 // Linear mode: fetches issues from Linear MCP.
@@ -169,7 +175,8 @@ type InboxArchiver interface {
 // Dispatch is best-effort: errors are logged but not returned.
 type ExpeditionEventEmitter interface {
 	EmitStartExpedition(expedition, worker int, model string, now time.Time) error
-	EmitCompleteExpedition(expedition int, status, issueID, bugsFound string, now time.Time) error
+	EmitCompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) error
+	EmitSpecRegistered(waveID string, steps []domain.WaveStepDef, source string, now time.Time) error
 	EmitInboxReceived(name, severity string, now time.Time) error
 	EmitGommage(expedition int, now time.Time) error
 	EmitGradientChange(level int, operator string, now time.Time) error
@@ -190,7 +197,10 @@ type NopExpeditionEventEmitter struct{}
 func (*NopExpeditionEventEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error {
 	return nil
 }
-func (*NopExpeditionEventEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+func (*NopExpeditionEventEmitter) EmitCompleteExpedition(_ int, _, _, _, _, _ string, _ time.Time) error {
+	return nil
+}
+func (*NopExpeditionEventEmitter) EmitSpecRegistered(_ string, _ []domain.WaveStepDef, _ string, _ time.Time) error {
 	return nil
 }
 func (*NopExpeditionEventEmitter) EmitInboxReceived(_, _ string, _ time.Time) error { return nil }

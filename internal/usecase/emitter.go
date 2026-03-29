@@ -59,12 +59,20 @@ func (e *expeditionEventEmitter) EmitStartExpedition(expedition, worker int, mod
 	return e.emit(ev)
 }
 
-func (e *expeditionEventEmitter) EmitCompleteExpedition(expedition int, status, issueID, bugsFound string, now time.Time) error {
-	events, err := e.agg.CompleteExpedition(expedition, status, issueID, bugsFound, now)
+func (e *expeditionEventEmitter) EmitCompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) error {
+	events, err := e.agg.CompleteExpedition(expedition, status, issueID, bugsFound, waveID, stepID, now)
 	if err != nil {
 		return err
 	}
 	return e.emit(events...)
+}
+
+func (e *expeditionEventEmitter) EmitSpecRegistered(waveID string, steps []domain.WaveStepDef, source string, now time.Time) error {
+	ev, err := e.agg.RecordSpecRegistered(waveID, steps, source, now)
+	if err != nil {
+		return err
+	}
+	return e.emit(ev)
 }
 
 func (e *expeditionEventEmitter) EmitInboxReceived(name, severity string, now time.Time) error {

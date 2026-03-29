@@ -28,7 +28,7 @@ func TestExpeditionAggregate_CompleteExpedition_Success(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 
 	// when
-	events, err := agg.CompleteExpedition(1, "success", "ISS-123", "", time.Now().UTC())
+	events, err := agg.CompleteExpedition(1, "success", "ISS-123", "", "", "", time.Now().UTC())
 
 	// then
 	if err != nil {
@@ -52,7 +52,7 @@ func TestExpeditionAggregate_CompleteExpedition_Failure(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 
 	// when
-	events, err := agg.CompleteExpedition(1, "failed", "", "", time.Now().UTC())
+	events, err := agg.CompleteExpedition(1, "failed", "", "", "", "", time.Now().UTC())
 
 	// then
 	if err != nil {
@@ -72,7 +72,7 @@ func TestExpeditionAggregate_ShouldGommage(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
-		agg.CompleteExpedition(i+1, "failed", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", "", "", now)
 	}
 
 	// when
@@ -89,7 +89,7 @@ func TestExpeditionAggregate_ShouldGommage_BelowThreshold(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 2 {
-		agg.CompleteExpedition(i+1, "failed", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", "", "", now)
 	}
 
 	// when
@@ -106,7 +106,7 @@ func TestExpeditionAggregate_GommageEvent(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
-		agg.CompleteExpedition(i+1, "failed", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", "", "", now)
 	}
 
 	// when
@@ -137,11 +137,11 @@ func TestExpeditionAggregate_StatusVocabulary(t *testing.T) {
 			// given: aggregate with 1 pre-existing failure
 			agg := domain.NewExpeditionAggregate()
 			now := time.Now().UTC()
-			agg.CompleteExpedition(1, "failed", "", "", now)
+			agg.CompleteExpedition(1, "failed", "", "", "", "", now)
 			before := agg.ConsecutiveFailures()
 
 			// when
-			events, err := agg.CompleteExpedition(2, tt.status, "", "", now)
+			events, err := agg.CompleteExpedition(2, tt.status, "", "", "", "", now)
 
 			// then
 			if err != nil {
@@ -175,7 +175,7 @@ func TestExpeditionAggregate_CompleteExpedition_RejectsUnknownStatus(t *testing.
 	agg := domain.NewExpeditionAggregate()
 
 	// when
-	events, err := agg.CompleteExpedition(1, "typo_status", "", "", time.Now().UTC())
+	events, err := agg.CompleteExpedition(1, "typo_status", "", "", "", "", time.Now().UTC())
 
 	// then
 	if err == nil {
@@ -208,9 +208,9 @@ func TestExpeditionAggregate_SuccessResetsFailures(t *testing.T) {
 	// given: 2 consecutive failures then a success
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
-	agg.CompleteExpedition(1, "failed", "", "", now)
-	agg.CompleteExpedition(2, "failed", "", "", now)
-	agg.CompleteExpedition(3, "success", "ISS-1", "", now)
+	agg.CompleteExpedition(1, "failed", "", "", "", "", now)
+	agg.CompleteExpedition(2, "failed", "", "", "", "", now)
+	agg.CompleteExpedition(3, "success", "ISS-1", "", "", "", now)
 
 	// when
 	shouldStop := agg.ShouldGommage(3)
@@ -229,7 +229,7 @@ func TestShouldEscalate_FiresOncePerStreak(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
-		agg.CompleteExpedition(i+1, "failed", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", "", "", now)
 	}
 
 	// when / then: first call returns true, second returns false
@@ -246,14 +246,14 @@ func TestShouldEscalate_ResetsOnSuccess(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 3 {
-		agg.CompleteExpedition(i+1, "failed", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", "", "", now)
 	}
 	agg.ShouldEscalate(3) // fires
-	agg.CompleteExpedition(4, "success", "ISS-1", "", now)
+	agg.CompleteExpedition(4, "success", "ISS-1", "", "", "", now)
 
 	// when: new failure streak reaches threshold
 	for i := range 3 {
-		agg.CompleteExpedition(5+i, "failed", "", "", now)
+		agg.CompleteExpedition(5+i, "failed", "", "", "", "", now)
 	}
 
 	// then: should fire again
@@ -267,7 +267,7 @@ func TestShouldEscalate_BelowThreshold(t *testing.T) {
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now().UTC()
 	for i := range 2 {
-		agg.CompleteExpedition(i+1, "failed", "", "", now)
+		agg.CompleteExpedition(i+1, "failed", "", "", "", "", now)
 	}
 
 	// when / then

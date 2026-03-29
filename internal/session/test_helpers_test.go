@@ -114,7 +114,10 @@ type failingEmitter struct {
 }
 
 func (f *failingEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error { return f.err }
-func (f *failingEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+func (f *failingEmitter) EmitCompleteExpedition(_ int, _, _, _, _, _ string, _ time.Time) error {
+	return f.err
+}
+func (f *failingEmitter) EmitSpecRegistered(_ string, _ []domain.WaveStepDef, _ string, _ time.Time) error {
 	return f.err
 }
 func (f *failingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error { return f.err }

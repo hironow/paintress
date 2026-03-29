@@ -8,30 +8,45 @@ import (
 )
 
 // waveTargetProvider implements port.TargetProvider for wave-centric mode.
-// Reads archive + inbox D-Mails, projects wave state, returns pending step targets.
+// Primary path: reads step completion state from the event-sourced Read Model.
+// Fallback path: reads inbox D-Mails when no spec.registered events exist yet
+// (legacy/migration scenario).
 type waveTargetProvider struct {
-	archive port.ArchiveReader
-	inbox   port.InboxReader
+	stepProgress port.StepProgressReader
+	inbox        port.InboxReader // fallback for legacy environments
 }
 
 // NewWaveTargetProvider creates a TargetProvider for wave mode.
-// Both archive and inbox are read: archive contains completion reports,
-// inbox contains specs not yet archived (first expedition cycle).
-func NewWaveTargetProvider(archive port.ArchiveReader, inbox port.InboxReader) port.TargetProvider {
-	return &waveTargetProvider{archive: archive, inbox: inbox}
+// stepProgress is the primary source (event-sourced Read Model).
+// inbox is used as fallback when no spec.registered events exist.
+func NewWaveTargetProvider(stepProgress port.StepProgressReader, inbox port.InboxReader) port.TargetProvider {
+	return &waveTargetProvider{stepProgress: stepProgress, inbox: inbox}
 }
 
 func (p *waveTargetProvider) FetchTargets(ctx context.Context) ([]domain.ExpeditionTarget, error) {
-	archived, err := p.archive.ReadArchiveDMails(ctx)
+	progress, err := p.stepProgress.ReadStepProgress(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// Inbox read failure is non-fatal: fall back to archive-only.
-	// A malformed file in inbox must not block target resolution.
-	inboxDMails, _ := p.inbox.ReadInboxDMails(ctx)
-	// Archive first (has completion reports), then inbox (new specs).
-	// ProjectWaveState uses first-spec-wins, so archive spec takes precedence.
-	dmails := append(archived, inboxDMails...)
-	waves := domain.ProjectWaveState(dmails)
+	if progress.HasWaves() {
+		return progress.PendingTargets(), nil
+	}
+	// Fallback: no spec.registered events yet — use inbox (legacy path).
+	// This is transitional: once spec.registered events accumulate,
+	// this path is never reached.
+	return p.legacyFetchFromInbox(ctx)
+}
+
+// legacyFetchFromInbox reads inbox D-Mails and projects wave state.
+// Used only when no spec.registered events exist in the event store.
+func (p *waveTargetProvider) legacyFetchFromInbox(ctx context.Context) ([]domain.ExpeditionTarget, error) {
+	if p.inbox == nil {
+		return nil, nil
+	}
+	inboxDMails, err := p.inbox.ReadInboxDMails(ctx)
+	if err != nil {
+		return nil, err
+	}
+	waves := domain.ProjectWaveState(inboxDMails)
 	return domain.ExpeditionTargetsFromWaves(waves), nil
 }

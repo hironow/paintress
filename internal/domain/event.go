@@ -34,6 +34,7 @@ const (
 	EventRetryAttempted       EventType = "retry.attempted"
 	EventEscalated            EventType = "escalated"
 	EventResolved             EventType = "resolved"
+	EventSpecRegistered       EventType = "spec.registered"
 )
 
 // CurrentEventSchemaVersion is the schema version set by NewEvent.
@@ -123,6 +124,8 @@ type ExpeditionCompletedData struct {
 	Expedition int    `json:"expedition"`
 	Status     string `json:"status"`
 	IssueID    string `json:"issue_id,omitempty"`
+	WaveID     string `json:"wave_id,omitempty"` // explicit wave reference for Read Model
+	StepID     string `json:"step_id,omitempty"` // explicit step reference for Read Model
 	BugsFound  string `json:"bugs_found,omitempty"`
 }
 
@@ -195,4 +198,13 @@ type EscalatedData struct {
 type ResolvedData struct {
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
+}
+
+// SpecRegisteredData is the payload for EventSpecRegistered.
+// Records a wave specification from a D-Mail so that wave/step definitions
+// persist in the event store after the D-Mail is archived.
+type SpecRegisteredData struct {
+	WaveID string        `json:"wave_id"`
+	Steps  []WaveStepDef `json:"steps"`
+	Source string        `json:"source"` // D-Mail name for tracing
 }

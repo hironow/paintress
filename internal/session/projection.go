@@ -93,6 +93,9 @@ func applyEvent(state *ExpeditionState, ev domain.Event) {
 	case domain.EventGommageTriggered:
 		state.GommageCount++
 
+	case domain.EventSpecRegistered:
+		// Tracked by WaveStepProgress Read Model; no counter needed in ExpeditionState.
+
 	case domain.EventExpeditionStarted, domain.EventDMailArchived:
 		// Audit-only events: no state mutation needed.
 
