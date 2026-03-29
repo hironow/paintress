@@ -26,10 +26,9 @@ func (p *waveTargetProvider) FetchTargets(ctx context.Context) ([]domain.Expedit
 	if err != nil {
 		return nil, err
 	}
-	inboxDMails, err := p.inbox.ReadInboxDMails(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// Inbox read failure is non-fatal: fall back to archive-only.
+	// A malformed file in inbox must not block target resolution.
+	inboxDMails, _ := p.inbox.ReadInboxDMails(ctx)
 	// Archive first (has completion reports), then inbox (new specs).
 	// ProjectWaveState uses first-spec-wins, so archive spec takes precedence.
 	dmails := append(archived, inboxDMails...)
