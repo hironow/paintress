@@ -1,5 +1,7 @@
 package domain
 
+// white-box-reason: tests ProjectWaveStepProgress pure function with unexported waveStepEntry internals
+
 import (
 	"encoding/json"
 	"testing"
