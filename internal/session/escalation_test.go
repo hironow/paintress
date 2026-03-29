@@ -164,7 +164,10 @@ func TestHandleEscalation_SucceedsWithWorkingEmitter(t *testing.T) {
 type nopEmitter struct{}
 
 func (n *nopEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error { return nil }
-func (n *nopEmitter) EmitCompleteExpedition(_ int, _, _, _ string, _ time.Time) error {
+func (n *nopEmitter) EmitCompleteExpedition(_ int, _, _, _, _, _ string, _ time.Time) error {
+	return nil
+}
+func (n *nopEmitter) EmitSpecRegistered(_ string, _ []domain.WaveStepDef, _ string, _ time.Time) error {
 	return nil
 }
 func (n *nopEmitter) EmitInboxReceived(_, _ string, _ time.Time) error      { return nil }

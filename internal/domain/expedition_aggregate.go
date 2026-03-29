@@ -60,7 +60,8 @@ func ValidExpeditionStatus(s string) bool {
 // CompleteExpedition produces events for an expedition result.
 // On success, consecutive failures are reset. On failure, they increment.
 // Returns the expedition.completed event plus a gradient.changed event if applicable.
-func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID, bugsFound string, now time.Time) ([]Event, error) {
+// waveID and stepID are optional wave references for the Read Model.
+func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) ([]Event, error) {
 	if !ValidExpeditionStatus(status) {
 		return nil, fmt.Errorf("unrecognized expedition status: %q", status)
 	}
@@ -68,6 +69,8 @@ func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID
 		Expedition: expedition,
 		Status:     status,
 		IssueID:    issueID,
+		WaveID:     waveID,
+		StepID:     stepID,
 		BugsFound:  bugsFound,
 	}, now)
 	if err != nil {
@@ -205,6 +208,16 @@ func (a *ExpeditionAggregate) RecordGommageRecovery(expedition int, class Gommag
 		Action:     action,
 		RetryNum:   retryNum,
 		Cooldown:   cooldown,
+	}, now)
+}
+
+// RecordSpecRegistered produces a spec.registered event.
+// Persists wave/step definitions from a specification D-Mail into the event store.
+func (a *ExpeditionAggregate) RecordSpecRegistered(waveID string, steps []WaveStepDef, source string, now time.Time) (Event, error) {
+	return a.nextEvent(EventSpecRegistered, SpecRegisteredData{
+		WaveID: waveID,
+		Steps:  steps,
+		Source: source,
 	}, now)
 }
 
