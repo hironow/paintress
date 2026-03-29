@@ -67,48 +67,52 @@ func ProjectWaveState(dmails []DMail) []WaveProgress {
 	waves := make(map[string]*waveEntry) // waveID → entry
 	var waveOrder []string
 
+	// Pass 1: register all specifications (defines waves and steps).
+	// Must run first so that reports/feedback find their parent wave
+	// regardless of D-Mail ordering (archive sorts pt-report-* before spec-*).
 	for _, dm := range dmails {
-		if dm.Wave == nil {
+		if dm.Wave == nil || dm.Wave.ID == "" || dm.Kind != "specification" {
 			continue
 		}
-
 		waveID := dm.Wave.ID
-		if waveID == "" {
+		if _, exists := waves[waveID]; exists {
+			continue // first spec wins (immutable)
+		}
+		entry := &waveEntry{
+			id:    waveID,
+			title: dm.Description,
+			steps: make(map[string]*StepProgress),
+		}
+		if len(dm.Wave.Steps) == 0 {
+			entry.steps[waveID] = &StepProgress{
+				StepID: waveID,
+				Title:  dm.Description,
+				Status: StepPending,
+			}
+			entry.order = []string{waveID}
+		} else {
+			for _, s := range dm.Wave.Steps {
+				entry.steps[s.ID] = &StepProgress{
+					StepID:     s.ID,
+					Title:      s.Title,
+					Status:     StepPending,
+					Acceptance: s.Acceptance,
+				}
+				entry.order = append(entry.order, s.ID)
+			}
+		}
+		waves[waveID] = entry
+		waveOrder = append(waveOrder, waveID)
+	}
+
+	// Pass 2: apply reports and feedback (updates step status).
+	for _, dm := range dmails {
+		if dm.Wave == nil || dm.Wave.ID == "" {
 			continue
 		}
+		waveID := dm.Wave.ID
 
 		switch dm.Kind {
-		case "specification":
-			if _, exists := waves[waveID]; exists {
-				continue // first spec wins (immutable)
-			}
-			entry := &waveEntry{
-				id:    waveID,
-				title: dm.Description,
-				steps: make(map[string]*StepProgress),
-			}
-			if len(dm.Wave.Steps) == 0 {
-				// Wave without explicit steps: wave itself is the single step
-				entry.steps[waveID] = &StepProgress{
-					StepID: waveID,
-					Title:  dm.Description,
-					Status: StepPending,
-				}
-				entry.order = []string{waveID}
-			} else {
-				for _, s := range dm.Wave.Steps {
-					entry.steps[s.ID] = &StepProgress{
-						StepID:     s.ID,
-						Title:      s.Title,
-						Status:     StepPending,
-						Acceptance: s.Acceptance,
-					}
-					entry.order = append(entry.order, s.ID)
-				}
-			}
-			waves[waveID] = entry
-			waveOrder = append(waveOrder, waveID)
-
 		case "report":
 			entry, ok := waves[waveID]
 			if !ok {
@@ -123,7 +127,6 @@ func ProjectWaveState(dmails []DMail) []WaveProgress {
 				continue
 			}
 			sp.Attempts++
-			// Determine status from severity: low/empty = success, else failure
 			if dm.Severity == "" || dm.Severity == "low" {
 				sp.Status = StepCompleted
 			} else {
@@ -131,7 +134,6 @@ func ProjectWaveState(dmails []DMail) []WaveProgress {
 			}
 
 		case "implementation-feedback", "design-feedback":
-			// Feedback resets a failed step back to pending (awaiting retry)
 			entry, ok := waves[waveID]
 			if !ok {
 				continue
