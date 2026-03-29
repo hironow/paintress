@@ -257,6 +257,131 @@ func TestProjectWaveState_MultiWaveProgression(t *testing.T) {
 	}
 }
 
+func TestProjectWaveState_ReportBeforeSpec_StillCompletes(t *testing.T) {
+	// given: report arrives before spec in archive sort order
+	// (pt-report-* sorts before spec-* alphabetically)
+	// This is the real go-taskboard scenario causing the infinite loop
+	dmails := []DMail{
+		// Report first (alphabetical file order: pt- < spec-)
+		{Kind: "report", Wave: &WaveReference{ID: "validation:w1", Step: "2"}},
+		// Spec second
+		{Kind: "specification", Wave: &WaveReference{
+			ID:    "validation:w1",
+			Steps: []WaveStepDef{{ID: "2"}, {ID: "3"}},
+		}},
+	}
+
+	// when
+	result := ProjectWaveState(dmails)
+
+	// then: step 2 should be completed even though report came before spec
+	if len(result) != 1 {
+		t.Fatalf("expected 1 wave, got %d", len(result))
+	}
+	w := result[0]
+	if w.Steps[0].Status != StepCompleted {
+		t.Errorf("step 2 status = %q, want completed (report-before-spec)", w.Steps[0].Status)
+	}
+	if w.Steps[1].Status != StepPending {
+		t.Errorf("step 3 status = %q, want pending", w.Steps[1].Status)
+	}
+}
+
+func TestProjectWaveState_ParsedReportCompletesStep(t *testing.T) {
+	// given: parse actual D-Mail bytes to verify real-world round-trip
+	specBytes := []byte(`---
+name: spec-validation-w1
+kind: specification
+dmail-schema-version: "1"
+wave:
+  id: "入力バリデーション:cluster-w1"
+  steps:
+    - id: "2"
+      title: Add validation
+    - id: "3"
+      title: Add error handling
+---
+`)
+	reportBytes := []byte(`---
+name: pt-report-cluster-w1-2_07ed50df
+kind: report
+description: 'Expedition #4 completed implement for 2'
+issues:
+    - "2"
+dmail-schema-version: "1"
+wave:
+    id: "入力バリデーション:cluster-w1"
+    step: "2"
+---
+# Report
+`)
+	spec, err := ParseDMail(specBytes)
+	if err != nil {
+		t.Fatalf("parse spec: %v", err)
+	}
+	report, err := ParseDMail(reportBytes)
+	if err != nil {
+		t.Fatalf("parse report: %v", err)
+	}
+
+	// when
+	result := ProjectWaveState([]DMail{spec, report})
+
+	// then: step 2 completed
+	w := result[0]
+	if w.Steps[0].StepID != "2" || w.Steps[0].Status != StepCompleted {
+		t.Errorf("step 2: status=%q, want completed", w.Steps[0].Status)
+	}
+	if w.Steps[1].StepID != "3" || w.Steps[1].Status != StepPending {
+		t.Errorf("step 3: status=%q, want pending", w.Steps[1].Status)
+	}
+}
+
+func TestProjectWaveState_DuplicateStepIDs_ReportCompletesStep(t *testing.T) {
+	// given: spec with duplicate step IDs (real go-taskboard data)
+	// ProjectWaveState uses map[stepID], so duplicates are deduplicated (last wins)
+	dmails := []DMail{
+		{
+			Kind: "specification",
+			Wave: &WaveReference{
+				ID: "入力バリデーション:cluster-w1",
+				Steps: []WaveStepDef{
+					{ID: "2", Title: "First occurrence of step 2"},
+					{ID: "3", Title: "Step 3"},
+					{ID: "2", Title: "Second occurrence of step 2"},
+					{ID: "5", Title: "Step 5"},
+					{ID: "2", Title: "Third occurrence of step 2"},
+				},
+			},
+		},
+		{
+			Kind: "report",
+			Wave: &WaveReference{ID: "入力バリデーション:cluster-w1", Step: "2"},
+			// severity empty = StepCompleted
+		},
+	}
+
+	// when
+	result := ProjectWaveState(dmails)
+
+	// then: step 2 completed despite duplicates, steps 3 and 5 pending
+	w := result[0]
+	for _, s := range w.Steps {
+		if s.StepID == "2" && s.Status != StepCompleted {
+			t.Errorf("step 2 status = %q, want completed", s.Status)
+		}
+		if (s.StepID == "3" || s.StepID == "5") && s.Status != StepPending {
+			t.Errorf("step %s status = %q, want pending", s.StepID, s.Status)
+		}
+	}
+
+	// Pending should be 3 and 5 only
+	pending := w.PendingSteps()
+	if len(pending) != 2 {
+		t.Fatalf("expected 2 pending steps, got %d", len(pending))
+	}
+}
+
 func TestProjectWaveState_ReportWithoutSpec_Ignored(t *testing.T) {
 	// given: report for unknown wave
 	dmails := []DMail{
