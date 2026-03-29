@@ -190,6 +190,73 @@ func TestProjectWaveState_DMailsWithoutWaveIgnored(t *testing.T) {
 	}
 }
 
+func TestProjectWaveState_SkippedReportCompletesStep(t *testing.T) {
+	// given: spec + skipped report (Claude determined issue was already done)
+	dmails := []DMail{
+		{
+			Kind: "specification",
+			Wave: &WaveReference{ID: "auth-w1", Steps: []WaveStepDef{{ID: "s1", Title: "Step 1"}, {ID: "s2", Title: "Step 2"}}},
+		},
+		{
+			Kind:     "report",
+			Wave:     &WaveReference{ID: "auth-w1", Step: "s1"},
+			Metadata: map[string]string{"status": "skipped"},
+			// severity empty → currently treated as success (completed)
+		},
+	}
+
+	// when
+	result := ProjectWaveState(dmails)
+
+	// then: s1 should be completed (skipped = already done)
+	w := result[0]
+	if w.Steps[0].Status != StepCompleted {
+		t.Errorf("s1 status = %q, want completed (skipped should mark as completed)", w.Steps[0].Status)
+	}
+	if w.Steps[1].Status != StepPending {
+		t.Errorf("s2 status = %q, want pending", w.Steps[1].Status)
+	}
+}
+
+func TestProjectWaveState_MultiWaveProgression(t *testing.T) {
+	// given: 2 waves with multiple steps, some completed/skipped
+	// Simulates go-taskboard state after several expeditions
+	dmails := []DMail{
+		// Wave 1: spec with 3 steps
+		{Kind: "specification", Wave: &WaveReference{
+			ID:    "validation:w1",
+			Steps: []WaveStepDef{{ID: "2"}, {ID: "3"}, {ID: "4"}},
+		}},
+		// Wave 2: spec with 2 steps
+		{Kind: "specification", Wave: &WaveReference{
+			ID:    "api:w1",
+			Steps: []WaveStepDef{{ID: "6"}, {ID: "7"}},
+		}},
+		// Wave 1, step 2: completed via skipped report (severity empty)
+		{Kind: "report", Wave: &WaveReference{ID: "validation:w1", Step: "2"}},
+		// Wave 1, step 3: completed via success report
+		{Kind: "report", Severity: "low", Wave: &WaveReference{ID: "validation:w1", Step: "3"}},
+	}
+
+	// when
+	result := ProjectWaveState(dmails)
+	targets := ExpeditionTargetsFromWaves(result)
+
+	// then: wave 1 has 1 pending (step 4), wave 2 has 2 pending (steps 6, 7)
+	if len(targets) != 3 {
+		t.Fatalf("expected 3 pending targets, got %d", len(targets))
+	}
+	if targets[0].StepID != "4" {
+		t.Errorf("targets[0].StepID = %q, want 4", targets[0].StepID)
+	}
+	if targets[1].StepID != "6" {
+		t.Errorf("targets[1].StepID = %q, want 6", targets[1].StepID)
+	}
+	if targets[2].StepID != "7" {
+		t.Errorf("targets[2].StepID = %q, want 7", targets[2].StepID)
+	}
+}
+
 func TestProjectWaveState_ReportWithoutSpec_Ignored(t *testing.T) {
 	// given: report for unknown wave
 	dmails := []DMail{
