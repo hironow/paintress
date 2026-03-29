@@ -478,6 +478,11 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			if err := UpdatePRReviewGate(ctx, report.PRUrl, reviewStatus, p.Logger); err != nil {
 				p.Logger.Warn("PR review gate update: %v", err)
 			}
+			if report.IssueID != "" {
+				if err := ApplyIssueLabel(ctx, report.IssueID, PROpenLabel, p.Logger); err != nil {
+					p.Logger.Warn("issue label: %v", err)
+				}
+			}
 		}
 		p.writeFlag(flagDir, exp, report.IssueID, "success", report.Remaining, midHighCount)
 		WriteJournal(p.config.Continent, report)
