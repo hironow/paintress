@@ -8,21 +8,31 @@ import (
 )
 
 // waveTargetProvider implements port.TargetProvider for wave-centric mode.
-// Reads archive D-Mails, projects wave state, returns pending step targets.
+// Reads archive + inbox D-Mails, projects wave state, returns pending step targets.
 type waveTargetProvider struct {
 	archive port.ArchiveReader
+	inbox   port.InboxReader
 }
 
 // NewWaveTargetProvider creates a TargetProvider for wave mode.
-func NewWaveTargetProvider(archive port.ArchiveReader) port.TargetProvider {
-	return &waveTargetProvider{archive: archive}
+// Both archive and inbox are read: archive contains completion reports,
+// inbox contains specs not yet archived (first expedition cycle).
+func NewWaveTargetProvider(archive port.ArchiveReader, inbox port.InboxReader) port.TargetProvider {
+	return &waveTargetProvider{archive: archive, inbox: inbox}
 }
 
 func (p *waveTargetProvider) FetchTargets(ctx context.Context) ([]domain.ExpeditionTarget, error) {
-	dmails, err := p.archive.ReadArchiveDMails(ctx)
+	archived, err := p.archive.ReadArchiveDMails(ctx)
 	if err != nil {
 		return nil, err
 	}
+	inboxDMails, err := p.inbox.ReadInboxDMails(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Archive first (has completion reports), then inbox (new specs).
+	// ProjectWaveState uses first-spec-wins, so archive spec takes precedence.
+	dmails := append(archived, inboxDMails...)
 	waves := domain.ProjectWaveState(dmails)
 	return domain.ExpeditionTargetsFromWaves(waves), nil
 }
