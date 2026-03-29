@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ func TestApplyIssueLabel_RejectsEmptyIssueID(t *testing.T) {
 	label := "paintress:pr-open"
 
 	// when
-	err := ApplyIssueLabel(nil, issueID, label, nil)
+	err := ApplyIssueLabel(context.Background(), issueID, label, nil)
 
 	// then
 	if err == nil {
@@ -24,7 +25,7 @@ func TestApplyIssueLabel_RejectsEmptyLabel(t *testing.T) {
 	label := ""
 
 	// when
-	err := ApplyIssueLabel(nil, issueID, label, nil)
+	err := ApplyIssueLabel(context.Background(), issueID, label, nil)
 
 	// then
 	if err == nil {
