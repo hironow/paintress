@@ -23,10 +23,15 @@ type ClaudeAdapter struct {
 	Logger     domain.Logger
 }
 
-// Run executes the Claude CLI once with streaming. It writes assistant text
-// to w incrementally and returns the result text (or concatenated assistant
-// text if no result message appears).
+// Run executes the Claude CLI once with streaming, returning only the result text.
 func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (string, error) {
+	result, err := a.RunDetailed(ctx, prompt, w, opts...)
+	return result.Text, err
+}
+
+// RunDetailed executes the Claude CLI once with streaming, returning the result
+// text and provider session ID.
+func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Writer, opts ...port.RunOption) (port.RunResult, error) {
 	rc := port.ApplyOptions(opts...)
 
 	model := a.Model
@@ -46,7 +51,9 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 	if model != "" {
 		args = append(args, "--model", model)
 	}
-	if rc.Continue {
+	if rc.ResumeSessionID != "" {
+		args = append(args, "--resume", rc.ResumeSessionID)
+	} else if rc.Continue {
 		args = append(args, "--continue")
 	}
 	if len(rc.AllowedTools) > 0 {
@@ -93,14 +100,15 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return "", fmt.Errorf("stdout pipe: %w", err)
+		return port.RunResult{}, fmt.Errorf("stdout pipe: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("claude start: %w", err)
+		return port.RunResult{}, fmt.Errorf("claude start: %w", err)
 	}
 
 	var output strings.Builder
 	var responseModel, responseID string
+	var providerSessionID string
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 
@@ -147,6 +155,7 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents)))
 		}
 		if result != nil && result.SessionID != "" {
+			providerSessionID = result.SessionID
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
 		}
 		if weaveAttrs := emitter.WeaveThreadAttrs(); len(weaveAttrs) > 0 {
@@ -184,16 +193,16 @@ func (a *ClaudeAdapter) Run(ctx context.Context, prompt string, w io.Writer, opt
 			if platform.IsNDJSON(diagnostic) {
 				diagnostic = platform.SummarizeNDJSON(diagnostic)
 			}
-			return output.String(), fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
+			return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
 		}
-		return output.String(), fmt.Errorf("claude exit: %w", waitErr)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("claude exit: %w", waitErr)
 	}
 	select {
 	case readError := <-streamErr:
-		return output.String(), fmt.Errorf("stream read: %w", readError)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("stream read: %w", readError)
 	default:
 	}
-	return output.String(), nil
+	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
 }
 
 // effectiveDir returns dir if non-empty, otherwise ".".
