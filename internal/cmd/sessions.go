@@ -42,6 +42,9 @@ func newSessionsListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			logger := cmd.Context().Value(loggerKey).(domain.Logger)
 			absPath, _ := filepath.Abs(repoPath)
+			if info, err := os.Stat(filepath.Join(absPath, domain.StateDir)); err != nil || !info.IsDir() {
+				return fmt.Errorf("state directory %s not found at %s — run 'paintress init' first", domain.StateDir, absPath)
+			}
 			dbPath := filepath.Join(absPath, domain.StateDir, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
@@ -102,6 +105,9 @@ func newSessionsEnterCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			absPath, _ := filepath.Abs(repoPath)
+			if info, err := os.Stat(filepath.Join(absPath, domain.StateDir)); err != nil || !info.IsDir() {
+				return fmt.Errorf("state directory %s not found at %s — run 'paintress init' first", domain.StateDir, absPath)
+			}
 			dbPath := filepath.Join(absPath, domain.StateDir, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
