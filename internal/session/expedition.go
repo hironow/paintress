@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -57,6 +58,9 @@ type Expedition struct {
 
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
+
+	// StreamBus receives live session stream events (optional, nil = no streaming).
+	StreamBus port.SessionStreamPublisher
 }
 
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
@@ -336,6 +340,17 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 		emitter := platform.NewSpanEmittingStreamReader(sr, expCtx, platform.Tracer)
 		emitter.SetInput(prompt)
+
+		// Wire live stream event bus for expedition path.
+		if e.StreamBus != nil {
+			expNormalizer := platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
+			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
+				if ev := expNormalizer.Normalize(msg, raw); ev != nil {
+					e.StreamBus.Publish(expCtx, *ev)
+				}
+			})
+		}
+
 		result, messages, readErr := emitter.CollectAll()
 		if readErr != nil {
 			streamErr <- readErr

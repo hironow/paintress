@@ -112,8 +112,18 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	var output strings.Builder
 	var responseModel, responseID string
 	var providerSessionID string
+	var runResultErr error
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
+
+	var normalizer *platform.StreamNormalizer
+	if a.StreamBus != nil && a.ToolName != "" {
+		normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		defer func() {
+			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
+			a.StreamBus.Publish(ctx, endEvent)
+		}()
+	}
 
 	go func() {
 		defer close(done)
@@ -124,8 +134,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 		emitter.SetInput(prompt)
 
-		if a.StreamBus != nil && a.ToolName != "" {
-			normalizer := platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		if normalizer != nil {
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := normalizer.Normalize(msg, raw); ev != nil {
 					a.StreamBus.Publish(ctx, *ev)
@@ -206,13 +215,16 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			if platform.IsNDJSON(diagnostic) {
 				diagnostic = platform.SummarizeNDJSON(diagnostic)
 			}
-			return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
+			runResultErr = fmt.Errorf("claude exit: %w\n%s", waitErr, diagnostic)
+			return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 		}
-		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("claude exit: %w", waitErr)
+		runResultErr = fmt.Errorf("claude exit: %w", waitErr)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 	}
 	select {
 	case readError := <-streamErr:
-		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, fmt.Errorf("stream read: %w", readError)
+		runResultErr = fmt.Errorf("stream read: %w", readError)
+		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 	default:
 	}
 	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
