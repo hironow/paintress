@@ -63,7 +63,8 @@ type SpanEmittingStreamReader struct {
 	sessionID    string         // captured from stream session_id for Weave thread_id
 	resultText   string         // captured from result message for Weave output.value
 	inputText    string         // caller-provided prompt for Weave input.value
-	initMsg      *StreamMessage // captured from system:init for InitAttrs()
+	initMsg          *StreamMessage                        // captured from system:init for InitAttrs()
+	onStreamMessage  func(msg *StreamMessage, raw json.RawMessage) // optional live stream hook
 }
 
 // NewSpanEmittingStreamReader creates a SpanEmittingStreamReader.
@@ -75,6 +76,12 @@ func NewSpanEmittingStreamReader(reader *StreamReader, parentCtx context.Context
 		openSpans:   make(map[string]trace.Span),
 		maxValueLen: DefaultMaxValueLen,
 	}
+}
+
+// SetStreamMessageHandler registers a callback invoked for every parsed stream message.
+// Used by the session event bus for live streaming. Nil by default (no-op).
+func (s *SpanEmittingStreamReader) SetStreamMessageHandler(fn func(*StreamMessage, json.RawMessage)) {
+	s.onStreamMessage = fn
 }
 
 // RawEvents returns the collected raw event strings.
@@ -100,10 +107,10 @@ func (s *SpanEmittingStreamReader) SetInput(prompt string) {
 func (s *SpanEmittingStreamReader) WeaveIOAttrs() []attribute.KeyValue {
 	var attrs []attribute.KeyValue
 	if s.inputText != "" {
-		attrs = append(attrs, WeaveInputVal.String(s.inputText))
+		attrs = append(attrs, WeaveInputVal.String(SanitizeUTF8(s.inputText)))
 	}
 	if s.resultText != "" {
-		attrs = append(attrs, WeaveOutputVal.String(s.resultText))
+		attrs = append(attrs, WeaveOutputVal.String(SanitizeUTF8(s.resultText)))
 	}
 	return attrs
 }
@@ -155,6 +162,11 @@ func (s *SpanEmittingStreamReader) processMessage(msg *StreamMessage) {
 	case "tool_result":
 		s.handleToolResult(msg)
 	}
+
+	// Live stream hook: notify listener with parsed message + raw JSON.
+	if s.onStreamMessage != nil {
+		s.onStreamMessage(msg, raw)
+	}
 }
 
 func (s *SpanEmittingStreamReader) handleAssistant(msg *StreamMessage) {
@@ -179,7 +191,7 @@ func (s *SpanEmittingStreamReader) handleAssistant(msg *StreamMessage) {
 		)
 
 		if len(tool.Input) > 0 {
-			toolSpan.SetAttributes(GenAIToolInput.String(TruncateValue(string(tool.Input), s.maxValueLen)))
+			toolSpan.SetAttributes(GenAIToolInput.String(SanitizeUTF8(TruncateValue(string(tool.Input), s.maxValueLen))))
 		}
 
 		s.openSpans[toolID] = toolSpan

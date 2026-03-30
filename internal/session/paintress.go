@@ -138,12 +138,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		approver:        approver,
 		retryTracker:    domain.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
-		claude: &ClaudeAdapter{
-			ClaudeCmd:  cfgCopy.ClaudeCmd,
-			Model:      primary,
-			TimeoutSec: cfgCopy.TimeoutSec,
-			Logger:     logger,
-		},
+		claude: newTrackedClaudeRunner(cfgCopy, primary, logger),
 	}
 
 	if !cfg.NoDev {
@@ -157,6 +152,28 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	}
 
 	return p
+}
+
+// newTrackedClaudeRunner creates a ClaudeAdapter wrapped with session tracking.
+// Best-effort: if the session store cannot be opened, returns the plain adapter.
+func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logger) port.ClaudeRunner {
+	adapter := &ClaudeAdapter{
+		ClaudeCmd:  cfg.ClaudeCmd,
+		Model:      model,
+		TimeoutSec: cfg.TimeoutSec,
+		Logger:     logger,
+	}
+	dbPath := filepath.Join(cfg.Continent, domain.StateDir, ".run", "sessions.db")
+	store, err := NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		if logger != nil {
+			logger.Debug("session tracking unavailable: %v", err)
+		}
+		return adapter
+	}
+	// NOTE: store is not closed here — it lives for the duration of the Paintress instance.
+	// SQLite WAL mode handles this safely; the connection is released when the process exits.
+	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
 }
 
 // SetEmitter sets the event emitter for the session.
