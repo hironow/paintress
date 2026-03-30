@@ -183,7 +183,7 @@ Expedition (Claude Code)   <- One session per issue
 Review Gate (exec)         <- Code review tool + Claude Code --continue (up to 3 cycles)
     |
     v
-D-Mail Waiting Loop        <- fsnotify inbox/ watch (--wait-timeout, default 30m)
+D-Mail Waiting Loop        <- fsnotify inbox/ watch (--idle-timeout, default 30m)
     |                         On D-Mail arrival: re-run expedition loop
     |                         On timeout/signal: clean exit
     v

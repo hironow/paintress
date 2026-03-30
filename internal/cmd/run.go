@@ -68,7 +68,7 @@ If path is omitted, the current working directory is used.`,
 	cmd.Flags().String("notify-cmd", "", "Notification command ({title}, {message} placeholders)")
 	cmd.Flags().String("approve-cmd", "", "Approval command ({message} placeholder, exit 0 = approve)")
 	cmd.Flags().Bool("auto-approve", false, "Skip approval gate for HIGH severity D-Mail")
-	cmd.Flags().Duration("wait-timeout", domain.DefaultWaitTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
+	cmd.Flags().Duration("idle-timeout", domain.DefaultIdleTimeout, "D-Mail waiting phase timeout (0 = 24h safety cap, negative = disable waiting)")
 
 	return cmd
 }
@@ -93,7 +93,7 @@ func configFromProject(pc *domain.ProjectConfig) domain.Config {
 		ApproveCmd:     pc.ApproveCmd,
 		AutoApprove:    pc.AutoApprove,
 		MaxRetries:     pc.MaxRetries,
-		WaitTimeout:    pc.WaitTimeout,
+		IdleTimeout:    pc.IdleTimeout,
 	}
 }
 
@@ -183,8 +183,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Changed("auto-approve") {
 		cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
 	}
-	if cmd.Flags().Changed("wait-timeout") {
-		cfg.WaitTimeout, _ = cmd.Flags().GetDuration("wait-timeout")
+	if cmd.Flags().Changed("idle-timeout") {
+		cfg.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
 	}
 
 	// Derive review-cmd from base-branch if neither CLI nor config set it
@@ -266,7 +266,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	logger.Info("paintress run: initial expedition cycle completed (exit code %d)", exitCode)
 
 	// Skip waiting in dry-run mode or when explicitly disabled
-	if cfg.DryRun || cfg.WaitTimeout < 0 {
+	if cfg.DryRun || cfg.IdleTimeout < 0 {
 		return nil
 	}
 
@@ -278,7 +278,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 
 	// Waiting loop: wait for D-Mail → re-run expeditions → repeat
 	for {
-		arrivedDMail, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.WaitTimeout, logger)
+		arrivedDMail, waitErr := session.WaitForDMail(ctx, inboxCh, cfg.IdleTimeout, logger)
 		if waitErr != nil {
 			return tryWriteHandover(ctx, waitErr, continent, domain.HandoverState{
 				Tool:         "paintress",

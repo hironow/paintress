@@ -153,7 +153,7 @@ func TestRunCmd_FailsWithoutInit(t *testing.T) {
 	}
 }
 
-func TestRunCommand_WaitTimeoutFlag(t *testing.T) {
+func TestRunCommand_IdleTimeoutFlag(t *testing.T) {
 	// given
 	root := cmd.NewRootCommand()
 	runCmd, _, err := root.Find([]string{"run"})
@@ -162,15 +162,15 @@ func TestRunCommand_WaitTimeoutFlag(t *testing.T) {
 	}
 
 	// when
-	f := runCmd.Flags().Lookup("wait-timeout")
+	f := runCmd.Flags().Lookup("idle-timeout")
 
 	// then
 	if f == nil {
-		t.Fatal("--wait-timeout flag not found on run command")
+		t.Fatal("--idle-timeout flag not found on run command")
 	}
-	// Default is domain.DefaultWaitTimeout = 30m0s
+	// Default is domain.DefaultIdleTimeout = 30m0s
 	if f.DefValue != "30m0s" {
-		t.Errorf("--wait-timeout default = %q, want %q", f.DefValue, "30m0s")
+		t.Errorf("--idle-timeout default = %q, want %q", f.DefValue, "30m0s")
 	}
 }
 

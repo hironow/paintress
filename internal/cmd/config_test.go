@@ -138,7 +138,7 @@ func TestConfigCommand_SetAllKeys(t *testing.T) {
 		{"no_dev", "true", "no_dev: true"},
 		{"auto_approve", "true", "auto_approve: true"},
 		// duration key
-		{"wait_timeout", "45m0s", "wait_timeout: 45m0s"},
+		{"idle_timeout", "45m0s", "idle_timeout: 45m0s"},
 		// lang key (enum)
 		{"lang", "en", "lang: en"},
 	}
