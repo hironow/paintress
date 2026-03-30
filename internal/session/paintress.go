@@ -185,6 +185,15 @@ func (p *Paintress) SetCheckpointScanner(s port.CheckpointScanner) {
 }
 
 func (p *Paintress) Run(ctx context.Context) int {
+	// Acquire daemon lock — prevents multiple instances on the same continent
+	runDir := filepath.Join(p.config.Continent, domain.StateDir, ".run")
+	unlock, lockErr := TryLockDaemon(runDir)
+	if lockErr != nil {
+		p.Logger.Error("daemon lock: %v", lockErr)
+		return 1
+	}
+	defer unlock()
+
 	ctx, rootSpan := platform.Tracer.Start(ctx, "paintress.run",
 		trace.WithAttributes(
 			attribute.String("continent", platform.SanitizeUTF8(p.config.Continent)),
