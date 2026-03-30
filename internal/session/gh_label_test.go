@@ -1,8 +1,10 @@
-package session
+package session_test
 
 import (
 	"context"
 	"testing"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 func TestApplyIssueLabel_RejectsEmptyIssueID(t *testing.T) {
@@ -11,7 +13,7 @@ func TestApplyIssueLabel_RejectsEmptyIssueID(t *testing.T) {
 	label := "paintress:pr-open"
 
 	// when
-	err := ApplyIssueLabel(context.Background(), issueID, label, nil)
+	err := session.ApplyIssueLabel(context.Background(), issueID, label, nil)
 
 	// then
 	if err == nil {
@@ -25,7 +27,7 @@ func TestApplyIssueLabel_RejectsEmptyLabel(t *testing.T) {
 	label := ""
 
 	// when
-	err := ApplyIssueLabel(context.Background(), issueID, label, nil)
+	err := session.ApplyIssueLabel(context.Background(), issueID, label, nil)
 
 	// then
 	if err == nil {
