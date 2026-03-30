@@ -15,8 +15,8 @@ const (
 	DefaultTimeoutSec = 1980
 )
 
-// DefaultWaitTimeout is the default D-Mail waiting phase timeout.
-const DefaultWaitTimeout = 30 * time.Minute
+// DefaultIdleTimeout is the default D-Mail waiting phase timeout.
+const DefaultIdleTimeout = 30 * time.Minute
 
 // ApproverConfig describes how approval behavior is configured.
 // Implemented by Config. Used by session.BuildApprover.
@@ -47,7 +47,7 @@ type Config struct {
 	ApproveCmd     string        // External approval command ({message} placeholder, exit 0 = approve)
 	AutoApprove    bool          // Skip approval gate for HIGH severity D-Mail
 	MaxRetries     int           // Maximum retry attempts per unique issue set (default: 3)
-	WaitTimeout    time.Duration `yaml:"wait_timeout,omitempty"` // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)
+	IdleTimeout    time.Duration `yaml:"idle_timeout,omitempty"` // D-Mail waiting phase timeout (0 = 24h safety cap, <0 = disable waiting)
 }
 
 // IsAutoApprove reports whether the config is set to auto-approve.
@@ -71,7 +71,7 @@ func DefaultConfig() Config {
 		Workers:        pc.Workers,
 		OutputFormat:   "text",
 		MaxRetries:     pc.MaxRetries,
-		WaitTimeout:    pc.WaitTimeout,
+		IdleTimeout:    pc.IdleTimeout,
 	}
 }
 
@@ -99,7 +99,7 @@ type ProjectConfig struct {
 	ApproveCmd     string             `yaml:"approve_cmd,omitempty"`
 	AutoApprove    bool               `yaml:"auto_approve,omitempty"`
 	MaxRetries     int                `yaml:"max_retries,omitempty"`
-	WaitTimeout    time.Duration      `yaml:"wait_timeout,omitempty"`
+	IdleTimeout    time.Duration      `yaml:"idle_timeout,omitempty"`
 	Computed       ComputedConfig     `yaml:"computed,omitempty"`
 }
 
@@ -116,7 +116,7 @@ func DefaultProjectConfig() ProjectConfig {
 		DevURL:         "http://localhost:3000",
 		Workers:        1,
 		MaxRetries:     3,
-		WaitTimeout:    DefaultWaitTimeout,
+		IdleTimeout:    DefaultIdleTimeout,
 	}
 }
 

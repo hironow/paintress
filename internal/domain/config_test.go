@@ -156,8 +156,8 @@ func TestDefaultProjectConfig_MatchesDefaultConfig(t *testing.T) {
 	if pc.MaxRetries != rc.MaxRetries {
 		t.Errorf("MaxRetries mismatch: ProjectConfig=%d, Config=%d", pc.MaxRetries, rc.MaxRetries)
 	}
-	if pc.WaitTimeout != rc.WaitTimeout {
-		t.Errorf("WaitTimeout mismatch: ProjectConfig=%v, Config=%v", pc.WaitTimeout, rc.WaitTimeout)
+	if pc.IdleTimeout != rc.IdleTimeout {
+		t.Errorf("IdleTimeout mismatch: ProjectConfig=%v, Config=%v", pc.IdleTimeout, rc.IdleTimeout)
 	}
 }
 
@@ -263,20 +263,20 @@ func TestProjectConfig_ComputedConfig_EmptyByDefault(t *testing.T) {
 	}
 }
 
-func TestDefaultConfig_WaitTimeout(t *testing.T) {
+func TestDefaultConfig_IdleTimeout(t *testing.T) {
 	// when
 	cfg := domain.DefaultConfig()
 
 	// then
-	if cfg.WaitTimeout != domain.DefaultWaitTimeout {
-		t.Errorf("expected WaitTimeout=%v, got %v", domain.DefaultWaitTimeout, cfg.WaitTimeout)
+	if cfg.IdleTimeout != domain.DefaultIdleTimeout {
+		t.Errorf("expected IdleTimeout=%v, got %v", domain.DefaultIdleTimeout, cfg.IdleTimeout)
 	}
 }
 
-func TestDefaultWaitTimeout_Is30Minutes(t *testing.T) {
+func TestDefaultIdleTimeout_Is30Minutes(t *testing.T) {
 	// then
-	if domain.DefaultWaitTimeout != 30*time.Minute {
-		t.Errorf("expected 30m, got %v", domain.DefaultWaitTimeout)
+	if domain.DefaultIdleTimeout != 30*time.Minute {
+		t.Errorf("expected 30m, got %v", domain.DefaultIdleTimeout)
 	}
 }
 
