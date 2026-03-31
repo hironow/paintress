@@ -100,7 +100,7 @@ func TestStageEscalation_Idempotent(t *testing.T) {
 	p.stageEscalation(context.Background(), 5, 3)
 	p.stageEscalation(context.Background(), 5, 3)
 
-	// then — only one D-Mail in outbox (INSERT OR IGNORE + already flushed)
+	// then — only one D-Mail in outbox (upsert keeps latest data, single file)
 	outboxDir := domain.OutboxDir(continent)
 	entries, _ := os.ReadDir(outboxDir)
 	if len(entries) != 1 {
