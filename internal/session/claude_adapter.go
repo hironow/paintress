@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -17,13 +18,26 @@ import (
 
 // ClaudeAdapter implements port.ClaudeRunner by executing the Claude CLI
 // as a subprocess with streaming (--output-format stream-json).
+// It does NOT retry; wrap with RetryRunner for that.
 type ClaudeAdapter struct {
 	ClaudeCmd  string
 	Model      string
 	TimeoutSec int
 	Logger     domain.Logger
-	ToolName   string                    // CLI tool name for stream events (e.g. "paintress")
-	StreamBus  port.SessionStreamPublisher // optional: live session event streaming
+	ToolName   string                       // CLI tool name for stream events (e.g. "sightjack")
+	StreamBus  port.SessionStreamPublisher   // optional: live session event streaming
+	// NewCmd overrides command creation. If nil, platform.NewShellCmd is used.
+	NewCmd     func(ctx context.Context, name string, args ...string) *exec.Cmd
+	// CancelFunc sets cmd.Cancel for graceful shutdown. If nil, default (process kill) is used.
+	CancelFunc func(cmd *exec.Cmd) func() error
+}
+
+// newCmd returns the command constructor, defaulting to platform.NewShellCmd.
+func (a *ClaudeAdapter) newCmd(ctx context.Context, name string, args ...string) *exec.Cmd {
+	if a.NewCmd != nil {
+		return a.NewCmd(ctx, name, args...)
+	}
+	return platform.NewShellCmd(ctx, name, args...)
 }
 
 // Run executes the Claude CLI once with streaming, returning only the result text.
@@ -41,14 +55,24 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	if rc.Model != "" {
 		model = rc.Model
 	}
+
 	_, span := platform.Tracer.Start(ctx, "claude.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
 				attribute.String("claude.model", platform.SanitizeUTF8(model)),
+				attribute.Int("claude.timeout_sec", a.TimeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)
 	defer span.End()
+
+	// Apply per-call timeout only when the caller has not already set a deadline.
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline && a.TimeoutSec > 0 {
+		timeout := time.Duration(a.TimeoutSec) * time.Second
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	var args []string
 	if model != "" {
@@ -59,9 +83,6 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	} else if rc.Continue {
 		args = append(args, "--continue")
 	}
-	if len(rc.AllowedTools) > 0 {
-		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
-	}
 	args = append(args, "--verbose", "--output-format", "stream-json")
 	// NOTE: --setting-sources "" skips settings loading but does NOT suppress CLAUDE.md auto-discovery.
 	// --bare would suppress it but also disables OAuth. No individual flag exists to disable CLAUDE.md
@@ -69,8 +90,11 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	// cause context budget issues in practice.
 	args = append(args, "--setting-sources", "") // Skip user/project settings (hooks, plugins, auto-memory) while preserving OAuth auth
 	args = append(args, "--disable-slash-commands")
+	if len(rc.AllowedTools) > 0 {
+		args = append(args, "--allowedTools", strings.Join(rc.AllowedTools, ","))
+	}
 
-	// Settings and MCP config live under the tool's stateDir (e.g. .expedition/).
+	// Settings and MCP config live under the tool's stateDir.
 	// ConfigBase is the repo root (continent) where stateDir was initialized.
 	// When ConfigBase is unset, fall back to WorkDir, then CWD.
 	configBase := rc.ConfigBase
@@ -83,28 +107,34 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		args = append(args, "--settings", settingsPath)
 	} else if a.Logger != nil {
 		a.Logger.Warn("Claude subprocess settings not found at %s", settingsPath)
-		a.Logger.Warn("Run 'paintress mcp-config generate' to create settings.")
+		a.Logger.Warn("Run 'mcp-config generate' to create settings.")
 	}
 
 	// Enforce MCP allowlist when .mcp.json (or legacy .run/mcp-config.json) exists
 	if mcpPath := ResolveMCPConfigPath(configBase); mcpPath != "" {
 		args = append(args, "--strict-mcp-config", "--mcp-config", mcpPath)
 	}
-	args = append(args, "--dangerously-skip-permissions", "--print", "-p", prompt)
+	args = append(args, "--dangerously-skip-permissions", "--print")
 
-	cmd := platform.NewShellCmd(ctx, a.ClaudeCmd, args...)
+	cmd := a.newCmd(ctx, a.ClaudeCmd, args...)
+	if a.CancelFunc != nil {
+		cmd.Cancel = a.CancelFunc(cmd)
+	}
+	cmd.WaitDelay = 3 * time.Second
 	if rc.WorkDir != "" {
 		cmd.Dir = rc.WorkDir
 	}
-	cmd.WaitDelay = 3 * time.Second
 
-	var stderrBuf strings.Builder
-	cmd.Stderr = &stderrBuf
+	// Pass prompt via stdin to avoid E2BIG for large prompts.
+	cmd.Stdin = strings.NewReader(prompt)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return port.RunResult{}, fmt.Errorf("stdout pipe: %w", err)
 	}
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
+
 	if err := cmd.Start(); err != nil {
 		return port.RunResult{}, fmt.Errorf("claude start: %w", err)
 	}
@@ -116,6 +146,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 
+	// Create normalizer at RunDetailed scope so defer can emit session_end.
 	var normalizer *platform.StreamNormalizer
 	if a.StreamBus != nil && a.ToolName != "" {
 		normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
@@ -134,6 +165,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		emitter := platform.NewSpanEmittingStreamReader(sr, ctx, platform.Tracer)
 		emitter.SetInput(prompt)
 
+		// Wire live stream event bus when available.
 		if normalizer != nil {
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := normalizer.Normalize(msg, raw); ev != nil {
@@ -147,6 +179,10 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			streamErr <- readErr
 			return
 		}
+		if result == nil {
+			streamErr <- fmt.Errorf("no result message in stream-json output")
+			return
+		}
 
 		for _, msg := range messages {
 			switch msg.Type {
@@ -157,6 +193,12 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 						_, _ = w.Write([]byte(text))
 					}
 					output.WriteString(text)
+				}
+				tools, _ := msg.ExtractToolUse()
+				for _, t := range tools {
+					if a.Logger != nil {
+						a.Logger.Info("  tool: %s", t.Name)
+					}
 				}
 				if am, _ := msg.ParseAssistantMessage(); am != nil {
 					if am.Model != "" {
@@ -180,6 +222,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			providerSessionID = result.SessionID
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
 		}
+
 		if weaveAttrs := emitter.WeaveThreadAttrs(); len(weaveAttrs) > 0 {
 			span.SetAttributes(weaveAttrs...)
 		}
@@ -190,18 +233,31 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			span.SetAttributes(initAttrs...)
 		}
 
+		// Context budget measurement
 		budget := platform.CalculateContextBudget(messages)
 		span.SetAttributes(budget.Attrs()...)
+		if warning := budget.WarningMessage(platform.DefaultContextBudgetThreshold); warning != "" {
+			if a.Logger != nil {
+				a.Logger.Warn("%s", warning)
+			}
+		}
 
-		// Phase 5: persist raw events to .run/claude-logs/
-		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
-			if logErr := WriteClaudeLog(effectiveDir(rc.WorkDir), rawEvents); logErr != nil && a.Logger != nil {
+		// Persist raw events to .run/claude-logs/
+		if raw := emitter.RawEvents(); len(raw) > 0 {
+			if logErr := WriteClaudeLog(effectiveDir(rc.WorkDir), raw); logErr != nil && a.Logger != nil {
 				a.Logger.Warn("claude-log write: %v", logErr)
 			}
 		}
 	}()
 
 	<-done
+
+	var readError error
+	select {
+	case sErr := <-streamErr:
+		readError = sErr
+	default:
+	}
 
 	// Log captured stderr at debug level; suppress raw NDJSON from errors.
 	if stderrBuf.Len() > 0 && a.Logger != nil {
@@ -221,12 +277,12 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		runResultErr = fmt.Errorf("claude exit: %w", waitErr)
 		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
 	}
-	select {
-	case readError := <-streamErr:
+
+	if readError != nil {
 		runResultErr = fmt.Errorf("stream read: %w", readError)
 		return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, runResultErr
-	default:
 	}
+
 	return port.RunResult{Text: output.String(), ProviderSessionID: providerSessionID}, nil
 }
 

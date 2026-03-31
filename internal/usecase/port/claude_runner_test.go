@@ -16,7 +16,7 @@ type stubRunner struct {
 	lastOpt RunConfig
 }
 
-func (s *stubRunner) Run(ctx context.Context, prompt string, w io.Writer, opts ...RunOption) (string, error) {
+func (s *stubRunner) Run(_ context.Context, _ string, _ io.Writer, opts ...RunOption) (string, error) {
 	s.calls++
 	s.lastOpt = ApplyOptions(opts...)
 	if s.calls <= s.failN {
@@ -71,6 +71,16 @@ func TestWithContinue_SetsConfig(t *testing.T) {
 	}
 }
 
+func TestWithModel_SetsConfig(t *testing.T) {
+	// given/when
+	cfg := ApplyOptions(WithModel("sonnet"))
+
+	// then
+	if cfg.Model != "sonnet" {
+		t.Errorf("expected 'sonnet', got %q", cfg.Model)
+	}
+}
+
 func TestApplyOptions_Empty(t *testing.T) {
 	// when
 	cfg := ApplyOptions()
@@ -85,6 +95,9 @@ func TestApplyOptions_Empty(t *testing.T) {
 	if cfg.Continue {
 		t.Error("expected Continue=false")
 	}
+	if cfg.Model != "" {
+		t.Errorf("expected empty Model, got %q", cfg.Model)
+	}
 }
 
 func TestApplyOptions_Combined(t *testing.T) {
@@ -93,6 +106,7 @@ func TestApplyOptions_Combined(t *testing.T) {
 		WithAllowedTools("Read"),
 		WithWorkDir("/repo"),
 		WithContinue(),
+		WithModel("opus"),
 	)
 
 	// then
@@ -104,5 +118,8 @@ func TestApplyOptions_Combined(t *testing.T) {
 	}
 	if !cfg.Continue {
 		t.Error("expected Continue=true")
+	}
+	if cfg.Model != "opus" {
+		t.Errorf("expected 'opus', got %q", cfg.Model)
 	}
 }
