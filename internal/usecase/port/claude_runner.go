@@ -49,7 +49,7 @@ func WithContinue() RunOption {
 }
 
 // WithConfigBase sets the base directory for resolving tool stateDir settings
-// (e.g. .expedition/.claude/settings.json). When unset, WorkDir is used.
+// (e.g. .claude/settings.json under the stateDir). When unset, WorkDir is used.
 // Use this when WorkDir is a worktree that doesn't contain the stateDir.
 func WithConfigBase(dir string) RunOption {
 	return func(c *RunConfig) {
