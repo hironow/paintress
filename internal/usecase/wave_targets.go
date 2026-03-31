@@ -34,16 +34,15 @@ func (p *waveTargetProvider) FetchTargets(ctx context.Context) ([]domain.Expedit
 		// this path is never reached.
 		return p.legacyFetchFromInbox(ctx)
 	}
-	targets := progress.PendingTargets()
-
-	// Append waveless feedback D-Mails as standalone targets.
-	// These are reactive tasks (e.g., conflict resolution from amadeus)
-	// that don't belong to any wave but are still paintress's responsibility.
+	// Reactive targets first: conflict resolution, review fixes, etc.
+	// Principle: fix what's broken before building new things.
+	// Conflict rebase unblocks merge → convergence progresses.
 	standalone, sErr := p.collectWavelessFeedbackTargets(ctx)
 	if sErr != nil {
-		return targets, nil // non-fatal: return wave targets even if inbox read fails
+		return progress.PendingTargets(), nil // non-fatal: fall back to wave targets only
 	}
-	targets = append(targets, standalone...)
+	targets := standalone
+	targets = append(targets, progress.PendingTargets()...)
 	return targets, nil
 }
 

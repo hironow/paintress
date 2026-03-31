@@ -185,12 +185,20 @@ func TestWaveTargetProvider_WavelessFeedback_MixedWithWaveTargets(t *testing.T) 
 	provider := NewWaveTargetProvider(reader, inbox)
 	targets, err := provider.FetchTargets(context.Background())
 
-	// then: wave target s2 + standalone feedback target
+	// then: standalone FIRST, wave target SECOND (reactive before proactive)
 	if err != nil {
 		t.Fatalf("FetchTargets error: %v", err)
 	}
 	if len(targets) != 2 {
-		t.Fatalf("expected 2 targets (1 wave + 1 standalone), got %d", len(targets))
+		t.Fatalf("expected 2 targets (1 standalone + 1 wave), got %d", len(targets))
+	}
+	// Standalone conflict target comes first
+	if targets[0].ID != "am-conflict-#14-a9c5e6e3" {
+		t.Errorf("targets[0] should be standalone conflict, got %s", targets[0].ID)
+	}
+	// Wave target comes second
+	if targets[1].StepID != "s2" {
+		t.Errorf("targets[1] should be wave step s2, got %s", targets[1].StepID)
 	}
 }
 
