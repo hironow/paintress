@@ -1,6 +1,6 @@
 //go:build contract
 
-package policy_test
+package verifier_test
 
 import (
 	"os"
