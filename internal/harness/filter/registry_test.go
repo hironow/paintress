@@ -15,8 +15,17 @@ func TestNewRegistry_LoadsAllPrompts(t *testing.T) {
 	}
 
 	expected := []string{
+		"expedition_en",
+		"expedition_fr",
+		"expedition_ja",
 		"fetch_issues",
 		"follow_up",
+		"mission_en_linear",
+		"mission_en_wave",
+		"mission_fr_linear",
+		"mission_fr_wave",
+		"mission_ja_linear",
+		"mission_ja_wave",
 		"review_fix",
 		"review_fix_with_reflection",
 		"review_fix_with_strategy",
