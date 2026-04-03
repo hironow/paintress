@@ -35,7 +35,7 @@ func RenderExpeditionPrompt(reg *PromptRegistry, lang string, data domain.Prompt
 		"context_section":     renderContextSection(lang, data),
 		"inbox_section":       renderInboxSection(lang, data),
 		"mission_section":     data.MissionSection,
-		"issue_tool_line":     renderIssueToolLine(lang, data),
+		"is_wave_mode":        boolFlag(data.WaveTarget != nil),
 	}
 
 	result, err := reg.Expand(name, vars)
@@ -73,13 +73,11 @@ func expeditionPromptName(lang string) string {
 	}
 }
 
-// renderIssueToolLine returns the capability boundary line for issue operations.
-// Wave mode: gh CLI only. Linear mode: gh CLI + Linear MCP.
-func renderIssueToolLine(_ string, data domain.PromptData) string {
-	if data.WaveTarget != nil {
-		return "- GitHub CLI（`gh`）による issue 操作"
+func boolFlag(v bool) string {
+	if v {
+		return "true"
 	}
-	return "- GitHub CLI（`gh`）または Linear MCP ツールによる issue 操作（モードに依存）"
+	return "false"
 }
 
 // renderScopeSection pre-renders the Wave Target or Linear Scope block.
