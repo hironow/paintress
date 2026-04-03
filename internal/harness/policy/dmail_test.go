@@ -1,9 +1,11 @@
-package domain_test
+package policy_test
 
 import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
+	"github.com/hironow/paintress/internal/harness/verifier"
 )
 
 func TestDMailIdempotencyKey_Deterministic(t *testing.T) {
@@ -149,7 +151,7 @@ func TestValidateDMail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := domain.ValidateDMail(tt.dmail)
+			err := verifier.ValidateDMail(tt.dmail)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateDMail() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -324,7 +326,7 @@ func TestNewReportDMail_InsightContext_Present(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := policy.NewReportDMail(report, 0)
 
 	// then
 	if dm.Context == nil {
@@ -349,7 +351,7 @@ func TestNewReportDMail_InsightContext_Absent(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := policy.NewReportDMail(report, 0)
 
 	// then — backward-compatible: nil Context when Insight is empty
 	if dm.Context != nil {
@@ -361,7 +363,7 @@ func TestNewReportDMail_InsightContext_Absent(t *testing.T) {
 
 func TestReportSeverity_LevelZero_ReturnsHigh(t *testing.T) {
 	// given / when
-	severity := domain.ReportSeverity(0)
+	severity := policy.ReportSeverity(0)
 
 	// then
 	if severity != "high" {
@@ -371,7 +373,7 @@ func TestReportSeverity_LevelZero_ReturnsHigh(t *testing.T) {
 
 func TestReportSeverity_LevelOne_ReturnsMedium(t *testing.T) {
 	// given / when
-	severity := domain.ReportSeverity(1)
+	severity := policy.ReportSeverity(1)
 
 	// then
 	if severity != "medium" {
@@ -381,7 +383,7 @@ func TestReportSeverity_LevelOne_ReturnsMedium(t *testing.T) {
 
 func TestReportSeverity_LevelTwo_ReturnsMedium(t *testing.T) {
 	// given / when
-	severity := domain.ReportSeverity(2)
+	severity := policy.ReportSeverity(2)
 
 	// then
 	if severity != "medium" {
@@ -391,7 +393,7 @@ func TestReportSeverity_LevelTwo_ReturnsMedium(t *testing.T) {
 
 func TestReportSeverity_LevelThree_ReturnsLow(t *testing.T) {
 	// given / when
-	severity := domain.ReportSeverity(3)
+	severity := policy.ReportSeverity(3)
 
 	// then
 	if severity != "low" {
@@ -401,7 +403,7 @@ func TestReportSeverity_LevelThree_ReturnsLow(t *testing.T) {
 
 func TestReportSeverity_LevelFive_ReturnsLow(t *testing.T) {
 	// given / when
-	severity := domain.ReportSeverity(5)
+	severity := policy.ReportSeverity(5)
 
 	// then
 	if severity != "low" {
@@ -420,7 +422,7 @@ func TestNewReportDMail_GaugeLevelZero_SetsHighSeverity(t *testing.T) {
 	}
 
 	// when — gauge at 0 means high severity
-	dm := domain.NewReportDMail(report, 0)
+	dm := policy.NewReportDMail(report, 0)
 
 	// then
 	if dm.Severity != "high" {
@@ -439,7 +441,7 @@ func TestNewReportDMail_GaugeLevelTwo_SetsMediumSeverity(t *testing.T) {
 	}
 
 	// when — gauge at 2 means medium severity
-	dm := domain.NewReportDMail(report, 2)
+	dm := policy.NewReportDMail(report, 2)
 
 	// then
 	if dm.Severity != "medium" {
@@ -458,7 +460,7 @@ func TestNewReportDMail_GaugeLevelFour_SetsLowSeverity(t *testing.T) {
 	}
 
 	// when — gauge at 4 means low severity
-	dm := domain.NewReportDMail(report, 4)
+	dm := policy.NewReportDMail(report, 4)
 
 	// then
 	if dm.Severity != "low" {
@@ -478,7 +480,7 @@ func TestNewReportDMail_InsightContext_NilGuard(t *testing.T) {
 	}
 
 	// when / then — must not panic
-	dm := domain.NewReportDMail(report, 0)
+	dm := policy.NewReportDMail(report, 0)
 	if dm.Context != nil {
 		t.Errorf("expected nil Context for empty Insight, got %+v", dm.Context)
 	}

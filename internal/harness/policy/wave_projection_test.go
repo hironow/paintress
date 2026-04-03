@@ -1,12 +1,17 @@
-package domain
+package policy_test
 
-// white-box-reason: tests ProjectWaveState pure function — archive D-Mail to wave progress projection
+// Tests ProjectWaveState pure function — archive D-Mail to wave progress projection
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
+)
 
 func TestProjectWaveState_EmptyArchive(t *testing.T) {
 	// when
-	result := ProjectWaveState(nil)
+	result := policy.ProjectWaveState(nil)
 
 	// then
 	if len(result) != 0 {
@@ -16,13 +21,13 @@ func TestProjectWaveState_EmptyArchive(t *testing.T) {
 
 func TestProjectWaveState_SpecOnly_AllPending(t *testing.T) {
 	// given
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		{
 			Kind:        "specification",
 			Description: "Auth wave",
-			Wave: &WaveReference{
+			Wave: &domain.WaveReference{
 				ID: "auth-w1",
-				Steps: []WaveStepDef{
+				Steps: []domain.WaveStepDef{
 					{ID: "s1", Title: "Add middleware", Acceptance: "intercepts /api/*"},
 					{ID: "s2", Title: "Add login"},
 				},
@@ -31,7 +36,7 @@ func TestProjectWaveState_SpecOnly_AllPending(t *testing.T) {
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	if len(result) != 1 {
@@ -45,7 +50,7 @@ func TestProjectWaveState_SpecOnly_AllPending(t *testing.T) {
 		t.Fatalf("expected 2 steps, got %d", len(w.Steps))
 	}
 	for _, s := range w.Steps {
-		if s.Status != StepPending {
+		if s.Status != domain.StepPending {
 			t.Errorf("step %s: status = %q, want pending", s.StepID, s.Status)
 		}
 	}
@@ -56,28 +61,28 @@ func TestProjectWaveState_SpecOnly_AllPending(t *testing.T) {
 
 func TestProjectWaveState_StepCompleted(t *testing.T) {
 	// given
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		{
 			Kind:        "specification",
 			Description: "Auth wave",
-			Wave:        &WaveReference{ID: "auth-w1", Steps: []WaveStepDef{{ID: "s1", Title: "Step 1"}, {ID: "s2", Title: "Step 2"}}},
+			Wave:        &domain.WaveReference{ID: "auth-w1", Steps: []domain.WaveStepDef{{ID: "s1", Title: "Step 1"}, {ID: "s2", Title: "Step 2"}}},
 		},
 		{
 			Kind: "report",
-			Wave: &WaveReference{ID: "auth-w1", Step: "s1"},
+			Wave: &domain.WaveReference{ID: "auth-w1", Step: "s1"},
 			// severity empty = success
 		},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	w := result[0]
-	if w.Steps[0].Status != StepCompleted {
+	if w.Steps[0].Status != domain.StepCompleted {
 		t.Errorf("s1 status = %q, want completed", w.Steps[0].Status)
 	}
-	if w.Steps[1].Status != StepPending {
+	if w.Steps[1].Status != domain.StepPending {
 		t.Errorf("s2 status = %q, want pending", w.Steps[1].Status)
 	}
 	if w.IsComplete() {
@@ -87,14 +92,14 @@ func TestProjectWaveState_StepCompleted(t *testing.T) {
 
 func TestProjectWaveState_AllStepsCompleted(t *testing.T) {
 	// given
-	dmails := []DMail{
-		{Kind: "specification", Wave: &WaveReference{ID: "w1", Steps: []WaveStepDef{{ID: "s1"}, {ID: "s2"}}}},
-		{Kind: "report", Wave: &WaveReference{ID: "w1", Step: "s1"}},
-		{Kind: "report", Wave: &WaveReference{ID: "w1", Step: "s2"}},
+	dmails := []domain.DMail{
+		{Kind: "specification", Wave: &domain.WaveReference{ID: "w1", Steps: []domain.WaveStepDef{{ID: "s1"}, {ID: "s2"}}}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "w1", Step: "s1"}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "w1", Step: "s2"}},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	if !result[0].IsComplete() {
@@ -104,19 +109,19 @@ func TestProjectWaveState_AllStepsCompleted(t *testing.T) {
 
 func TestProjectWaveState_FailedThenRetrySuccess(t *testing.T) {
 	// given: fail → feedback → retry success
-	dmails := []DMail{
-		{Kind: "specification", Wave: &WaveReference{ID: "w1", Steps: []WaveStepDef{{ID: "s1"}}}},
-		{Kind: "report", Severity: "high", Wave: &WaveReference{ID: "w1", Step: "s1"}},
-		{Kind: "implementation-feedback", Wave: &WaveReference{ID: "w1", Step: "s1"}},
-		{Kind: "report", Wave: &WaveReference{ID: "w1", Step: "s1"}}, // retry success
+	dmails := []domain.DMail{
+		{Kind: "specification", Wave: &domain.WaveReference{ID: "w1", Steps: []domain.WaveStepDef{{ID: "s1"}}}},
+		{Kind: "report", Severity: "high", Wave: &domain.WaveReference{ID: "w1", Step: "s1"}},
+		{Kind: "implementation-feedback", Wave: &domain.WaveReference{ID: "w1", Step: "s1"}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "w1", Step: "s1"}}, // retry success
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	s := result[0].Steps[0]
-	if s.Status != StepCompleted {
+	if s.Status != domain.StepCompleted {
 		t.Errorf("status = %q, want completed after retry", s.Status)
 	}
 	if s.Attempts != 2 {
@@ -126,13 +131,13 @@ func TestProjectWaveState_FailedThenRetrySuccess(t *testing.T) {
 
 func TestProjectWaveState_SingleStepWave(t *testing.T) {
 	// given: wave with no explicit steps = wave itself is the step
-	dmails := []DMail{
-		{Kind: "specification", Description: "Small fix", Wave: &WaveReference{ID: "fix-w1"}},
-		{Kind: "report", Wave: &WaveReference{ID: "fix-w1"}}, // step="" → uses waveID
+	dmails := []domain.DMail{
+		{Kind: "specification", Description: "Small fix", Wave: &domain.WaveReference{ID: "fix-w1"}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "fix-w1"}}, // step="" → uses waveID
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	if len(result) != 1 {
@@ -152,14 +157,14 @@ func TestProjectWaveState_SingleStepWave(t *testing.T) {
 
 func TestProjectWaveState_MultipleWaves(t *testing.T) {
 	// given
-	dmails := []DMail{
-		{Kind: "specification", Description: "Wave A", Wave: &WaveReference{ID: "a", Steps: []WaveStepDef{{ID: "a1"}}}},
-		{Kind: "specification", Description: "Wave B", Wave: &WaveReference{ID: "b", Steps: []WaveStepDef{{ID: "b1"}, {ID: "b2"}}}},
-		{Kind: "report", Wave: &WaveReference{ID: "a", Step: "a1"}},
+	dmails := []domain.DMail{
+		{Kind: "specification", Description: "Wave A", Wave: &domain.WaveReference{ID: "a", Steps: []domain.WaveStepDef{{ID: "a1"}}}},
+		{Kind: "specification", Description: "Wave B", Wave: &domain.WaveReference{ID: "b", Steps: []domain.WaveStepDef{{ID: "b1"}, {ID: "b2"}}}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "a", Step: "a1"}},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	if len(result) != 2 {
@@ -175,14 +180,14 @@ func TestProjectWaveState_MultipleWaves(t *testing.T) {
 
 func TestProjectWaveState_DMailsWithoutWaveIgnored(t *testing.T) {
 	// given: mix of wave and non-wave D-Mails
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		{Kind: "report", Description: "Legacy report"}, // no wave field
-		{Kind: "specification", Wave: &WaveReference{ID: "w1", Steps: []WaveStepDef{{ID: "s1"}}}},
+		{Kind: "specification", Wave: &domain.WaveReference{ID: "w1", Steps: []domain.WaveStepDef{{ID: "s1"}}}},
 		{Kind: "implementation-feedback", Description: "Legacy feedback"}, // no wave field
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	if len(result) != 1 {
@@ -192,28 +197,28 @@ func TestProjectWaveState_DMailsWithoutWaveIgnored(t *testing.T) {
 
 func TestProjectWaveState_SkippedReportCompletesStep(t *testing.T) {
 	// given: spec + skipped report (Claude determined issue was already done)
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		{
 			Kind: "specification",
-			Wave: &WaveReference{ID: "auth-w1", Steps: []WaveStepDef{{ID: "s1", Title: "Step 1"}, {ID: "s2", Title: "Step 2"}}},
+			Wave: &domain.WaveReference{ID: "auth-w1", Steps: []domain.WaveStepDef{{ID: "s1", Title: "Step 1"}, {ID: "s2", Title: "Step 2"}}},
 		},
 		{
 			Kind:     "report",
-			Wave:     &WaveReference{ID: "auth-w1", Step: "s1"},
+			Wave:     &domain.WaveReference{ID: "auth-w1", Step: "s1"},
 			Metadata: map[string]string{"status": "skipped"},
 			// severity empty → currently treated as success (completed)
 		},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then: s1 should be completed (skipped = already done)
 	w := result[0]
-	if w.Steps[0].Status != StepCompleted {
+	if w.Steps[0].Status != domain.StepCompleted {
 		t.Errorf("s1 status = %q, want completed (skipped should mark as completed)", w.Steps[0].Status)
 	}
-	if w.Steps[1].Status != StepPending {
+	if w.Steps[1].Status != domain.StepPending {
 		t.Errorf("s2 status = %q, want pending", w.Steps[1].Status)
 	}
 }
@@ -221,26 +226,26 @@ func TestProjectWaveState_SkippedReportCompletesStep(t *testing.T) {
 func TestProjectWaveState_MultiWaveProgression(t *testing.T) {
 	// given: 2 waves with multiple steps, some completed/skipped
 	// Simulates go-taskboard state after several expeditions
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		// Wave 1: spec with 3 steps
-		{Kind: "specification", Wave: &WaveReference{
+		{Kind: "specification", Wave: &domain.WaveReference{
 			ID:    "validation:w1",
-			Steps: []WaveStepDef{{ID: "2"}, {ID: "3"}, {ID: "4"}},
+			Steps: []domain.WaveStepDef{{ID: "2"}, {ID: "3"}, {ID: "4"}},
 		}},
 		// Wave 2: spec with 2 steps
-		{Kind: "specification", Wave: &WaveReference{
+		{Kind: "specification", Wave: &domain.WaveReference{
 			ID:    "api:w1",
-			Steps: []WaveStepDef{{ID: "6"}, {ID: "7"}},
+			Steps: []domain.WaveStepDef{{ID: "6"}, {ID: "7"}},
 		}},
 		// Wave 1, step 2: completed via skipped report (severity empty)
-		{Kind: "report", Wave: &WaveReference{ID: "validation:w1", Step: "2"}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "validation:w1", Step: "2"}},
 		// Wave 1, step 3: completed via success report
-		{Kind: "report", Severity: "low", Wave: &WaveReference{ID: "validation:w1", Step: "3"}},
+		{Kind: "report", Severity: "low", Wave: &domain.WaveReference{ID: "validation:w1", Step: "3"}},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
-	targets := ExpeditionTargetsFromWaves(result)
+	result := policy.ProjectWaveState(dmails)
+	targets := policy.ExpeditionTargetsFromWaves(result)
 
 	// then: wave 1 has 1 pending (step 4), wave 2 has 2 pending (steps 6, 7)
 	if len(targets) != 3 {
@@ -261,28 +266,28 @@ func TestProjectWaveState_ReportBeforeSpec_StillCompletes(t *testing.T) {
 	// given: report arrives before spec in archive sort order
 	// (pt-report-* sorts before spec-* alphabetically)
 	// This is the real go-taskboard scenario causing the infinite loop
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		// Report first (alphabetical file order: pt- < spec-)
-		{Kind: "report", Wave: &WaveReference{ID: "validation:w1", Step: "2"}},
+		{Kind: "report", Wave: &domain.WaveReference{ID: "validation:w1", Step: "2"}},
 		// Spec second
-		{Kind: "specification", Wave: &WaveReference{
+		{Kind: "specification", Wave: &domain.WaveReference{
 			ID:    "validation:w1",
-			Steps: []WaveStepDef{{ID: "2"}, {ID: "3"}},
+			Steps: []domain.WaveStepDef{{ID: "2"}, {ID: "3"}},
 		}},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then: step 2 should be completed even though report came before spec
 	if len(result) != 1 {
 		t.Fatalf("expected 1 wave, got %d", len(result))
 	}
 	w := result[0]
-	if w.Steps[0].Status != StepCompleted {
+	if w.Steps[0].Status != domain.StepCompleted {
 		t.Errorf("step 2 status = %q, want completed (report-before-spec)", w.Steps[0].Status)
 	}
-	if w.Steps[1].Status != StepPending {
+	if w.Steps[1].Status != domain.StepPending {
 		t.Errorf("step 3 status = %q, want pending", w.Steps[1].Status)
 	}
 }
@@ -315,24 +320,24 @@ wave:
 ---
 # Report
 `)
-	spec, err := ParseDMail(specBytes)
+	spec, err := domain.ParseDMail(specBytes)
 	if err != nil {
 		t.Fatalf("parse spec: %v", err)
 	}
-	report, err := ParseDMail(reportBytes)
+	report, err := domain.ParseDMail(reportBytes)
 	if err != nil {
 		t.Fatalf("parse report: %v", err)
 	}
 
 	// when
-	result := ProjectWaveState([]DMail{spec, report})
+	result := policy.ProjectWaveState([]domain.DMail{spec, report})
 
 	// then: step 2 completed
 	w := result[0]
-	if w.Steps[0].StepID != "2" || w.Steps[0].Status != StepCompleted {
+	if w.Steps[0].StepID != "2" || w.Steps[0].Status != domain.StepCompleted {
 		t.Errorf("step 2: status=%q, want completed", w.Steps[0].Status)
 	}
-	if w.Steps[1].StepID != "3" || w.Steps[1].Status != StepPending {
+	if w.Steps[1].StepID != "3" || w.Steps[1].Status != domain.StepPending {
 		t.Errorf("step 3: status=%q, want pending", w.Steps[1].Status)
 	}
 }
@@ -340,12 +345,12 @@ wave:
 func TestProjectWaveState_DuplicateStepIDs_ReportCompletesStep(t *testing.T) {
 	// given: spec with duplicate step IDs (real go-taskboard data)
 	// ProjectWaveState uses map[stepID], so duplicates are deduplicated (last wins)
-	dmails := []DMail{
+	dmails := []domain.DMail{
 		{
 			Kind: "specification",
-			Wave: &WaveReference{
+			Wave: &domain.WaveReference{
 				ID: "入力バリデーション:cluster-w1",
-				Steps: []WaveStepDef{
+				Steps: []domain.WaveStepDef{
 					{ID: "2", Title: "First occurrence of step 2"},
 					{ID: "3", Title: "Step 3"},
 					{ID: "2", Title: "Second occurrence of step 2"},
@@ -356,21 +361,21 @@ func TestProjectWaveState_DuplicateStepIDs_ReportCompletesStep(t *testing.T) {
 		},
 		{
 			Kind: "report",
-			Wave: &WaveReference{ID: "入力バリデーション:cluster-w1", Step: "2"},
+			Wave: &domain.WaveReference{ID: "入力バリデーション:cluster-w1", Step: "2"},
 			// severity empty = StepCompleted
 		},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then: step 2 completed despite duplicates, steps 3 and 5 pending
 	w := result[0]
 	for _, s := range w.Steps {
-		if s.StepID == "2" && s.Status != StepCompleted {
+		if s.StepID == "2" && s.Status != domain.StepCompleted {
 			t.Errorf("step 2 status = %q, want completed", s.Status)
 		}
-		if (s.StepID == "3" || s.StepID == "5") && s.Status != StepPending {
+		if (s.StepID == "3" || s.StepID == "5") && s.Status != domain.StepPending {
 			t.Errorf("step %s status = %q, want pending", s.StepID, s.Status)
 		}
 	}
@@ -384,12 +389,12 @@ func TestProjectWaveState_DuplicateStepIDs_ReportCompletesStep(t *testing.T) {
 
 func TestProjectWaveState_ReportWithoutSpec_Ignored(t *testing.T) {
 	// given: report for unknown wave
-	dmails := []DMail{
-		{Kind: "report", Wave: &WaveReference{ID: "unknown", Step: "s1"}},
+	dmails := []domain.DMail{
+		{Kind: "report", Wave: &domain.WaveReference{ID: "unknown", Step: "s1"}},
 	}
 
 	// when
-	result := ProjectWaveState(dmails)
+	result := policy.ProjectWaveState(dmails)
 
 	// then
 	if len(result) != 0 {

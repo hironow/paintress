@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 )
 
@@ -88,8 +89,8 @@ func newTestExpedition(t *testing.T, output string, exitCode int) *Expedition {
 		},
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(output, exitCode),
 	}
 }
@@ -104,8 +105,8 @@ func TestExpedition_BuildPrompt_ContainsNumber(t *testing.T) {
 			DevURL:     "http://localhost:3000",
 		},
 		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -141,8 +142,8 @@ func TestExpedition_BuildPrompt_French(t *testing.T) {
 			DevURL:     "http://localhost:3000",
 		},
 		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -166,7 +167,7 @@ func TestExpedition_BuildPrompt_French(t *testing.T) {
 
 func TestExpedition_BuildPrompt_ContainsGradient(t *testing.T) {
 	dir := t.TempDir()
-	g := domain.NewGradientGauge(5)
+	g := harness.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 
@@ -176,7 +177,7 @@ func TestExpedition_BuildPrompt_ContainsGradient(t *testing.T) {
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
 		Gradient:  g,
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -192,8 +193,8 @@ func TestExpedition_BuildPrompt_ContainsLuminas(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 		Luminas: []domain.Lumina{
 			{Pattern: "[WARN] Failed 3 times: timeout", Source: "failure-pattern", Uses: 3},
 		},
@@ -212,8 +213,8 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -224,7 +225,7 @@ func TestExpedition_BuildPrompt_NoLuminas(t *testing.T) {
 
 func TestExpedition_BuildPrompt_ReserveInfo(t *testing.T) {
 	dir := t.TempDir()
-	rp := domain.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false))
+	rp := harness.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false))
 	rp.CheckOutput("rate limit") // Switch to reserve
 
 	e := &Expedition{
@@ -232,7 +233,7 @@ func TestExpedition_BuildPrompt_ReserveInfo(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "develop", DevURL: "http://localhost:5173"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
+		Gradient:  harness.NewGradientGauge(5),
 		Reserve:   rp,
 	}
 
@@ -255,8 +256,8 @@ func TestExpedition_BuildPrompt_OutputFormat(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -285,8 +286,8 @@ func TestBuildPrompt_IncludesContextFiles(t *testing.T) {
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := exp.BuildPrompt()
@@ -309,8 +310,8 @@ func TestBuildPrompt_NoContextSection_WhenEmpty(t *testing.T) {
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Luminas:   nil,
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := exp.BuildPrompt()
@@ -583,8 +584,8 @@ echo "done"
 		},
 		LogDir:   logDir,
 		Logger:   logger,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, logger),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, logger),
 	}
 
 	ctx := context.Background()
@@ -646,8 +647,8 @@ echo "done"
 		},
 		LogDir:   logDir,
 		Logger:   logger,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, logger),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, logger),
 	}
 
 	ctx := context.Background()
@@ -673,8 +674,8 @@ func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	for _, lang := range []string{"en", "ja", "fr"} {
@@ -701,8 +702,8 @@ func TestExpedition_BuildPrompt_EmptyDevURL_NoDevServerLine(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: ""},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// Test all 3 languages
@@ -744,8 +745,8 @@ func TestBuildPrompt_WithLinearConfig(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -766,8 +767,8 @@ func TestBuildPrompt_WithoutLinearConfig(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -793,8 +794,8 @@ func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// Must not panic — should gracefully omit Linear scope
@@ -864,8 +865,8 @@ __EXPEDITION_END__`
 		},
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd(reportOutput, 0),
 	}
 
@@ -920,8 +921,8 @@ func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
 		},
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
 	}
 
@@ -950,8 +951,8 @@ func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 		Continent: dir,
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -1090,8 +1091,8 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1151,8 +1152,8 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1220,8 +1221,8 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1293,8 +1294,8 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1401,8 +1402,8 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1474,8 +1475,8 @@ echo "done"
 		LogDir:   logDir,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when
@@ -1580,8 +1581,8 @@ echo "done"
 		LogDir:   logDir1,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 	exp2 := &Expedition{
 		Number:    2,
@@ -1596,8 +1597,8 @@ echo "done"
 		LogDir:   logDir2,
 		Logger:   platform.NewLogger(io.Discard, false),
 		DataOut:  io.Discard,
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// when — run both expeditions concurrently

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -508,7 +509,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if err := p.emitExpeditionCompleted(expCtx, exp, "success", report.IssueID, fmt.Sprintf("%d", report.BugsFound), model, waveID, stepID); err != nil {
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
-		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
+		if dm := harness.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
@@ -539,7 +540,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		// Send report D-Mail so ProjectWaveState marks the step as completed.
 		// Without this, skipped steps remain pending and cause infinite loops.
 		// Skipped = already done, so override severity to empty (= StepCompleted).
-		if dm := domain.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
+		if dm := harness.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
 			dm.Severity = "" // force StepCompleted in ProjectWaveState
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 )
@@ -214,8 +215,8 @@ func TestExpedition_BuildPrompt_ZeroNumber(t *testing.T) {
 		Continent: "/tmp",
 		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	prompt := e.BuildPrompt()
@@ -230,8 +231,8 @@ func TestExpedition_BuildPrompt_EmptyConfig(t *testing.T) {
 		Continent: "",
 		Config:    domain.Config{}, // all empty
 		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  domain.NewGradientGauge(5),
-		Reserve:   domain.NewReserveParty("", nil, platform.NewLogger(io.Discard, false)),
+		Gradient:  harness.NewGradientGauge(5),
+		Reserve:   harness.NewReserveParty("", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	// Should not panic with empty config

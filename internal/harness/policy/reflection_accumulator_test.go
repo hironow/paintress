@@ -1,16 +1,16 @@
-package domain_test
+package policy_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 // TestReflectionAccumulator_EmptyAccumulator verifies FormatForPrompt on empty accumulator.
 func TestReflectionAccumulator_EmptyAccumulator(t *testing.T) {
 	// given
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 
 	// when
 	prompt := acc.FormatForPrompt()
@@ -24,7 +24,7 @@ func TestReflectionAccumulator_EmptyAccumulator(t *testing.T) {
 // TestReflectionAccumulator_AddCycleAndFormat verifies cycle data is formatted.
 func TestReflectionAccumulator_AddCycleAndFormat(t *testing.T) {
 	// given
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] Missing error handling\n[P1] Nil pointer risk")
 
 	// when
@@ -45,7 +45,7 @@ func TestReflectionAccumulator_AddCycleAndFormat(t *testing.T) {
 // TestReflectionAccumulator_MultipleCycles verifies all cycles are accumulated.
 func TestReflectionAccumulator_MultipleCycles(t *testing.T) {
 	// given
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] First issue")
 	acc.AddCycle(2, "[P1] Second issue")
 
@@ -64,7 +64,7 @@ func TestReflectionAccumulator_MultipleCycles(t *testing.T) {
 // TestReflectionAccumulator_IsStagnantAfterNoProgress verifies stagnation detection.
 func TestReflectionAccumulator_IsStagnantAfterNoProgress(t *testing.T) {
 	// given: same comment count across two cycles
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] issue A\n[P2] issue B") // 2 tags
 	acc.AddCycle(2, "[P2] still A\n[P2] still B") // 2 tags (no change)
 
@@ -80,7 +80,7 @@ func TestReflectionAccumulator_IsStagnantAfterNoProgress(t *testing.T) {
 // TestReflectionAccumulator_IsStagnantAfterImprovement verifies no stagnation when improving.
 func TestReflectionAccumulator_IsStagnantAfterImprovement(t *testing.T) {
 	// given: tag count decreased
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] issue A\n[P2] issue B\n[P1] issue C") // 3 tags
 	acc.AddCycle(2, "[P2] issue A")                             // 1 tag (improvement)
 
@@ -96,7 +96,7 @@ func TestReflectionAccumulator_IsStagnantAfterImprovement(t *testing.T) {
 // TestReflectionAccumulator_IsStagnantWithOneCycle verifies no stagnation after first cycle.
 func TestReflectionAccumulator_IsStagnantWithOneCycle(t *testing.T) {
 	// given: only one cycle recorded
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] issue A")
 
 	// when
@@ -113,11 +113,11 @@ func TestBuildReviewFixPrompt_WithAccumulator(t *testing.T) {
 	// given
 	branch := "feat/test-branch"
 	comments := "[P1] Fix the error handling"
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 	acc.AddCycle(1, "[P2] prior issue")
 
 	// when
-	prompt := domain.BuildReviewFixPromptWithReflection(branch, comments, acc)
+	prompt := policy.BuildReviewFixPromptWithReflection(branch, comments, acc)
 
 	// then
 	if !strings.Contains(prompt, branch) {
@@ -136,10 +136,10 @@ func TestBuildReviewFixPrompt_WithEmptyAccumulator(t *testing.T) {
 	// given
 	branch := "feat/test-branch"
 	comments := "[P1] Fix the error handling"
-	acc := domain.NewReflectionAccumulator()
+	acc := policy.NewReflectionAccumulator()
 
 	// when
-	prompt := domain.BuildReviewFixPromptWithReflection(branch, comments, acc)
+	prompt := policy.BuildReviewFixPromptWithReflection(branch, comments, acc)
 
 	// then: should still produce a valid prompt
 	if !strings.Contains(prompt, branch) {

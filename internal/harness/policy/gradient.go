@@ -1,9 +1,11 @@
-package domain
+package policy
 
 import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // GradientGauge tracks consecutive successes to scale difficulty.
@@ -91,13 +93,13 @@ func (g *GradientGauge) PriorityHint() string {
 func (g *GradientGauge) priorityHint() string {
 	switch {
 	case g.level >= g.max:
-		return Msg("grad_attack")
+		return domain.Msg("grad_attack")
 	case g.level >= 3:
-		return Msg("grad_high")
+		return domain.Msg("grad_high")
 	case g.level >= 1:
-		return Msg("grad_normal")
+		return domain.Msg("grad_normal")
 	default:
-		return Msg("grad_empty")
+		return domain.Msg("grad_empty")
 	}
 }
 

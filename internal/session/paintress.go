@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -43,7 +44,7 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 	if classifyTarget == "" {
 		classifyTarget = err.Error()
 	}
-	info := domain.ClassifyProviderError(provider, classifyTarget)
+	info := harness.ClassifyProviderError(provider, classifyTarget)
 	if info.IsTrip() {
 		sharedCircuitBreaker.RecordProviderError(info)
 	}
@@ -68,8 +69,8 @@ type Paintress struct {
 	ErrOut      io.Writer // stderr-equivalent for UI chrome (banners, blank lines)
 	StdinIn     io.Reader // stdin-equivalent for interactive input
 	devServer   *DevServer
-	gradient    *domain.GradientGauge
-	reserve     *domain.ReserveParty
+	gradient    *harness.GradientGauge
+	reserve     *harness.ReserveParty
 	pool        *WorktreePool // nil when --workers=0
 	notifier    port.Notifier
 	approver    port.Approver
@@ -77,7 +78,7 @@ type Paintress struct {
 	claude      port.ClaudeRunner
 
 	// Retry tracking: maps sorted issue keys to attempt count
-	retryTracker *domain.RetryTracker
+	retryTracker *harness.RetryTracker
 
 	// PreFlightTriager processes D-Mail actions before expedition (usecase-injected)
 	preFlightTriager port.PreFlightTriager
@@ -162,11 +163,11 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		DataOut:         dataOut,
 		ErrOut:          errOut,
 		StdinIn:         stdinIn,
-		gradient:        domain.NewGradientGauge(gradientMax),
-		reserve:         domain.NewReserveParty(primary, reserves, logger),
+		gradient:        harness.NewGradientGauge(gradientMax),
+		reserve:         harness.NewReserveParty(primary, reserves, logger),
 		notifier:        notifier,
 		approver:        approver,
-		retryTracker:    domain.NewRetryTracker(),
+		retryTracker:    harness.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
 		claude: newTrackedClaudeRunner(cfgCopy, primary, logger),
 	}
@@ -370,7 +371,7 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.Error("inbox scan failed (fail-closed): %v", scanErr)
 		return 1
 	}
-	if highDMails := domain.FilterHighSeverity(preflightInbox); len(highDMails) > 0 {
+	if highDMails := harness.FilterHighSeverity(preflightInbox); len(highDMails) > 0 {
 		names := make([]string, len(highDMails))
 		for i, dm := range highDMails {
 			names[i] = dm.Name

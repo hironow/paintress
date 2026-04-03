@@ -1,4 +1,4 @@
-package domain_test
+package policy_test
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 // Property-based tests for GradientGauge invariants.
@@ -18,7 +19,7 @@ import (
 func TestGradient_Property_LevelBounds(t *testing.T) {
 	f := func(ops []byte, maxVal uint8) bool {
 		max := int(maxVal%20) + 1 // max in [1, 20]
-		g := domain.NewGradientGauge(max)
+		g := policy.NewGradientGauge(max)
 
 		for _, op := range ops {
 			switch op % 3 {
@@ -46,7 +47,7 @@ func TestGradient_Property_LevelBounds(t *testing.T) {
 func TestGradient_Property_IsGradientAttackConsistency(t *testing.T) {
 	f := func(ops []byte, maxVal uint8) bool {
 		max := int(maxVal%20) + 1
-		g := domain.NewGradientGauge(max)
+		g := policy.NewGradientGauge(max)
 
 		for _, op := range ops {
 			switch op % 3 {
@@ -83,7 +84,7 @@ func TestGradient_Property_PriorityHintMonotonicity(t *testing.T) {
 
 	f := func(maxVal uint8) bool {
 		max := int(maxVal%20) + 1
-		g := domain.NewGradientGauge(max)
+		g := policy.NewGradientGauge(max)
 
 		prevRank := hintRank(g.PriorityHint())
 		for i := 0; i < max; i++ {
@@ -105,7 +106,7 @@ func TestGradient_Property_PriorityHintMonotonicity(t *testing.T) {
 // RecordGradientChange produces events with Level matching the gauge state.
 func TestGradientGauge_ExpeditionAggregate_Linkage(t *testing.T) {
 	// given
-	gauge := domain.NewGradientGauge(5)
+	gauge := policy.NewGradientGauge(5)
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now()
 
@@ -138,7 +139,7 @@ func TestGradientGauge_ExpeditionAggregate_Linkage(t *testing.T) {
 
 // TestGradientGauge_DischargeEvent verifies discharge produces level=0 event.
 func TestGradientGauge_DischargeEvent(t *testing.T) {
-	gauge := domain.NewGradientGauge(5)
+	gauge := policy.NewGradientGauge(5)
 	agg := domain.NewExpeditionAggregate()
 	now := time.Now()
 

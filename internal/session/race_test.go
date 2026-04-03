@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 )
 
@@ -142,8 +143,8 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 
 func TestRace_Expedition_ConcurrentReserveCheck(t *testing.T) {
 	dir := t.TempDir()
-	rp := domain.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false))
-	g := domain.NewGradientGauge(5)
+	rp := harness.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false))
+	g := harness.NewGradientGauge(5)
 
 	e := &Expedition{
 		Number:    1,

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -258,7 +259,7 @@ func TestFormatDMailForPrompt_EmptySlice(t *testing.T) {
 	var dmails []domain.DMail
 
 	// when
-	result := domain.FormatDMailForPrompt(dmails)
+	result := harness.FormatDMailForPrompt(dmails)
 
 	// then
 	if result != "" {
@@ -279,7 +280,7 @@ func TestFormatDMailForPrompt_SingleDMail(t *testing.T) {
 	}
 
 	// when
-	result := domain.FormatDMailForPrompt(dmails)
+	result := harness.FormatDMailForPrompt(dmails)
 
 	// then
 	if !strings.Contains(result, "spec-my-42") {
@@ -304,7 +305,7 @@ func TestFormatDMailForPrompt_MultipleDMails(t *testing.T) {
 	}
 
 	// when
-	result := domain.FormatDMailForPrompt(dmails)
+	result := harness.FormatDMailForPrompt(dmails)
 
 	// then
 	if !strings.Contains(result, "spec-my-10") {
@@ -325,7 +326,7 @@ func TestFormatDMailForPrompt_BodylessDMail(t *testing.T) {
 	}
 
 	// when
-	result := domain.FormatDMailForPrompt(dmails)
+	result := harness.FormatDMailForPrompt(dmails)
 
 	// then — should still contain name and description
 	if !strings.Contains(result, "report-my-99") {
@@ -351,7 +352,7 @@ func TestNewReportDMail_BasicFields(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// then
 	if dm.Kind != "report" {
@@ -381,7 +382,7 @@ func TestNewReportDMail_NameNormalization(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// then — name should be lowercase
 	if dm.Name != "pt-report-my-100_00000000" {
@@ -1083,7 +1084,7 @@ func TestNewReportDMail_NoPRUrl(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// then — body should not contain PR line
 	if strings.Contains(dm.Body, "**PR:**") {
@@ -1103,7 +1104,7 @@ func TestNewReportDMail_PRUrlNone(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// then — "none" is also excluded
 	if strings.Contains(dm.Body, "**PR:**") {
@@ -1123,7 +1124,7 @@ func TestNewReportDMail_NoReason(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// then — body should not contain Summary section
 	if strings.Contains(dm.Body, "## Summary") {
@@ -1143,7 +1144,7 @@ func TestNewReportDMail_MarshalRoundTrip(t *testing.T) {
 		Reason:      "Added Redis caching layer",
 	}
 
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// when — marshal then parse
 	data, err := dm.Marshal()
@@ -1239,7 +1240,7 @@ func TestNewReportDMail_SetsSchemaVersion(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 0)
+	dm := harness.NewReportDMail(report, 0)
 
 	// then
 	if dm.SchemaVersion != domain.DMailSchemaVersion {
@@ -1403,7 +1404,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 
 	// ── Phase 3: Format for prompt injection ──
 
-	promptSection := domain.FormatDMailForPrompt(scanned)
+	promptSection := harness.FormatDMailForPrompt(scanned)
 	if promptSection == "" {
 		t.Fatal("FormatDMailForPrompt returned empty string")
 	}
@@ -1433,7 +1434,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 		Status:      "success",
 		Reason:      "Implemented token bucket with Redis backend",
 	}
-	reportDMail := domain.NewReportDMail(report, 0)
+	reportDMail := harness.NewReportDMail(report, 0)
 
 	if reportDMail.Name != "pt-report-my-42_00000000" {
 		t.Errorf("report Name = %q, want report-my-42", reportDMail.Name)
@@ -1557,7 +1558,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 
 	// ── Phase 2: Empty prompt section ──
 
-	promptSection := domain.FormatDMailForPrompt(scanned)
+	promptSection := harness.FormatDMailForPrompt(scanned)
 	if promptSection != "" {
 		t.Errorf("expected empty prompt section, got %q", promptSection)
 	}
@@ -1572,7 +1573,7 @@ func TestDMailLifecycle_EmptyInbox(t *testing.T) {
 		Status:      "success",
 		Reason:      "Initial setup complete",
 	}
-	reportDMail := domain.NewReportDMail(report, 0)
+	reportDMail := harness.NewReportDMail(report, 0)
 	if err := session.SendDMail(context.Background(), store, reportDMail, nil); err != nil {
 		t.Fatalf("SendDMail: %v", err)
 	}
@@ -1612,7 +1613,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 	}
 
 	// Success → send report + archive inbox
-	report1 := domain.NewReportDMail(&domain.ExpeditionReport{
+	report1 := harness.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 1, IssueID: "MY-1", IssueTitle: "First", MissionType: "implement", Status: "success",
 	}, 0)
 	if err := session.SendDMail(context.Background(), store, report1, nil); err != nil {
@@ -1644,7 +1645,7 @@ func TestDMailLifecycle_MultipleExpeditions(t *testing.T) {
 		t.Fatalf("Exp2: unexpected scan result: %v", scanned2)
 	}
 
-	report2 := domain.NewReportDMail(&domain.ExpeditionReport{
+	report2 := harness.NewReportDMail(&domain.ExpeditionReport{
 		Expedition: 2, IssueID: "MY-2", IssueTitle: "Second", MissionType: "fix", Status: "success",
 	}, 0)
 	if err := session.SendDMail(context.Background(), store, report2, nil); err != nil {
@@ -1686,7 +1687,7 @@ func TestBuildFollowUpPrompt_SingleDMail(t *testing.T) {
 		{Name: "spec-my-42", Kind: "specification", Description: "Rate limiting spec", Issues: []string{"MY-42"}, Body: "# DoD\n- Token bucket\n"},
 	}
 
-	prompt := domain.BuildFollowUpPrompt(dmails)
+	prompt := harness.BuildFollowUpPrompt(dmails)
 
 	if !strings.Contains(prompt, "spec-my-42") {
 		t.Error("prompt should contain d-mail name")
@@ -1705,7 +1706,7 @@ func TestBuildFollowUpPrompt_MultipleDMails(t *testing.T) {
 		{Name: "feedback-d-001", Kind: "implementation-feedback", Description: "Review feedback", Severity: "medium"},
 	}
 
-	prompt := domain.BuildFollowUpPrompt(dmails)
+	prompt := harness.BuildFollowUpPrompt(dmails)
 
 	if !strings.Contains(prompt, "spec-my-42") {
 		t.Error("prompt should contain first d-mail")
@@ -1716,7 +1717,7 @@ func TestBuildFollowUpPrompt_MultipleDMails(t *testing.T) {
 }
 
 func TestBuildFollowUpPrompt_EmptySlice(t *testing.T) {
-	prompt := domain.BuildFollowUpPrompt(nil)
+	prompt := harness.BuildFollowUpPrompt(nil)
 	if prompt != "" {
 		t.Errorf("empty input should return empty string, got %q", prompt)
 	}
@@ -1730,7 +1731,7 @@ func TestFilterHighSeverity_NoHighSeverity(t *testing.T) {
 	}
 
 	// when
-	high := domain.FilterHighSeverity(dmails)
+	high := harness.FilterHighSeverity(dmails)
 
 	// then
 	if len(high) != 0 {
@@ -1748,7 +1749,7 @@ func TestFilterHighSeverity_MixedSeverity(t *testing.T) {
 	}
 
 	// when
-	high := domain.FilterHighSeverity(dmails)
+	high := harness.FilterHighSeverity(dmails)
 
 	// then
 	if len(high) != 2 {
@@ -1764,7 +1765,7 @@ func TestFilterHighSeverity_EmptySlice(t *testing.T) {
 	var dmails []domain.DMail
 
 	// when
-	high := domain.FilterHighSeverity(dmails)
+	high := harness.FilterHighSeverity(dmails)
 
 	// then
 	if len(high) != 0 {

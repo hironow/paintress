@@ -1,14 +1,14 @@
-package domain_test
+package policy_test
 
 import (
 	"testing"
 
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 func TestRetryTracker_Track_AlwaysIncrements(t *testing.T) {
 	// given
-	rt := domain.NewRetryTrackerWithMax(3)
+	rt := policy.NewRetryTrackerWithMax(3)
 	issues := []string{"ISS-1", "ISS-2"}
 
 	// when: track 5 times
@@ -25,7 +25,7 @@ func TestRetryTracker_Track_AlwaysIncrements(t *testing.T) {
 
 func TestRetryTracker_Exhausted_TrueAfterMax(t *testing.T) {
 	// given
-	rt := domain.NewRetryTrackerWithMax(2)
+	rt := policy.NewRetryTrackerWithMax(2)
 	issues := []string{"ISS-1"}
 	rt.Track(issues)
 	rt.Track(issues)
@@ -38,7 +38,7 @@ func TestRetryTracker_Exhausted_TrueAfterMax(t *testing.T) {
 
 func TestRetryTracker_Exhausted_FalseBeforeMax(t *testing.T) {
 	// given
-	rt := domain.NewRetryTrackerWithMax(3)
+	rt := policy.NewRetryTrackerWithMax(3)
 	issues := []string{"ISS-1"}
 	rt.Track(issues)
 
@@ -50,7 +50,7 @@ func TestRetryTracker_Exhausted_FalseBeforeMax(t *testing.T) {
 
 func TestRetryTracker_ZeroMax_MeansUnlimited(t *testing.T) {
 	// given: default constructor (max=0)
-	rt := domain.NewRetryTracker()
+	rt := policy.NewRetryTracker()
 	issues := []string{"ISS-1"}
 	for range 100 {
 		rt.Track(issues)

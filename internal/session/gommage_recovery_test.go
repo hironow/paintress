@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
@@ -103,7 +104,7 @@ func TestInjectParseErrorLumina_WritesInsight(t *testing.T) {
 func TestExecuteRecovery_TimeoutSwitchesModel(t *testing.T) {
 	p := newRecoveryTestPaintress(t)
 	// Set up reserve with a fallback model
-	p.reserve = domain.NewReserveParty("opus", []string{"sonnet"}, &domain.NopLogger{})
+	p.reserve = harness.NewReserveParty("opus", []string{"sonnet"}, &domain.NopLogger{})
 
 	decision := domain.RecoveryDecision{
 		RecoveryKind: domain.RecoveryRetry,

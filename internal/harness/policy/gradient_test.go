@@ -1,14 +1,14 @@
-package domain_test
+package policy_test
 
 import (
 	"sync"
 	"testing"
 
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 func TestGradient_NewStartsAtZero(t *testing.T) {
-	g := domain.NewGradientGauge(10)
+	g := policy.NewGradientGauge(10)
 	if g.Level() != 0 {
 		t.Errorf("new gauge should start at 0, got %d", g.Level())
 	}
@@ -18,7 +18,7 @@ func TestGradient_NewStartsAtZero(t *testing.T) {
 }
 
 func TestGradient_FormatForPrompt_AtZero(t *testing.T) {
-	g := domain.NewGradientGauge(3)
+	g := policy.NewGradientGauge(3)
 	s := g.FormatForPrompt()
 	if !containsStr(s, "░░░") {
 		t.Errorf("at 0, should show all empty bars: %q", s)
@@ -32,7 +32,7 @@ func TestGradient_FormatForPrompt_AtZero(t *testing.T) {
 }
 
 func TestGradient_FormatForPrompt_AtMax(t *testing.T) {
-	g := domain.NewGradientGauge(3)
+	g := policy.NewGradientGauge(3)
 	g.Charge()
 	g.Charge()
 	g.Charge()
@@ -49,7 +49,7 @@ func TestGradient_FormatForPrompt_AtMax(t *testing.T) {
 }
 
 func TestGradient_FormatForPrompt_Partial(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 	s := g.FormatForPrompt()
@@ -59,7 +59,7 @@ func TestGradient_FormatForPrompt_Partial(t *testing.T) {
 }
 
 func TestGradient_FormatLog_Empty(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	log := g.FormatLog()
 	if !containsStr(log, "(empty)") {
 		t.Errorf("empty gauge log should say empty: %q", log)
@@ -67,7 +67,7 @@ func TestGradient_FormatLog_Empty(t *testing.T) {
 }
 
 func TestGradient_FormatLog_WithHistory(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Discharge()
 	log := g.FormatLog()
@@ -80,7 +80,7 @@ func TestGradient_FormatLog_WithHistory(t *testing.T) {
 }
 
 func TestGradient_DecayLog(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Decay()
 	log := g.FormatLog()
@@ -90,7 +90,7 @@ func TestGradient_DecayLog(t *testing.T) {
 }
 
 func TestGradient_ConcurrentAccess(t *testing.T) {
-	g := domain.NewGradientGauge(100)
+	g := policy.NewGradientGauge(100)
 	var wg sync.WaitGroup
 
 	// 50 goroutines charge, 50 goroutines read level
@@ -116,7 +116,7 @@ func TestGradient_ConcurrentAccess(t *testing.T) {
 }
 
 func TestGradient_MaxOfOne(t *testing.T) {
-	g := domain.NewGradientGauge(1)
+	g := policy.NewGradientGauge(1)
 	g.Charge()
 	if !g.IsGradientAttack() {
 		t.Error("max=1, single charge should be gradient attack")
@@ -127,7 +127,7 @@ func TestGradient_MaxOfOne(t *testing.T) {
 }
 
 func TestGradient_ChargeDischargeCharge(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 	g.Charge()    // level 3
@@ -153,7 +153,7 @@ func TestGradient_PriorityHint_AllLevels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		g := domain.NewGradientGauge(5)
+		g := policy.NewGradientGauge(5)
 		for i := 0; i < tt.charges; i++ {
 			g.Charge()
 		}
@@ -166,7 +166,7 @@ func TestGradient_PriorityHint_AllLevels(t *testing.T) {
 
 func TestGradientGauge_DecayFromPositive_LogsDecrement(t *testing.T) {
 	// given
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 
@@ -188,7 +188,7 @@ func TestGradientGauge_DecayFromPositive_LogsDecrement(t *testing.T) {
 
 func TestGradientGauge_MultipleDecaysAtZero_NoPhantomCounts(t *testing.T) {
 	// given — gauge starts at zero
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 
 	// when — 3 decays at zero
 	g.Decay()
@@ -211,7 +211,7 @@ func TestGradientGauge_MultipleDecaysAtZero_NoPhantomCounts(t *testing.T) {
 // --- from ralph_test.go ---
 
 func TestGradient_Charge(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	if g.Level() != 0 {
 		t.Fatal("should start at 0")
 	}
@@ -228,7 +228,7 @@ func TestGradient_Charge(t *testing.T) {
 }
 
 func TestGradient_Full(t *testing.T) {
-	g := domain.NewGradientGauge(3)
+	g := policy.NewGradientGauge(3)
 	g.Charge()
 	g.Charge()
 	g.Charge()
@@ -243,7 +243,7 @@ func TestGradient_Full(t *testing.T) {
 }
 
 func TestGradient_Discharge(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 	g.Charge()
@@ -254,7 +254,7 @@ func TestGradient_Discharge(t *testing.T) {
 }
 
 func TestGradient_Decay(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 	g.Decay()
@@ -270,7 +270,7 @@ func TestGradient_Decay(t *testing.T) {
 }
 
 func TestGradient_PriorityHint(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 
 	hint := g.PriorityHint()
 	if !containsStr(hint, "Gauge empty") {
@@ -301,7 +301,7 @@ func TestGradient_PriorityHint(t *testing.T) {
 // --- from edge_cases_test.go ---
 
 func TestGradient_MaxZero(t *testing.T) {
-	g := domain.NewGradientGauge(0)
+	g := policy.NewGradientGauge(0)
 
 	// At max=0, gauge is already "full" — IsGradientAttack should be true (level >= max)
 	if !g.IsGradientAttack() {
@@ -328,7 +328,7 @@ func TestGradient_MaxZero(t *testing.T) {
 }
 
 func TestGradient_DischargeAtZero(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	// Already at 0, discharge should be idempotent
 	g.Discharge()
 	if g.Level() != 0 {
@@ -343,7 +343,7 @@ func TestGradient_DischargeAtZero(t *testing.T) {
 }
 
 func TestGradient_DoubleDischarge(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 	g.Charge()
 	g.Charge()
 	g.Charge()
@@ -356,7 +356,7 @@ func TestGradient_DoubleDischarge(t *testing.T) {
 }
 
 func TestGradient_ConcurrentMixedOperations(t *testing.T) {
-	g := domain.NewGradientGauge(100)
+	g := policy.NewGradientGauge(100)
 	var wg sync.WaitGroup
 
 	// Mix of Charge, Discharge, Decay concurrently
@@ -388,7 +388,7 @@ func TestGradient_ConcurrentMixedOperations(t *testing.T) {
 }
 
 func TestGradient_LargeMax(t *testing.T) {
-	g := domain.NewGradientGauge(1000)
+	g := policy.NewGradientGauge(1000)
 
 	for i := 0; i < 1000; i++ {
 		g.Charge()
@@ -408,7 +408,7 @@ func TestGradient_LargeMax(t *testing.T) {
 
 func TestGradient_DecayAtZero_NoPhantomLog(t *testing.T) {
 	// given: gauge at level 0
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 
 	// when: decay at zero
 	g.Decay()
@@ -422,7 +422,7 @@ func TestGradient_DecayAtZero_NoPhantomLog(t *testing.T) {
 
 func TestGradient_NegativeMax_ClampsToZero(t *testing.T) {
 	// given
-	g := domain.NewGradientGauge(-5)
+	g := policy.NewGradientGauge(-5)
 
 	// then: level starts at 0
 	if g.Level() != 0 {
@@ -451,7 +451,7 @@ func TestGradient_NegativeMax_ClampsToZero(t *testing.T) {
 // --- from race_test.go ---
 
 func TestGradient_ConcurrentFormatForPrompt(t *testing.T) {
-	g := domain.NewGradientGauge(5)
+	g := policy.NewGradientGauge(5)
 
 	var wg sync.WaitGroup
 
@@ -480,7 +480,7 @@ func TestGradient_ConcurrentFormatForPrompt(t *testing.T) {
 }
 
 func TestGradient_ConcurrentFormatLog(t *testing.T) {
-	g := domain.NewGradientGauge(10)
+	g := policy.NewGradientGauge(10)
 
 	var wg sync.WaitGroup
 

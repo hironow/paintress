@@ -1,6 +1,6 @@
 //go:build contract
 
-package domain_test
+package policy_test
 
 import (
 	"os"
@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
+	"github.com/hironow/paintress/internal/harness/verifier"
 )
 
 const contractGoldenDir = "testdata/contract"
@@ -79,7 +81,7 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := domain.ValidateDMail(dm); err == nil {
+	if err := verifier.ValidateDMail(dm); err == nil {
 		t.Error("expected ValidateDMail to fail for schema version '2', but it passed")
 	}
 
@@ -89,7 +91,7 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := domain.ValidateDMail(dm); err != nil {
+	if err := verifier.ValidateDMail(dm); err != nil {
 		t.Errorf("unexpected ValidateDMail error for unknown kind: %v", err)
 	}
 }
@@ -111,10 +113,10 @@ func TestContract_NewReportDMail_ValidatesSuccessfully(t *testing.T) {
 	}
 
 	// when
-	dmail := domain.NewReportDMail(report, 0)
+	dmail := policy.NewReportDMail(report, 0)
 
 	// then: must pass validation
-	if err := domain.ValidateDMail(dmail); err != nil {
+	if err := verifier.ValidateDMail(dmail); err != nil {
 		t.Fatalf("NewReportDMail produced invalid D-Mail: %v", err)
 	}
 
@@ -162,9 +164,9 @@ func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 				PRUrl:       tc.prUrl,
 			}
 
-			dmail := domain.NewReportDMail(report, 0)
+			dmail := policy.NewReportDMail(report, 0)
 
-			if err := domain.ValidateDMail(dmail); err != nil {
+			if err := verifier.ValidateDMail(dmail); err != nil {
 				t.Fatalf("validation failed: %v", err)
 			}
 
@@ -188,9 +190,9 @@ func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
 		Reason:      "OOM during benchmark",
 	}
 
-	dmail := domain.NewReportDMail(report, 0)
+	dmail := policy.NewReportDMail(report, 0)
 
-	if err := domain.ValidateDMail(dmail); err != nil {
+	if err := verifier.ValidateDMail(dmail); err != nil {
 		t.Fatalf("validation failed: %v", err)
 	}
 

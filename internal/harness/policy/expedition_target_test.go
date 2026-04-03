@@ -1,25 +1,30 @@
-package domain
+package policy_test
 
-// white-box-reason: tests ExpeditionTargetsFromWaves pure function with various wave/step combinations
+// Tests ExpeditionTargetsFromWaves pure function with various wave/step combinations
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
+)
 
 func TestExpeditionTargetsFromWaves_PendingOnly(t *testing.T) {
 	// given: wave with 3 steps, s1 completed
-	waves := []WaveProgress{
+	waves := []domain.WaveProgress{
 		{
 			WaveID: "auth-w1",
 			Title:  "Auth wave",
-			Steps: []StepProgress{
-				{StepID: "s1", Title: "Middleware", Status: StepCompleted},
-				{StepID: "s2", Title: "Session", Status: StepPending, Acceptance: "persist across restarts"},
-				{StepID: "s3", Title: "Login", Status: StepFailed},
+			Steps: []domain.StepProgress{
+				{StepID: "s1", Title: "Middleware", Status: domain.StepCompleted},
+				{StepID: "s2", Title: "Session", Status: domain.StepPending, Acceptance: "persist across restarts"},
+				{StepID: "s3", Title: "Login", Status: domain.StepFailed},
 			},
 		},
 	}
 
 	// when
-	targets := ExpeditionTargetsFromWaves(waves)
+	targets := policy.ExpeditionTargetsFromWaves(waves)
 
 	// then
 	if len(targets) != 2 {
@@ -38,15 +43,15 @@ func TestExpeditionTargetsFromWaves_PendingOnly(t *testing.T) {
 
 func TestExpeditionTargetsFromWaves_AllCompleted(t *testing.T) {
 	// given: fully completed wave
-	waves := []WaveProgress{
+	waves := []domain.WaveProgress{
 		{
 			WaveID: "done-w1",
-			Steps:  []StepProgress{{StepID: "s1", Status: StepCompleted}},
+			Steps:  []domain.StepProgress{{StepID: "s1", Status: domain.StepCompleted}},
 		},
 	}
 
 	// when
-	targets := ExpeditionTargetsFromWaves(waves)
+	targets := policy.ExpeditionTargetsFromWaves(waves)
 
 	// then
 	if len(targets) != 0 {
@@ -56,16 +61,16 @@ func TestExpeditionTargetsFromWaves_AllCompleted(t *testing.T) {
 
 func TestExpeditionTargetsFromWaves_SingleStepWave(t *testing.T) {
 	// given: single-step wave (stepID == waveID)
-	waves := []WaveProgress{
+	waves := []domain.WaveProgress{
 		{
 			WaveID: "fix-w1",
 			Title:  "Quick fix",
-			Steps:  []StepProgress{{StepID: "fix-w1", Title: "Quick fix", Status: StepPending}},
+			Steps:  []domain.StepProgress{{StepID: "fix-w1", Title: "Quick fix", Status: domain.StepPending}},
 		},
 	}
 
 	// when
-	targets := ExpeditionTargetsFromWaves(waves)
+	targets := policy.ExpeditionTargetsFromWaves(waves)
 
 	// then
 	if len(targets) != 1 {
@@ -81,13 +86,13 @@ func TestExpeditionTargetsFromWaves_SingleStepWave(t *testing.T) {
 
 func TestExpeditionTargetsFromWaves_MultipleWaves(t *testing.T) {
 	// given: 2 waves, mixed status
-	waves := []WaveProgress{
-		{WaveID: "a", Steps: []StepProgress{{StepID: "a1", Status: StepPending}}},
-		{WaveID: "b", Steps: []StepProgress{{StepID: "b1", Status: StepCompleted}, {StepID: "b2", Status: StepPending}}},
+	waves := []domain.WaveProgress{
+		{WaveID: "a", Steps: []domain.StepProgress{{StepID: "a1", Status: domain.StepPending}}},
+		{WaveID: "b", Steps: []domain.StepProgress{{StepID: "b1", Status: domain.StepCompleted}, {StepID: "b2", Status: domain.StepPending}}},
 	}
 
 	// when
-	targets := ExpeditionTargetsFromWaves(waves)
+	targets := policy.ExpeditionTargetsFromWaves(waves)
 
 	// then: a1 + b2
 	if len(targets) != 2 {

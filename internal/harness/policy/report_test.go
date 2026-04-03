@@ -1,10 +1,11 @@
-package domain_test
+package policy_test
 
 import (
 	"os"
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 func TestParseReport_FailureType_Blocker(t *testing.T) {
@@ -711,7 +712,7 @@ func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
 	luminas := []domain.Lumina{
 		{Pattern: "only one pattern", Source: "failure-pattern", Uses: 1},
 	}
-	result := domain.FormatLuminaForPrompt(luminas)
+	result := policy.FormatLuminaForPrompt(luminas)
 	if !containsStr(result, "only one pattern") {
 		t.Errorf("should contain pattern: %q", result)
 	}

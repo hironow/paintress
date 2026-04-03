@@ -1,10 +1,12 @@
-package domain
+package policy
 
 import (
 	"fmt"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hironow/paintress/internal/domain"
 )
 
 // ReserveParty manages model fallback when the primary model hits rate limits.
@@ -19,7 +21,7 @@ type ReserveParty struct {
 	primary string   // e.g. "opus"
 	reserve []string // e.g. ["sonnet", "haiku"]
 	active  string   // currently active model
-	logger  Logger
+	logger  domain.Logger
 
 	// Rate limit tracking
 	rateLimitHits int
@@ -27,9 +29,9 @@ type ReserveParty struct {
 	cooldowns     map[string]time.Time // per-model cooldown expiry
 }
 
-func NewReserveParty(primary string, reserves []string, logger Logger) *ReserveParty {
+func NewReserveParty(primary string, reserves []string, logger domain.Logger) *ReserveParty {
 	if logger == nil {
-		logger = &NopLogger{}
+		logger = &domain.NopLogger{}
 	}
 	return &ReserveParty{
 		primary:   primary,
@@ -144,7 +146,7 @@ func (rp *ReserveParty) onRateLimitDetected() {
 	if next := rp.nextAvailableModel(); next != "" {
 		prev := rp.active
 		rp.active = next
-		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_activated"), prev, rp.active))
+		rp.logger.Warn("%s", fmt.Sprintf(domain.Msg("reserve_activated"), prev, rp.active))
 	}
 }
 
@@ -162,7 +164,7 @@ func (rp *ReserveParty) TryRecoverPrimary() {
 	}
 	prev := rp.active
 	rp.active = rp.primary
-	rp.logger.OK("%s", fmt.Sprintf(Msg("primary_recovered"), prev, rp.active))
+	rp.logger.OK("%s", fmt.Sprintf(domain.Msg("primary_recovered"), prev, rp.active))
 }
 
 // ForceReserve manually switches to the next available reserve model.
@@ -175,7 +177,7 @@ func (rp *ReserveParty) ForceReserve() {
 	if next := rp.nextAvailableModel(); next != "" {
 		prev := rp.active
 		rp.active = next
-		rp.logger.Warn("%s", fmt.Sprintf(Msg("reserve_forced"), prev, rp.active))
+		rp.logger.Warn("%s", fmt.Sprintf(domain.Msg("reserve_forced"), prev, rp.active))
 	}
 }
 
