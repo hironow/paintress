@@ -23,8 +23,8 @@ type promptFile struct {
 	Template    string            `yaml:"template"`
 }
 
-// PromptEntry is the read-only view of a loaded prompt template.
-type PromptEntry struct {
+// PromptConfig is the read-only view of a loaded prompt template.
+type PromptConfig struct {
 	Name        string
 	Version     string
 	Description string
@@ -34,7 +34,7 @@ type PromptEntry struct {
 
 // PromptRegistry holds all embedded prompt templates keyed by name.
 type PromptRegistry struct {
-	entries map[string]PromptEntry
+	entries map[string]PromptConfig
 }
 
 // NewRegistry loads all YAML files from the embedded prompts/ directory
@@ -45,7 +45,7 @@ func NewRegistry() (*PromptRegistry, error) {
 
 // newRegistryFromFS is the testable inner constructor.
 func newRegistryFromFS(fsys embed.FS) (*PromptRegistry, error) {
-	r := &PromptRegistry{entries: make(map[string]PromptEntry)}
+	r := &PromptRegistry{entries: make(map[string]PromptConfig)}
 
 	err := fs.WalkDir(fsys, "prompts", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -71,7 +71,7 @@ func newRegistryFromFS(fsys embed.FS) (*PromptRegistry, error) {
 		if _, dup := r.entries[pf.Name]; dup {
 			return fmt.Errorf("duplicate prompt name %q in %s", pf.Name, path)
 		}
-		r.entries[pf.Name] = PromptEntry{
+		r.entries[pf.Name] = PromptConfig{
 			Name:        pf.Name,
 			Version:     pf.Version,
 			Description: pf.Description,
@@ -89,11 +89,11 @@ func newRegistryFromFS(fsys embed.FS) (*PromptRegistry, error) {
 	return r, nil
 }
 
-// Get returns the PromptEntry for the given name, or an error if not found.
-func (r *PromptRegistry) Get(name string) (PromptEntry, error) {
+// Get returns the PromptConfig for the given name, or an error if not found.
+func (r *PromptRegistry) Get(name string) (PromptConfig, error) {
 	e, ok := r.entries[name]
 	if !ok {
-		return PromptEntry{}, fmt.Errorf("prompt %q not found in registry", name)
+		return PromptConfig{}, fmt.Errorf("prompt %q not found in registry", name)
 	}
 	return e, nil
 }

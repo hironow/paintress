@@ -103,8 +103,8 @@ var ExpeditionTargetsFromWaves = policy.ExpeditionTargetsFromWaves
 // PromptRegistry is a type alias for the filter PromptRegistry.
 type PromptRegistry = filter.PromptRegistry
 
-// PromptEntry is a type alias for the filter PromptEntry.
-type PromptEntry = filter.PromptEntry
+// PromptConfig is a type alias for the filter PromptConfig.
+type PromptConfig = filter.PromptConfig
 
 // NewPromptRegistry creates a new PromptRegistry from embedded YAML files.
 var NewPromptRegistry = filter.NewRegistry
@@ -157,3 +157,12 @@ var ValidateDMail = verifier.ValidateDMail
 func ClassifyProviderError(provider domain.Provider, stderr string) domain.ProviderErrorInfo {
 	return verifier.ClassifyProviderError(provider, stderr)
 }
+
+// --- filter layer: optimization (Phase 3) ---
+
+type PromptOptimizer = filter.PromptOptimizer
+type EvalCase = filter.EvalCase
+type OptimizedResult = filter.OptimizedResult
+
+var SavePrompt = filter.Save
+var PromptsDir = filter.PromptsDir
