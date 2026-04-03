@@ -35,11 +35,23 @@ func FetchIssuesViaMCP(ctx context.Context, runner port.ClaudeRunner, team, proj
 		team, projectClause, outputPath,
 	)
 
+	// Circuit breaker: reject if provider is rate-limited / degraded
+	if sharedCircuitBreaker != nil {
+		if cbErr := sharedCircuitBreaker.Allow(ctx); cbErr != nil {
+			span.RecordError(cbErr)
+			return nil, cbErr
+		}
+	}
+
 	start := time.Now()
 	_, err := runner.Run(ctx, prompt, io.Discard,
 		port.WithWorkDir(workDir),
 		port.WithAllowedTools("mcp__linear__list_issues", "Write"),
 	)
+
+	// Record outcome in circuit breaker regardless of success/failure
+	recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
+
 	if err != nil {
 		span.SetAttributes(attribute.Int64("issues.fetch.exec_ms", time.Since(start).Milliseconds()))
 		span.RecordError(err)

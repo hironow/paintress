@@ -203,6 +203,10 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	domain.Lang = lang
 
 	logger := loggerFrom(cmd)
+
+	// Initialize process-wide circuit breaker for rate limit / server error protection
+	session.SetCircuitBreaker(platform.NewCircuitBreaker(logger))
+
 	stateDir := filepath.Join(continent, domain.StateDir)
 	eventStore := session.NewEventStore(stateDir, logger)
 

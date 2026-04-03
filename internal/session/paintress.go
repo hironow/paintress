@@ -19,6 +19,36 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// sharedCircuitBreaker is the process-wide circuit breaker shared across all
+// provider adapter instances. Set via SetCircuitBreaker at startup.
+var sharedCircuitBreaker *platform.CircuitBreaker
+
+// SetCircuitBreaker sets the process-wide circuit breaker for all provider calls.
+// Call this once during startup before any provider invocations.
+func SetCircuitBreaker(cb *platform.CircuitBreaker) {
+	sharedCircuitBreaker = cb
+}
+
+// recordCircuitBreaker updates the shared circuit breaker based on provider error classification.
+func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
+	if sharedCircuitBreaker == nil {
+		return
+	}
+	if err == nil {
+		sharedCircuitBreaker.RecordSuccess()
+		return
+	}
+	// Use stderr if available, otherwise try extracting from the error message itself
+	classifyTarget := stderr
+	if classifyTarget == "" {
+		classifyTarget = err.Error()
+	}
+	info := domain.ClassifyProviderError(provider, classifyTarget)
+	if info.IsTrip() {
+		sharedCircuitBreaker.RecordProviderError(info)
+	}
+}
+
 const maxConsecutiveFailures = 3
 const maxConsecutiveSkips = 3
 const gradientMax = 5

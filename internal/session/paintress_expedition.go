@@ -212,8 +212,23 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		}
 
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("sending"), p.reserve.ActiveModel()))
+
+		// Circuit breaker: reject expedition if provider is rate-limited / degraded
+		if sharedCircuitBreaker != nil {
+			if cbErr := sharedCircuitBreaker.Allow(expCtx); cbErr != nil {
+				p.Logger.Error("circuit breaker open, skipping expedition #%d: %v", exp, cbErr)
+				expSpan.AddEvent("circuit_breaker.rejected")
+				releaseWorkDir()
+				expSpan.End()
+				return cbErr
+			}
+		}
+
 		expStart := time.Now()
 		output, err := expedition.Run(expCtx)
+
+		// Record outcome in circuit breaker regardless of success/failure
+		recordCircuitBreaker(domain.ProviderClaudeCode, err, expedition.Stderr())
 
 		if err != nil {
 			if ctx.Err() != nil {
