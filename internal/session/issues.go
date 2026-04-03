@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
@@ -27,13 +28,12 @@ func FetchIssuesViaMCP(ctx context.Context, runner port.ClaudeRunner, team, proj
 	if project != "" {
 		projectClause = fmt.Sprintf(" for project %q", project)
 	}
-	prompt := fmt.Sprintf(
-		"Use mcp__linear__list_issues to list ALL issues for team %q%s. "+
-			"Paginate until no more results. "+
-			"Write the result as a JSON array to %s "+
-			"Each element must have fields: id (the issue identifier like TEAM-123), title, priority (number), status (state name), labels (array of label names).",
-		team, projectClause, outputPath,
-	)
+	reg := harness.MustDefaultPromptRegistry()
+	prompt := reg.MustExpand("fetch_issues", map[string]string{
+		"team":           fmt.Sprintf("%q", team),
+		"project_clause": projectClause,
+		"output_path":    outputPath,
+	})
 
 	// Circuit breaker: reject if provider is rate-limited / degraded
 	if sharedCircuitBreaker != nil {

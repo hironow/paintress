@@ -5,6 +5,7 @@ package harness
 
 import (
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/filter"
 	"github.com/hironow/paintress/internal/harness/policy"
 	"github.com/hironow/paintress/internal/harness/verifier"
 )
@@ -125,6 +126,23 @@ var ExpeditionTargetsFromWaves = policy.ExpeditionTargetsFromWaves
 
 // FormatLuminaForPrompt formats Luminas for prompt injection.
 var FormatLuminaForPrompt = policy.FormatLuminaForPrompt
+
+// --- filter: prompt registry ---
+
+// PromptRegistry is a type alias for the filter PromptRegistry.
+type PromptRegistry = filter.PromptRegistry
+
+// PromptEntry is a type alias for the filter PromptEntry.
+type PromptEntry = filter.PromptEntry
+
+// NewPromptRegistry creates a new PromptRegistry from embedded YAML files.
+var NewPromptRegistry = filter.NewRegistry
+
+// DefaultPromptRegistry returns the package-level PromptRegistry singleton.
+var DefaultPromptRegistry = filter.Default
+
+// MustDefaultPromptRegistry returns the singleton or panics.
+var MustDefaultPromptRegistry = filter.MustDefault
 
 // --- verifier ---
 

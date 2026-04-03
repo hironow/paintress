@@ -38,7 +38,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		return &ReviewResult{Passed: true}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd)
+	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command -- reviewCmd is from validated Config.ReviewCmd, not user input [permanent]
 	cmd.Dir = dir
 	cmd.WaitDelay = 1 * time.Second
 
@@ -179,7 +179,10 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 
 		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
 
-		prompt := harness.BuildReviewFixPrompt(branch, result.Comments)
+		prompt := harness.MustDefaultPromptRegistry().MustExpand("review_fix", map[string]string{
+			"branch":   branch,
+			"comments": result.Comments,
+		})
 
 		model := p.reserve.ActiveModel()
 		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after Run [permanent]
@@ -295,7 +298,9 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 		return
 	}
 
-	prompt := harness.BuildFollowUpPrompt(dmails)
+	prompt := harness.MustDefaultPromptRegistry().MustExpand("follow_up", map[string]string{
+		"dmail_section": harness.FormatDMailForPrompt(dmails),
+	})
 
 	model := p.reserve.ActiveModel()
 	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",

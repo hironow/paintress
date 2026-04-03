@@ -1,0 +1,17 @@
+name: review_fix
+version: "1.0"
+description: |
+  Basic prompt for fixing review comments on an open PR.
+  Used in the review gate cycle when no strategy or reflection is needed.
+variables:
+  branch: "Git branch name with the open PR"
+  comments: "Review comments to fix"
+template: |
+  You are on branch {branch} with an open PR. A code review found the following issues:
+
+  {comments}
+
+  Fix all review comments above. Commit and push your changes. Do not create a new branch or PR.
+  Keep fixes focused — only address the review comments, do not refactor unrelated code.
+  If a review comment is unclear or you cannot resolve it after a reasonable attempt, skip it and move on to the next.
+  Do not change the Linear issue status — it stays in its current state until the next Expedition.

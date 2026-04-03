@@ -1,0 +1,12 @@
+name: follow_up
+version: "1.0"
+description: |
+  Prompt injected when issue-matched D-Mails arrived during an expedition.
+  Asks Claude to review and optionally act on the new information.
+variables:
+  dmail_section: "Formatted D-Mail content"
+template: |
+  The following D-Mail(s) arrived during this expedition and are related to the issue you just worked on.
+  Review them and take any additional action if needed. If no action is required, briefly acknowledge.
+
+  {dmail_section}
