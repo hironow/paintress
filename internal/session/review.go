@@ -191,6 +191,16 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 		)
 
 		p.Logger.Info("%s", fmt.Sprintf(domain.Msg("reviewfix_running"), model))
+
+		// Circuit breaker: block call if rate-limited or server error
+		if sharedCircuitBreaker != nil {
+			if cbErr := sharedCircuitBreaker.Allow(fixCtx); cbErr != nil {
+				fixSpan.End()
+				fixCancel()
+				return notResolved(cycle, lastComments)
+			}
+		}
+
 		start := time.Now()
 		out, err := p.claude.Run(fixCtx, prompt, io.Discard,
 			port.WithContinue(),
@@ -200,6 +210,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			port.WithModel(model),
 		)
 		consumed += time.Since(start)
+		recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
 		fixSpan.End()
 		fixCancel()
 
@@ -310,6 +321,14 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 		dir = p.config.Continent
 	}
 
+	// Circuit breaker: block call if rate-limited or server error
+	if sharedCircuitBreaker != nil {
+		if cbErr := sharedCircuitBreaker.Allow(followCtx); cbErr != nil {
+			p.Logger.Warn("Follow-up skipped: circuit breaker open")
+			return
+		}
+	}
+
 	out, err := p.claude.Run(followCtx, prompt, io.Discard,
 		port.WithContinue(),
 		port.WithWorkDir(dir),
@@ -317,6 +336,7 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 		port.WithAllowedTools(ReviewFixAllowedTools...),
 		port.WithModel(model),
 	)
+	recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
 	if err != nil {
 		p.Logger.Warn("Follow-up failed: %v", err)
 		followUpSpan.AddEvent("followup.error",
