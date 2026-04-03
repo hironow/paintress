@@ -1,5 +1,5 @@
 // Package harness provides the policy and verification layer for paintress.
-// It re-exports all functions from sub-packages (policy, verifier) as a
+// It re-exports all functions from sub-packages (policy, verifier, filter) as a
 // single entry point for callers outside the harness package.
 package harness
 
@@ -45,31 +45,13 @@ var RetryKey = policy.RetryKey
 
 // --- policy: dmail ---
 
-// FormatDMailForPrompt formats d-mails for prompt injection.
-var FormatDMailForPrompt = policy.FormatDMailForPrompt
-
 // NewReportDMail creates a report D-Mail from an ExpeditionReport.
 var NewReportDMail = policy.NewReportDMail
-
-// BuildFollowUpPrompt builds a follow-up prompt for matched D-Mails.
-var BuildFollowUpPrompt = policy.BuildFollowUpPrompt
 
 // FilterHighSeverity returns only HIGH severity d-mails.
 var FilterHighSeverity = policy.FilterHighSeverity
 
 // --- policy: review ---
-
-// HasReviewComments checks for actionable review comment indicators.
-var HasReviewComments = policy.HasReviewComments
-
-// IsRateLimited checks for rate/quota limiting signals.
-var IsRateLimited = policy.IsRateLimited
-
-// ExpandReviewCmd replaces placeholders in the review command.
-var ExpandReviewCmd = policy.ExpandReviewCmd
-
-// BuildReviewFixPrompt creates a fix prompt for review comments.
-var BuildReviewFixPrompt = policy.BuildReviewFixPrompt
 
 // SummarizeReview normalizes and truncates review output.
 var SummarizeReview = policy.SummarizeReview
@@ -89,9 +71,6 @@ const (
 // StrategyForCycle returns the fix strategy for a given cycle number.
 var StrategyForCycle = policy.StrategyForCycle
 
-// BuildReviewFixPromptWithStrategy creates a fix prompt with strategy hint.
-var BuildReviewFixPromptWithStrategy = policy.BuildReviewFixPromptWithStrategy
-
 // --- policy: reflection ---
 
 // ReflectionAccumulator is a type alias for the policy ReflectionAccumulator.
@@ -102,9 +81,6 @@ type ReflectionCycle = policy.ReflectionCycle
 
 // NewReflectionAccumulator creates an empty ReflectionAccumulator.
 var NewReflectionAccumulator = policy.NewReflectionAccumulator
-
-// BuildReviewFixPromptWithReflection creates a fix prompt with reflection.
-var BuildReviewFixPromptWithReflection = policy.BuildReviewFixPromptWithReflection
 
 // --- policy: stagnation ---
 
@@ -121,11 +97,6 @@ var ProjectWaveState = policy.ProjectWaveState
 
 // ExpeditionTargetsFromWaves converts pending wave steps into targets.
 var ExpeditionTargetsFromWaves = policy.ExpeditionTargetsFromWaves
-
-// --- policy: lumina ---
-
-// FormatLuminaForPrompt formats Luminas for prompt injection.
-var FormatLuminaForPrompt = policy.FormatLuminaForPrompt
 
 // --- filter: prompt registry ---
 
@@ -144,7 +115,40 @@ var DefaultPromptRegistry = filter.Default
 // MustDefaultPromptRegistry returns the singleton or panics.
 var MustDefaultPromptRegistry = filter.MustDefault
 
+// --- filter: dmail ---
+
+// FormatDMailForPrompt formats d-mails for prompt injection.
+var FormatDMailForPrompt = filter.FormatDMailForPrompt
+
+// BuildFollowUpPrompt builds a follow-up prompt for matched D-Mails.
+var BuildFollowUpPrompt = filter.BuildFollowUpPrompt
+
+// --- filter: lumina ---
+
+// FormatLuminaForPrompt formats Luminas for prompt injection.
+var FormatLuminaForPrompt = filter.FormatLuminaForPrompt
+
+// --- filter: review ---
+
+// BuildReviewFixPrompt creates a fix prompt for review comments.
+var BuildReviewFixPrompt = filter.BuildReviewFixPrompt
+
+// ExpandReviewCmd replaces placeholders in the review command.
+var ExpandReviewCmd = filter.ExpandReviewCmd
+
+// BuildReviewFixPromptWithStrategy creates a fix prompt with strategy hint.
+var BuildReviewFixPromptWithStrategy = filter.BuildReviewFixPromptWithStrategy
+
+// BuildReviewFixPromptWithReflection creates a fix prompt with reflection.
+var BuildReviewFixPromptWithReflection = filter.BuildReviewFixPromptWithReflection
+
 // --- verifier ---
+
+// HasReviewComments checks for actionable review comment indicators.
+var HasReviewComments = verifier.HasReviewComments
+
+// IsRateLimited checks for rate/quota limiting signals.
+var IsRateLimited = verifier.IsRateLimited
 
 // ValidateDMail checks that a DMail conforms to D-Mail schema v1.
 var ValidateDMail = verifier.ValidateDMail

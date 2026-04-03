@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 func TestParseReport_FailureType_Blocker(t *testing.T) {
@@ -705,23 +704,6 @@ func TestParseReport_ExpNumZero(t *testing.T) {
 	}
 	if report.Expedition != 0 {
 		t.Errorf("Expedition = %d, want 0", report.Expedition)
-	}
-}
-
-func TestFormatLuminaForPrompt_SingleLumina(t *testing.T) {
-	luminas := []domain.Lumina{
-		{Pattern: "only one pattern", Source: "failure-pattern", Uses: 1},
-	}
-	result := policy.FormatLuminaForPrompt(luminas)
-	if !containsStr(result, "only one pattern") {
-		t.Errorf("should contain pattern: %q", result)
-	}
-	// Should contain section header and bullet
-	if !containsStr(result, "Defensive") {
-		t.Errorf("should contain Defensive header: %q", result)
-	}
-	if !containsStr(result, "- only one pattern") {
-		t.Errorf("should contain bulleted pattern: %q", result)
 	}
 }
 
