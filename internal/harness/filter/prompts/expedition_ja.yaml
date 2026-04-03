@@ -13,6 +13,7 @@ variables:
   environment_section: "Pre-rendered environment lines"
   context_section: "Pre-rendered injected context block with header (or empty)"
   inbox_section: "Pre-rendered D-Mail inbox block with header (or empty)"
+  issue_tool_line: "Issue operation tool description (mode-dependent)"
   mission_section: "Mission rules of engagement text"
 template: |
   # Expedition #{number} — {timestamp}
@@ -54,7 +55,7 @@ template: |
   - Git 操作（clone, checkout, commit, push, pull）
   - シェルコマンドの実行（PATH 上に存在するツールのみ）
   - GitHub CLI（`gh`）による PR 操作
-  - GitHub CLI（`gh`）または Linear MCP ツールによる issue 操作（モードに依存）
+  {issue_tool_line}
   - HTTP リクエスト（許可された外部 API のみ）
 
   ### 禁止されている操作
