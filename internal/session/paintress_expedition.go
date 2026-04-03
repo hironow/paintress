@@ -228,7 +228,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		output, err := expedition.Run(expCtx)
 
 		// Record outcome in circuit breaker regardless of success/failure
-		recordCircuitBreaker(domain.ProviderClaudeCode, err, "")
+		recordCircuitBreaker(domain.ProviderClaudeCode, err, expedition.Stderr())
 
 		if err != nil {
 			if ctx.Err() != nil {

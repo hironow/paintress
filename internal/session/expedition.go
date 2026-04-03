@@ -56,11 +56,19 @@ type Expedition struct {
 	midMatchedMu    sync.Mutex
 	midMatchedMails []domain.DMail
 
+	// capturedStderr holds the stderr output from the last Run() invocation.
+	capturedStderr string
+
 	// makeCmd overrides command creation for testing. If nil, exec.CommandContext is used.
 	makeCmd func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 	// StreamBus receives live session stream events (optional, nil = no streaming).
 	StreamBus port.SessionStreamPublisher
+}
+
+// Stderr returns the captured stderr output from the last Run() invocation.
+func (e *Expedition) Stderr() string {
+	return e.capturedStderr
 }
 
 // setCurrentIssue records the issue being worked on (called from watchFlag callback).
@@ -425,6 +433,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	<-inboxDone
 
 	err = cmd.Wait()
+	e.capturedStderr = stderrBuf.String()
 	if e.Config.OutputFormat != "json" {
 		fmt.Fprintln(e.ErrOut)
 	}
