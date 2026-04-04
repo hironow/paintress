@@ -16,7 +16,6 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/harness"
-	"github.com/hironow/paintress/internal/harness/filter"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -151,11 +150,11 @@ func (e *Expedition) BuildPrompt() string {
 		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.TrackerTeam(),
 		LinearProject:   projCfg.TrackerProject(),
-		MissionSection:  filter.MissionText(filter.MustDefault(), domain.Lang, e.Target != nil),
+		MissionSection:  harness.MissionText(harness.MustDefaultPromptRegistry(), domain.Lang, e.Target != nil),
 		WaveTarget:      e.Target,
 	}
 
-	return filter.RenderExpeditionPrompt(filter.MustDefault(), domain.Lang, data)
+	return harness.RenderExpeditionPrompt(harness.MustDefaultPromptRegistry(), domain.Lang, data)
 }
 
 func (e *Expedition) loadInboxSection() string {

@@ -141,9 +141,15 @@ func expandTemplate(tmpl string, vars map[string]string) string {
 	// A key is truthy if present in vars AND not empty/"false".
 	result := processConditionals(tmpl, vars)
 
-	// Phase 2: Simple {key} substitution.
+	// Phase 2: Two-pass expansion prevents variable values containing {key}
+	// patterns from being re-expanded. Pass 1: placeholder → token.
+	// Pass 2: token → value.
+	const sentinel = "\x00PROMPT_VAR_"
+	for k := range vars {
+		result = strings.ReplaceAll(result, "{"+k+"}", sentinel+k+"\x00")
+	}
 	for k, v := range vars {
-		result = strings.ReplaceAll(result, "{"+k+"}", v)
+		result = strings.ReplaceAll(result, sentinel+k+"\x00", v)
 	}
 	return result
 }

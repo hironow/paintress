@@ -18,7 +18,7 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/harness"
-	"github.com/hironow/paintress/internal/harness/filter"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 )
 
@@ -1787,7 +1787,7 @@ func TestReadContextFiles_EmptyFileStillCreatesHeader(t *testing.T) {
 // --- MissionText tests (merged from mission_test.go) ---
 
 func TestMissionText_English(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "en", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "en", false)
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("English mission should contain 'Rules of Engagement'")
 	}
@@ -1806,7 +1806,7 @@ func TestMissionText_English(t *testing.T) {
 }
 
 func TestMissionText_Japanese(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "ja", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "ja", false)
 	if !containsStr(text, "行動規範") {
 		t.Error("Japanese mission should contain '行動規範'")
 	}
@@ -1819,7 +1819,7 @@ func TestMissionText_Japanese(t *testing.T) {
 }
 
 func TestMissionText_French(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "fr", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "fr", false)
 	if !containsStr(text, "engagement") {
 		t.Error("French mission should contain 'engagement'")
 	}
@@ -1829,14 +1829,14 @@ func TestMissionText_French(t *testing.T) {
 }
 
 func TestMissionText_FallbackToEnglish(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "de", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "de", false)
 	if !containsStr(text, "Rules of Engagement") {
 		t.Error("unsupported lang should fall back to English")
 	}
 }
 
 func TestMissionText_English_ContainsConsolidate(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "en", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "en", false)
 	if !containsStr(text, "consolidate") {
 		t.Error("English mission should contain 'consolidate'")
 	}
@@ -1849,7 +1849,7 @@ func TestMissionText_English_ContainsConsolidate(t *testing.T) {
 }
 
 func TestMissionText_Japanese_ContainsConsolidate(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "ja", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "ja", false)
 	if !containsStr(text, "consolidate") {
 		t.Error("Japanese mission should contain 'consolidate'")
 	}
@@ -1859,7 +1859,7 @@ func TestMissionText_Japanese_ContainsConsolidate(t *testing.T) {
 }
 
 func TestMissionText_French_ContainsConsolidate(t *testing.T) {
-	text := filter.MissionText(filter.MustDefault(), "fr", false)
+	text := harness.MissionText(harness.MustDefaultPromptRegistry(), "fr", false)
 	if !containsStr(text, "consolidate") {
 		t.Error("French mission should contain 'consolidate'")
 	}
@@ -1882,10 +1882,10 @@ func TestExpeditionPrompt_ContainsConsolidateMissionType(t *testing.T) {
 				Cb:             "```",
 				BaseBranch:     "main",
 				ReserveSection: "Model: opus",
-				MissionSection: filter.MissionText(filter.MustDefault(), lang, false),
+				MissionSection: harness.MissionText(harness.MustDefaultPromptRegistry(), lang, false),
 			}
 
-			result := filter.RenderExpeditionPrompt(filter.MustDefault(), lang, data)
+			result := harness.RenderExpeditionPrompt(harness.MustDefaultPromptRegistry(), lang, data)
 			if !containsStr(result, "implement|verify|fix|consolidate") {
 				t.Errorf("expedition prompt (%s) should contain 'implement|verify|fix|consolidate'", lang)
 			}
@@ -1897,7 +1897,7 @@ func TestMissionText_WaveMode_NoLinearReference(t *testing.T) {
 	for _, lang := range []string{"en", "ja", "fr"} {
 		t.Run(lang, func(t *testing.T) {
 			// when
-			text := filter.MissionText(filter.MustDefault(), lang, true)
+			text := harness.MissionText(harness.MustDefaultPromptRegistry(), lang, true)
 
 			// then
 			if strings.Contains(text, "Linear") {
@@ -1914,7 +1914,7 @@ func TestMissionText_LinearMode_HasLinearReference(t *testing.T) {
 	for _, lang := range []string{"en", "ja", "fr"} {
 		t.Run(lang, func(t *testing.T) {
 			// when
-			text := filter.MissionText(filter.MustDefault(), lang, false)
+			text := harness.MissionText(harness.MustDefaultPromptRegistry(), lang, false)
 
 			// then
 			if !strings.Contains(text, "Linear") {
@@ -1934,11 +1934,11 @@ func TestExpeditionPrompt_WaveMode_NoLinearReference(t *testing.T) {
 				Cb:             "```",
 				BaseBranch:     "main",
 				ReserveSection: "Model: opus",
-				MissionSection: filter.MissionText(filter.MustDefault(), lang, true),
+				MissionSection: harness.MissionText(harness.MustDefaultPromptRegistry(), lang, true),
 				WaveTarget:     &domain.ExpeditionTarget{Title: "Test Step"},
 			}
 
-			result := filter.RenderExpeditionPrompt(filter.MustDefault(), lang, data)
+			result := harness.RenderExpeditionPrompt(harness.MustDefaultPromptRegistry(), lang, data)
 			if strings.Contains(result, "Linear MCP") {
 				t.Errorf("lang=%s: wave mode expedition should not reference Linear MCP", lang)
 			}

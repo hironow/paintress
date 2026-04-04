@@ -166,3 +166,11 @@ type OptimizedResult = filter.OptimizedResult
 
 var SavePrompt = filter.Save
 var PromptsDir = filter.PromptsDir
+
+// --- filter: expedition prompt rendering ---
+
+// MissionText renders the mission rules for the given language and mode.
+var MissionText = filter.MissionText
+
+// RenderExpeditionPrompt renders the expedition prompt template.
+var RenderExpeditionPrompt = filter.RenderExpeditionPrompt
