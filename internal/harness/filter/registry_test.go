@@ -232,12 +232,12 @@ func TestExpandTemplate(t *testing.T) {
 	}
 
 	// when
-	result := expandTemplate(tmpl, vars)
+	result := ExpandTemplate(tmpl, vars)
 
 	// then
 	want := "Hello Alice, welcome to Wonderland."
 	if result != want {
-		t.Errorf("expandTemplate() = %q, want %q", result, want)
+		t.Errorf("ExpandTemplate() = %q, want %q", result, want)
 	}
 }
 
@@ -246,11 +246,11 @@ func TestExpandTemplate_NoVars(t *testing.T) {
 	tmpl := "No placeholders here."
 
 	// when
-	result := expandTemplate(tmpl, nil)
+	result := ExpandTemplate(tmpl, nil)
 
 	// then
 	if result != tmpl {
-		t.Errorf("expandTemplate() = %q, want %q", result, tmpl)
+		t.Errorf("ExpandTemplate() = %q, want %q", result, tmpl)
 	}
 }
 

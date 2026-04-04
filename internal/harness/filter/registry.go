@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -41,11 +42,11 @@ type PromptRegistry struct {
 // NewRegistry loads all YAML files from the embedded prompts/ directory
 // and returns a ready-to-use PromptRegistry.
 func NewRegistry() (*PromptRegistry, error) {
-	return newRegistryFromFS(promptsFS)
+	return NewRegistryFromFS(promptsFS)
 }
 
-// newRegistryFromFS is the testable inner constructor.
-func newRegistryFromFS(fsys embed.FS) (*PromptRegistry, error) {
+// NewRegistryFromFS is the testable constructor that loads prompts from any fs.FS.
+func NewRegistryFromFS(fsys fs.FS) (*PromptRegistry, error) {
 	r := &PromptRegistry{entries: make(map[string]PromptConfig)}
 
 	err := fs.WalkDir(fsys, "prompts", func(path string, d fs.DirEntry, err error) error {
@@ -106,7 +107,7 @@ func (r *PromptRegistry) Expand(name string, vars map[string]string) (string, er
 	if err != nil {
 		return "", err
 	}
-	return expandTemplate(e.Template, vars), nil
+	return ExpandTemplate(e.Template, vars), nil
 }
 
 // MustExpand renders the named prompt template, panicking on error.
@@ -129,8 +130,8 @@ func (r *PromptRegistry) Names() []string {
 	return names
 }
 
-// expandTemplate performs simple {key} → value replacement.
-func expandTemplate(tmpl string, vars map[string]string) string {
+// ExpandTemplate performs simple {key} → value replacement.
+func ExpandTemplate(tmpl string, vars map[string]string) string {
 	// Phase 1: Process {#if key}...{#else}...{/if} conditionals.
 	// A key is truthy if present in vars AND not empty/"false".
 	result := processConditionals(tmpl, vars)
@@ -192,4 +193,31 @@ func processConditionals(tmpl string, vars map[string]string) string {
 
 		tmpl = tmpl[:start] + replacement + tmpl[endIdx+len(endTag):]
 	}
+}
+
+// --- singleton ---
+
+var (
+	defaultRegistry     *PromptRegistry
+	defaultRegistryOnce sync.Once
+	defaultRegistryErr  error
+)
+
+// Default returns the package-level PromptRegistry singleton.
+// It is loaded once from embedded YAML files and safe for concurrent use.
+func Default() (*PromptRegistry, error) {
+	defaultRegistryOnce.Do(func() {
+		defaultRegistry, defaultRegistryErr = NewRegistry()
+	})
+	return defaultRegistry, defaultRegistryErr
+}
+
+// MustDefault returns the package-level PromptRegistry singleton,
+// panicking if the embedded YAML files cannot be loaded.
+func MustDefault() *PromptRegistry {
+	r, err := Default()
+	if err != nil {
+		panic("filter.MustDefault: " + err.Error())
+	}
+	return r
 }

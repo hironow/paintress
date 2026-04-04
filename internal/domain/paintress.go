@@ -89,15 +89,6 @@ type DoctorCheck struct {
 	Hint    string      `json:"hint,omitempty"`
 }
 
-// FormatDoctorJSON returns the checks as a JSON array string.
-func FormatDoctorJSON(checks []DoctorCheck) (string, error) {
-	data, err := json.Marshal(checks)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
 // DoctorOutput is the structured output for the doctor command.
 // When metrics are not available (no repo-path), Metrics is nil and omitted from JSON.
 type DoctorOutput struct {
