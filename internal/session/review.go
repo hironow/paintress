@@ -38,7 +38,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		return &ReviewResult{Passed: true}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command -- reviewCmd is from validated Config.ReviewCmd, not user input [permanent]
+	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command, lod-excessive-dot-chain -- reviewCmd is from validated Config.ReviewCmd, not user input [permanent]
 	cmd.Dir = dir
 	cmd.WaitDelay = 1 * time.Second
 
