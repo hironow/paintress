@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
@@ -19,12 +20,12 @@ import (
 type testPreFlightTriager struct {
 	continent  string
 	maxRetries int
-	tracker    *domain.RetryTracker
+	tracker    *harness.RetryTracker
 	archiver   port.InboxArchiver
 	emitter    port.ExpeditionEventEmitter
 }
 
-func newTestTriager(continent string, maxRetries int, tracker *domain.RetryTracker, archiver port.InboxArchiver, emitter port.ExpeditionEventEmitter) *testPreFlightTriager {
+func newTestTriager(continent string, maxRetries int, tracker *harness.RetryTracker, archiver port.InboxArchiver, emitter port.ExpeditionEventEmitter) *testPreFlightTriager {
 	return &testPreFlightTriager{
 		continent:  continent,
 		maxRetries: maxRetries,
@@ -56,7 +57,7 @@ func (t *testPreFlightTriager) TriagePreFlightDMails(ctx context.Context, dmails
 				_ = t.archiver.ArchiveInboxDMail(ctx, t.continent, dm.Name)
 				continue
 			}
-			retryKey := domain.RetryKey(dm.Issues)
+			retryKey := harness.RetryKey(dm.Issues)
 			_ = t.emitter.EmitRetryAttempted(retryKey, count, time.Now())
 			result = append(result, dm)
 		default:
@@ -196,7 +197,7 @@ func TestTriagePreFlightDMails(t *testing.T) {
 
 			// given
 			emitter := &countingEmitter{}
-			tracker := domain.NewRetryTracker()
+			tracker := harness.NewRetryTracker()
 
 			// preload retries to simulate previous attempts
 			for range tt.preloadRetries {
@@ -340,7 +341,7 @@ func TestTriagePreFlightDMails_Filesystem(t *testing.T) {
 			}
 
 			emitter := &countingEmitter{}
-			tracker := domain.NewRetryTracker()
+			tracker := harness.NewRetryTracker()
 			for range tt.preloadRetries {
 				tracker.Track(tt.preloadIssues)
 			}

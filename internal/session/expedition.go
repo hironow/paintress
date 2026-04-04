@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -35,8 +36,8 @@ type Expedition struct {
 
 	// Game mechanics
 	Luminas     []domain.Lumina
-	Gradient    *domain.GradientGauge
-	Reserve     *domain.ReserveParty
+	Gradient    *harness.GradientGauge
+	Reserve     *harness.ReserveParty
 	InboxDMails []domain.DMail // d-mails from inbox (for archiving after expedition)
 	inboxOnce   sync.Once
 
@@ -140,7 +141,7 @@ func (e *Expedition) BuildPrompt() string {
 		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
 		Bt:              "`",
 		Cb:              "```",
-		LuminaSection:   domain.FormatLuminaForPrompt(e.Luminas),
+		LuminaSection:   harness.FormatLuminaForPrompt(e.Luminas),
 		GradientSection: e.Gradient.FormatForPrompt(),
 		ReserveSection:  e.Reserve.FormatForPrompt(),
 		BaseBranch:      e.Config.BaseBranch,
@@ -149,11 +150,11 @@ func (e *Expedition) BuildPrompt() string {
 		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.TrackerTeam(),
 		LinearProject:   projCfg.TrackerProject(),
-		MissionSection:  platform.MissionText(domain.Lang, e.Target != nil),
+		MissionSection:  harness.MissionText(harness.MustDefaultPromptRegistry(), domain.Lang, e.Target != nil),
 		WaveTarget:      e.Target,
 	}
 
-	return platform.RenderExpeditionPrompt(domain.Lang, data)
+	return harness.RenderExpeditionPrompt(harness.MustDefaultPromptRegistry(), domain.Lang, data)
 }
 
 func (e *Expedition) loadInboxSection() string {
@@ -168,7 +169,7 @@ func (e *Expedition) loadInboxSection() string {
 		}
 		e.InboxDMails = dmails
 	})
-	return domain.FormatDMailForPrompt(e.InboxDMails)
+	return harness.FormatDMailForPrompt(e.InboxDMails)
 }
 
 func (e *Expedition) loadContextSection() string {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
 	"go.opentelemetry.io/otel/attribute"
@@ -37,7 +38,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		return &ReviewResult{Passed: true}, nil
 	}
 
-	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd)
+	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), reviewCmd) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command, lod-excessive-dot-chain -- reviewCmd is from validated Config.ReviewCmd, not user input [permanent]
 	cmd.Dir = dir
 	cmd.WaitDelay = 1 * time.Second
 
@@ -54,7 +55,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			// Rate limit on non-zero exit is a service error, not review comments.
-			if domain.IsRateLimited(output) {
+			if harness.IsRateLimited(output) {
 				return nil, fmt.Errorf("review service rate/quota limited")
 			}
 			// Non-zero exit → review found comments.
@@ -65,7 +66,7 @@ func RunReview(ctx context.Context, reviewCmd string, dir string) (*ReviewResult
 			}, nil
 		}
 		// Non-exit errors (failed to start, etc.)
-		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, domain.SummarizeReview(output))
+		return nil, fmt.Errorf("review command failed: %w\noutput: %s", err, harness.SummarizeReview(output))
 	}
 
 	// Exit 0 → pass, regardless of output content.
@@ -106,7 +107,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				if report.Insight != "" {
 					report.Insight += " | "
 				}
-				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
+				report.Insight += "Review interrupted: " + harness.SummarizeReview(lastComments)
 			}
 			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), ctx.Err()))
 			return notResolved(cycle, lastComments)
@@ -118,7 +119,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			trace.WithAttributes(attribute.Int("cycle", cycle)),
 		)
 		reviewCtx, reviewCancel := context.WithTimeout(ctx, reviewTimeout)
-		expandedCmd := domain.ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
+		expandedCmd := harness.ExpandReviewCmd(p.config.ReviewCmd, reviewDir, report.Branch)
 		result, err := RunReview(reviewCtx, expandedCmd, reviewDir)
 		reviewCancel()
 		if err != nil {
@@ -127,7 +128,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 				if report.Insight != "" {
 					report.Insight += " | "
 				}
-				report.Insight += "Review interrupted: " + domain.SummarizeReview(lastComments)
+				report.Insight += "Review interrupted: " + harness.SummarizeReview(lastComments)
 			}
 			p.Logger.Warn("%s", fmt.Sprintf(domain.Msg("review_error"), err))
 			return notResolved(cycle, lastComments)
@@ -171,14 +172,17 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
+			report.Insight += "Review not fully resolved: " + harness.SummarizeReview(lastComments)
 			p.Logger.Warn("%s", domain.Msg("review_limit"))
 			return notResolved(cycle, lastComments)
 		}
 
 		fixCtx, fixCancel := context.WithTimeout(ctx, remaining)
 
-		prompt := domain.BuildReviewFixPrompt(branch, result.Comments)
+		prompt := harness.MustDefaultPromptRegistry().MustExpand("review_fix", map[string]string{
+			"branch":   branch,
+			"comments": result.Comments,
+		})
 
 		model := p.reserve.ActiveModel()
 		_, fixSpan := platform.Tracer.Start(fixCtx, "reviewfix.claude", // nosemgrep: adr0003-otel-span-without-defer-end -- End() called after Run [permanent]
@@ -219,7 +223,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 			if report.Insight != "" {
 				report.Insight += " | "
 			}
-			report.Insight += "Reviewfix failed: " + domain.SummarizeReview(out)
+			report.Insight += "Reviewfix failed: " + harness.SummarizeReview(out)
 			return notResolved(cycle, lastComments)
 		}
 	}
@@ -227,7 +231,7 @@ func (p *Paintress) runReviewLoop(ctx context.Context, report *domain.Expedition
 	if report.Insight != "" {
 		report.Insight += " | "
 	}
-	report.Insight += "Review not fully resolved: " + domain.SummarizeReview(lastComments)
+	report.Insight += "Review not fully resolved: " + harness.SummarizeReview(lastComments)
 	p.Logger.Warn("%s", domain.Msg("review_limit"))
 	return notResolved(maxReviewGateCycles, lastComments)
 }
@@ -294,7 +298,9 @@ func (p *Paintress) runFollowUp(ctx context.Context, dmails []domain.DMail, work
 		return
 	}
 
-	prompt := domain.BuildFollowUpPrompt(dmails)
+	prompt := harness.MustDefaultPromptRegistry().MustExpand("follow_up", map[string]string{
+		"dmail_section": harness.FormatDMailForPrompt(dmails),
+	})
 
 	model := p.reserve.ActiveModel()
 	_, followUpSpan := platform.Tracer.Start(ctx, "followup.claude",

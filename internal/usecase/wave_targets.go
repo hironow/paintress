@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
@@ -84,6 +85,6 @@ func (p *waveTargetProvider) legacyFetchFromInbox(ctx context.Context) ([]domain
 	if err != nil {
 		return nil, err
 	}
-	waves := domain.ProjectWaveState(inboxDMails)
-	return domain.ExpeditionTargetsFromWaves(waves), nil
+	waves := harness.ProjectWaveState(inboxDMails)
+	return harness.ExpeditionTargetsFromWaves(waves), nil
 }

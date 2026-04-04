@@ -1,0 +1,56 @@
+Some expedition output...
+Running tests, all 151 tests passed!
+
+```
+__EXPEDITION_REPORT__
+expedition_number: 60
+status: success
+mission_type: verify
+target_issue: MY-418
+target_issue_title: リンク作成ワークフロー（ドラッグ＋キーボード）
+verified_dods:
+  - "DoD #1: アノテーション間のリンクをドラッグ操作で作成できる - PASS"
+  - "DoD #8: キーボードのみでリンク作成・削除・ナビゲーションが可能 - PASS"
+additional_issues_verified:
+  - MY-449: AnnotationPanel矢印キーナビゲーションバグ修正 - PASS → Done
+bugs_found: 0
+remaining_in_review_issues:
+  - MY-420: リンク線SVGオーバーレイ描画
+  - MY-419: カラーコード方式と色覚多様性対応
+  - MY-423: プロンプトテンプレート管理とテキスト生成パイプライン
+  - MY-424: APIキー設定UIとコスト管理機構
+remaining_issues_count: 4
+notes: >
+  MY-418の2つのDoD項目をコードレビュー（ソース＋テストファイル読解）と
+  ブラウザ自動化（Playwright CLI）の両面から検証完了。
+__END_EXPEDITION_REPORT__
+```
+
+```
+__EXPEDITION_REPORT__
+expedition_number: 60
+status: success
+mission_type: verify
+target_issue: MY-418
+target_issue_title: リンク作成ワークフロー（ドラッグ＋キーボード）
+verified_dods:
+  - "DoD #1: アノテーション間のリンクをドラッグ操作で作成できる - PASS"
+  - "DoD #8: キーボードのみでリンク作成・削除・ナビゲーションが可能 - PASS"
+additional_issues_verified:
+  - "MY-449: AnnotationPanel矢印キーナビゲーションバグ修正 - PASS → Done"
+bugs_found: 0
+tests_status: "全151テストPASS、ビルド成功"
+remaining_in_review_issues:
+  - "MY-420: リンク線SVGオーバーレイ描画"
+  - "MY-419: カラーコード方式と色覚多様性対応"
+  - "MY-423: プロンプトテンプレート管理とテキスト生成パイプライン"
+  - "MY-424: APIキー設定UIとコスト管理機構"
+remaining_issues_count: 4
+notes: >
+  MY-418の2つのDoD項目をコードレビュー（ソース＋テストファイル読解）と
+  ブラウザ自動化（Playwright CLI）の両面から検証完了。
+  drag-link.ts（カスタムMIMEタイプによるDnDデータ転送）と
+  keyboard-nav.ts（循環リストナビゲーション）の実装を確認。
+  MY-449（AnnotationPanel ArrowUp/Down修正）も併せて検証しDoneへ移行。
+__END_EXPEDITION_REPORT__
+```

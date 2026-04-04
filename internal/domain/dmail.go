@@ -14,99 +14,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// FormatDMailForPrompt formats d-mails as a human-readable Markdown section
-// for injection into expedition prompts. Returns empty string for empty input.
-func FormatDMailForPrompt(dmails []DMail) string {
-	if len(dmails) == 0 {
-		return ""
-	}
-	var buf strings.Builder
-	for _, dm := range dmails {
-		fmt.Fprintf(&buf, "### %s (%s)\n\n", dm.Name, dm.Kind)
-		fmt.Fprintf(&buf, "**Description:** %s\n", dm.Description)
-		if len(dm.Issues) > 0 {
-			fmt.Fprintf(&buf, "**Issues:** %s\n", strings.Join(dm.Issues, ", "))
-		}
-		if dm.Severity != "" {
-			fmt.Fprintf(&buf, "**Severity:** %s\n", dm.Severity)
-		}
-		if dm.Body != "" {
-			buf.WriteString("\n")
-			buf.WriteString(dm.Body)
-			if !strings.HasSuffix(dm.Body, "\n") {
-				buf.WriteString("\n")
-			}
-		}
-		buf.WriteString("\n")
-	}
-	return buf.String()
-}
-
-// NewReportDMail creates a report d-mail from an ExpeditionReport.
-// gaugeLevel is the current GradientGauge level and determines the Severity field.
-func NewReportDMail(report *ExpeditionReport, gaugeLevel int) DMail {
-	name := "pt-report-" + sanitizeDMailKey(report.IssueID) + "_" + DMailUUIDFunc()
-
-	var body strings.Builder
-	fmt.Fprintf(&body, "# Expedition #%d Report: %s\n\n", report.Expedition, report.IssueTitle)
-	fmt.Fprintf(&body, "- **Issue:** %s\n", report.IssueID)
-	fmt.Fprintf(&body, "- **Mission:** %s\n", report.MissionType)
-	fmt.Fprintf(&body, "- **Status:** %s\n", report.Status)
-	if report.PRUrl != "" && report.PRUrl != "none" {
-		fmt.Fprintf(&body, "- **PR:** %s\n", report.PRUrl)
-	}
-	if report.Reason != "" {
-		fmt.Fprintf(&body, "\n## Summary\n\n%s\n", report.Reason)
-	}
-
-	dm := DMail{
-		Name:          name,
-		Kind:          "report",
-		Description:   fmt.Sprintf("Expedition #%d completed %s for %s", report.Expedition, report.MissionType, report.IssueID),
-		Issues:        []string{report.IssueID},
-		Severity:      ReportSeverity(gaugeLevel),
-		SchemaVersion: DMailSchemaVersion,
-		Body:          body.String(),
-	}
-
-	if report.Insight != "" {
-		dm.Context = &InsightContext{
-			Insights: []InsightSummary{
-				{Source: report.IssueID, Summary: report.Insight},
-			},
-		}
-	}
-
-	// Wave-centric mode: attach wave reference for archive projection
-	if report.WaveID != "" {
-		dm.Wave = &WaveReference{
-			ID:   report.WaveID,
-			Step: report.StepID,
-		}
-		// Override name to include wave/step for uniqueness
-		if report.StepID != "" {
-			dm.Name = "pt-report-" + sanitizeDMailKey(report.WaveID+"-"+report.StepID) + "_" + DMailUUIDFunc()
-		} else {
-			dm.Name = "pt-report-" + sanitizeDMailKey(report.WaveID) + "_" + DMailUUIDFunc()
-		}
-	}
-
-	return dm
-}
-
-// BuildFollowUpPrompt builds a follow-up prompt for issue-matched D-Mails
-// received mid-expedition. Returns empty string for empty input.
-func BuildFollowUpPrompt(dmails []DMail) string {
-	if len(dmails) == 0 {
-		return ""
-	}
-	var buf strings.Builder
-	buf.WriteString("The following D-Mail(s) arrived during this expedition and are related to the issue you just worked on.\n")
-	buf.WriteString("Review them and take any additional action if needed. If no action is required, briefly acknowledge.\n\n")
-	buf.WriteString(FormatDMailForPrompt(dmails))
-	return buf.String()
-}
-
 // InboxDir returns the path to the d-mail inbox directory.
 func InboxDir(continent string) string {
 	return filepath.Join(continent, StateDir, "inbox")
@@ -168,14 +75,6 @@ type DMail struct {
 	Metadata      map[string]string `yaml:"metadata,omitempty"`
 	Context       *InsightContext   `yaml:"context,omitempty" json:"context,omitempty"`
 	Body          string            `yaml:"-"`
-}
-
-// validActions is the set of valid action values per D-Mail schema v1.
-// Strict on send, liberal on receive (Postel's law / S0021).
-var validActions = map[string]bool{
-	"retry":    true,
-	"escalate": true,
-	"resolve":  true,
 }
 
 var (
@@ -260,40 +159,6 @@ func (d DMail) Marshal() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
-func ValidateDMail(d DMail) error {
-	if d.SchemaVersion == "" {
-		return fmt.Errorf("dmail: dmail-schema-version is required")
-	}
-	if d.SchemaVersion != DMailSchemaVersion {
-		return fmt.Errorf("dmail: unsupported dmail-schema-version: %q (want %q)", d.SchemaVersion, DMailSchemaVersion)
-	}
-	if d.Name == "" {
-		return fmt.Errorf("dmail: name is required")
-	}
-	if d.Kind == "" {
-		return fmt.Errorf("dmail: kind is required")
-	}
-	if d.Description == "" {
-		return fmt.Errorf("dmail: description is required")
-	}
-	if d.Action != "" && !validActions[d.Action] {
-		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", d.Action)
-	}
-	return nil
-}
-
-// FilterHighSeverity returns only HIGH severity d-mails from the input slice.
-func FilterHighSeverity(dmails []DMail) []DMail {
-	var high []DMail
-	for _, dm := range dmails {
-		if dm.Severity == "high" {
-			high = append(high, dm)
-		}
-	}
-	return high
-}
-
 // DMailUUIDFunc is the UUID generator for D-Mail filenames. Override in tests.
 var DMailUUIDFunc = shortDMailUUID
 
@@ -307,7 +172,8 @@ func shortDMailUUID() string {
 	return fmt.Sprintf("%08x", buf[:4])
 }
 
-func sanitizeDMailKey(key string) string {
+// SanitizeDMailKey normalizes a key for use in D-Mail filenames.
+func SanitizeDMailKey(key string) string {
 	var b strings.Builder
 	prev := rune(0)
 	for _, r := range strings.ToLower(key) {

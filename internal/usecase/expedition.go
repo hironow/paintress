@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
@@ -28,7 +29,7 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
 	runner.SetEmitter(emitter)
 
 	// Wire pre-flight triage if archiver is available
-	tracker := domain.NewRetryTracker()
+	tracker := harness.NewRetryTracker()
 	if archiver != nil {
 		triager := NewPreFlightTriager(
 			continent, maxRetries, tracker,

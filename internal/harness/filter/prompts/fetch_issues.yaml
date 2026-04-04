@@ -1,0 +1,15 @@
+name: fetch_issues
+version: "1.0"
+description: |
+  Prompt for fetching issues via Linear MCP tools.
+  Instructs Claude to paginate and write results as JSON.
+variables:
+  team: "Linear team identifier"
+  project_clause: "Optional project filter clause (empty string if none)"
+  output_path: "File path where JSON array should be written"
+template: >-
+  Use mcp__linear__list_issues to list ALL issues for team {team}{project_clause}.
+  Paginate until no more results.
+  Write the result as a JSON array to {output_path}
+  Each element must have fields: id (the issue identifier like TEAM-123),
+  title, priority (number), status (state name), labels (array of label names).

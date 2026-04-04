@@ -8,63 +8,63 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/session"
 )
 
 // === HasReviewComments ===
 
 func TestHasReviewComments_P0(t *testing.T) {
-	if !domain.HasReviewComments("[P0] Critical: missing null check") {
+	if !harness.HasReviewComments("[P0] Critical: missing null check") {
 		t.Error("should detect [P0]")
 	}
 }
 
 func TestHasReviewComments_P1(t *testing.T) {
-	if !domain.HasReviewComments("[P1] Reset live URL state") {
+	if !harness.HasReviewComments("[P1] Reset live URL state") {
 		t.Error("should detect [P1]")
 	}
 }
 
 func TestHasReviewComments_P2(t *testing.T) {
-	if !domain.HasReviewComments("[P2] Some review finding") {
+	if !harness.HasReviewComments("[P2] Some review finding") {
 		t.Error("should detect [P2]")
 	}
 }
 
 func TestHasReviewComments_P3(t *testing.T) {
-	if !domain.HasReviewComments("[P3] Minor style issue") {
+	if !harness.HasReviewComments("[P3] Minor style issue") {
 		t.Error("should detect [P3]")
 	}
 }
 
 func TestHasReviewComments_P4(t *testing.T) {
-	if !domain.HasReviewComments("[P4] Nitpick") {
+	if !harness.HasReviewComments("[P4] Nitpick") {
 		t.Error("should detect [P4]")
 	}
 }
 
 func TestHasReviewComments_ReviewCommentKeyword(t *testing.T) {
-	if !domain.HasReviewComments("Review comment:\n- Fix the return type") {
+	if !harness.HasReviewComments("Review comment:\n- Fix the return type") {
 		t.Error("should detect 'Review comment' keyword")
 	}
 }
 
 func TestHasReviewComments_NoComments(t *testing.T) {
-	if domain.HasReviewComments("I did not find any discrete, actionable regressions in the changed application code.") {
+	if harness.HasReviewComments("I did not find any discrete, actionable regressions in the changed application code.") {
 		t.Error("clean review should not be detected as having comments")
 	}
 }
 
 func TestHasReviewComments_EmptyOutput(t *testing.T) {
-	if domain.HasReviewComments("") {
+	if harness.HasReviewComments("") {
 		t.Error("empty output should not be detected as having comments")
 	}
 }
 
 func TestHasReviewComments_MultipleTags(t *testing.T) {
 	output := "[P1] First issue\n[P2] Second issue\n[P3] Third issue"
-	if !domain.HasReviewComments(output) {
+	if !harness.HasReviewComments(output) {
 		t.Error("should detect multiple priority tags")
 	}
 }
@@ -72,31 +72,31 @@ func TestHasReviewComments_MultipleTags(t *testing.T) {
 // === IsRateLimited ===
 
 func TestIsRateLimited_RateLimit(t *testing.T) {
-	if !domain.IsRateLimited("Error: rate limit exceeded, try again later") {
+	if !harness.IsRateLimited("Error: rate limit exceeded, try again later") {
 		t.Error("should detect 'rate limit'")
 	}
 }
 
 func TestIsRateLimited_RateLimitUnderscore(t *testing.T) {
-	if !domain.IsRateLimited("rate_limit_error: 429") {
+	if !harness.IsRateLimited("rate_limit_error: 429") {
 		t.Error("should detect 'rate_limit'")
 	}
 }
 
 func TestIsRateLimited_QuotaExceeded(t *testing.T) {
-	if !domain.IsRateLimited("quota exceeded for this billing period") {
+	if !harness.IsRateLimited("quota exceeded for this billing period") {
 		t.Error("should detect 'quota exceeded'")
 	}
 }
 
 func TestIsRateLimited_QuotaLimit(t *testing.T) {
-	if !domain.IsRateLimited("quota limit reached") {
+	if !harness.IsRateLimited("quota limit reached") {
 		t.Error("should detect 'quota limit'")
 	}
 }
 
 func TestIsRateLimited_TooManyRequests(t *testing.T) {
-	if !domain.IsRateLimited("too many requests") {
+	if !harness.IsRateLimited("too many requests") {
 		t.Error("should detect 'too many requests'")
 	}
 }
@@ -104,31 +104,31 @@ func TestIsRateLimited_TooManyRequests(t *testing.T) {
 func TestIsRateLimited_Bare429NotDetected(t *testing.T) {
 	// Bare "429" should NOT trigger rate-limit detection to avoid false positives
 	// (e.g. review comments about HTTP 429 handling, line numbers, test names).
-	if domain.IsRateLimited("HTTP 429: slow down") {
+	if harness.IsRateLimited("HTTP 429: slow down") {
 		t.Error("bare '429' without rate-limit keywords should not be detected")
 	}
 }
 
 func TestIsRateLimited_UsageLimit(t *testing.T) {
-	if !domain.IsRateLimited("usage limit hit") {
+	if !harness.IsRateLimited("usage limit hit") {
 		t.Error("should detect 'usage limit'")
 	}
 }
 
 func TestIsRateLimited_CaseInsensitive(t *testing.T) {
-	if !domain.IsRateLimited("RATE LIMIT exceeded") {
+	if !harness.IsRateLimited("RATE LIMIT exceeded") {
 		t.Error("should detect rate limit case-insensitively")
 	}
 }
 
 func TestIsRateLimited_NormalOutput(t *testing.T) {
-	if domain.IsRateLimited("I did not find any discrete regressions.") {
+	if harness.IsRateLimited("I did not find any discrete regressions.") {
 		t.Error("normal output should not be rate limited")
 	}
 }
 
 func TestIsRateLimited_EmptyOutput(t *testing.T) {
-	if domain.IsRateLimited("") {
+	if harness.IsRateLimited("") {
 		t.Error("empty output should not be rate limited")
 	}
 }
@@ -137,7 +137,7 @@ func TestIsRateLimited_EmptyOutput(t *testing.T) {
 
 func TestSummarizeReview_Short(t *testing.T) {
 	input := "Short review comment"
-	got := domain.SummarizeReview(input)
+	got := harness.SummarizeReview(input)
 	if got != input {
 		t.Errorf("short input should be unchanged, got %q", got)
 	}
@@ -145,7 +145,7 @@ func TestSummarizeReview_Short(t *testing.T) {
 
 func TestSummarizeReview_ExactlyMaxLen(t *testing.T) {
 	input := strings.Repeat("a", 500)
-	got := domain.SummarizeReview(input)
+	got := harness.SummarizeReview(input)
 	if got != input {
 		t.Error("exactly 500 chars should not be truncated")
 	}
@@ -153,7 +153,7 @@ func TestSummarizeReview_ExactlyMaxLen(t *testing.T) {
 
 func TestSummarizeReview_OverMaxLen(t *testing.T) {
 	input := strings.Repeat("a", 600)
-	got := domain.SummarizeReview(input)
+	got := harness.SummarizeReview(input)
 	if len(got) > 520 {
 		t.Errorf("truncated output too long: %d", len(got))
 	}
@@ -163,7 +163,7 @@ func TestSummarizeReview_OverMaxLen(t *testing.T) {
 }
 
 func TestSummarizeReview_Empty(t *testing.T) {
-	got := domain.SummarizeReview("")
+	got := harness.SummarizeReview("")
 	if got != "" {
 		t.Errorf("empty input should return empty, got %q", got)
 	}
@@ -172,7 +172,7 @@ func TestSummarizeReview_Empty(t *testing.T) {
 // === BuildReviewFixPrompt ===
 
 func TestBuildReviewFixPrompt_ContainsBranch(t *testing.T) {
-	prompt := domain.BuildReviewFixPrompt("feat/my-branch", "[P1] Fix null check")
+	prompt := harness.BuildReviewFixPrompt("feat/my-branch", "[P1] Fix null check")
 	if !strings.Contains(prompt, "feat/my-branch") {
 		t.Error("prompt should contain the branch name")
 	}
@@ -180,21 +180,21 @@ func TestBuildReviewFixPrompt_ContainsBranch(t *testing.T) {
 
 func TestBuildReviewFixPrompt_ContainsComments(t *testing.T) {
 	comments := "[P2] Reset live URL state when entering demo mode"
-	prompt := domain.BuildReviewFixPrompt("feat/demo", comments)
+	prompt := harness.BuildReviewFixPrompt("feat/demo", comments)
 	if !strings.Contains(prompt, comments) {
 		t.Error("prompt should contain the review comments")
 	}
 }
 
 func TestBuildReviewFixPrompt_NoBranchCreation(t *testing.T) {
-	prompt := domain.BuildReviewFixPrompt("feat/x", "fix this")
+	prompt := harness.BuildReviewFixPrompt("feat/x", "fix this")
 	if !strings.Contains(prompt, "Do not create a new branch") {
 		t.Error("prompt should instruct not to create new branch")
 	}
 }
 
 func TestBuildReviewFixPrompt_NoStatusChange(t *testing.T) {
-	prompt := domain.BuildReviewFixPrompt("feat/x", "fix this")
+	prompt := harness.BuildReviewFixPrompt("feat/x", "fix this")
 	if strings.Contains(prompt, "Testing") {
 		t.Error("prompt should NOT instruct to change status to Testing")
 	}
@@ -524,7 +524,7 @@ func TestExpandReviewCmd_FilePlaceholder(t *testing.T) {
 	dir := "/tmp/myrepo"
 
 	// when
-	got := domain.ExpandReviewCmd(cmd, dir, "feature/auth")
+	got := harness.ExpandReviewCmd(cmd, dir, "feature/auth")
 
 	// then
 	if got != "lint /tmp/myrepo" {
@@ -537,7 +537,7 @@ func TestExpandReviewCmd_BranchPlaceholder(t *testing.T) {
 	cmd := "codex review --base {branch}"
 
 	// when
-	got := domain.ExpandReviewCmd(cmd, "/repo", "main")
+	got := harness.ExpandReviewCmd(cmd, "/repo", "main")
 
 	// then
 	if got != "codex review --base main" {
@@ -550,7 +550,7 @@ func TestExpandReviewCmd_MultiplePlaceholders(t *testing.T) {
 	cmd := "review --dir {file} --branch {branch}"
 
 	// when
-	got := domain.ExpandReviewCmd(cmd, "/work", "dev")
+	got := harness.ExpandReviewCmd(cmd, "/work", "dev")
 
 	// then
 	want := "review --dir /work --branch dev"
@@ -564,7 +564,7 @@ func TestExpandReviewCmd_NoPlaceholders(t *testing.T) {
 	cmd := "eslint ."
 
 	// when
-	got := domain.ExpandReviewCmd(cmd, "/repo", "main")
+	got := harness.ExpandReviewCmd(cmd, "/repo", "main")
 
 	// then
 	if got != "eslint ." {
@@ -574,7 +574,7 @@ func TestExpandReviewCmd_NoPlaceholders(t *testing.T) {
 
 func TestExpandReviewCmd_EmptyCommand(t *testing.T) {
 	// given / when
-	got := domain.ExpandReviewCmd("", "/repo", "main")
+	got := harness.ExpandReviewCmd("", "/repo", "main")
 
 	// then
 	if got != "" {

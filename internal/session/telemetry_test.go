@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 	"go.opentelemetry.io/otel"
@@ -163,8 +164,8 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 		},
 		LogDir:   filepath.Join(dir, ".expedition", ".run", "logs"),
 		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: domain.NewGradientGauge(5),
-		Reserve:  domain.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
+		Gradient: harness.NewGradientGauge(5),
+		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

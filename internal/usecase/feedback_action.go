@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // feedbackActionHandler implements port.FeedbackActionHandler using usecase logic.
 type feedbackActionHandler struct {
 	maxRetries int
-	tracker    *domain.RetryTracker
+	tracker    *harness.RetryTracker
 	emitter    port.ExpeditionEventEmitter
 	followUp   port.FollowUpRunner
 	logger     domain.Logger
@@ -19,7 +20,7 @@ type feedbackActionHandler struct {
 
 // NewFeedbackActionHandler creates a FeedbackActionHandler with the given dependencies.
 func NewFeedbackActionHandler(
-	maxRetries int, tracker *domain.RetryTracker,
+	maxRetries int, tracker *harness.RetryTracker,
 	emitter port.ExpeditionEventEmitter, followUp port.FollowUpRunner, logger domain.Logger,
 ) port.FeedbackActionHandler {
 	return &feedbackActionHandler{
@@ -42,7 +43,7 @@ func (h *feedbackActionHandler) HandleFeedbackAction(ctx context.Context, dm dom
 			return
 		}
 		count := h.tracker.Track(dm.Issues)
-		retryKey := domain.RetryKey(dm.Issues)
+		retryKey := harness.RetryKey(dm.Issues)
 
 		if count > h.maxRetries {
 			h.logger.Warn("Max retries (%d) reached for %s, escalating", h.maxRetries, dm.Name)

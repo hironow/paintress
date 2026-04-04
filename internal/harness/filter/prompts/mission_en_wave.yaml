@@ -1,0 +1,118 @@
+name: mission_en_wave
+version: "1.0"
+description: |
+  Mission rules of engagement for English, wave mode.
+  Pre-rendered variant with wave-specific instructions (no Linear references).
+variables: {}
+template: |
+  # Mission — Rules of Engagement
+
+  This file defines the rules of engagement for the Expedition.
+  All Expeditioners must read this file and carry out their mission.
+
+  ---
+
+  ## Obtaining the Mission
+
+  1. The target issue is provided via the Wave specification — do not search for issues yourself
+  2. If a **Gradient Gauge** is provided, use it as a hint for how much complexity to take on
+
+  ## Mission Assessment
+
+  Analyze the issue content and inbox D-Mails, and classify into one of four types:
+
+  ### implement
+
+  Code implementation, feature additions, refactoring, etc.
+
+  ### verify
+
+  E2E testing, UI review, checklist completion, behavior verification, etc.
+  Criteria: description contains keywords like "test", "check", "verify", "QA", "E2E",
+  or includes a checklist (`- [ ]`).
+
+  ### fix
+
+  When defects are found during verify, you transition to fix within the same Expedition. This is not a separate selection — it follows naturally from verify results.
+
+  ### consolidate
+
+  Unify a chain of stacked PRs into a single PR. Choose this when impl-feedback D-Mails describe PR chain convergence issues and no actionable issues exist in earlier statuses.
+
+  ---
+
+  ## implement Procedure
+
+  1. `git checkout <base-branch> && git pull origin <base-branch>`
+  2. Create branch: `feat/<step-id>-<short-description>` (replace `:` with `-` in the step ID for valid git refs, e.g. `auth-w1:s1` → `auth-w1-s1`)
+  4. TDD: write tests -> implement -> make tests pass
+  5. Commit frequently (include step/issue ID in commit messages)
+  6. Run lint / format checks
+  7. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+  8. Create PR via GitHub (body references the wave step being implemented)
+  10. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
+
+  ## verify Procedure
+
+  1. Confirm dev server is running (check URL accessibility)
+  3. If browser automation tools are available (Playwright, Chrome DevTools, etc.), use them to open a browser and navigate to the target page
+  4. Execute checklist items **one by one**:
+     a. Interact with UI
+     b. Compare expected vs actual results
+     c. Take screenshot if browser automation is available
+     d. Record result (Pass / Fail + details)
+  5. Create QA report and include results in the expedition report (D-Mail)
+  6. **If no defects**: mark the step as completed in the report
+  7. **If defects found**: -> transition to fix
+
+  ## fix Procedure (auto-transition from verify)
+
+  For each defect:
+
+  1. Record the defect in the expedition report (D-Mail) — do NOT create a GitHub issue
+  2. `git checkout <base-branch> && git pull origin <base-branch>`
+  3. Branch: `fix/<step-id>-<short-description>`
+  4. Implement fix and write tests
+  5. If it still fails after 3 fix attempts -> skip (record lesson in journal)
+  6. Create PR via GitHub (body references the defect found during verify)
+  9. Code review is handled by the orchestrator (Paintress) after PR creation — do not run review commands yourself
+
+  ## consolidate Procedure
+
+  When inbox contains impl-feedback D-Mails describing PR chain convergence issues (stacked PRs, behind-by counts, conflicts), and no actionable issues exist in earlier statuses, choose `consolidate` to unify the chain into a single PR.
+
+  1. **Analyze chain**: Read impl-feedback D-Mail(s) to understand the PR chain structure (PR numbers, dependency order, conflicts, behind-by)
+  2. **Create branch**: `git checkout -b consolidate/<PR-numbers> <base-branch>` where `<PR-numbers>` lists original PR numbers in descending order (e.g. `consolidate/pr-35-34-33 main`). If the list is too long, truncate with the most recent PRs.
+  3. **Apply changes root-first**: For each PR in the chain, starting from the root (closest to base branch):
+     - Fetch the PR's changes: `gh pr diff <PR-number> | git apply` or cherry-pick the commits
+     - If conflict occurs: resolve it by consulting the wave step's DoD and implementation intent
+     - Commit after each PR's changes are applied: `git commit -m "consolidate: apply <PR-number> (<issue-id>)"`
+  4. **Create new PR**: `gh pr create --base <base-branch>` — both the **title** and **body** must include the consolidated PR numbers (e.g. title: `consolidate: unify #33, #34, #35`)
+  5. **Close old PRs**: For each old PR whose changes are fully contained in the new PR:
+     - Comment: `Consolidated into #<new-PR-number>`
+     - Close: `gh pr close <PR-number>`
+  6. **Report**: Output expedition report with `mission_type: consolidate`
+
+  ### consolidate Constraints
+
+  - **Protected branches**: Never directly modify or checkout from these branches as working branches: main, master, develop, staging, dev, stg, prod, production. Only use them as `--base` for the new PR.
+  - **Do not merge**: Create the consolidated PR but do NOT merge it. Let the normal review flow handle merging.
+  - **Do not close unless contained**: Only close old PRs if their changes are fully present in the new PR.
+  - **Step status unchanged**: Do not modify the wave step status — the PR linkage changes with the new PR, but the step remains as-is.
+  - **Partial completion**: If you cannot complete the full chain before timeout, include progress in the reason field (applied PRs, remaining PRs) so the next expedition can continue from the pushed branch.
+
+  ---
+
+  ## Prohibitions
+
+  - Do not force push
+  - Do not commit directly to the base branch
+  - Do not create a PR with failing tests
+  - Do not stop the dev server (managed by external process)
+  - Do not re-verify fixes within the same Expedition — leave verification to the next Expedition
+
+  ## Handling Ambiguity
+
+  - Execute ambiguous items using best judgment and record reasoning in journal
+  - Skip issues with unclear specs and record in journal
+  - If unsure, skip and leave it to the next Expedition

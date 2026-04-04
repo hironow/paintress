@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -48,7 +49,7 @@ func TestExtractValue_ValueWithColons(t *testing.T) {
 }
 
 func TestFormatLuminaForPrompt_Empty(t *testing.T) {
-	result := domain.FormatLuminaForPrompt(nil)
+	result := harness.FormatLuminaForPrompt(nil)
 	if !strings.Contains(result, "No Lumina learned") {
 		t.Errorf("empty luminas should say no luminas: %q", result)
 	}
@@ -59,7 +60,7 @@ func TestFormatLuminaForPrompt_WithLuminas(t *testing.T) {
 		{Pattern: "[WARN] Avoid — failed 3 times: tests failing", Source: "failure-pattern", Uses: 3},
 		{Pattern: "[OK] Proven approach (4x successful): implement", Source: "success-pattern", Uses: 4},
 	}
-	result := domain.FormatLuminaForPrompt(luminas)
+	result := harness.FormatLuminaForPrompt(luminas)
 
 	if !strings.Contains(result, "Defensive") {
 		t.Errorf("should contain Defensive section header: %q", result)
@@ -433,7 +434,7 @@ func TestFormatLuminaForPrompt_WithAlert(t *testing.T) {
 	}
 
 	// when
-	result := domain.FormatLuminaForPrompt(luminas)
+	result := harness.FormatLuminaForPrompt(luminas)
 
 	// then
 	if !strings.Contains(result, "Alert") {

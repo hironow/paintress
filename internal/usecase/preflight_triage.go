@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
@@ -13,7 +14,7 @@ import (
 type preFlightTriager struct {
 	continent  string
 	maxRetries int
-	tracker    *domain.RetryTracker
+	tracker    *harness.RetryTracker
 	archiver   port.InboxArchiver
 	emitter    port.ExpeditionEventEmitter
 	logger     domain.Logger
@@ -21,7 +22,7 @@ type preFlightTriager struct {
 
 // NewPreFlightTriager creates a PreFlightTriager with the given dependencies.
 func NewPreFlightTriager(
-	continent string, maxRetries int, tracker *domain.RetryTracker,
+	continent string, maxRetries int, tracker *harness.RetryTracker,
 	archiver port.InboxArchiver, emitter port.ExpeditionEventEmitter, logger domain.Logger,
 ) port.PreFlightTriager {
 	return &preFlightTriager{
@@ -45,7 +46,7 @@ func triagePreFlightDMails(
 	dmails []domain.DMail,
 	continent string,
 	maxRetries int,
-	tracker *domain.RetryTracker,
+	tracker *harness.RetryTracker,
 	archiver port.InboxArchiver,
 	emitter port.ExpeditionEventEmitter,
 	logger domain.Logger,
@@ -80,7 +81,7 @@ func triagePreFlightDMails(
 				continue
 			}
 			count := tracker.Track(dm.Issues)
-			retryKey := domain.RetryKey(dm.Issues)
+			retryKey := harness.RetryKey(dm.Issues)
 
 			if count > maxRetries {
 				logger.Warn("Max retries (%d) reached for %s, escalating", maxRetries, dm.Name)

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness"
 )
 
 func TestBuildPrompt_WaveTargetSection(t *testing.T) {
@@ -69,7 +70,7 @@ func TestNewReportDMail_WaveReference(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 3)
+	dm := harness.NewReportDMail(report, 3)
 
 	// then
 	if dm.Wave == nil {
@@ -97,7 +98,7 @@ func TestNewReportDMail_NoWaveReference_LinearMode(t *testing.T) {
 	}
 
 	// when
-	dm := domain.NewReportDMail(report, 2)
+	dm := harness.NewReportDMail(report, 2)
 
 	// then: no wave reference
 	if dm.Wave != nil {
