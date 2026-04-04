@@ -18,9 +18,6 @@ type GradientGauge = policy.GradientGauge
 // NewGradientGauge creates a new GradientGauge.
 var NewGradientGauge = policy.NewGradientGauge
 
-// ReportSeverity maps a gauge level to a D-Mail severity string.
-var ReportSeverity = policy.ReportSeverity
-
 // --- policy: reserve ---
 
 // ReserveParty is a type alias for the policy ReserveParty.
@@ -36,9 +33,6 @@ type RetryTracker = policy.RetryTracker
 
 // NewRetryTracker creates a new unlimited RetryTracker.
 var NewRetryTracker = policy.NewRetryTracker
-
-// NewRetryTrackerWithMax creates a new RetryTracker with a cap.
-var NewRetryTrackerWithMax = policy.NewRetryTrackerWithMax
 
 // RetryKey returns the canonical key for an issue set.
 var RetryKey = policy.RetryKey
@@ -56,40 +50,6 @@ var FilterHighSeverity = policy.FilterHighSeverity
 // SummarizeReview normalizes and truncates review output.
 var SummarizeReview = policy.SummarizeReview
 
-// --- policy: strategy ---
-
-// FixStrategy identifies the approach for a review-fix cycle.
-type FixStrategy = policy.FixStrategy
-
-// Strategy constants.
-const (
-	StrategyDirect    = policy.StrategyDirect
-	StrategyDecompose = policy.StrategyDecompose
-	StrategyRewrite   = policy.StrategyRewrite
-)
-
-// StrategyForCycle returns the fix strategy for a given cycle number.
-var StrategyForCycle = policy.StrategyForCycle
-
-// --- policy: reflection ---
-
-// ReflectionAccumulator is a type alias for the policy ReflectionAccumulator.
-type ReflectionAccumulator = policy.ReflectionAccumulator
-
-// ReflectionCycle is a type alias for the policy ReflectionCycle.
-type ReflectionCycle = policy.ReflectionCycle
-
-// NewReflectionAccumulator creates an empty ReflectionAccumulator.
-var NewReflectionAccumulator = policy.NewReflectionAccumulator
-
-// --- policy: stagnation ---
-
-// CountPriorityTags counts priority tags in review output.
-var CountPriorityTags = policy.CountPriorityTags
-
-// IsStagnant checks if the review loop has stagnated.
-var IsStagnant = policy.IsStagnant
-
 // --- policy: wave ---
 
 // ProjectWaveState builds wave progress from D-Mails.
@@ -102,15 +62,6 @@ var ExpeditionTargetsFromWaves = policy.ExpeditionTargetsFromWaves
 
 // PromptRegistry is a type alias for the filter PromptRegistry.
 type PromptRegistry = filter.PromptRegistry
-
-// PromptConfig is a type alias for the filter PromptConfig.
-type PromptConfig = filter.PromptConfig
-
-// NewPromptRegistry creates a new PromptRegistry from embedded YAML files.
-var NewPromptRegistry = filter.NewRegistry
-
-// DefaultPromptRegistry returns the package-level PromptRegistry singleton.
-var DefaultPromptRegistry = filter.Default
 
 // MustDefaultPromptRegistry returns the singleton or panics.
 var MustDefaultPromptRegistry = filter.MustDefault
@@ -136,12 +87,6 @@ var BuildReviewFixPrompt = filter.BuildReviewFixPrompt
 // ExpandReviewCmd replaces placeholders in the review command.
 var ExpandReviewCmd = filter.ExpandReviewCmd
 
-// BuildReviewFixPromptWithStrategy creates a fix prompt with strategy hint.
-var BuildReviewFixPromptWithStrategy = filter.BuildReviewFixPromptWithStrategy
-
-// BuildReviewFixPromptWithReflection creates a fix prompt with reflection.
-var BuildReviewFixPromptWithReflection = filter.BuildReviewFixPromptWithReflection
-
 // --- verifier ---
 
 // HasReviewComments checks for actionable review comment indicators.
@@ -158,6 +103,14 @@ func ClassifyProviderError(provider domain.Provider, stderr string) domain.Provi
 	return verifier.ClassifyProviderError(provider, stderr)
 }
 
+// --- filter: expedition prompt rendering ---
+
+// MissionText renders the mission rules for the given language and mode.
+var MissionText = filter.MissionText
+
+// RenderExpeditionPrompt renders the expedition prompt template.
+var RenderExpeditionPrompt = filter.RenderExpeditionPrompt
+
 // --- filter layer: optimization (Phase 3) ---
 
 type PromptOptimizer = filter.PromptOptimizer
@@ -166,11 +119,3 @@ type OptimizedResult = filter.OptimizedResult
 
 var SavePrompt = filter.Save
 var PromptsDir = filter.PromptsDir
-
-// --- filter: expedition prompt rendering ---
-
-// MissionText renders the mission rules for the given language and mode.
-var MissionText = filter.MissionText
-
-// RenderExpeditionPrompt renders the expedition prompt template.
-var RenderExpeditionPrompt = filter.RenderExpeditionPrompt

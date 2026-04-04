@@ -42,14 +42,6 @@ func LogBanner(logger Logger, dir BannerDirection, kind, name, description strin
 	}
 }
 
-// LogHeader calls Header if the logger supports it (type assertion).
-// Prints a single-line startup header with tool name and version.
-func LogHeader(logger Logger, toolName, version string) {
-	if bl, ok := logger.(BannerLogger); ok {
-		bl.Header(toolName, version)
-	}
-}
-
 // LogSection calls Section if the logger supports it (type assertion).
 // Prints a single-line section separator for phase transitions.
 func LogSection(logger Logger, title string) {

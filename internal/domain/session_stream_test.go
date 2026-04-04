@@ -1,17 +1,16 @@
-package domain_test
+package domain
+// white-box-reason: tests unexported domain functions (parseProvider, excludeIssuesByLabel, etc.)
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/hironow/paintress/internal/domain"
 )
 
 func TestTruncateField_NoTruncation(t *testing.T) {
 	t.Parallel()
 	s := "short string"
-	got, truncated := domain.TruncateField(s, 100)
+	got, truncated := TruncateField(s, 100)
 	if truncated {
 		t.Error("should not truncate")
 	}
@@ -23,7 +22,7 @@ func TestTruncateField_NoTruncation(t *testing.T) {
 func TestTruncateField_ExactBoundary(t *testing.T) {
 	t.Parallel()
 	s := "abcd"
-	got, truncated := domain.TruncateField(s, 4)
+	got, truncated := TruncateField(s, 4)
 	if truncated {
 		t.Error("should not truncate at exact boundary")
 	}
@@ -35,7 +34,7 @@ func TestTruncateField_ExactBoundary(t *testing.T) {
 func TestTruncateField_Truncates(t *testing.T) {
 	t.Parallel()
 	s := strings.Repeat("x", 5000)
-	got, truncated := domain.TruncateField(s, 4096)
+	got, truncated := TruncateField(s, 4096)
 	if !truncated {
 		t.Error("should truncate")
 	}
@@ -50,9 +49,9 @@ func TestTruncateField_Truncates(t *testing.T) {
 func TestTruncateField_UTF8Boundary(t *testing.T) {
 	t.Parallel()
 	// Build a string with multi-byte characters that straddles the boundary.
-	// Japanese char "あ" = 3 bytes (0xE3 0x81 0x82).
-	s := strings.Repeat("あ", 2000) // 6000 bytes
-	got, truncated := domain.TruncateField(s, 4096)
+	// Japanese char = 3 bytes (0xE3 0x81 0x82).
+	s := strings.Repeat("\xe3\x81\x82", 2000) // 6000 bytes
+	got, truncated := TruncateField(s, 4096)
 	if !truncated {
 		t.Error("should truncate")
 	}
@@ -72,7 +71,7 @@ func TestTruncateField_UTF8Boundary(t *testing.T) {
 
 func TestTruncateField_TinyMax(t *testing.T) {
 	t.Parallel()
-	got, truncated := domain.TruncateField("hello", 2)
+	got, truncated := TruncateField("hello", 2)
 	if !truncated {
 		t.Error("should truncate")
 	}
@@ -84,10 +83,10 @@ func TestTruncateField_TinyMax(t *testing.T) {
 func TestNewSessionStreamEvent(t *testing.T) {
 	t.Parallel()
 	data, _ := json.Marshal(map[string]string{"tool_name": "Read"})
-	ev := domain.NewSessionStreamEvent("sightjack", domain.ProviderClaudeCode, domain.StreamToolUseStart, data)
+	ev := NewSessionStreamEvent("sightjack", ProviderClaudeCode, StreamToolUseStart, data)
 
-	if ev.SchemaVersion != domain.StreamSchemaVersion {
-		t.Errorf("SchemaVersion = %d, want %d", ev.SchemaVersion, domain.StreamSchemaVersion)
+	if ev.SchemaVersion != StreamSchemaVersion {
+		t.Errorf("SchemaVersion = %d, want %d", ev.SchemaVersion, StreamSchemaVersion)
 	}
 	if ev.ID == "" {
 		t.Error("ID should be non-empty")
@@ -95,11 +94,11 @@ func TestNewSessionStreamEvent(t *testing.T) {
 	if ev.Tool != "sightjack" {
 		t.Errorf("Tool = %q, want %q", ev.Tool, "sightjack")
 	}
-	if ev.Provider != domain.ProviderClaudeCode {
-		t.Errorf("Provider = %q, want %q", ev.Provider, domain.ProviderClaudeCode)
+	if ev.Provider != ProviderClaudeCode {
+		t.Errorf("Provider = %q, want %q", ev.Provider, ProviderClaudeCode)
 	}
-	if ev.Type != domain.StreamToolUseStart {
-		t.Errorf("Type = %q, want %q", ev.Type, domain.StreamToolUseStart)
+	if ev.Type != StreamToolUseStart {
+		t.Errorf("Type = %q, want %q", ev.Type, StreamToolUseStart)
 	}
 	if ev.Timestamp.IsZero() {
 		t.Error("Timestamp should be non-zero")
@@ -108,42 +107,42 @@ func TestNewSessionStreamEvent(t *testing.T) {
 
 func TestSessionStreamEvent_WithRaw(t *testing.T) {
 	t.Parallel()
-	ev := domain.NewSessionStreamEvent("sightjack", domain.ProviderClaudeCode, domain.StreamAssistantText, nil)
+	ev := NewSessionStreamEvent("sightjack", ProviderClaudeCode, StreamAssistantText, nil)
 
-	// Short raw — no truncation.
+	// Short raw -- no truncation.
 	ev.WithRaw(`{"type":"assistant"}`)
 	if ev.RawTruncated {
 		t.Error("should not be truncated")
 	}
 
-	// Long raw — truncation.
+	// Long raw -- truncation.
 	longRaw := strings.Repeat("a", 5000)
 	ev.WithRaw(longRaw)
 	if !ev.RawTruncated {
 		t.Error("should be truncated")
 	}
-	if len(ev.Raw) > domain.RawFieldMaxBytes {
-		t.Errorf("raw length %d exceeds max %d", len(ev.Raw), domain.RawFieldMaxBytes)
+	if len(ev.Raw) > RawFieldMaxBytes {
+		t.Errorf("raw length %d exceeds max %d", len(ev.Raw), RawFieldMaxBytes)
 	}
 }
 
 func TestValidateSessionStreamEvent(t *testing.T) {
 	t.Parallel()
 
-	valid := domain.NewSessionStreamEvent("sightjack", domain.ProviderClaudeCode, domain.StreamSessionStart, nil)
-	if err := domain.ValidateSessionStreamEvent(valid); err != nil {
+	valid := NewSessionStreamEvent("sightjack", ProviderClaudeCode, StreamSessionStart, nil)
+	if err := validateSessionStreamEvent(valid); err != nil {
 		t.Errorf("valid event should pass: %v", err)
 	}
 
 	noTool := valid
 	noTool.Tool = ""
-	if err := domain.ValidateSessionStreamEvent(noTool); err == nil {
+	if err := validateSessionStreamEvent(noTool); err == nil {
 		t.Error("missing tool should fail")
 	}
 
 	noType := valid
 	noType.Type = ""
-	if err := domain.ValidateSessionStreamEvent(noType); err == nil {
+	if err := validateSessionStreamEvent(noType); err == nil {
 		t.Error("missing type should fail")
 	}
 }

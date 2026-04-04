@@ -79,8 +79,8 @@ func (e *Expedition) setCurrentIssue(issue string) {
 	e.currentIssue = issue
 }
 
-// ReleaseClaim releases the issue claim held by this expedition, if any.
-func (e *Expedition) ReleaseClaim() {
+// releaseClaim releases the issue claim held by this expedition, if any.
+func (e *Expedition) releaseClaim() {
 	if e.ClaimRegistry == nil {
 		return
 	}

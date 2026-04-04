@@ -183,7 +183,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		// Wrap releaseWorkDir to also release the issue claim.
 		origReleaseWorkDir := releaseWorkDir
 		releaseWorkDir = func() {
-			expedition.ReleaseClaim()
+			expedition.releaseClaim()
 			origReleaseWorkDir()
 		}
 

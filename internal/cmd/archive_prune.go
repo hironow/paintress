@@ -145,6 +145,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 				}
 				out.EventDeleted = len(deleted)
 			}
+
 		}
 		data, jsonErr := json.Marshal(out)
 		if jsonErr != nil {
