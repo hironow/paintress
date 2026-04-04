@@ -17,6 +17,12 @@ type expeditionEventEmitter struct {
 	store      port.EventStore
 	dispatcher port.EventDispatcher
 	logger     domain.Logger
+	seqAlloc   port.SeqAllocator
+}
+
+// SetSeqAllocator injects a SeqAllocator for SeqNr allocation into emitted events.
+func (e *expeditionEventEmitter) SetSeqAllocator(alloc port.SeqAllocator) {
+	e.seqAlloc = alloc
 }
 
 // NewExpeditionEventEmitter creates an ExpeditionEventEmitter that wraps the aggregate event chain.
@@ -36,6 +42,15 @@ func NewExpeditionEventEmitter(
 
 // emit persists events and dispatches (best-effort).
 func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
+	if e.seqAlloc != nil {
+		for i := range events {
+			seq, err := e.seqAlloc.AllocSeqNr(context.Background())
+			if err != nil {
+				return fmt.Errorf("alloc seq nr: %w", err)
+			}
+			events[i].SeqNr = seq
+		}
+	}
 	if e.store != nil {
 		if _, err := e.store.Append(events...); err != nil {
 			return fmt.Errorf("append events: %w", err)

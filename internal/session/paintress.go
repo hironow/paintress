@@ -76,6 +76,7 @@ type Paintress struct {
 	approver    port.Approver
 	outboxStore port.OutboxStore // transactional outbox for D-Mail delivery
 	claude      port.ClaudeRunner
+	seqAlloc    port.SeqAllocator
 
 	// Retry tracking: maps sorted issue keys to attempt count
 	retryTracker *harness.RetryTracker
@@ -208,8 +209,20 @@ func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logge
 }
 
 // SetEmitter sets the event emitter for the session.
+// If p.seqAlloc is set, it is injected into the emitter via SetSeqAllocator.
 func (p *Paintress) SetEmitter(e port.ExpeditionEventEmitter) {
+	type seqSetter interface {
+		SetSeqAllocator(port.SeqAllocator)
+	}
+	if setter, ok := e.(seqSetter); ok && p.seqAlloc != nil {
+		setter.SetSeqAllocator(p.seqAlloc)
+	}
 	p.Emitter = e
+}
+
+// SetSeqAllocator injects a SeqAllocator for SeqNr allocation into emitted events.
+func (p *Paintress) SetSeqAllocator(alloc port.SeqAllocator) {
+	p.seqAlloc = alloc
 }
 
 // SetPreFlightTriager injects the pre-flight triage usecase.
