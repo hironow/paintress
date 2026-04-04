@@ -34,12 +34,12 @@ func detectPriority(line string) int {
 	return -1
 }
 
-// ExtractReviewComments parses review output and extracts structured ReviewComment values.
+// extractReviewComments parses review output and extracts structured ReviewComment values.
 // Lines containing priority tags [P0]–[P4] are extracted and sorted by priority (P0 first).
 // If no priority tags are found but the output contains "Review comment", the full output
 // is returned as a single raw fallback comment with priority 4.
 // Returns an empty slice when the output contains no recognizable review content.
-func ExtractReviewComments(output string) []ReviewComment {
+func extractReviewComments(output string) []ReviewComment {
 	if strings.TrimSpace(output) == "" {
 		return nil
 	}

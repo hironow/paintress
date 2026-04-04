@@ -1,9 +1,7 @@
-package domain_test
+package domain
 
 import (
 	"testing"
-
-	"github.com/hironow/paintress/internal/domain"
 )
 
 // TestExtractReviewComments_EmptyOutput verifies empty output produces no comments.
@@ -12,11 +10,11 @@ func TestExtractReviewComments_EmptyOutput(t *testing.T) {
 	output := ""
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
 	// then
 	if len(comments) != 0 {
-		t.Errorf("ExtractReviewComments(empty) = %v, want empty slice", comments)
+		t.Errorf("extractReviewComments(empty) = %v, want empty slice", comments)
 	}
 }
 
@@ -26,11 +24,11 @@ func TestExtractReviewComments_NoPriorityTags(t *testing.T) {
 	output := "Review comment: please add error handling"
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
 	// then: should fall back to raw output as a single comment
 	if len(comments) != 1 {
-		t.Errorf("ExtractReviewComments without tags = %d comments, want 1 (raw fallback)", len(comments))
+		t.Errorf("extractReviewComments without tags = %d comments, want 1 (raw fallback)", len(comments))
 	}
 }
 
@@ -40,11 +38,11 @@ func TestExtractReviewComments_SingleP0Tag(t *testing.T) {
 	output := "[P0] Critical: nil pointer dereference in handler"
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
 	// then
 	if len(comments) != 1 {
-		t.Fatalf("ExtractReviewComments = %d comments, want 1", len(comments))
+		t.Fatalf("extractReviewComments = %d comments, want 1", len(comments))
 	}
 	if comments[0].Priority != 0 {
 		t.Errorf("comment priority = %d, want 0 (P0)", comments[0].Priority)
@@ -60,11 +58,11 @@ func TestExtractReviewComments_MultipleTagsSortedByPriority(t *testing.T) {
 	output := "[P3] Style issue\n[P1] Missing test\n[P0] Critical bug\n[P2] Performance"
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
 	// then: sorted so P0 first, then P1, P2, P3
 	if len(comments) != 4 {
-		t.Fatalf("ExtractReviewComments = %d comments, want 4", len(comments))
+		t.Fatalf("extractReviewComments = %d comments, want 4", len(comments))
 	}
 	if comments[0].Priority != 0 {
 		t.Errorf("first comment priority = %d, want 0 (P0 should be first)", comments[0].Priority)
@@ -86,11 +84,11 @@ func TestExtractReviewComments_AllPriorityLevels(t *testing.T) {
 	output := "[P0] Bug\n[P1] Warning\n[P2] Style\n[P3] Suggestion\n[P4] Nitpick"
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
 	// then
 	if len(comments) != 5 {
-		t.Fatalf("ExtractReviewComments = %d comments, want 5", len(comments))
+		t.Fatalf("extractReviewComments = %d comments, want 5", len(comments))
 	}
 	for i, c := range comments {
 		if c.Priority != i {
@@ -105,7 +103,7 @@ func TestReviewComment_HasPriorityAndText(t *testing.T) {
 	output := "[P1] Missing nil check in getUserHandler"
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
 	// then
 	if len(comments) != 1 {
@@ -125,10 +123,10 @@ func TestExtractReviewComments_FallbackToRawWhenNoTagsAndNoKeyword(t *testing.T)
 	output := "exit status 1"
 
 	// when
-	comments := domain.ExtractReviewComments(output)
+	comments := extractReviewComments(output)
 
-	// then: no recognizable content → empty
+	// then: no recognizable content -> empty
 	if len(comments) != 0 {
-		t.Errorf("ExtractReviewComments(plain exit status) = %d comments, want 0", len(comments))
+		t.Errorf("extractReviewComments(plain exit status) = %d comments, want 0", len(comments))
 	}
 }

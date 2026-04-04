@@ -53,6 +53,7 @@ func (r *SessionRecorder) Record(ev domain.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	ev.SessionID = r.sessionID
 	ev.CorrelationID = r.sessionID
 	if r.prevID != "" {
 		ev.CausationID = r.prevID
