@@ -56,6 +56,14 @@ func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResu
 	return s.loadEvents, s.loadResult, nil
 }
 
+func (s *stubEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+	return s.loadEvents, s.loadResult, nil
+}
+
+func (s *stubEventStore) LatestSeqNr() (uint64, error) {
+	return 0, nil
+}
+
 // --- tests ---
 
 func TestSpanEventStore_IncludesAllAttributes(t *testing.T) {
