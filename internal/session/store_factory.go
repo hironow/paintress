@@ -37,9 +37,10 @@ func NewSnapshotStore(stateDir string) port.SnapshotStore {
 	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
 }
 
-// NewSeqCounter creates a SeqCounter at {stateDir}/.run/seq.db.
+// NewSeqCounter creates a SeqCounter at {stateDir}/seq.db.
+// seq.db lives at stateDir root (NOT .run/) — .run/ is ephemeral
 func NewSeqCounter(stateDir string) (*eventsource.SeqCounter, error) {
-	return eventsource.NewSeqCounter(filepath.Join(stateDir, ".run", "seq.db"))
+	return eventsource.NewSeqCounter(filepath.Join(stateDir, "seq.db"))
 }
 
 // EnsureCutover creates a SeqCounter, SnapshotStore, and raw FileEventStore,
