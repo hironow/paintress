@@ -88,7 +88,6 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	logger := loggerFrom(cmd)
 	archiveOps := session.NewArchiveOps()
 
 	rp, rpErr := domain.NewRepoPath(repoPath)
@@ -147,8 +146,6 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 				out.EventDeleted = len(deleted)
 			}
 
-			// Truncate oversized event files
-			session.TruncateOversizedEventFiles(stateDir, logger)
 		}
 		data, jsonErr := json.Marshal(out)
 		if jsonErr != nil {
@@ -226,9 +223,6 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	if pruned, pruneErr := archiveOps.PruneFlushedOutbox(cmd.Context(), repoPath); pruneErr == nil && pruned > 0 {
 		fmt.Fprintf(ew, "Pruned %d flushed outbox row(s).\n", pruned)
 	}
-
-	// Truncate oversized event files
-	session.TruncateOversizedEventFiles(stateDir, logger)
 
 	if len(archiveResult.Candidates) > 0 {
 		fmt.Fprintln(ew, "Note: archive/ is git-tracked. Run 'git status' to review and commit deletions.")
