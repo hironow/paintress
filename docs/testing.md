@@ -81,7 +81,7 @@ The `SPRTEvaluator` (`internal/domain/sprt.go`) implements the Sequential Probab
 
 ## Property-Based Tests
 
-Property-based tests use `testing/quick` (stdlib) to verify invariants hold for arbitrary operation sequences. Located in `internal/domain/`:
+Property-based tests use `testing/quick` (stdlib) to verify invariants hold for arbitrary operation sequences. Located in `internal/harness/policy/`:
 
 - **GradientGauge bounds**: Level never goes below 0 or above max regardless of Charge/Discharge/Decay sequence
 - **GradientGauge monotonicity**: Charge never decreases level; Discharge always resets to 0

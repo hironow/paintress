@@ -345,7 +345,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress run
 
 ## Development
 
-All code lives in `internal/` (Go convention). See [docs/conformance.md](docs/conformance.md) for layer architecture and directory responsibilities. Run `just --list` for available tasks.
+All code lives in `internal/` (Go convention). The `internal/harness/` layer provides the decision/validation/prompt-rendering boundary between the LLM and the environment, organized as `policy/` (deterministic decisions), `verifier/` (output validation), and `filter/` (prompt construction) behind a single facade. See [docs/conformance.md](docs/conformance.md) for the full layer architecture, dependency rules, and directory responsibilities. Run `just --list` for available tasks.
 
 ## Companion Binaries
 
