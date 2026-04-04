@@ -35,6 +35,7 @@ const (
 	EventEscalated            EventType = "escalated"
 	EventResolved             EventType = "resolved"
 	EventSpecRegistered       EventType = "spec.registered"
+	EventSystemCutover        EventType = "system.cutover"
 )
 
 // CurrentEventSchemaVersion is the schema version set by NewEvent.

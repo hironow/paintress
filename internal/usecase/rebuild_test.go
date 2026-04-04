@@ -79,3 +79,9 @@ func (s *stubEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
 func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return s.events, domain.LoadResult{}, nil
 }
+func (s *stubEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+	return s.events, domain.LoadResult{}, nil
+}
+func (s *stubEventStore) LatestSeqNr() (uint64, error) {
+	return 0, nil
+}
