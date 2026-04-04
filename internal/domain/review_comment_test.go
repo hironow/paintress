@@ -1,4 +1,5 @@
 package domain
+// white-box-reason: tests unexported domain functions (parseProvider, excludeIssuesByLabel, etc.)
 
 import (
 	"testing"
