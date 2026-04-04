@@ -116,6 +116,11 @@ func (g *GradientGauge) FormatForPrompt() string {
 func (g *GradientGauge) Stats() (charges, discharges, resets int) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
+	return g.statsLocked()
+}
+
+// statsLocked is the lock-free internal version. Caller must hold at least RLock.
+func (g *GradientGauge) statsLocked() (charges, discharges, resets int) {
 	for _, entry := range g.log {
 		switch {
 		case strings.HasPrefix(entry, "+1"):
@@ -151,19 +156,7 @@ func (g *GradientGauge) FormatLog() string {
 	if len(g.log) == 0 {
 		return "(empty)"
 	}
-	charges := 0
-	discharges := 0
-	resets := 0
-	for _, entry := range g.log {
-		switch {
-		case strings.HasPrefix(entry, "+1"):
-			charges++
-		case strings.HasPrefix(entry, "-1"):
-			discharges++
-		case strings.HasPrefix(entry, "RESET"):
-			resets++
-		}
-	}
+	charges, discharges, resets := g.statsLocked()
 	parts := []string{fmt.Sprintf("level %d/%d", g.level, g.max)}
 	if charges > 0 {
 		parts = append(parts, fmt.Sprintf("+%d", charges))

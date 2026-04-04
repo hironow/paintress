@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -124,14 +125,7 @@ func (r *PromptRegistry) Names() []string {
 	for n := range r.entries {
 		names = append(names, n)
 	}
-	// Simple sort for determinism
-	for i := range names {
-		for j := i + 1; j < len(names); j++ {
-			if names[i] > names[j] {
-				names[i], names[j] = names[j], names[i]
-			}
-		}
-	}
+	slices.Sort(names)
 	return names
 }
 

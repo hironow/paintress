@@ -1,7 +1,7 @@
 package policy
 
 import (
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -56,6 +56,6 @@ func (rt *RetryTracker) Exhausted(issues []string) bool {
 func RetryKey(issues []string) string {
 	sorted := make([]string, len(issues))
 	copy(sorted, issues)
-	sort.Strings(sorted)
+	slices.Sort(sorted)
 	return strings.Join(sorted, ",")
 }
