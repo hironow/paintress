@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -8,8 +9,10 @@ import (
 )
 
 // Rebuild replays events to regenerate projection state.
-// The RebuildCommand is already valid by construction (parse-don't-validate).
-func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, logger domain.Logger) error {
+// If a SnapshotStore is provided, saves a snapshot after successful replay.
+// seqAllocLatest provides the global SeqNr watermark (from SQLite counter, not event scan).
+// Pass nil if SeqCounter is not available — snapshot will be saved at SeqNr=0.
+func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, snapshots port.SnapshotStore, seqAllocLatest func() (uint64, error), aggregateType string, logger domain.Logger) error {
 	allEvents, _, err := events.LoadAll()
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
@@ -19,6 +22,29 @@ func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain
 
 	if err := projector.Rebuild(allEvents); err != nil {
 		return fmt.Errorf("rebuild: %w", err)
+	}
+
+	// Save snapshot after successful rebuild.
+	// SeqNr comes from the global counter (SQLite), NOT from scanning event files.
+	// Legacy pre-cutover events may have aggregate-local SeqNr values that are
+	// higher than the global counter, which would corrupt the snapshot watermark.
+	if snapshots != nil {
+		var latestSeqNr uint64
+		if seqAllocLatest != nil {
+			if seq, seqErr := seqAllocLatest(); seqErr != nil {
+				logger.Warn("could not determine global SeqNr for snapshot: %v", seqErr)
+			} else {
+				latestSeqNr = seq
+			}
+		}
+		state, serErr := projector.Serialize()
+		if serErr != nil {
+			logger.Warn("could not serialize projection for snapshot: %v", serErr)
+		} else if err := snapshots.Save(context.Background(), aggregateType, latestSeqNr, state); err != nil {
+			logger.Warn("could not save snapshot: %v", err)
+		} else {
+			logger.Info("snapshot saved at SeqNr=%d", latestSeqNr)
+		}
 	}
 
 	logger.OK("rebuild complete")

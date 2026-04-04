@@ -20,7 +20,7 @@ func TestRebuild_EmptyEventStore(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	err := usecase.Rebuild(cmd, store, applier, logger)
+	err := usecase.Rebuild(cmd, store, applier, nil, nil, "paintress.state", logger)
 
 	// then
 	if err != nil {
@@ -47,7 +47,7 @@ func TestRebuild_ReplaysEvents(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 
 	// when
-	err := usecase.Rebuild(cmd, store, applier, logger)
+	err := usecase.Rebuild(cmd, store, applier, nil, nil, "paintress.state", logger)
 
 	// then
 	if err != nil {

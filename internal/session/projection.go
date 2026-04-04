@@ -9,20 +9,20 @@ import (
 
 // ExpeditionState is the materialized READ MODEL projected from events.
 type ExpeditionState struct {
-	TotalExpeditions    int
-	Succeeded           int
-	Failed              int
-	Skipped             int
-	LastExpedition      int
-	LastStatus          string
-	LastExpeditionAt    time.Time
-	LastIssueID         string
-	ConsecutiveFailures int
-	GommageCount        int
-	GradientLevel       int
-	DMailsStaged        int
-	DMailsFlushed       int
-	InboxReceived       int
+	TotalExpeditions    int       `json:"total_expeditions"`
+	Succeeded           int       `json:"succeeded"`
+	Failed              int       `json:"failed"`
+	Skipped             int       `json:"skipped"`
+	LastExpedition      int       `json:"last_expedition"`
+	LastStatus          string    `json:"last_status"`
+	LastExpeditionAt    time.Time `json:"last_expedition_at"`
+	LastIssueID         string    `json:"last_issue_id"`
+	ConsecutiveFailures int       `json:"consecutive_failures"`
+	GommageCount        int       `json:"gommage_count"`
+	GradientLevel       int       `json:"gradient_level"`
+	DMailsStaged        int       `json:"dmails_staged"`
+	DMailsFlushed       int       `json:"dmails_flushed"`
+	InboxReceived       int       `json:"inbox_received"`
 }
 
 // ErrorRate returns the fraction of failed expeditions (0.0 to 1.0).
