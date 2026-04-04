@@ -37,9 +37,27 @@ func NewSnapshotStore(stateDir string) port.SnapshotStore {
 	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
 }
 
-// NewSeqCounter creates a SeqCounter at {stateDir}/.run/seq.db.
+// NewSeqCounter creates a SeqCounter at {stateDir}/seq.db.
+// seq.db lives at stateDir root (NOT .run/) — .run/ is ephemeral
 func NewSeqCounter(stateDir string) (*eventsource.SeqCounter, error) {
-	return eventsource.NewSeqCounter(filepath.Join(stateDir, ".run", "seq.db"))
+	return eventsource.NewSeqCounter(filepath.Join(stateDir, "seq.db"))
+}
+
+// EnsureCutover creates a SeqCounter, SnapshotStore, and raw FileEventStore,
+// then runs the one-time cutover migration. Returns the SeqCounter for
+// ongoing SeqNr allocation (caller must defer Close).
+func EnsureCutover(ctx context.Context, stateDir, aggregateType string, logger domain.Logger) (*eventsource.SeqCounter, error) {
+	sc, err := NewSeqCounter(stateDir)
+	if err != nil {
+		return nil, fmt.Errorf("ensure cutover: seq counter: %w", err)
+	}
+	ss := eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
+	raw := eventsource.NewFileEventStore(filepath.Join(stateDir, "events"), logger)
+	if _, err := eventsource.RunCutover(ctx, raw, ss, sc, aggregateType, logger); err != nil {
+		sc.Close()
+		return nil, fmt.Errorf("ensure cutover: %w", err)
+	}
+	return sc, nil
 }
 
 // NewCheckpointScanner creates a checkpoint scanner for the given continent.
