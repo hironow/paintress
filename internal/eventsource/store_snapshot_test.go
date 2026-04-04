@@ -1,5 +1,7 @@
 package eventsource
 
+// white-box-reason: eventsource internals: tests unexported FileSnapshotStore implementation
+
 import (
 	"context"
 	"testing"
