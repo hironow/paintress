@@ -32,6 +32,16 @@ func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
 	return NewSpanEventStore(raw)
 }
 
+// NewSnapshotStore creates a FileSnapshotStore at {stateDir}/snapshots/.
+func NewSnapshotStore(stateDir string) port.SnapshotStore {
+	return eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
+}
+
+// NewSeqCounter creates a SeqCounter at {stateDir}/.run/seq.db.
+func NewSeqCounter(stateDir string) (*eventsource.SeqCounter, error) {
+	return eventsource.NewSeqCounter(filepath.Join(stateDir, ".run", "seq.db"))
+}
+
 // NewCheckpointScanner creates a checkpoint scanner for the given continent.
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
 func NewCheckpointScanner(continent string) port.CheckpointScanner {

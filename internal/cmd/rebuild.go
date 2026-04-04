@@ -31,12 +31,13 @@ If path is omitted, the current working directory is used.`,
 			logger := loggerFrom(cmd)
 			stateDir := filepath.Join(repoRoot, domain.StateDir)
 			eventStore := session.NewEventStore(stateDir, logger)
+			snapshotStore := session.NewSnapshotStore(stateDir)
 			projector := session.NewProjectionApplier()
 			rp, rpErr := domain.NewRepoPath(repoRoot)
 			if rpErr != nil {
 				return rpErr
 			}
-			if err := usecase.Rebuild(domain.NewRebuildCommand(rp), eventStore, projector, logger); err != nil {
+			if err := usecase.Rebuild(domain.NewRebuildCommand(rp), eventStore, projector, snapshotStore, "paintress.state", logger); err != nil {
 				return err
 			}
 			state := projector.State()

@@ -1,6 +1,10 @@
 package session
 
-import "github.com/hironow/paintress/internal/domain"
+import (
+	"encoding/json"
+
+	"github.com/hironow/paintress/internal/domain"
+)
 
 // ProjectionApplier implements domain.EventApplier by delegating to the
 // existing applyEvent logic used by ProjectState.
@@ -30,6 +34,16 @@ func (p *ProjectionApplier) Rebuild(events []domain.Event) error {
 		applyEvent(p.state, ev)
 	}
 	return nil
+}
+
+// Serialize returns the projection state as JSON bytes.
+func (p *ProjectionApplier) Serialize() ([]byte, error) {
+	return json.Marshal(p.state)
+}
+
+// Deserialize restores projection state from JSON bytes.
+func (p *ProjectionApplier) Deserialize(data []byte) error {
+	return json.Unmarshal(data, p.state)
 }
 
 // State returns the current materialized projection state.
