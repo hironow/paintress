@@ -11,6 +11,7 @@ import (
 func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 	meta := domain.CorrectionMetadata{
 		FailureType:      domain.FailureTypeExecutionFailure,
+		Severity:         domain.SeverityMedium,
 		TargetAgent:      "paintress",
 		CorrelationID:    "corr-wave",
 		CorrectiveAction: "retry",
@@ -45,6 +46,7 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 	meta := domain.CorrectionMetadata{
 		FailureType:      domain.FailureTypeExecutionFailure,
+		Severity:         domain.SeverityHigh,
 		TargetAgent:      "paintress",
 		CorrelationID:    "corr-issue",
 		CorrectiveAction: "retry",
@@ -75,5 +77,33 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 	}
 	if got.EscalationReason != "high-severity" {
 		t.Fatalf("EscalationReason = %q, want high-severity", got.EscalationReason)
+	}
+}
+
+func TestCorrectionMetadataForReport_AcceptsLegacyV1WithoutSchemaVersion(t *testing.T) {
+	expedition := &Expedition{
+		InboxDMails: []domain.DMail{{
+			Name:   "feedback-legacy",
+			Issues: []string{"ENG-3"},
+			Metadata: map[string]string{
+				domain.MetadataFailureType:      string(domain.FailureTypeExecutionFailure),
+				domain.MetadataSeverity:         "HIGH",
+				domain.MetadataCorrelationID:    "corr-legacy",
+				domain.MetadataCorrectiveAction: "retry",
+			},
+		}},
+	}
+	report := &domain.ExpeditionReport{IssueID: "ENG-3"}
+
+	got := correctionMetadataForReport(report, expedition)
+
+	if got.ConsumerSchemaVersion() != domain.ImprovementSchemaVersion {
+		t.Fatalf("ConsumerSchemaVersion = %q, want %q", got.ConsumerSchemaVersion(), domain.ImprovementSchemaVersion)
+	}
+	if got.Severity != domain.SeverityHigh {
+		t.Fatalf("Severity = %q, want %q", got.Severity, domain.SeverityHigh)
+	}
+	if got.Outcome != domain.ImprovementOutcomePending {
+		t.Fatalf("Outcome = %q, want %q", got.Outcome, domain.ImprovementOutcomePending)
 	}
 }

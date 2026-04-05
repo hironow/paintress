@@ -15,7 +15,7 @@ func WriteCorrectionInsight(w *InsightWriter, mail domain.DMail, logger domain.L
 		return
 	}
 	meta := domain.CorrectionMetadataFromMap(mail.Metadata)
-	if meta.SchemaVersion == "" {
+	if !meta.IsImprovement() || !meta.HasSupportedVocabulary() {
 		return
 	}
 	entry := meta.InsightEntry(mail.Name)
