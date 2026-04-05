@@ -6,6 +6,8 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 )
 
+// white-box-reason: session internals: tests unexported corrective metadata matching helper
+
 func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 	meta := domain.CorrectionMetadata{
 		FailureType:      domain.FailureTypeExecutionFailure,
