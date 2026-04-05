@@ -515,6 +515,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 			p.Logger.Error("expedition completion event lost: %v", err)
 		}
 		if dm := harness.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
+			annotateReportDMail(&dm, report, expedition)
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
@@ -546,6 +547,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		// Without this, skipped steps remain pending and cause infinite loops.
 		// Skipped = already done, so override severity to empty (= StepCompleted).
 		if dm := harness.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
+			annotateReportDMail(&dm, report, expedition)
 			dm.Severity = "" // force StepCompleted in ProjectWaveState
 			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
