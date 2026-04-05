@@ -55,7 +55,7 @@ Key constraints enforced by semgrep (ERROR severity):
 - `harness/filter` may only import `domain` + `harness/verifier` + `harness/policy`
 - External callers must use `harness` facade, not sub-packages directly
 
-Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, ADR S0007
+Ref: `.semgrep/layers.yaml`, `.semgrep/layers-harness.yaml`, `refs/opsx/semgrep-layer-contract.md`, ADR S0007
 
 ## Domain Primitives & Parse-Don't-Validate
 

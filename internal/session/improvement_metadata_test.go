@@ -13,6 +13,8 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 		FailureType:      domain.FailureTypeExecutionFailure,
 		Severity:         domain.SeverityMedium,
 		TargetAgent:      "paintress",
+		RoutingHistory:   []string{"retry"},
+		OwnerHistory:     []string{"paintress"},
 		CorrelationID:    "corr-wave",
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(true),
@@ -41,6 +43,12 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 	if got.RetryAllowed == nil || !*got.RetryAllowed {
 		t.Fatal("RetryAllowed = nil/false, want true")
 	}
+	if gotHistory := domain.FormatImprovementHistory(got.RoutingHistory); gotHistory != "retry" {
+		t.Fatalf("RoutingHistory = %q, want retry", gotHistory)
+	}
+	if gotOwners := domain.FormatImprovementHistory(got.OwnerHistory); gotOwners != "paintress" {
+		t.Fatalf("OwnerHistory = %q, want paintress", gotOwners)
+	}
 }
 
 func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
@@ -48,6 +56,8 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 		FailureType:      domain.FailureTypeExecutionFailure,
 		Severity:         domain.SeverityHigh,
 		TargetAgent:      "paintress",
+		RoutingHistory:   []string{"retry", "escalate"},
+		OwnerHistory:     []string{"paintress"},
 		CorrelationID:    "corr-issue",
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(false),
@@ -77,6 +87,12 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 	}
 	if got.EscalationReason != "high-severity" {
 		t.Fatalf("EscalationReason = %q, want high-severity", got.EscalationReason)
+	}
+	if mail.Metadata[domain.MetadataProviderState] != string(domain.ProviderStateActive) {
+		t.Fatalf("provider_state = %q, want %q", mail.Metadata[domain.MetadataProviderState], domain.ProviderStateActive)
+	}
+	if gotHistory := domain.FormatImprovementHistory(got.RoutingHistory); gotHistory != "retry>escalate" {
+		t.Fatalf("RoutingHistory = %q, want retry>escalate", gotHistory)
 	}
 }
 

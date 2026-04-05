@@ -4,8 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // Status collects current operational status from the event store and filesystem.
@@ -14,6 +17,8 @@ func Status(ctx context.Context, baseDir string, logger domain.Logger) domain.St
 	report := domain.StatusReport{
 		Continent: baseDir,
 	}
+	stateDir := filepath.Join(baseDir, domain.StateDir)
+	applyLatestProviderMetadata(ctx, stateDir, &report)
 
 	// Count inbox files
 	report.InboxCount = countDirFiles(domain.InboxDir(baseDir))
@@ -22,7 +27,6 @@ func Status(ctx context.Context, baseDir string, logger domain.Logger) domain.St
 	report.ArchiveCount = countDirFiles(domain.ArchiveDir(baseDir))
 
 	// Load all events for expedition stats
-	stateDir := filepath.Join(baseDir, domain.StateDir)
 	store := NewEventStore(stateDir, logger)
 
 	allEvents, _, err := store.LoadAll()
@@ -45,6 +49,33 @@ func Status(ctx context.Context, baseDir string, logger domain.Logger) domain.St
 	report.SuccessRate = domain.SuccessRate(allEvents)
 
 	return report
+}
+
+func applyLatestProviderMetadata(ctx context.Context, stateDir string, report *domain.StatusReport) {
+	dbPath := filepath.Join(stateDir, ".run", "sessions.db")
+	store, err := NewSQLiteCodingSessionStore(dbPath)
+	if err != nil {
+		return
+	}
+	defer store.Close()
+	records, err := store.List(ctx, port.ListSessionOpts{Limit: 1})
+	if err != nil || len(records) == 0 {
+		return
+	}
+	meta := records[0].Metadata
+	report.ProviderState = meta[domain.MetadataProviderState]
+	report.ProviderReason = meta[domain.MetadataProviderReason]
+	if budget := meta[domain.MetadataProviderRetryBudget]; budget != "" {
+		if n, err := strconv.Atoi(budget); err == nil {
+			report.ProviderRetryBudget = n
+		}
+	}
+	if resumeAt := meta[domain.MetadataProviderResumeAt]; resumeAt != "" {
+		if ts, err := time.Parse(time.RFC3339, resumeAt); err == nil {
+			report.ProviderResumeAt = ts
+		}
+	}
+	report.ProviderResumeWhen = meta[domain.MetadataProviderResumeWhen]
 }
 
 // countDirFiles returns the number of non-directory entries in the given directory.
