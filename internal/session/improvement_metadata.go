@@ -10,7 +10,7 @@ func annotateReportDMail(mail *domain.DMail, report *domain.ExpeditionReport, ex
 	if !meta.IsImprovement() || !meta.HasSupportedVocabulary() {
 		return
 	}
-	mail.Metadata = meta.Apply(mail.Metadata)
+	mail.Metadata = currentProviderState().ApplyMetadata(meta.Apply(mail.Metadata))
 }
 
 func correctionMetadataForReport(report *domain.ExpeditionReport, expedition *Expedition) domain.CorrectionMetadata {

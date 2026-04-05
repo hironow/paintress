@@ -54,17 +54,27 @@ func triagePreFlightDMails(
 	result := make([]domain.DMail, 0, len(dmails))
 
 	for _, dm := range dmails {
+		retryCount := 0
+		if dm.Action == "retry" && len(dm.Issues) > 0 {
+			retryCount = tracker.Track(dm.Issues)
+		}
+		decision := harness.DeterminePreFlightDecision(dm, retryCount, maxRetries)
+
 		switch dm.Action {
 		case "escalate":
-			if err := handleEscalation(dm, emitter, logger); err != nil {
-				logger.Error("pre-flight escalation event lost: %v", err)
-			}
-			if archErr := archiver.ArchiveInboxDMail(ctx, continent, dm.Name); archErr != nil {
-				logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
-			}
-			// consumed — do not pass to expedition
-
 		case "resolve":
+		case "retry":
+		default:
+		}
+
+		if decision.TrackRetry {
+			retryKey := harness.RetryKey(dm.Issues)
+			logger.Info("Retry %d/%d for %s", retryCount, maxRetries, dm.Name)
+			if err := emitter.EmitRetryAttempted(retryKey, retryCount, time.Now()); err != nil {
+				logger.Warn("retry event: %v", err)
+			}
+		}
+		if decision.Resolve {
 			logger.OK("Issue resolved per feedback: %s", dm.Name)
 			if err := emitter.EmitResolved(dm.Name, dm.Issues, time.Now()); err != nil {
 				logger.Warn("pre-flight resolved event: %v", err)
@@ -72,35 +82,21 @@ func triagePreFlightDMails(
 			if archErr := archiver.ArchiveInboxDMail(ctx, continent, dm.Name); archErr != nil {
 				logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
 			}
-			// consumed — do not pass to expedition
-
-		case "retry":
-			if len(dm.Issues) == 0 {
-				// retry without issues: pass through to expedition
-				result = append(result, dm)
-				continue
-			}
-			count := tracker.Track(dm.Issues)
-			retryKey := harness.RetryKey(dm.Issues)
-
-			if count > maxRetries {
+			continue
+		}
+		if decision.Escalate {
+			if dm.Action == "retry" && len(dm.Issues) > 0 && retryCount > maxRetries {
 				logger.Warn("Max retries (%d) reached for %s, escalating", maxRetries, dm.Name)
-				if err := handleEscalation(dm, emitter, logger); err != nil {
-					logger.Error("pre-flight escalation event lost: %v", err)
-				}
-				if archErr := archiver.ArchiveInboxDMail(ctx, continent, dm.Name); archErr != nil {
-					logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
-				}
-				continue
 			}
-			logger.Info("Retry %d/%d for %s", count, maxRetries, dm.Name)
-			if err := emitter.EmitRetryAttempted(retryKey, count, time.Now()); err != nil {
-				logger.Warn("retry event: %v", err)
+			if err := handleEscalation(dm, emitter, logger); err != nil {
+				logger.Error("pre-flight escalation event lost: %v", err)
 			}
-			result = append(result, dm)
-
-		default:
-			// no action or unknown action: pass through
+			if archErr := archiver.ArchiveInboxDMail(ctx, continent, dm.Name); archErr != nil {
+				logger.Warn("pre-flight archive %s: %v", dm.Name, archErr)
+			}
+			continue
+		}
+		if decision.PassThrough {
 			result = append(result, dm)
 		}
 	}

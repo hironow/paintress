@@ -37,6 +37,12 @@ var NewRetryTracker = policy.NewRetryTracker
 // RetryKey returns the canonical key for an issue set.
 var RetryKey = policy.RetryKey
 
+// PreFlightDecision is the deterministic pre-flight triage result.
+type PreFlightDecision = policy.PreFlightDecision
+
+// DeterminePreFlightDecision decides how a pre-flight D-Mail should be handled.
+var DeterminePreFlightDecision = policy.DeterminePreFlightDecision
+
 // --- policy: dmail ---
 
 // NewReportDMail creates a report D-Mail from an ExpeditionReport.
