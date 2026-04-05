@@ -99,6 +99,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				p.Logger.Warn("inbox received event: %v", err)
 			}
 		}
+		WriteCorrectionInsights(
+			NewInsightWriter(domain.InsightsDir(p.config.Continent), domain.RunDir(p.config.Continent)),
+			inboxDMails,
+			p.Logger,
+		)
 
 		// Register specification D-Mails in event store before triage/archiving.
 		// This persists wave/step definitions so the Read Model survives D-Mail archival.

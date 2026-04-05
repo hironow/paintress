@@ -170,7 +170,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		approver:        approver,
 		retryTracker:    harness.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
-		claude: newTrackedClaudeRunner(cfgCopy, primary, logger),
+		claude:          newTrackedClaudeRunner(cfgCopy, primary, logger),
 	}
 
 	if !cfg.NoDev {
@@ -384,6 +384,11 @@ func (p *Paintress) Run(ctx context.Context) int {
 		p.Logger.Error("inbox scan failed (fail-closed): %v", scanErr)
 		return 1
 	}
+	WriteCorrectionInsights(
+		NewInsightWriter(domain.InsightsDir(p.config.Continent), domain.RunDir(p.config.Continent)),
+		preflightInbox,
+		p.Logger,
+	)
 	if highDMails := harness.FilterHighSeverity(preflightInbox); len(highDMails) > 0 {
 		names := make([]string, len(highDMails))
 		for i, dm := range highDMails {

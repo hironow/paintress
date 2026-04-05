@@ -305,11 +305,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	inboxDone := make(chan struct{})
 	go func() {
 		defer close(inboxDone)
+		insightWriter := NewInsightWriter(domain.InsightsDir(e.Continent), domain.RunDir(e.Continent))
 		watchInbox(watchCtx, e.Continent, func(dm domain.DMail) {
 			if seenFiles[dm.Name] {
 				return
 			}
 			seenFiles[dm.Name] = true
+			WriteCorrectionInsight(insightWriter, dm, e.Logger)
 			domain.LogBanner(e.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
 			if dm.Severity == "high" {
 				e.appendMidHighName(dm.Name)
