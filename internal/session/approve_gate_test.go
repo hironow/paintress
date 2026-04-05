@@ -78,6 +78,37 @@ func TestHighSeverityGate_Approved(t *testing.T) {
 	}
 }
 
+func TestHighSeverityGate_ImplementationFeedbackApproved(t *testing.T) {
+	dir := setupTestRepo(t)
+	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+	os.MkdirAll(inboxDir, 0755)
+
+	content := "---\nname: feedback-1\nkind: implementation-feedback\ndescription: escalated corrective feedback\nseverity: high\n---\n"
+	os.WriteFile(filepath.Join(inboxDir, "feedback-1.md"), []byte(content), 0644)
+
+	cfg := domain.Config{
+		Continent:      dir,
+		Workers:        0,
+		MaxExpeditions: 1,
+		DryRun:         true,
+		BaseBranch:     "main",
+		TimeoutSec:     30,
+		Model:          "opus",
+	}
+
+	p := NewPaintress(cfg, platform.NewLogger(io.Discard, false), io.Discard, io.Discard, nil, nil, nil, nil)
+	p.approver = &port.AutoApprover{}
+	p.notifier = &port.NopNotifier{}
+
+	code := p.Run(context.Background())
+	if code != 0 {
+		t.Fatalf("Run() = %d, want 0 (approved gate should continue)", code)
+	}
+	if p.totalSuccess.Load() != 1 {
+		t.Errorf("totalSuccess = %d, want 1", p.totalSuccess.Load())
+	}
+}
+
 func TestHighSeverityGate_Denied(t *testing.T) {
 	dir := setupTestRepo(t)
 	inboxDir := filepath.Join(dir, ".expedition", "inbox")
