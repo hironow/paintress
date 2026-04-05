@@ -12,6 +12,7 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 		TargetAgent:      "paintress",
 		CorrelationID:    "corr-wave",
 		CorrectiveAction: "retry",
+		RetryAllowed:     domain.BoolPtr(true),
 	}
 	expedition := &Expedition{
 		InboxDMails: []domain.DMail{{
@@ -34,6 +35,9 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 	if got.Outcome != domain.ImprovementOutcomePending {
 		t.Fatalf("Outcome = %q, want %q", got.Outcome, domain.ImprovementOutcomePending)
 	}
+	if got.RetryAllowed == nil || !*got.RetryAllowed {
+		t.Fatal("RetryAllowed = nil/false, want true")
+	}
 }
 
 func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
@@ -42,6 +46,8 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 		TargetAgent:      "paintress",
 		CorrelationID:    "corr-issue",
 		CorrectiveAction: "retry",
+		RetryAllowed:     domain.BoolPtr(false),
+		EscalationReason: "high-severity",
 	}
 	expedition := &Expedition{
 		InboxDMails: []domain.DMail{{
@@ -61,5 +67,11 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 	}
 	if got.TargetAgent != "" {
 		t.Fatalf("TargetAgent = %q, want empty", got.TargetAgent)
+	}
+	if got.RetryAllowed == nil || *got.RetryAllowed {
+		t.Fatal("RetryAllowed = nil/true, want false")
+	}
+	if got.EscalationReason != "high-severity" {
+		t.Fatalf("EscalationReason = %q, want high-severity", got.EscalationReason)
 	}
 }

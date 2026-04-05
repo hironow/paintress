@@ -50,6 +50,13 @@ func recordCircuitBreaker(provider domain.Provider, err error, stderr string) {
 	}
 }
 
+func currentProviderState() domain.ProviderStateSnapshot {
+	if sharedCircuitBreaker == nil {
+		return domain.ActiveProviderState()
+	}
+	return sharedCircuitBreaker.Snapshot()
+}
+
 const maxConsecutiveFailures = 3
 const maxConsecutiveSkips = 3
 const gradientMax = 5
