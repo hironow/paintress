@@ -7,7 +7,7 @@ func annotateReportDMail(mail *domain.DMail, report *domain.ExpeditionReport, ex
 		return
 	}
 	meta := correctionMetadataForReport(report, expedition)
-	if meta.SchemaVersion == "" {
+	if !meta.IsImprovement() || !meta.HasSupportedVocabulary() {
 		return
 	}
 	mail.Metadata = meta.Apply(mail.Metadata)
@@ -22,7 +22,7 @@ func correctionMetadataForReport(report *domain.ExpeditionReport, expedition *Ex
 	candidates = append(candidates, expedition.MidMatchedDMails()...)
 	for i := len(candidates) - 1; i >= 0; i-- {
 		meta := domain.CorrectionMetadataFromMap(candidates[i].Metadata)
-		if meta.SchemaVersion == "" || !matchesReportCorrection(candidates[i], report, expedition.Target) {
+		if !meta.IsImprovement() || !meta.HasSupportedVocabulary() || !matchesReportCorrection(candidates[i], report, expedition.Target) {
 			continue
 		}
 		return meta.ForwardForRecheck()

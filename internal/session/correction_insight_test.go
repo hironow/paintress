@@ -20,12 +20,13 @@ func TestWriteCorrectionInsight_AppendsImprovementInsight(t *testing.T) {
 	w := session.NewInsightWriter(filepath.Join(base, ".expedition", "insights"), filepath.Join(base, ".expedition", ".run"))
 	mail := domain.DMail{
 		Name: "feedback-1",
-		Metadata: domain.CorrectionMetadata{
-			FailureType:      domain.FailureTypeExecutionFailure,
-			TargetAgent:      "paintress",
-			CorrectiveAction: "retry",
-			Outcome:          domain.ImprovementOutcomePending,
-		}.Apply(nil),
+		Metadata: map[string]string{
+			domain.MetadataFailureType:      string(domain.FailureTypeExecutionFailure),
+			domain.MetadataSeverity:         "medium",
+			domain.MetadataTargetAgent:      "paintress",
+			domain.MetadataCorrectiveAction: "retry",
+			domain.MetadataOutcome:          string(domain.ImprovementOutcomePending),
+		},
 	}
 
 	session.WriteCorrectionInsight(w, mail, &domain.NopLogger{})
