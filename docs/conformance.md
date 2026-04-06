@@ -97,3 +97,17 @@ Ref: ADR S0035, `internal/domain/wave_projection.go`, `internal/domain/expeditio
 ## Cross-Tool Conformance
 
 All 4 tools (phonewave, sightjack, paintress, amadeus) maintain a What/Why/How conformance table in `docs/conformance.md` with the same structure. This prevents expression drift across README files.
+
+## Harness Inventory (Track A)
+
+| Sub-package | Key functions | Role |
+|-------------|---------------|------|
+| `harness/policy` | `Preflight`, `Gradient`, `Reserve`, `RetryTracker`, `ExpeditionTarget`, `Review`, `EvaluateExhaustion`, `RunGuard`, `ReflectionAccumulator` | Deterministic decisions |
+| `harness/verifier` | `ProviderError`, `Review`, `DMail` | Validation rules |
+| `harness/filter` | `Expedition`, `Lumina`, `Reflection`, `Optimizer`, `DMail` | LLM action spaces |
+
+Ref: ADR S0038, S0039
+
+## Improvement Controller (Track D3/F)
+
+The improvement controller resides in amadeus (ADR S0041). paintress receives corrective D-Mails as a consumer and forwards outcomes via report D-Mails.
