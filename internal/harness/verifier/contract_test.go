@@ -70,10 +70,8 @@ func TestContract_ParseDMail(t *testing.T) {
 }
 
 // TestContract_ValidateDMailRejectsEdgeCases verifies that paintress's
-// ValidateDMail rejects D-Mails with unsupported schema version.
-// NOTE: paintress ValidateDMail does NOT validate kind enum (unlike
-// phonewave/sightjack). This is a known divergence — kind validation
-// is deferred to the consuming tool's business logic.
+// ValidateDMail rejects D-Mails with unsupported schema version or unknown kind.
+// Send-side strict: kind enum is enforced at validation time.
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	// future-schema.md has dmail-schema-version "2" — should be rejected
 	data := readContractGolden(t, "future-schema.md")
