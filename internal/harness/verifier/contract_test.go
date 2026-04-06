@@ -43,8 +43,8 @@ func readContractGolden(t *testing.T, name string) []byte {
 }
 
 // TestContract_ParseDMail verifies that paintress's ParseDMail can
-// parse all cross-tool golden files. Paintress is Postel-liberal at
-// the parse level — unknown kinds and future schemas parse without error.
+// parse all cross-tool golden files. Parse is liberal (any YAML frontmatter),
+// but validation is send-side strict (kind enum enforced, unknown kinds rejected).
 func TestContract_ParseDMail(t *testing.T) {
 	for _, name := range contractGoldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
@@ -85,14 +85,14 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 		t.Error("expected ValidateDMail to fail for schema version '2', but it passed")
 	}
 
-	// unknown-kind.md parses and validates (paintress doesn't enforce kind enum)
+	// unknown-kind.md parses but fails validation (send-side strict: kind enum enforced)
 	data = readContractGolden(t, "unknown-kind.md")
 	dm, err = domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := verifier.ValidateDMail(dm); err != nil {
-		t.Errorf("unexpected ValidateDMail error for unknown kind: %v", err)
+	if err := verifier.ValidateDMail(dm); err == nil {
+		t.Error("expected ValidateDMail to reject unknown kind, but it passed")
 	}
 }
 
