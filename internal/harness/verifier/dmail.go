@@ -28,6 +28,9 @@ func ValidateDMail(d domain.DMail) error {
 	if d.Kind == "" {
 		return fmt.Errorf("dmail: kind is required")
 	}
+	if !domain.IsValidDMailKind(d.Kind) {
+		return fmt.Errorf("dmail: invalid kind %q: not in canonical kind set", d.Kind)
+	}
 	if d.Description == "" {
 		return fmt.Errorf("dmail: description is required")
 	}

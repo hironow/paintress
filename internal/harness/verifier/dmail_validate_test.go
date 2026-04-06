@@ -69,6 +69,26 @@ func TestValidateDMail(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "unknown kind rejected (SPEC-002)",
+			dmail: domain.DMail{
+				SchemaVersion: domain.DMailSchemaVersion,
+				Name:          "report-001",
+				Kind:          "foo-bar",
+				Description:   "test",
+			},
+			wantErr: true,
+		},
+		{
+			name: "stall-escalation accepted (SPEC-001)",
+			dmail: domain.DMail{
+				SchemaVersion: domain.DMailSchemaVersion,
+				Name:          "stall-001",
+				Kind:          "stall-escalation",
+				Description:   "test",
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
