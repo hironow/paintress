@@ -445,14 +445,31 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		invokeSpan.AddEvent("expedition.timeout",
 			trace.WithAttributes(attribute.String("timeout", timeout.String())), // nosemgrep: otel-attribute-string-unsanitized -- time.Duration.String() always produces valid UTF-8 [permanent]
 		)
+		invokeSpan.AddEvent("expedition.failed",
+			trace.WithAttributes(attribute.String("failure_type", "timeout")),
+		)
 		return output.String(), fmt.Errorf("timeout after %v", timeout)
 	}
 	if ctx.Err() == context.Canceled {
+		invokeSpan.AddEvent("expedition.failed",
+			trace.WithAttributes(attribute.String("failure_type", "interrupted")),
+		)
 		return output.String(), fmt.Errorf("interrupted")
 	}
 
 	if readError != nil {
+		invokeSpan.AddEvent("expedition.failed",
+			trace.WithAttributes(attribute.String("failure_type", "stream_error")),
+		)
 		return output.String(), fmt.Errorf("stream read: %w", readError)
+	}
+
+	if err != nil {
+		invokeSpan.AddEvent("expedition.failed",
+			trace.WithAttributes(attribute.String("failure_type", "execution_error")),
+		)
+	} else {
+		invokeSpan.AddEvent("expedition.succeeded")
 	}
 
 	return output.String(), err
