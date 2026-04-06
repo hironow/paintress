@@ -42,6 +42,23 @@ func RunDir(continent string) string {
 // DMailSchemaVersion is the current D-Mail protocol schema version.
 const DMailSchemaVersion = "1"
 
+// ValidDMailKinds is the canonical set of allowed D-Mail kinds per schema v1.
+// Used for send-side strict validation (Postel's law: strict on send, liberal on receive).
+var ValidDMailKinds = map[string]bool{
+	"specification":          true,
+	"report":                 true,
+	"design-feedback":        true,
+	"implementation-feedback": true,
+	"convergence":            true,
+	"ci-result":              true,
+	"stall-escalation":       true,
+}
+
+// IsValidDMailKind returns true if the given kind is in the canonical set.
+func IsValidDMailKind(kind string) bool {
+	return ValidDMailKinds[kind]
+}
+
 // WaveStepDef defines a single step within a wave specification.
 type WaveStepDef struct {
 	ID            string   `yaml:"id" json:"id"`
