@@ -152,7 +152,7 @@ rules:
         - "/internal/cmd/**"
         - "/internal/usecase/**"
         - "/internal/session/**"
-
         - "/internal/eventsource/**"
+        - "/tests/**"
     message: |
       外部から harness sub-package の直接 import は禁止です。harness facade (internal/harness) を使用してください。
