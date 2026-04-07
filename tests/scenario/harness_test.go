@@ -349,14 +349,38 @@ func (w *Workspace) RunPaintress(t *testing.T, ctx context.Context, args ...stri
 	return err
 }
 
-// RunPaintressExpedition runs paintress run with auto-approve, no-dev, workers 0,
+// RunPaintressExpedition runs paintress run as a one-shot expedition (waiting mode
+// explicitly disabled via --idle-timeout=-1s). Uses auto-approve, no-dev, workers 0,
 // and max-expeditions 1 (sufficient for scenario tests that inject D-Mails one at a time).
 func (w *Workspace) RunPaintressExpedition(t *testing.T, ctx context.Context, extraArgs ...string) error {
 	t.Helper()
-	args := []string{"run", "--auto-approve", "--no-dev", "--workers", "0", "--max-expeditions", "1"}
+	args := []string{"run", "--auto-approve", "--no-dev", "--workers", "0", "--max-expeditions", "1", "--idle-timeout", "-1s"}
 	args = append(args, extraArgs...)
 	args = append(args, w.RepoPath)
 	return w.RunPaintress(t, ctx, args...)
+}
+
+// StartPaintressAsync starts paintress run in the background with the given idle
+// timeout. Returns the combined output buffer. The process is killed on test cleanup.
+func (w *Workspace) StartPaintressAsync(t *testing.T, ctx context.Context, idleTimeout string, extraArgs ...string) (*exec.Cmd, *bytes.Buffer) {
+	t.Helper()
+	args := []string{"run", "--auto-approve", "--no-dev", "--workers", "0", "--max-expeditions", "1", "--idle-timeout", idleTimeout}
+	args = append(args, extraArgs...)
+	args = append(args, w.RepoPath)
+
+	cmd := w.runToolCmd(ctx, "paintress", args...)
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = &output
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start paintress async: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+	return cmd, &output
 }
 
 // RunAmadeus runs amadeus with the given args and waits for completion.
