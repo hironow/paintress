@@ -48,6 +48,11 @@ type Expedition struct {
 	// Wave-centric mode: expedition target (step or wave)
 	Target *domain.ExpeditionTarget
 
+	// Resume context from a previous interrupted expedition (workers=0 only).
+	// When non-empty, this is prepended to the expedition prompt so Claude
+	// can continue from where the previous session left off.
+	ResumeContext string
+
 	// Parallel worker same-issue guard (nil in single-worker mode)
 	ClaimRegistry *domain.IssueClaimRegistry
 
@@ -146,7 +151,7 @@ func (e *Expedition) BuildPrompt() string {
 		ReserveSection:  e.Reserve.FormatForPrompt(),
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
-		ContextSection:  e.loadContextSection(),
+		ContextSection:  e.loadContextSection() + e.resumeSection(),
 		InboxSection:    e.loadInboxSection(),
 		LinearTeam:      projCfg.TrackerTeam(),
 		LinearProject:   projCfg.TrackerProject(),
@@ -179,6 +184,13 @@ func (e *Expedition) loadContextSection() string {
 		return ""
 	}
 	return ctx
+}
+
+func (e *Expedition) resumeSection() string {
+	if e.ResumeContext == "" {
+		return ""
+	}
+	return "\n\n## Previous Session Context (Resume)\n\n" + e.ResumeContext
 }
 
 // Run executes the expedition with timeout and streaming output.

@@ -70,11 +70,25 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			),
 		)
 
+		// Resume: if there's a resume target, use its workDir instead of acquiring a new one.
 		var workDir string
-		if p.pool != nil {
+		var resumeCtx string
+		if len(p.resumeTargets) > 0 {
+			target := p.resumeTargets[0]
+			p.resumeTargets = p.resumeTargets[1:]
+			workDir = target.WorkDir
+			resumeCtx = buildResumeContext(workDir)
+			p.Logger.Info("resuming incomplete expedition #%d from %s", target.Expedition, target.WorkDir)
+		} else if p.pool != nil {
 			_, acqSpan := platform.Tracer.Start(expCtx, "worktree.acquire") // nosemgrep: adr0003-otel-span-without-defer-end — acqSpan.End() called immediately after Acquire() [permanent]
 			workDir = p.pool.Acquire()
 			acqSpan.End()
+		}
+		// Single-worker (workers=0, no pool): execution dir = Continent.
+		// Expedition.Run() falls back to Continent when WorkDir is empty,
+		// but checkpoint needs the actual execution dir for resume.
+		if workDir == "" && p.pool == nil {
+			workDir = p.config.Continent
 		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
@@ -87,6 +101,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				workDir = ""
 				relSpan.End()
 			}
+		}
+
+		// Checkpoint: worktree ready (best-effort, for crash recovery)
+		if workDir != "" {
+			p.saveCheckpoint(exp, CheckpointWorktreeReady, workDir)
 		}
 
 		inboxDMails, scanErr := ScanInbox(expCtx, p.config.Continent)
@@ -179,6 +198,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			Notifier:      p.notifier,
 			ClaimRegistry: p.claimRegistry,
 			Target:        waveTarget,
+			ResumeContext: resumeCtx,
 		}
 		// Wave mode: pre-set the claim key from target ID (no flag watcher needed)
 		if waveTarget != nil {
@@ -229,6 +249,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				return cbErr
 			}
 		}
+
+		// Checkpoint: subprocess starting (best-effort, for crash recovery)
+		p.saveCheckpoint(exp, CheckpointSubprocessStart, expedition.WorkDir)
 
 		expStart := time.Now()
 		output, err := expedition.Run(expCtx)
