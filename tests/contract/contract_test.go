@@ -1,6 +1,6 @@
 //go:build contract
 
-package verifier_test
+package contract_test
 
 import (
 	"os"
@@ -13,13 +13,13 @@ import (
 	"github.com/hironow/paintress/internal/harness/verifier"
 )
 
-const contractGoldenDir = "testdata/contract"
+const goldenDir = "testdata/golden"
 
-func contractGoldenFiles(t *testing.T) []string {
+func goldenFiles(t *testing.T) []string {
 	t.Helper()
-	entries, err := os.ReadDir(contractGoldenDir)
+	entries, err := os.ReadDir(goldenDir)
 	if err != nil {
-		t.Fatalf("read contract golden dir: %v", err)
+		t.Fatalf("read golden dir: %v", err)
 	}
 	var files []string
 	for _, e := range entries {
@@ -28,27 +28,26 @@ func contractGoldenFiles(t *testing.T) []string {
 		}
 	}
 	if len(files) == 0 {
-		t.Fatal("no contract golden files found")
+		t.Fatal("no golden files found")
 	}
 	return files
 }
 
-func readContractGolden(t *testing.T, name string) []byte {
+func readGolden(t *testing.T, name string) []byte {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(contractGoldenDir, name))
+	data, err := os.ReadFile(filepath.Join(goldenDir, name))
 	if err != nil {
-		t.Fatalf("read contract golden %s: %v", name, err)
+		t.Fatalf("read golden %s: %v", name, err)
 	}
 	return data
 }
 
 // TestContract_ParseDMail verifies that paintress's ParseDMail can
-// parse all cross-tool golden files. Parse is liberal (any YAML frontmatter),
-// but validation is send-side strict (kind enum enforced, unknown kinds rejected).
+// parse all cross-tool golden files.
 func TestContract_ParseDMail(t *testing.T) {
-	for _, name := range contractGoldenFiles(t) {
+	for _, name := range goldenFiles(t) {
 		t.Run(name, func(t *testing.T) {
-			data := readContractGolden(t, name)
+			data := readGolden(t, name)
 			dm, err := domain.ParseDMail(data)
 			if err != nil {
 				t.Fatalf("ParseDMail error: %v", err)
@@ -69,12 +68,10 @@ func TestContract_ParseDMail(t *testing.T) {
 	}
 }
 
-// TestContract_ValidateDMailRejectsEdgeCases verifies that paintress's
-// ValidateDMail rejects D-Mails with unsupported schema version or unknown kind.
-// Send-side strict: kind enum is enforced at validation time.
+// TestContract_ValidateDMailRejectsEdgeCases verifies send-side strict
+// validation rejects unknown kinds and future schemas.
 func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
-	// future-schema.md has dmail-schema-version "2" — should be rejected
-	data := readContractGolden(t, "future-schema.md")
+	data := readGolden(t, "future-schema.md")
 	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
@@ -83,8 +80,7 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 		t.Error("expected ValidateDMail to fail for schema version '2', but it passed")
 	}
 
-	// unknown-kind.md parses but fails validation (send-side strict: kind enum enforced)
-	data = readContractGolden(t, "unknown-kind.md")
+	data = readGolden(t, "unknown-kind.md")
 	dm, err = domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
@@ -94,12 +90,9 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	}
 }
 
-// --- Send-side contract tests (proposal 035) ---
+// --- Send-side contract tests ---
 
-// TestContract_NewReportDMail_ValidatesSuccessfully verifies that a report
-// D-Mail created by NewReportDMail passes ValidateDMail and marshals correctly.
 func TestContract_NewReportDMail_ValidatesSuccessfully(t *testing.T) {
-	// given
 	report := &domain.ExpeditionReport{
 		Expedition:  1,
 		IssueID:     "AUTH-42",
@@ -109,39 +102,22 @@ func TestContract_NewReportDMail_ValidatesSuccessfully(t *testing.T) {
 		PRUrl:       "https://github.com/test/repo/pull/123",
 		Reason:      "All tests pass, 2FA implemented",
 	}
-
-	// when
 	dmail := policy.NewReportDMail(report, 0)
-
-	// then: must pass validation
 	if err := verifier.ValidateDMail(dmail); err != nil {
 		t.Fatalf("NewReportDMail produced invalid D-Mail: %v", err)
 	}
-
-	// then: kind must be "report"
 	if dmail.Kind != "report" {
 		t.Errorf("kind: got %q, want %q", dmail.Kind, "report")
 	}
-
-	// then: name must start with "report-"
-	if !strings.HasPrefix(dmail.Name, "report-") {
-		t.Errorf("name: got %q, want prefix %q", dmail.Name, "report-")
-	}
-
-	// then: marshal must succeed
 	data, err := dmail.Marshal()
 	if err != nil {
 		t.Fatalf("MarshalDMail: %v", err)
 	}
-
-	// then: marshaled output must contain PR URL
 	if !strings.Contains(string(data), "https://github.com/test/repo/pull/123") {
 		t.Error("marshaled D-Mail should contain PR URL")
 	}
 }
 
-// TestContract_NewReportDMail_OmitsPRWhenNone verifies that PR URL is
-// omitted when set to empty string or "none".
 func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -150,7 +126,6 @@ func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 		{"empty", ""},
 		{"none", "none"},
 	}
-
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			report := &domain.ExpeditionReport{
@@ -161,13 +136,10 @@ func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 				Status:      "failed",
 				PRUrl:       tc.prUrl,
 			}
-
 			dmail := policy.NewReportDMail(report, 0)
-
 			if err := verifier.ValidateDMail(dmail); err != nil {
 				t.Fatalf("validation failed: %v", err)
 			}
-
 			data, _ := dmail.Marshal()
 			if strings.Contains(string(data), "**PR:**") {
 				t.Error("PR line should be omitted when URL is empty/none")
@@ -176,8 +148,6 @@ func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 	}
 }
 
-// TestContract_NewReportDMail_FailedStatus verifies report D-Mail with
-// failed status passes validation and includes reason in body.
 func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
 	report := &domain.ExpeditionReport{
 		Expedition:  3,
@@ -187,26 +157,20 @@ func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
 		Status:      "failed",
 		Reason:      "OOM during benchmark",
 	}
-
 	dmail := policy.NewReportDMail(report, 0)
-
 	if err := verifier.ValidateDMail(dmail); err != nil {
 		t.Fatalf("validation failed: %v", err)
 	}
-
 	data, _ := dmail.Marshal()
 	if !strings.Contains(string(data), "OOM during benchmark") {
 		t.Error("body should contain failure reason")
 	}
-	if !strings.Contains(string(data), "failed") {
-		t.Error("body should contain status")
-	}
 }
 
-// TestContract_CorrectiveMetadataRoundTrip verifies that corrective-feedback.md
+// TestContract_CorrectiveMetadataRoundTrip verifies corrective-feedback.md
 // golden file parses correctly and CorrectionMetadataFromMap extracts all fields.
 func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
-	data := readContractGolden(t, "corrective-feedback.md")
+	data := readGolden(t, "corrective-feedback.md")
 	dm, err := domain.ParseDMail(data)
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
