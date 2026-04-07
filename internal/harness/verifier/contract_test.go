@@ -202,3 +202,39 @@ func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
 		t.Error("body should contain status")
 	}
 }
+
+// TestContract_CorrectiveMetadataRoundTrip verifies that corrective-feedback.md
+// golden file parses correctly and CorrectionMetadataFromMap extracts all fields.
+func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
+	data := readContractGolden(t, "corrective-feedback.md")
+	dm, err := domain.ParseDMail(data)
+	if err != nil {
+		t.Fatalf("ParseDMail error: %v", err)
+	}
+	meta := domain.CorrectionMetadataFromMap(dm.Metadata)
+	if !meta.IsImprovement() {
+		t.Fatal("expected IsImprovement() = true for corrective-feedback.md")
+	}
+	checks := map[string]string{
+		"routing_mode":   string(meta.RoutingMode),
+		"target_agent":   meta.TargetAgent,
+		"provider_state": string(meta.ProviderState),
+		"correlation_id": meta.CorrelationID,
+		"trace_id":       meta.TraceID,
+		"failure_type":   string(meta.FailureType),
+	}
+	expected := map[string]string{
+		"routing_mode":   "escalate",
+		"target_agent":   "sightjack",
+		"provider_state": "active",
+		"correlation_id": "corr-abc-123",
+		"trace_id":       "trace-xyz-789",
+		"failure_type":   "scope_violation",
+	}
+	for key, want := range expected {
+		got := checks[key]
+		if got != want {
+			t.Errorf("metadata[%q] = %q, want %q", key, got, want)
+		}
+	}
+}
