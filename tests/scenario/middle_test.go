@@ -71,5 +71,23 @@ func TestScenario_L3_Middle(t *testing.T) {
 
 	// Verify no deadlock, all outboxes eventually empty
 	ws.WaitForAbsent(t, ".expedition", "outbox", 15*time.Second)
+
+	// --- Phase 3: inject resolve feedback → verify issue.resolved event ---
+	resolveFB := FormatDMail(map[string]string{
+		"dmail-schema-version": "1",
+		"name":                 "resolve-feedback-001",
+		"kind":                 "implementation-feedback",
+		"description":          "Resolve previous issue",
+		"action":               "resolve",
+	}, "# Resolved\n\nIssue has been resolved after fix applied.")
+	ws.InjectDMail(t, ".expedition", "inbox", "resolve-feedback-001.md", resolveFB)
+
+	err = ws.RunPaintressExpedition(t, ctx)
+	if err != nil {
+		t.Logf("resolve expedition: %v", err)
+	}
+
+	ws.WaitForAbsent(t, ".expedition", "outbox", 15*time.Second)
+	obs.AssertResolvedEventExists()
 	obs.AssertAllOutboxEmpty()
 }
