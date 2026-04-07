@@ -94,7 +94,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
 		}
 		for _, dm := range inboxDMails {
-			domain.LogBanner(p.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
+			domain.LogBanner(p.Logger, domain.BannerRecv, string(dm.Kind), dm.Name, dm.Description)
 			if err := p.Emitter.EmitInboxReceived(dm.Name, dm.Severity, time.Now()); err != nil {
 				p.Logger.Warn("inbox received event: %v", err)
 			}
@@ -108,7 +108,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		// Register specification D-Mails in event store before triage/archiving.
 		// This persists wave/step definitions so the Read Model survives D-Mail archival.
 		for _, dm := range inboxDMails {
-			if dm.Kind == "specification" && dm.Wave != nil && dm.Wave.ID != "" {
+			if dm.Kind == domain.KindSpecification && dm.Wave != nil && dm.Wave.ID != "" {
 				if err := p.Emitter.EmitSpecRegistered(dm.Wave.ID, dm.Wave.Steps, dm.Name, time.Now()); err != nil {
 					p.Logger.Warn("spec registration event: %v", err)
 				}
@@ -516,7 +516,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		}
 		if dm := harness.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
 			annotateReportDMail(&dm, report, expedition)
-			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
+			domain.LogBanner(p.Logger, domain.BannerSend, string(dm.Kind), dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send: %v", err)
 			}
@@ -549,7 +549,7 @@ func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context
 		if dm := harness.NewReportDMail(report, p.gradient.Level()); dm.Name != "" {
 			annotateReportDMail(&dm, report, expedition)
 			dm.Severity = "" // force StepCompleted in ProjectWaveState
-			domain.LogBanner(p.Logger, domain.BannerSend, dm.Kind, dm.Name, dm.Description)
+			domain.LogBanner(p.Logger, domain.BannerSend, string(dm.Kind), dm.Name, dm.Description)
 			if err := SendDMail(ctx, p.outboxStore, dm, p.Emitter); err != nil {
 				p.Logger.Warn("dmail send (skipped): %v", err)
 			}

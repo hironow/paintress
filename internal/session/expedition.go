@@ -312,7 +312,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			}
 			seenFiles[dm.Name] = true
 			WriteCorrectionInsight(insightWriter, dm, e.Logger)
-			domain.LogBanner(e.Logger, domain.BannerRecv, dm.Kind, dm.Name, dm.Description)
+			domain.LogBanner(e.Logger, domain.BannerRecv, string(dm.Kind), dm.Name, dm.Description)
 			if dm.Severity == "high" {
 				e.appendMidHighName(dm.Name)
 				e.Logger.Warn("HIGH severity d-mail received mid-expedition: %s", dm.Name)

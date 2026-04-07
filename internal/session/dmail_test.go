@@ -1534,7 +1534,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 			t.Errorf("parse archived %s: %v", entry.Name(), err)
 			continue
 		}
-		if parsed.Kind != expectedKind {
+		if string(parsed.Kind) != expectedKind {
 			t.Errorf("archived %s: Kind = %q, want %q", entry.Name(), parsed.Kind, expectedKind)
 		}
 	}
