@@ -13,7 +13,7 @@ metadata:
     provider_state: active
     correlation_id: corr-abc-123
     owner_history: amadeus>sightjack
-    routing_history: amadeus>sightjack
+    routing_history: retry>escalate
     trace_id: trace-xyz-789
     failure_type: scope_violation
     idempotency_key: placeholder

@@ -9,8 +9,7 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/harness/policy"
-	"github.com/hironow/paintress/internal/harness/verifier"
+	"github.com/hironow/paintress/internal/harness"
 )
 
 const goldenDir = "testdata/golden"
@@ -76,7 +75,7 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := verifier.ValidateDMail(dm); err == nil {
+	if err := harness.ValidateDMail(dm); err == nil {
 		t.Error("expected ValidateDMail to fail for schema version '2', but it passed")
 	}
 
@@ -85,7 +84,7 @@ func TestContract_ValidateDMailRejectsEdgeCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseDMail error: %v", err)
 	}
-	if err := verifier.ValidateDMail(dm); err == nil {
+	if err := harness.ValidateDMail(dm); err == nil {
 		t.Error("expected ValidateDMail to reject unknown kind, but it passed")
 	}
 }
@@ -102,8 +101,8 @@ func TestContract_NewReportDMail_ValidatesSuccessfully(t *testing.T) {
 		PRUrl:       "https://github.com/test/repo/pull/123",
 		Reason:      "All tests pass, 2FA implemented",
 	}
-	dmail := policy.NewReportDMail(report, 0)
-	if err := verifier.ValidateDMail(dmail); err != nil {
+	dmail := harness.NewReportDMail(report, 0)
+	if err := harness.ValidateDMail(dmail); err != nil {
 		t.Fatalf("NewReportDMail produced invalid D-Mail: %v", err)
 	}
 	if dmail.Kind != "report" {
@@ -136,8 +135,8 @@ func TestContract_NewReportDMail_OmitsPRWhenNone(t *testing.T) {
 				Status:      "failed",
 				PRUrl:       tc.prUrl,
 			}
-			dmail := policy.NewReportDMail(report, 0)
-			if err := verifier.ValidateDMail(dmail); err != nil {
+			dmail := harness.NewReportDMail(report, 0)
+			if err := harness.ValidateDMail(dmail); err != nil {
 				t.Fatalf("validation failed: %v", err)
 			}
 			data, _ := dmail.Marshal()
@@ -157,8 +156,8 @@ func TestContract_NewReportDMail_FailedStatus(t *testing.T) {
 		Status:      "failed",
 		Reason:      "OOM during benchmark",
 	}
-	dmail := policy.NewReportDMail(report, 0)
-	if err := verifier.ValidateDMail(dmail); err != nil {
+	dmail := harness.NewReportDMail(report, 0)
+	if err := harness.ValidateDMail(dmail); err != nil {
 		t.Fatalf("validation failed: %v", err)
 	}
 	data, _ := dmail.Marshal()
@@ -202,15 +201,22 @@ func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
 		}
 	}
 
-	// Semantic history delimiter check: canonical delimiter is ">".
-	ownerHistory := domain.FormatImprovementHistory(meta.OwnerHistory)
-	parsedOwner := domain.ParseImprovementHistory(ownerHistory)
-	if len(parsedOwner) != 2 {
-		t.Errorf("owner_history: got %d entries, want 2 (raw=%q)", len(parsedOwner), ownerHistory)
+	// Semantic history check: raw metadata string must use canonical ">" delimiter
+	// and match domain semantics (owner=agents, routing=modes).
+	rawOwner := dm.Metadata["owner_history"]
+	if rawOwner != "amadeus>sightjack" {
+		t.Errorf("owner_history raw = %q, want %q", rawOwner, "amadeus>sightjack")
 	}
-	routingHistory := domain.FormatImprovementHistory(meta.RoutingHistory)
-	parsedRouting := domain.ParseImprovementHistory(routingHistory)
-	if len(parsedRouting) != 2 {
-		t.Errorf("routing_history: got %d entries, want 2 (raw=%q)", len(parsedRouting), routingHistory)
+	rawRouting := dm.Metadata["routing_history"]
+	if rawRouting != "retry>escalate" {
+		t.Errorf("routing_history raw = %q, want %q", rawRouting, "retry>escalate")
+	}
+	parsedOwner := domain.ParseImprovementHistory(rawOwner)
+	if len(parsedOwner) != 2 || parsedOwner[0] != "amadeus" || parsedOwner[1] != "sightjack" {
+		t.Errorf("ParseImprovementHistory(owner) = %v, want [amadeus sightjack]", parsedOwner)
+	}
+	parsedRouting := domain.ParseImprovementHistory(rawRouting)
+	if len(parsedRouting) != 2 || parsedRouting[0] != "retry" || parsedRouting[1] != "escalate" {
+		t.Errorf("ParseImprovementHistory(routing) = %v, want [retry escalate]", parsedRouting)
 	}
 }
