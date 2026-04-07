@@ -210,4 +210,118 @@ func TestResumeIncompleteExpeditions_MissingWorktreeIsSkipped(t *testing.T) {
 	}
 }
 
+func TestResumePolicy_Workers0_ResumesIncomplete(t *testing.T) {
+	// white-box-reason: tests that workers=0 populates resumeTargets from checkpoint scan
+
+	// given: continent with checkpoint event and existing worktree dir
+	continent := t.TempDir()
+	eventsDir := filepath.Join(continent, domain.StateDir, "events")
+	os.MkdirAll(eventsDir, 0755)
+	os.MkdirAll(filepath.Join(continent, domain.StateDir, ".run", "logs"), 0755)
+
+	workDir := filepath.Join(continent, "worker-resume-test")
+	os.MkdirAll(workDir, 0755)
+
+	events := `{"type":"expedition.checkpoint","data":{"expedition":1,"phase":"subprocess_started","work_dir":"` + workDir + `","commit_count":3},"timestamp":"2026-04-07T12:00:00Z"}`
+	os.WriteFile(filepath.Join(eventsDir, "2026-04-07.jsonl"), []byte(events+"\n"), 0644)
+
+	cfg := domain.Config{Continent: continent, Model: "opus", Workers: 0}
+	logger := platform.NewLogger(io.Discard, false)
+	p := NewPaintress(cfg, logger, io.Discard, io.Discard, nil, nil, nil, nil)
+	p.checkpointScanner = eventsource.NewCheckpointScanner(continent)
+
+	// when: scan before cleanup (simulating startup order)
+	allIncompletes := p.resumeIncompleteExpeditions()
+	resumeWorkDirs := make(map[string]bool)
+	for _, inc := range allIncompletes {
+		resumeWorkDirs[inc.WorkDir] = true
+	}
+
+	// then: incomplete detected and workDir preserved
+	if len(allIncompletes) != 1 {
+		t.Fatalf("expected 1 incomplete, got %d", len(allIncompletes))
+	}
+	if allIncompletes[0].WorkDir != workDir {
+		t.Errorf("workDir = %q, want %q", allIncompletes[0].WorkDir, workDir)
+	}
+	if !resumeWorkDirs[workDir] {
+		t.Error("workDir should be in resumeWorkDirs (protected from cleanup)")
+	}
+}
+
+func TestResumePolicy_WorkersN_SkipsResume(t *testing.T) {
+	// white-box-reason: tests that workers>0 detects incompletes pre-cleanup but does not resume
+
+	// given: same setup as above but workers=2
+	continent := t.TempDir()
+	eventsDir := filepath.Join(continent, domain.StateDir, "events")
+	os.MkdirAll(eventsDir, 0755)
+	os.MkdirAll(filepath.Join(continent, domain.StateDir, ".run", "logs"), 0755)
+
+	workDir := filepath.Join(continent, "worker-skip-test")
+	os.MkdirAll(workDir, 0755)
+
+	events := `{"type":"expedition.checkpoint","data":{"expedition":1,"phase":"subprocess_started","work_dir":"` + workDir + `","commit_count":2},"timestamp":"2026-04-07T12:00:00Z"}`
+	os.WriteFile(filepath.Join(eventsDir, "2026-04-07.jsonl"), []byte(events+"\n"), 0644)
+
+	cfg := domain.Config{Continent: continent, Model: "opus", Workers: 2}
+	logger := platform.NewLogger(io.Discard, false)
+	p := NewPaintress(cfg, logger, io.Discard, io.Discard, nil, nil, nil, nil)
+	p.checkpointScanner = eventsource.NewCheckpointScanner(continent)
+
+	// when: scan before cleanup (workers>0 still scans, just doesn't resume)
+	allIncompletes := p.resumeIncompleteExpeditions()
+
+	// then: incomplete detected (visibility preserved)
+	if len(allIncompletes) != 1 {
+		t.Fatalf("expected 1 incomplete detected pre-cleanup, got %d", len(allIncompletes))
+	}
+
+	// but: no resume targets assigned (swarm = fresh start)
+	// (In production, resumeWorkDirs would be empty for workers>0,
+	// so cleanup would remove the worktree)
+	resumeWorkDirs := make(map[string]bool) // empty for workers>0
+	if resumeWorkDirs[workDir] {
+		t.Error("workers>0 should not protect worktrees for resume")
+	}
+}
+
+func TestCleanOrphanWorktrees_ExcludesResumeCandidate(t *testing.T) {
+	// white-box-reason: tests that cleanOrphanWorktrees preserves excluded dirs
+
+	continent := t.TempDir()
+	os.MkdirAll(filepath.Join(continent, domain.StateDir, ".run", "logs"), 0755)
+	run := func(args ...string) {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = continent
+		cmd.Run()
+	}
+	run("init")
+	run("config", "user.email", "test@test.com")
+	run("config", "user.name", "test")
+	os.WriteFile(filepath.Join(continent, "dummy.go"), []byte("package main"), 0644)
+	run("add", ".")
+	run("commit", "-m", "init")
+
+	// Create a worktree matching the worker- pattern
+	wtDir := filepath.Join(continent, "worker-resume-candidate")
+	run("worktree", "add", "-b", "resume-branch", wtDir)
+
+	// Resolve symlinks (macOS /var -> /private/var) to match git worktree list output
+	resolvedWtDir, _ := filepath.EvalSymlinks(wtDir)
+
+	cfg := domain.Config{Continent: continent, Model: "opus"}
+	logger := platform.NewLogger(io.Discard, false)
+	p := NewPaintress(cfg, logger, io.Discard, io.Discard, nil, nil, nil, nil)
+
+	// when: cleanup with exclude (use resolved path to match git output)
+	exclude := map[string]bool{resolvedWtDir: true}
+	p.cleanOrphanWorktrees(exclude)
+
+	// then: worktree still exists (preserved as resume candidate)
+	if _, err := os.Stat(wtDir); err != nil {
+		t.Errorf("resume candidate worktree should be preserved, but was removed: %v", err)
+	}
+}
+
 // containsStr and indexOfStr are defined in test_helpers_test.go

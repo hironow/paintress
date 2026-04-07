@@ -276,15 +276,16 @@ func (p *Paintress) Run(ctx context.Context) int {
 	)
 	defer rootSpan.End()
 
-	// Checkpoint scanning BEFORE cleanup: detect incomplete expeditions so
-	// resume candidates' worktrees are preserved during orphan cleanup.
-	var resumeTargets []IncompleteExpedition
+	// Checkpoint scanning BEFORE cleanup for ALL worker modes: detect
+	// incomplete expeditions so the resume/skip decision is based on
+	// pre-cleanup state. Without this, cleanup removes worktrees and
+	// the scanner silently skips missing dirs, losing visibility.
+	allIncompletes := p.resumeIncompleteExpeditions()
+	resumeWorkDirs := make(map[string]bool)
 	if p.config.Workers == 0 {
-		resumeTargets = p.resumeIncompleteExpeditions()
-	}
-	resumeWorkDirs := make(map[string]bool, len(resumeTargets))
-	for _, inc := range resumeTargets {
-		resumeWorkDirs[inc.WorkDir] = true
+		for _, inc := range allIncompletes {
+			resumeWorkDirs[inc.WorkDir] = true
+		}
 	}
 
 	// Best-effort: clean orphan worktrees from previous crashed sessions.
@@ -364,15 +365,15 @@ func (p *Paintress) Run(ctx context.Context) int {
 
 	// Resume policy: workers=0 resumes incomplete expeditions,
 	// workers>0 starts fresh (swarm worktrees are pooled, not resumable).
-	if len(resumeTargets) > 0 && p.config.Workers == 0 {
-		for _, inc := range resumeTargets {
-			p.Logger.Info("resuming incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
-		}
-		p.resumeTargets = resumeTargets
-	} else if p.config.Workers > 0 {
-		incompletes := p.resumeIncompleteExpeditions()
-		if len(incompletes) > 0 {
-			p.Logger.Info("%d incomplete expedition(s) from previous session — skipping resume in swarm mode (workers=%d)", len(incompletes), p.config.Workers)
+	// allIncompletes was scanned BEFORE cleanup to capture full state.
+	if len(allIncompletes) > 0 {
+		if p.config.Workers == 0 {
+			for _, inc := range allIncompletes {
+				p.Logger.Info("resuming incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
+			}
+			p.resumeTargets = allIncompletes
+		} else {
+			p.Logger.Info("%d incomplete expedition(s) from previous session — skipping resume in swarm mode (workers=%d)", len(allIncompletes), p.config.Workers)
 		}
 	}
 
