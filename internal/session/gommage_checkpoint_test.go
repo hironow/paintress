@@ -101,7 +101,7 @@ func TestCleanOrphanWorktrees_NoOrphans(t *testing.T) {
 	logger := platform.NewLogger(io.Discard, false)
 	p := NewPaintress(cfg, logger, io.Discard, io.Discard, nil, nil, nil, nil)
 	// Should not panic with no worktrees
-	p.cleanOrphanWorktrees()
+	p.cleanOrphanWorktrees(nil)
 }
 
 func TestSaveCheckpoint_EmitsEvent(t *testing.T) {

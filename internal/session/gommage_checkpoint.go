@@ -108,8 +108,9 @@ func (p *Paintress) resumeIncompleteExpeditions() []IncompleteExpedition {
 }
 
 // cleanOrphanWorktrees removes worktrees from previous sessions.
+// Worktrees in excludeDirs are preserved (resume candidates).
 // Best-effort: errors are logged but do not block startup.
-func (p *Paintress) cleanOrphanWorktrees() {
+func (p *Paintress) cleanOrphanWorktrees(excludeDirs map[string]bool) {
 	cmd := exec.Command("git", "worktree", "list", "--porcelain") //nolint:gosec // internal path
 	cmd.Dir = p.config.Continent
 	out, err := cmd.Output()
@@ -121,6 +122,10 @@ func (p *Paintress) cleanOrphanWorktrees() {
 			path := strings.TrimPrefix(line, "worktree ")
 			// Match pooled worktrees: .expedition/.run/worktrees/worker-NNN
 			if strings.Contains(path, "worker-") {
+				if excludeDirs[path] {
+					p.Logger.Info("preserving resume candidate worktree: %s", path)
+					continue
+				}
 				rmCmd := exec.Command("git", "worktree", "remove", "--force", path) //nolint:gosec // internal path
 				rmCmd.Dir = p.config.Continent
 				if rmErr := rmCmd.Run(); rmErr != nil {

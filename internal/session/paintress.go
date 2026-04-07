@@ -102,6 +102,9 @@ type Paintress struct {
 	recoveryDecider   port.RecoveryDecider
 	checkpointScanner port.CheckpointScanner
 
+	// Resume targets: incomplete expeditions from previous session (workers=0 only)
+	resumeTargets []IncompleteExpedition
+
 	// Parallel worker same-issue guard (nil when Workers == 0)
 	claimRegistry *domain.IssueClaimRegistry
 
@@ -273,8 +276,20 @@ func (p *Paintress) Run(ctx context.Context) int {
 	)
 	defer rootSpan.End()
 
-	// Best-effort: clean orphan worktrees from previous crashed sessions
-	p.cleanOrphanWorktrees()
+	// Checkpoint scanning BEFORE cleanup: detect incomplete expeditions so
+	// resume candidates' worktrees are preserved during orphan cleanup.
+	var resumeTargets []IncompleteExpedition
+	if p.config.Workers == 0 {
+		resumeTargets = p.resumeIncompleteExpeditions()
+	}
+	resumeWorkDirs := make(map[string]bool, len(resumeTargets))
+	for _, inc := range resumeTargets {
+		resumeWorkDirs[inc.WorkDir] = true
+	}
+
+	// Best-effort: clean orphan worktrees from previous crashed sessions.
+	// Exclude worktrees that are resume candidates (workers=0 only).
+	p.cleanOrphanWorktrees(resumeWorkDirs)
 
 	logPath := filepath.Join(p.logDir, fmt.Sprintf("paintress-%s.log", time.Now().Format("20060102")))
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
@@ -347,16 +362,17 @@ func (p *Paintress) Run(ctx context.Context) int {
 	}
 	fmt.Fprintln(p.ErrOut)
 
-	// Checkpoint scanning: detect incomplete expeditions from previous session.
-	// Currently log-only — actual resume (feeding checkpoints back into the run loop
-	// via buildResumeContext/--continue) is not yet implemented. The checkpoint events
-	// are recorded for observability and future resume support.
-	if p.pool == nil {
-		if incompletes := p.resumeIncompleteExpeditions(); len(incompletes) > 0 {
-			for _, inc := range incompletes {
-				p.Logger.Info("found incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
-			}
-			p.Logger.Warn("%d incomplete expedition(s) detected (resume not yet implemented — starting fresh)", len(incompletes))
+	// Resume policy: workers=0 resumes incomplete expeditions,
+	// workers>0 starts fresh (swarm worktrees are pooled, not resumable).
+	if len(resumeTargets) > 0 && p.config.Workers == 0 {
+		for _, inc := range resumeTargets {
+			p.Logger.Info("resuming incomplete expedition #%d (phase=%s, dir=%s)", inc.Expedition, inc.Phase, inc.WorkDir)
+		}
+		p.resumeTargets = resumeTargets
+	} else if p.config.Workers > 0 {
+		incompletes := p.resumeIncompleteExpeditions()
+		if len(incompletes) > 0 {
+			p.Logger.Info("%d incomplete expedition(s) from previous session — skipping resume in swarm mode (workers=%d)", len(incompletes), p.config.Workers)
 		}
 	}
 
