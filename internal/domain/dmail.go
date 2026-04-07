@@ -71,6 +71,17 @@ func IsValidDMailKind(kind DMailKind) bool {
 	return ValidDMailKinds[kind]
 }
 
+// ErrDMailKindInvalid is returned when a D-Mail kind is not in the canonical set.
+var ErrDMailKindInvalid = errors.New("dmail: invalid kind")
+
+// ValidateKind checks that kind is one of the allowed D-Mail kinds.
+func ValidateKind(kind DMailKind) error {
+	if !IsValidDMailKind(kind) {
+		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
+	}
+	return nil
+}
+
 // WaveStepDef defines a single step within a wave specification.
 type WaveStepDef struct {
 	ID            string   `yaml:"id" json:"id"`
