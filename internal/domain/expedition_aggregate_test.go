@@ -333,3 +333,43 @@ func TestDecideRecovery_ResetOnSuccess(t *testing.T) {
 		t.Errorf("expected retryNum=1 after reset, got %d", d.RetryNum)
 	}
 }
+
+func TestExpeditionAggregate_RecordEscalated_DotCase(t *testing.T) {
+	// given
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now().UTC()
+
+	// when
+	ev, err := agg.RecordEscalated("stall-001", []string{"ISS-1"}, now)
+
+	// then
+	if err != nil {
+		t.Fatalf("RecordEscalated error: %v", err)
+	}
+	if ev.Type != domain.EventEscalated {
+		t.Errorf("event type = %q, want %q", ev.Type, domain.EventEscalated)
+	}
+	if string(ev.Type) != "issue.escalated" {
+		t.Errorf("event type string = %q, want %q", string(ev.Type), "issue.escalated")
+	}
+}
+
+func TestExpeditionAggregate_RecordResolved_DotCase(t *testing.T) {
+	// given
+	agg := domain.NewExpeditionAggregate()
+	now := time.Now().UTC()
+
+	// when
+	ev, err := agg.RecordResolved("resolve-001", []string{"ISS-2"}, now)
+
+	// then
+	if err != nil {
+		t.Fatalf("RecordResolved error: %v", err)
+	}
+	if ev.Type != domain.EventResolved {
+		t.Errorf("event type = %q, want %q", ev.Type, domain.EventResolved)
+	}
+	if string(ev.Type) != "issue.resolved" {
+		t.Errorf("event type string = %q, want %q", string(ev.Type), "issue.resolved")
+	}
+}

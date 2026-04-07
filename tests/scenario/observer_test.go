@@ -410,11 +410,32 @@ func (o *Observer) AssertEscalationEvent() {
 			continue
 		}
 		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
-		if strings.Contains(string(data), `"escalation"`) || strings.Contains(string(data), `"escalated"`) {
+		if strings.Contains(string(data), `"issue.escalated"`) {
 			return
 		}
 	}
 	o.t.Error("no escalation event found in .expedition/events/*.jsonl")
+}
+
+// AssertResolvedEventExists checks for an issue.resolved event in JSONL.
+func (o *Observer) AssertResolvedEventExists() {
+	o.t.Helper()
+	eventsDir := filepath.Join(o.ws.RepoPath, ".expedition", "events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		o.t.Fatalf("read events dir: %v", err)
+	}
+
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if strings.Contains(string(data), `"issue.resolved"`) {
+			return
+		}
+	}
+	o.t.Error("no issue.resolved event found in .expedition/events/*.jsonl")
 }
 
 // AssertInboxProcessedAll verifies that all D-Mails in .expedition/inbox/

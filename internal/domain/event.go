@@ -34,8 +34,8 @@ const (
 	EventExpeditionCheckpoint EventType = "expedition.checkpoint"
 	EventInboxReceived        EventType = "inbox.received"
 	EventRetryAttempted       EventType = "retry.attempted"
-	EventEscalated            EventType = "escalated"
-	EventResolved             EventType = "resolved"
+	EventEscalated            EventType = "issue.escalated"
+	EventResolved             EventType = "issue.resolved"
 	EventSpecRegistered       EventType = "spec.registered"
 	EventSystemCutover        EventType = "system.cutover"
 )
