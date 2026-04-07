@@ -84,6 +84,12 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			workDir = p.pool.Acquire()
 			acqSpan.End()
 		}
+		// Single-worker (workers=0, no pool): execution dir = Continent.
+		// Expedition.Run() falls back to Continent when WorkDir is empty,
+		// but checkpoint needs the actual execution dir for resume.
+		if workDir == "" && p.pool == nil {
+			workDir = p.config.Continent
+		}
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
 				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release() [permanent]
