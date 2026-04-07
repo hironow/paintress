@@ -2,7 +2,9 @@
 //
 // It handles the subset of gh commands used by the 4-tool ecosystem:
 //   - gh pr create → prints a fake PR URL to stdout.
-//   - gh pr view   → prints minimal JSON to stdout.
+//   - gh pr view   → prints minimal JSON to stdout (body included for review gate).
+//   - gh pr edit   → records edit to $FAKE_GH_EDIT_LOG (for scenario verification).
+//   - gh pr list   → returns a fake PR chain.
 //
 // All other invocations exit 0 silently.
 package main
@@ -28,6 +30,17 @@ func main() {
 		// Return a PR chain (feat/a -> feat/b) to trigger PR convergence D-Mail generation.
 		fmt.Println(`[{"number":1,"title":"feat: base change","baseRefName":"main","headRefName":"feat/a","mergeable":"MERGEABLE"},{"number":2,"title":"feat: dependent change","baseRefName":"feat/a","headRefName":"feat/b","mergeable":"CONFLICTING"}]`)
 	case strings.HasPrefix(sub, "pr view"):
-		fmt.Println(`{"number":42,"state":"open","url":"https://github.com/test/repo/pull/42"}`)
+		// Return body field so UpdatePRReviewGate can read and append.
+		fmt.Println(`{"number":42,"state":"open","url":"https://github.com/test/repo/pull/42","body":"Initial PR body."}`)
+	case strings.HasPrefix(sub, "pr edit"):
+		// Record the edit to a log file for test verification.
+		logPath := os.Getenv("FAKE_GH_EDIT_LOG")
+		if logPath != "" {
+			f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				fmt.Fprintf(f, "pr edit %s\n", strings.Join(args[2:], " "))
+				f.Close()
+			}
+		}
 	}
 }
