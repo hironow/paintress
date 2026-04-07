@@ -410,7 +410,7 @@ func (o *Observer) AssertEscalationEvent() {
 			continue
 		}
 		data, _ := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
-		if strings.Contains(string(data), `"escalation"`) || strings.Contains(string(data), `"escalated"`) {
+		if strings.Contains(string(data), `"issue.escalated"`) {
 			return
 		}
 	}
