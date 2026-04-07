@@ -24,7 +24,11 @@ type IncompleteExpedition struct {
 }
 
 // saveCheckpoint records expedition progress as an event.
+// Best-effort: silently ignored if Emitter is nil (e.g., during startup).
 func (p *Paintress) saveCheckpoint(exp int, phase CheckpointPhase, workDir string) {
+	if p.Emitter == nil {
+		return
+	}
 	commitCount := countCommitsInDir(workDir)
 	_ = p.Emitter.EmitCheckpoint(exp, string(phase), workDir, commitCount, time.Now())
 }

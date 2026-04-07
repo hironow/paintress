@@ -97,6 +97,11 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			}
 		}
 
+		// Checkpoint: worktree ready (best-effort, for crash recovery)
+		if workDir != "" {
+			p.saveCheckpoint(exp, CheckpointWorktreeReady, workDir)
+		}
+
 		inboxDMails, scanErr := ScanInbox(expCtx, p.config.Continent)
 		if scanErr != nil {
 			p.Logger.Warn("inbox scan for expedition #%d: %v", exp, scanErr)
@@ -238,6 +243,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 				return cbErr
 			}
 		}
+
+		// Checkpoint: subprocess starting (best-effort, for crash recovery)
+		p.saveCheckpoint(exp, CheckpointSubprocessStart, expedition.WorkDir)
 
 		expStart := time.Now()
 		output, err := expedition.Run(expCtx)
