@@ -201,4 +201,16 @@ func TestContract_CorrectiveMetadataRoundTrip(t *testing.T) {
 			t.Errorf("metadata[%q] = %q, want %q", key, got, want)
 		}
 	}
+
+	// Semantic history delimiter check: canonical delimiter is ">".
+	ownerHistory := domain.FormatImprovementHistory(meta.OwnerHistory)
+	parsedOwner := domain.ParseImprovementHistory(ownerHistory)
+	if len(parsedOwner) != 2 {
+		t.Errorf("owner_history: got %d entries, want 2 (raw=%q)", len(parsedOwner), ownerHistory)
+	}
+	routingHistory := domain.FormatImprovementHistory(meta.RoutingHistory)
+	parsedRouting := domain.ParseImprovementHistory(routingHistory)
+	if len(parsedRouting) != 2 {
+		t.Errorf("routing_history: got %d entries, want 2 (raw=%q)", len(parsedRouting), routingHistory)
+	}
 }
