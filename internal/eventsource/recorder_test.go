@@ -17,12 +17,12 @@ func TestSessionRecorder_SetsCausationChain(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ev1, _ := domain.NewEvent("a", map[string]string{}, time.Now())
+	ev1, _ := domain.NewEvent(domain.EventExpeditionStarted, map[string]string{}, time.Now())
 	if err := rec.Record(ev1); err != nil {
 		t.Fatal(err)
 	}
 
-	ev2, _ := domain.NewEvent("b", map[string]string{}, time.Now())
+	ev2, _ := domain.NewEvent(domain.EventExpeditionCompleted, map[string]string{}, time.Now())
 	if err := rec.Record(ev2); err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +51,12 @@ func TestSessionRecorder_ResumesPrevID(t *testing.T) {
 
 	// First recorder writes one event with session "s1"
 	rec1, _ := NewSessionRecorder(store, "s1")
-	ev1, _ := domain.NewEvent("a", map[string]string{}, time.Now())
+	ev1, _ := domain.NewEvent(domain.EventExpeditionStarted, map[string]string{}, time.Now())
 	rec1.Record(ev1)
 
 	// Second recorder with SAME session ID should resume CausationID chain
 	rec2, _ := NewSessionRecorder(store, "s1")
-	ev2, _ := domain.NewEvent("b", map[string]string{}, time.Now())
+	ev2, _ := domain.NewEvent(domain.EventExpeditionCompleted, map[string]string{}, time.Now())
 	rec2.Record(ev2)
 
 	events, _, _ := store.LoadAll()
@@ -71,12 +71,12 @@ func TestSessionRecorder_DifferentSession_NoCausation(t *testing.T) {
 	store := NewFileEventStore(dir, &domain.NopLogger{})
 
 	rec1, _ := NewSessionRecorder(store, "s1")
-	ev1, _ := domain.NewEvent("a", map[string]string{}, time.Now())
+	ev1, _ := domain.NewEvent(domain.EventExpeditionStarted, map[string]string{}, time.Now())
 	rec1.Record(ev1)
 
 	// Different session should NOT chain to s1's event
 	rec2, _ := NewSessionRecorder(store, "s2")
-	ev2, _ := domain.NewEvent("b", map[string]string{}, time.Now())
+	ev2, _ := domain.NewEvent(domain.EventExpeditionCompleted, map[string]string{}, time.Now())
 	rec2.Record(ev2)
 
 	events, _, _ := store.LoadAll()

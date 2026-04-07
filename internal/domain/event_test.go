@@ -3,6 +3,7 @@ package domain_test
 import (
 	"encoding/json"
 	"strings"
+	"regexp"
 	"testing"
 	"time"
 
@@ -276,5 +277,24 @@ func TestEventsDir(t *testing.T) {
 	// then
 	if dir != "/repo/.expedition/events" {
 		t.Errorf("EventsDir = %q, want /repo/.expedition/events", dir)
+	}
+}
+
+func TestValidateEvent_RejectsUnknownType(t *testing.T) {
+	ev, err := domain.NewEvent("totally.unknown.type", map[string]string{"k": "v"}, time.Now())
+	if err != nil {
+		t.Fatalf("NewEvent: %v", err)
+	}
+	if err := domain.ValidateEvent(ev); err == nil {
+		t.Error("expected ValidateEvent to reject unknown event type")
+	}
+}
+
+func TestAllEventTypes_AreDotCase(t *testing.T) {
+	dotCaseRe := regexp.MustCompile(`^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)+$`)
+	for et := range domain.AllValidEventTypes() {
+		if !dotCaseRe.MatchString(string(et)) {
+			t.Errorf("EventType %q violates dot.case naming convention", et)
+		}
 	}
 }

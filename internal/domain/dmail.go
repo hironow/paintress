@@ -42,20 +42,32 @@ func RunDir(continent string) string {
 // DMailSchemaVersion is the current D-Mail protocol schema version.
 const DMailSchemaVersion = "1"
 
+// DMailKind is the type-safe representation of D-Mail message kinds.
+type DMailKind string
+
+const (
+	KindSpecification    DMailKind = "specification"
+	KindReport           DMailKind = "report"
+	KindDesignFeedback   DMailKind = "design-feedback"
+	KindImplFeedback     DMailKind = "implementation-feedback"
+	KindConvergence      DMailKind = "convergence"
+	KindCIResult         DMailKind = "ci-result"
+	KindStallEscalation  DMailKind = "stall-escalation"
+)
+
 // ValidDMailKinds is the canonical set of allowed D-Mail kinds per schema v1.
-// Used for send-side strict validation (Postel's law: strict on send, liberal on receive).
-var ValidDMailKinds = map[string]bool{
-	"specification":          true,
-	"report":                 true,
-	"design-feedback":        true,
-	"implementation-feedback": true,
-	"convergence":            true,
-	"ci-result":              true,
-	"stall-escalation":       true,
+var ValidDMailKinds = map[DMailKind]bool{
+	KindSpecification:   true,
+	KindReport:          true,
+	KindDesignFeedback:  true,
+	KindImplFeedback:    true,
+	KindConvergence:     true,
+	KindCIResult:        true,
+	KindStallEscalation: true,
 }
 
 // IsValidDMailKind returns true if the given kind is in the canonical set.
-func IsValidDMailKind(kind string) bool {
+func IsValidDMailKind(kind DMailKind) bool {
 	return ValidDMailKinds[kind]
 }
 
@@ -81,7 +93,7 @@ type WaveReference struct {
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
 type DMail struct {
 	Name          string            `yaml:"name"`
-	Kind          string            `yaml:"kind"`
+	Kind          DMailKind         `yaml:"kind"`
 	Description   string            `yaml:"description"`
 	Issues        []string          `yaml:"issues,omitempty"`
 	Severity      string            `yaml:"severity,omitempty"`

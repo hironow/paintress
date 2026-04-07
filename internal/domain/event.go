@@ -40,6 +40,39 @@ const (
 	EventSystemCutover        EventType = "system.cutover"
 )
 
+// validEventTypes is the set of recognized EventType values.
+var validEventTypes = map[EventType]bool{
+	EventExpeditionStarted:    true,
+	EventExpeditionCompleted:  true,
+	EventDMailStaged:          true,
+	EventDMailFlushed:         true,
+	EventDMailArchived:        true,
+	EventGradientChanged:      true,
+	EventGommageTriggered:     true,
+	EventGommageRecovery:      true,
+	EventExpeditionCheckpoint: true,
+	EventInboxReceived:        true,
+	EventRetryAttempted:       true,
+	EventEscalated:            true,
+	EventResolved:             true,
+	EventSpecRegistered:       true,
+	EventSystemCutover:        true,
+}
+
+// ValidEventType returns true if the given EventType is recognized.
+func ValidEventType(t EventType) bool {
+	return validEventTypes[t]
+}
+
+// AllValidEventTypes returns a copy of the canonical event type set (for testing).
+func AllValidEventTypes() map[EventType]bool {
+	cp := make(map[EventType]bool, len(validEventTypes))
+	for k, v := range validEventTypes {
+		cp[k] = v
+	}
+	return cp
+}
+
 // CurrentEventSchemaVersion is the schema version set by NewEvent.
 // Version 0 represents pre-Phase2 legacy events.
 const CurrentEventSchemaVersion uint8 = 1
@@ -67,6 +100,8 @@ func ValidateEvent(e Event) error {
 	}
 	if e.Type == "" {
 		errs = append(errs, "Type is required")
+	} else if !ValidEventType(e.Type) {
+		errs = append(errs, fmt.Sprintf("Type %q is not a recognized event type", e.Type))
 	}
 	if e.Timestamp.IsZero() {
 		errs = append(errs, "Timestamp must not be zero")
