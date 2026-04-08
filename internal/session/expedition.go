@@ -347,10 +347,13 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
 	// expNormalizer is declared here (outside goroutine) so the defer can call SessionEnd().
+	// expRunErr captures the error for the terminal event (set before each return).
 	var expNormalizer *platform.StreamNormalizer
+	var expRunErr error
 	defer func() {
 		if expNormalizer != nil && e.StreamBus != nil {
-			endEv := expNormalizer.SessionEnd("", nil)
+			// providerSessionID="" → SessionEnd falls back to stream-captured value
+			endEv := expNormalizer.SessionEnd("", expRunErr)
 			e.StreamBus.Publish(context.Background(), endEv)
 		}
 	}()
@@ -470,20 +473,23 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		invokeSpan.AddEvent("expedition.failed",
 			trace.WithAttributes(attribute.String("failure_type", "timeout")),
 		)
-		return output.String(), fmt.Errorf("timeout after %v", timeout)
+		expRunErr = fmt.Errorf("timeout after %v", timeout)
+		return output.String(), expRunErr
 	}
 	if ctx.Err() == context.Canceled {
 		invokeSpan.AddEvent("expedition.failed",
 			trace.WithAttributes(attribute.String("failure_type", "interrupted")),
 		)
-		return output.String(), fmt.Errorf("interrupted")
+		expRunErr = fmt.Errorf("interrupted")
+		return output.String(), expRunErr
 	}
 
 	if readError != nil {
 		invokeSpan.AddEvent("expedition.failed",
 			trace.WithAttributes(attribute.String("failure_type", "stream_error")),
 		)
-		return output.String(), fmt.Errorf("stream read: %w", readError)
+		expRunErr = fmt.Errorf("stream read: %w", readError)
+		return output.String(), expRunErr
 	}
 
 	if err != nil {
@@ -494,6 +500,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		invokeSpan.AddEvent("expedition.succeeded")
 	}
 
+	expRunErr = err
 	return output.String(), err
 }
 
