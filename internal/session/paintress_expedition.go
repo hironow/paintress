@@ -199,6 +199,7 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 			ClaimRegistry: p.claimRegistry,
 			Target:        waveTarget,
 			ResumeContext: resumeCtx,
+			StreamBus:     sharedStreamBus,
 		}
 		// Wave mode: pre-set the claim key from target ID (no flag watcher needed)
 		if waveTarget != nil {

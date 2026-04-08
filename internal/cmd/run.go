@@ -229,6 +229,10 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		ctx = context.Background()
 	}
 
+	streamBus := platform.NewInProcessSessionBus()
+	defer streamBus.Close()
+	session.SetStreamBus(streamBus)
+
 	notifier := session.BuildNotifier(cfg.NotifyCmd)
 	approver := session.BuildApprover(cfg, cmd.InOrStdin(), cmd.ErrOrStderr())
 	p := session.NewPaintress(cfg, logger, cmd.OutOrStdout(), cmd.ErrOrStderr(), cmd.InOrStdin(), nil, approver, domain.NewExpeditionAggregate())
