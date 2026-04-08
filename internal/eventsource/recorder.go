@@ -28,8 +28,8 @@ type SessionRecorder struct {
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
 // Loads existing events to resume the CausationID chain from the last recorded event.
-func NewSessionRecorder(store eventStore, sessionID string) (*SessionRecorder, error) {
-	events, _, err := store.LoadAll(context.Background())
+func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string) (*SessionRecorder, error) {
+	events, _, err := store.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
 	}
@@ -55,7 +55,7 @@ func (r *SessionRecorder) SetSeqCounter(sc *SeqCounter) {
 
 // Record appends an event, setting CorrelationID and CausationID automatically.
 // If a SeqCounter is attached, assigns a globally monotonic SeqNr.
-func (r *SessionRecorder) Record(ev domain.Event) error {
+func (r *SessionRecorder) Record(ctx context.Context, ev domain.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -65,13 +65,13 @@ func (r *SessionRecorder) Record(ev domain.Event) error {
 		ev.CausationID = r.prevID
 	}
 	if r.seqCounter != nil {
-		seq, err := r.seqCounter.AllocSeqNr(context.Background())
+		seq, err := r.seqCounter.AllocSeqNr(ctx)
 		if err != nil {
 			return fmt.Errorf("alloc seq nr: %w", err)
 		}
 		ev.SeqNr = seq
 	}
-	if _, err := r.store.Append(context.Background(), ev); err != nil {
+	if _, err := r.store.Append(ctx, ev); err != nil {
 		return err
 	}
 	r.prevID = ev.ID

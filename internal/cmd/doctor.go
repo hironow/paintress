@@ -74,7 +74,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	var metrics *domain.DoctorMetrics
 	stateDir := filepath.Join(continent, domain.StateDir)
 	eventStore := session.NewEventStore(stateDir, loggerFrom(cmd))
-	metrics = usecase.ComputeSuccessRate(eventStore)
+	metrics = usecase.ComputeSuccessRate(cmd.Context(), eventStore)
 
 	if outputFmt == "json" {
 		output := domain.DoctorOutput{

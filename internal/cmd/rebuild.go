@@ -46,7 +46,7 @@ If path is omitted, the current working directory is used.`,
 			if rpErr != nil {
 				return rpErr
 			}
-			if err := usecase.Rebuild(domain.NewRebuildCommand(rp), eventStore, projector, snapshotStore, seqLatest, "paintress.state", logger); err != nil {
+			if err := usecase.Rebuild(cmd.Context(), domain.NewRebuildCommand(rp), eventStore, projector, snapshotStore, seqLatest, "paintress.state", logger); err != nil {
 				return err
 			}
 			state := projector.State()

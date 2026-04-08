@@ -12,8 +12,8 @@ import (
 // If a SnapshotStore is provided, saves a snapshot after successful replay.
 // seqAllocLatest provides the global SeqNr watermark (from SQLite counter, not event scan).
 // Pass nil if SeqCounter is not available — snapshot will be saved at SeqNr=0.
-func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, snapshots port.SnapshotStore, seqAllocLatest func() (uint64, error), aggregateType string, logger domain.Logger) error {
-	allEvents, _, err := events.LoadAll(context.Background())
+func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, snapshots port.SnapshotStore, seqAllocLatest func() (uint64, error), aggregateType string, logger domain.Logger) error {
+	allEvents, _, err := events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
 	}
@@ -40,7 +40,7 @@ func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain
 		state, serErr := projector.Serialize()
 		if serErr != nil {
 			logger.Warn("could not serialize projection for snapshot: %v", serErr)
-		} else if err := snapshots.Save(context.Background(), aggregateType, latestSeqNr, state); err != nil {
+		} else if err := snapshots.Save(ctx, aggregateType, latestSeqNr, state); err != nil {
 			logger.Warn("could not save snapshot: %v", err)
 		} else {
 			logger.Info("snapshot saved at SeqNr=%d", latestSeqNr)

@@ -25,7 +25,7 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
 	registerExpeditionPolicies(engine, logger, notifier, metrics)
 
 	agg := domain.NewExpeditionAggregate()
-	emitter := NewExpeditionEventEmitter(agg, eventStore, engine, logger)
+	emitter := NewExpeditionEventEmitter(ctx, agg, eventStore, engine, logger)
 	runner.SetEmitter(emitter)
 
 	// Wire pre-flight triage if archiver is available

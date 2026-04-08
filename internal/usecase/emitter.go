@@ -18,6 +18,7 @@ type expeditionEventEmitter struct {
 	dispatcher port.EventDispatcher
 	logger     domain.Logger
 	seqAlloc   port.SeqAllocator
+	ctx        context.Context //nolint:containedctx // stored for trace propagation into emit chain
 }
 
 // SetSeqAllocator injects a SeqAllocator for SeqNr allocation into emitted events.
@@ -26,7 +27,9 @@ func (e *expeditionEventEmitter) SetSeqAllocator(alloc port.SeqAllocator) {
 }
 
 // NewExpeditionEventEmitter creates an ExpeditionEventEmitter that wraps the aggregate event chain.
+// ctx is used for trace propagation in store/dispatcher operations.
 func NewExpeditionEventEmitter(
+	ctx context.Context,
 	agg *domain.ExpeditionAggregate,
 	store port.EventStore,
 	dispatcher port.EventDispatcher,
@@ -37,14 +40,16 @@ func NewExpeditionEventEmitter(
 		store:      store,
 		dispatcher: dispatcher,
 		logger:     logger,
+		ctx:        ctx,
 	}
 }
 
 // emit persists events and dispatches (best-effort).
 func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
+	ctx := e.ctx
 	if e.seqAlloc != nil {
 		for i := range events {
-			seq, err := e.seqAlloc.AllocSeqNr(context.Background())
+			seq, err := e.seqAlloc.AllocSeqNr(ctx)
 			if err != nil {
 				return fmt.Errorf("alloc seq nr: %w", err)
 			}
@@ -52,13 +57,13 @@ func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
 		}
 	}
 	if e.store != nil {
-		if _, err := e.store.Append(context.Background(), events...); err != nil {
+		if _, err := e.store.Append(ctx, events...); err != nil {
 			return fmt.Errorf("append events: %w", err)
 		}
 	}
 	if e.dispatcher != nil {
 		for _, ev := range events {
-			if err := e.dispatcher.Dispatch(context.Background(), ev); err != nil {
+			if err := e.dispatcher.Dispatch(ctx, ev); err != nil {
 				e.logger.Warn("policy dispatch %s: %v", ev.Type, err)
 			}
 		}
