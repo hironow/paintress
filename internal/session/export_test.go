@@ -41,3 +41,6 @@ func NewLocalNotifierForTest(osName string, factory cmdFactoryFunc) *LocalNotifi
 func NewCmdNotifierForTest(cmdTemplate string, factory cmdFactoryFunc) *CmdNotifier {
 	return &CmdNotifier{cmdTemplate: cmdTemplate, cmdFactory: factory}
 }
+
+// ExportBuildIsolationFlags exposes buildIsolationFlags for contract testing.
+func ExportBuildIsolationFlags(cfg EnterConfig) []string { return buildIsolationFlags(cfg) }
