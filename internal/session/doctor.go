@@ -618,8 +618,11 @@ func checkSkills(continent string) domain.DoctorCheck {
 	}
 }
 
-// checkEventStore verifies that event JSONL files are parseable.
-// Scans .expedition/events/*.jsonl and validates each line is valid JSON. // nosemgrep: layer-session-no-event-persistence [permanent]
+// checkEventStore verifies that event JSONL files are parseable using the same
+// json.Unmarshal judgment as the real event store replay. This catches both
+// syntactic corruption (invalid JSON) and structural corruption (valid JSON but
+// incompatible with domain.Event, e.g. bad timestamp format).
+// Scans .expedition/events/*.jsonl files. // nosemgrep: layer-session-no-event-persistence [permanent]
 // Returns a Warning-level check.
 func checkEventStore(continent string) domain.DoctorCheck {
 	eventsDir := filepath.Join(continent, domain.StateDir, "events")
@@ -653,7 +656,8 @@ func checkEventStore(continent string) domain.DoctorCheck {
 			if line == "" {
 				continue
 			}
-			if !json.Valid([]byte(line)) {
+			var ev domain.Event
+			if jsonErr := json.Unmarshal([]byte(line), &ev); jsonErr != nil {
 				corruptLines++
 				continue
 			}

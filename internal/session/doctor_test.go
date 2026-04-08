@@ -412,6 +412,29 @@ func TestCheckEventStore_Corrupt(t *testing.T) {
 	}
 }
 
+func TestCheckEventStore_StructuralCorrupt(t *testing.T) {
+	// given — valid JSON but invalid domain.Event (bad timestamp format)
+	// json.Valid would accept this, but json.Unmarshal into domain.Event fails
+	dir := t.TempDir()
+	eventsDir := filepath.Join(dir, ".expedition", "events")
+	os.MkdirAll(eventsDir, 0755)
+	structuralCorrupt := `{"type":"expedition.completed","data":{},"timestamp":"not-a-date"}`
+	valid := `{"type":"expedition.completed","data":{},"timestamp":"2026-04-08T00:00:00Z","schema_version":1}`
+	os.WriteFile(filepath.Join(eventsDir, "structural.jsonl"),
+		[]byte(valid+"\n"+structuralCorrupt+"\n"), 0644)
+
+	// when
+	check := session.ExportCheckEventStore(dir)
+
+	// then: structural corruption detected via json.Unmarshal (not json.Valid)
+	if check.Status != domain.CheckWarn {
+		t.Errorf("expected WARN for structural corruption, got %s: %s", check.Status.StatusLabel(), check.Message)
+	}
+	if !strings.Contains(check.Message, "1 corrupt line") {
+		t.Errorf("expected '1 corrupt line' in message: %q", check.Message)
+	}
+}
+
 func TestCheckEventStore_NoDir(t *testing.T) {
 	// given — no events directory
 	dir := t.TempDir()
