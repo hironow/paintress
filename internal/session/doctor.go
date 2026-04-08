@@ -633,7 +633,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		}
 	}
 
-	var files, lines int
+	var files, lines, corruptLines int
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") { // nosemgrep: layer-session-no-event-persistence [permanent]
 			continue
@@ -654,13 +654,8 @@ func checkEventStore(continent string) domain.DoctorCheck {
 				continue
 			}
 			if !json.Valid([]byte(line)) {
-				f.Close()
-				return domain.DoctorCheck{
-					Name:    "events",
-					Status:  domain.CheckWarn,
-					Message: fmt.Sprintf("corrupt JSON in %s", entry.Name()),
-					Hint:    "check event files for corruption in .expedition/events/",
-				}
+				corruptLines++
+				continue
 			}
 			lines++
 		}
@@ -684,6 +679,14 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		}
 	}
 
+	if corruptLines > 0 {
+		return domain.DoctorCheck{
+			Name:    "events",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d corrupt line(s) in event store (%d file(s), %d valid events)", corruptLines, files, lines),
+			Hint:    "corrupt lines are skipped during replay — review JSONL files in " + eventsDir,
+		}
+	}
 	return domain.DoctorCheck{
 		Name:    "events",
 		Status:  domain.CheckOK,
