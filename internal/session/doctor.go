@@ -618,8 +618,11 @@ func checkSkills(continent string) domain.DoctorCheck {
 	}
 }
 
-// checkEventStore verifies that event JSONL files are parseable.
-// Scans .expedition/events/*.jsonl and validates each line is valid JSON. // nosemgrep: layer-session-no-event-persistence [permanent]
+// checkEventStore verifies that event JSONL files are parseable using the same
+// json.Unmarshal judgment as the real event store replay. This catches both
+// syntactic corruption (invalid JSON) and structural corruption (valid JSON but
+// incompatible with domain.Event, e.g. bad timestamp format).
+// Scans .expedition/events/*.jsonl files. // nosemgrep: layer-session-no-event-persistence [permanent]
 // Returns a Warning-level check.
 func checkEventStore(continent string) domain.DoctorCheck {
 	eventsDir := filepath.Join(continent, domain.StateDir, "events")
@@ -633,7 +636,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		}
 	}
 
-	var files, lines int
+	var files, lines, corruptLines int
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") { // nosemgrep: layer-session-no-event-persistence [permanent]
 			continue
@@ -653,14 +656,10 @@ func checkEventStore(continent string) domain.DoctorCheck {
 			if line == "" {
 				continue
 			}
-			if !json.Valid([]byte(line)) {
-				f.Close()
-				return domain.DoctorCheck{
-					Name:    "events",
-					Status:  domain.CheckWarn,
-					Message: fmt.Sprintf("corrupt JSON in %s", entry.Name()),
-					Hint:    "check event files for corruption in .expedition/events/",
-				}
+			var ev domain.Event
+			if jsonErr := json.Unmarshal([]byte(line), &ev); jsonErr != nil {
+				corruptLines++
+				continue
 			}
 			lines++
 		}
@@ -684,6 +683,14 @@ func checkEventStore(continent string) domain.DoctorCheck {
 		}
 	}
 
+	if corruptLines > 0 {
+		return domain.DoctorCheck{
+			Name:    "events",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d corrupt line(s) in event store (%d file(s), %d valid events)", corruptLines, files, lines),
+			Hint:    "corrupt lines are skipped during replay — review JSONL files in " + eventsDir,
+		}
+	}
 	return domain.DoctorCheck{
 		Name:    "events",
 		Status:  domain.CheckOK,
