@@ -627,6 +627,15 @@ func checkSkills(continent string) domain.DoctorCheck {
 // Returns a Warning-level check.
 // checkDeadLetters reports outbox items that have exceeded max retry count.
 func checkDeadLetters(continent string) domain.DoctorCheck {
+	// Check DB file exists before opening (avoid creating dirs/DB as side effect)
+	dbPath := filepath.Join(continent, domain.StateDir, ".run", "outbox.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: "no outbox DB",
+		}
+	}
 	store, err := NewOutboxStoreForDir(continent)
 	if err != nil {
 		return domain.DoctorCheck{
