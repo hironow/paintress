@@ -346,6 +346,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	var responseModel, responseID string
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
+	// expNormalizer is declared here (outside goroutine) so the defer can call SessionEnd().
+	var expNormalizer *platform.StreamNormalizer
+	defer func() {
+		if expNormalizer != nil && e.StreamBus != nil {
+			endEv := expNormalizer.SessionEnd("", nil)
+			e.StreamBus.Publish(context.Background(), endEv)
+		}
+	}()
 
 	go func() {
 		defer close(done)
@@ -365,8 +373,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		emitter.SetInput(prompt)
 
 		// Wire live stream event bus for expedition path.
+		// expNormalizer is declared outside the handler so SessionEnd() can access
+		// saved usage data after CollectAll completes.
 		if e.StreamBus != nil {
-			expNormalizer := platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
+			expNormalizer = platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := expNormalizer.Normalize(msg, raw); ev != nil {
 					e.StreamBus.Publish(expCtx, *ev)

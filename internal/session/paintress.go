@@ -207,6 +207,12 @@ func SetStreamBus(bus port.SessionStreamPublisher) {
 	sharedStreamBus = bus
 }
 
+// SharedStreamBus returns the process-wide stream bus (may be nil).
+// Use this when constructing ClaudeAdapter directly outside of newTrackedClaudeRunner.
+func SharedStreamBus() port.SessionStreamPublisher {
+	return sharedStreamBus
+}
+
 // newTrackedClaudeRunner creates a ClaudeAdapter wrapped with session tracking.
 // Best-effort: if the session store cannot be opened, returns the plain adapter.
 func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logger) port.ClaudeRunner {
