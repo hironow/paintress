@@ -186,6 +186,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 			checks = append(checks, skillResult)
 		}
 		checks = append(checks, checkEventStore(continent))
+		checks = append(checks, checkDeadLetters(continent))
 
 		// External connectivity checks (skip if claude binary not found)
 		claudeOK := false
@@ -624,6 +625,41 @@ func checkSkills(continent string) domain.DoctorCheck {
 // incompatible with domain.Event, e.g. bad timestamp format).
 // Scans .expedition/events/*.jsonl files. // nosemgrep: layer-session-no-event-persistence [permanent]
 // Returns a Warning-level check.
+// checkDeadLetters reports outbox items that have exceeded max retry count.
+func checkDeadLetters(continent string) domain.DoctorCheck {
+	store, err := NewOutboxStoreForDir(continent)
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: "outbox store unavailable",
+		}
+	}
+	defer store.Close()
+
+	count, err := store.DeadLetterCount(context.Background())
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckSkip,
+			Message: fmt.Sprintf("dead letter count: %v", err),
+		}
+	}
+	if count > 0 {
+		return domain.DoctorCheck{
+			Name:    "dead-letters",
+			Status:  domain.CheckWarn,
+			Message: fmt.Sprintf("%d dead-lettered outbox item(s)", count),
+			Hint:    `these items failed delivery 3+ times — review or purge via "paintress archive prune --include-dead-letters"`,
+		}
+	}
+	return domain.DoctorCheck{
+		Name:    "dead-letters",
+		Status:  domain.CheckOK,
+		Message: "no dead-lettered items",
+	}
+}
+
 func checkEventStore(continent string) domain.DoctorCheck {
 	eventsDir := filepath.Join(continent, domain.StateDir, "events")
 	entries, err := os.ReadDir(eventsDir)
