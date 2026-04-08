@@ -13,7 +13,7 @@ import (
 // seqAllocLatest provides the global SeqNr watermark (from SQLite counter, not event scan).
 // Pass nil if SeqCounter is not available — snapshot will be saved at SeqNr=0.
 func Rebuild(cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, snapshots port.SnapshotStore, seqAllocLatest func() (uint64, error), aggregateType string, logger domain.Logger) error {
-	allEvents, _, err := events.LoadAll()
+	allEvents, _, err := events.LoadAll(context.Background())
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
 	}

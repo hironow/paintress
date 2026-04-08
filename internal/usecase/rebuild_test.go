@@ -1,6 +1,7 @@
 package usecase_test
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
@@ -70,18 +71,18 @@ type stubEventStore struct {
 	events []domain.Event
 }
 
-func (s *stubEventStore) Append(_ ...domain.Event) (domain.AppendResult, error) {
+func (s *stubEventStore) Append(_ context.Context, _ ...domain.Event) (domain.AppendResult, error) {
 	return domain.AppendResult{}, nil
 }
-func (s *stubEventStore) LoadAll() ([]domain.Event, domain.LoadResult, error) {
+func (s *stubEventStore) LoadAll(_ context.Context) ([]domain.Event, domain.LoadResult, error) {
 	return s.events, domain.LoadResult{}, nil
 }
-func (s *stubEventStore) LoadSince(_ time.Time) ([]domain.Event, domain.LoadResult, error) {
+func (s *stubEventStore) LoadSince(_ context.Context, _ time.Time) ([]domain.Event, domain.LoadResult, error) {
 	return s.events, domain.LoadResult{}, nil
 }
-func (s *stubEventStore) LoadAfterSeqNr(_ uint64) ([]domain.Event, domain.LoadResult, error) {
+func (s *stubEventStore) LoadAfterSeqNr(_ context.Context, _ uint64) ([]domain.Event, domain.LoadResult, error) {
 	return s.events, domain.LoadResult{}, nil
 }
-func (s *stubEventStore) LatestSeqNr() (uint64, error) {
+func (s *stubEventStore) LatestSeqNr(_ context.Context) (uint64, error) {
 	return 0, nil
 }

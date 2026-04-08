@@ -113,7 +113,7 @@ func TestStatus_WithEvents(t *testing.T) {
 		}, ts.Add(4*time.Minute)),
 	}
 
-	if _, err := store.Append(events...); err != nil {
+	if _, err := store.Append(context.Background(), events...); err != nil {
 		t.Fatal(err)
 	}
 

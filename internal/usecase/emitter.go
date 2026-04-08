@@ -52,7 +52,7 @@ func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
 		}
 	}
 	if e.store != nil {
-		if _, err := e.store.Append(events...); err != nil {
+		if _, err := e.store.Append(context.Background(), events...); err != nil {
 			return fmt.Errorf("append events: %w", err)
 		}
 	}

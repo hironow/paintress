@@ -29,7 +29,7 @@ func Status(ctx context.Context, baseDir string, logger domain.Logger) domain.St
 	// Load all events for expedition stats
 	store := NewEventStore(stateDir, logger)
 
-	allEvents, _, err := store.LoadAll()
+	allEvents, _, err := store.LoadAll(ctx)
 	if err != nil {
 		return report
 	}
