@@ -150,9 +150,10 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 	var normalizer *platform.StreamNormalizer
 	if a.StreamBus != nil && a.ToolName != "" {
 		normalizer = platform.NewStreamNormalizer(a.ToolName, domain.ProviderClaudeCode)
+		normalizer.SetCodingSessionID(rc.CodingSessionID)
 		defer func() {
 			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
-			a.StreamBus.Publish(ctx, endEvent)
+			a.StreamBus.Publish(context.Background(), endEvent)
 		}()
 	}
 
