@@ -196,6 +196,23 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 	return p
 }
 
+// sharedStreamBus is the process-wide session stream bus. Set via SetStreamBus
+// at startup. All ClaudeAdapter instances and Expedition objects automatically
+// pick up this bus.
+var sharedStreamBus port.SessionStreamPublisher
+
+// SetStreamBus sets the process-wide stream bus for live session event publishing.
+// Call this once during startup before any provider invocations.
+func SetStreamBus(bus port.SessionStreamPublisher) {
+	sharedStreamBus = bus
+}
+
+// SharedStreamBus returns the process-wide stream bus (may be nil).
+// Use this when constructing ClaudeAdapter directly outside of newTrackedClaudeRunner.
+func SharedStreamBus() port.SessionStreamPublisher {
+	return sharedStreamBus
+}
+
 // newTrackedClaudeRunner creates a ClaudeAdapter wrapped with session tracking.
 // Best-effort: if the session store cannot be opened, returns the plain adapter.
 func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logger) port.ClaudeRunner {
@@ -204,6 +221,8 @@ func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logge
 		Model:      model,
 		TimeoutSec: cfg.TimeoutSec,
 		Logger:     logger,
+		StreamBus:  sharedStreamBus,
+		ToolName:   "paintress",
 	}
 	dbPath := filepath.Join(cfg.Continent, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)

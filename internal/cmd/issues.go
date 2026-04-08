@@ -67,6 +67,8 @@ func runIssues(cmd *cobra.Command, args []string) error {
 		ClaudeCmd:  claudeCmd,
 		TimeoutSec: 300,
 		Logger:     &domain.NopLogger{},
+		StreamBus:  session.SharedStreamBus(),
+		ToolName:   "paintress",
 	}
 	issues, err := usecase.FetchIssues(cmd.Context(), absPath, runner, stateFilter, projectOps)
 	if err != nil {

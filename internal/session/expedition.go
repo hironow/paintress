@@ -346,6 +346,17 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 	var responseModel, responseID string
 	streamErr := make(chan error, 1)
 	done := make(chan struct{})
+	// expNormalizer is declared here (outside goroutine) so the defer can call SessionEnd().
+	// expRunErr captures the error for the terminal event (set before each return).
+	var expNormalizer *platform.StreamNormalizer
+	var expRunErr error
+	defer func() {
+		if expNormalizer != nil && e.StreamBus != nil {
+			// providerSessionID="" → SessionEnd falls back to stream-captured value
+			endEv := expNormalizer.SessionEnd("", expRunErr)
+			e.StreamBus.Publish(context.Background(), endEv)
+		}
+	}()
 
 	go func() {
 		defer close(done)
@@ -365,8 +376,10 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		emitter.SetInput(prompt)
 
 		// Wire live stream event bus for expedition path.
+		// expNormalizer is declared outside the handler so SessionEnd() can access
+		// saved usage data after CollectAll completes.
 		if e.StreamBus != nil {
-			expNormalizer := platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
+			expNormalizer = platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := expNormalizer.Normalize(msg, raw); ev != nil {
 					e.StreamBus.Publish(expCtx, *ev)
@@ -460,20 +473,23 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		invokeSpan.AddEvent("expedition.failed",
 			trace.WithAttributes(attribute.String("failure_type", "timeout")),
 		)
-		return output.String(), fmt.Errorf("timeout after %v", timeout)
+		expRunErr = fmt.Errorf("timeout after %v", timeout)
+		return output.String(), expRunErr
 	}
 	if ctx.Err() == context.Canceled {
 		invokeSpan.AddEvent("expedition.failed",
 			trace.WithAttributes(attribute.String("failure_type", "interrupted")),
 		)
-		return output.String(), fmt.Errorf("interrupted")
+		expRunErr = fmt.Errorf("interrupted")
+		return output.String(), expRunErr
 	}
 
 	if readError != nil {
 		invokeSpan.AddEvent("expedition.failed",
 			trace.WithAttributes(attribute.String("failure_type", "stream_error")),
 		)
-		return output.String(), fmt.Errorf("stream read: %w", readError)
+		expRunErr = fmt.Errorf("stream read: %w", readError)
+		return output.String(), expRunErr
 	}
 
 	if err != nil {
@@ -484,6 +500,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		invokeSpan.AddEvent("expedition.succeeded")
 	}
 
+	expRunErr = err
 	return output.String(), err
 }
 
