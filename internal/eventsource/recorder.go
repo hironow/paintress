@@ -23,15 +23,19 @@ type SessionRecorder struct {
 	seqCounter *SeqCounter // nil = no SeqNr assignment (pre-cutover)
 	sessionID  string
 	prevID     string
+	logger     domain.Logger
 	mu         sync.Mutex
 }
 
 // NewSessionRecorder creates a SessionRecorder for the given session.
 // Loads existing events to resume the CausationID chain from the last recorded event.
-func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string) (*SessionRecorder, error) {
-	events, _, err := store.LoadAll(ctx)
+func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string, logger domain.Logger) (*SessionRecorder, error) {
+	events, loadResult, err := store.LoadAll(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("new session recorder: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 && logger != nil {
+		logger.Warn("session_recorder: %d corrupt event lines skipped", loadResult.CorruptLineCount)
 	}
 	var prevID string
 	for i := len(events) - 1; i >= 0; i-- {
@@ -44,6 +48,7 @@ func NewSessionRecorder(ctx context.Context, store eventStore, sessionID string)
 		store:     store,
 		sessionID: sessionID,
 		prevID:    prevID,
+		logger:    logger,
 	}, nil
 }
 

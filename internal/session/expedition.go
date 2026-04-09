@@ -134,7 +134,15 @@ func (e *Expedition) MidHighSeverityDMails() []string {
 }
 
 // BuildPrompt generates the expedition prompt in the configured language.
-func (e *Expedition) BuildPrompt() string {
+func (e *Expedition) BuildPrompt(ctxArgs ...context.Context) string {
+	// Accept optional ctx for propagation; default to context.Background() for
+	// backward compatibility with callers that don't pass a context (tests, dry-run).
+	var ctx context.Context
+	if len(ctxArgs) > 0 && ctxArgs[0] != nil {
+		ctx = ctxArgs[0]
+	} else {
+		ctx = context.Background()
+	}
 	projCfg, err := LoadProjectConfig(e.Continent)
 	if err != nil {
 		e.Logger.Warn("project config load failed: %v", err)
@@ -152,7 +160,7 @@ func (e *Expedition) BuildPrompt() string {
 		BaseBranch:      e.Config.BaseBranch,
 		DevURL:          e.Config.DevURL,
 		ContextSection:  e.loadContextSection() + e.resumeSection(),
-		InboxSection:    e.loadInboxSection(),
+		InboxSection:    e.loadInboxSection(ctx),
 		LinearTeam:      projCfg.TrackerTeam(),
 		LinearProject:   projCfg.TrackerProject(),
 		MissionSection:  harness.MissionText(harness.MustDefaultPromptRegistry(), domain.Lang, e.Target != nil),
@@ -162,12 +170,12 @@ func (e *Expedition) BuildPrompt() string {
 	return harness.RenderExpeditionPrompt(harness.MustDefaultPromptRegistry(), domain.Lang, data)
 }
 
-func (e *Expedition) loadInboxSection() string {
+func (e *Expedition) loadInboxSection(ctx context.Context) string {
 	e.inboxOnce.Do(func() {
 		if len(e.InboxDMails) > 0 {
 			return // already loaded externally (e.g., by HIGH severity gate)
 		}
-		dmails, err := ScanInbox(context.Background(), e.Continent)
+		dmails, err := ScanInbox(ctx, e.Continent)
 		if err != nil {
 			e.Logger.Warn("inbox scan failed: %v", err)
 			return
@@ -195,6 +203,8 @@ func (e *Expedition) resumeSection() string {
 
 // Run executes the expedition with timeout and streaming output.
 func (e *Expedition) Run(ctx context.Context) (string, error) {
+	// publishCtx survives cancellation so deferred session_end can still publish.
+	publishCtx := context.WithoutCancel(ctx)
 	if e.DataOut == nil {
 		e.DataOut = io.Discard
 	}
@@ -202,7 +212,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		e.ErrOut = io.Discard
 	}
 	promptStart := time.Now()
-	prompt := e.BuildPrompt()
+	prompt := e.BuildPrompt(ctx)
 	promptBuildDuration := time.Since(promptStart)
 
 	promptFile := filepath.Join(e.LogDir, fmt.Sprintf("expedition-%03d-prompt.md", e.Number))
@@ -360,8 +370,8 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				}
 				return
 			}
-			// Use Background: caller ctx may be cancelled, but session_end must still publish.
-			e.StreamBus.Publish(context.Background(), endEv)
+			// Use publishCtx (WithoutCancel): preserves trace baggage while surviving cancellation.
+			e.StreamBus.Publish(publishCtx, endEv)
 		}
 	}()
 

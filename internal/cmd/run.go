@@ -246,7 +246,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	// Build target provider for wave mode
 	var targetProvider port.TargetProvider
 	if mode.IsWave() {
-		stepProgressReader := session.NewStepProgressReader(eventStore)
+		stepProgressReader := session.NewStepProgressReader(eventStore, logger)
 		targetProvider = usecase.NewWaveTargetProvider(stepProgressReader, session.NewInboxReader(continent))
 	}
 
