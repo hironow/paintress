@@ -23,6 +23,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 * [paintress archive-prune](paintress_archive-prune.md)	 - Prune old archived d-mails
 * [paintress clean](paintress_clean.md)	 - Remove state directory (.expedition/)
 * [paintress config](paintress_config.md)	 - View or update paintress project configuration
+* [paintress dead-letters](paintress_dead-letters.md)	 - Manage dead-lettered outbox items
 * [paintress doctor](paintress_doctor.md)	 - Run health checks
 * [paintress init](paintress_init.md)	 - Initialize project configuration
 * [paintress issues](paintress_issues.md)	 - List Linear issues via Claude MCP
