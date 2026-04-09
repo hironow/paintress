@@ -216,3 +216,34 @@ func TestDoctorCommand_AcceptsOneArg(t *testing.T) {
 		t.Fatalf("unexpected error for one arg: %v", err)
 	}
 }
+
+func TestDoctorJSON_StatusLabelsAreKnown(t *testing.T) {
+	// given: run doctor -o json (no repo path → cwd fallback)
+	root := cmd.NewRootCommand()
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(new(bytes.Buffer))
+	root.SetArgs([]string{"doctor", "-o", "json"})
+
+	// when
+	_ = root.Execute()
+
+	// then: all status labels must be in the known set
+	known := map[string]bool{"OK": true, "FAIL": true, "SKIP": true, "WARN": true, "FIX": true}
+	var output struct {
+		Checks []struct {
+			Status string `json:"status"`
+		} `json:"checks"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &output); err != nil {
+		t.Fatalf("invalid JSON: %v\nraw: %s", err, buf.String())
+	}
+	if len(output.Checks) == 0 {
+		t.Fatal("expected at least one check in JSON output")
+	}
+	for _, c := range output.Checks {
+		if !known[c.Status] {
+			t.Errorf("unknown status label in doctor JSON: %q", c.Status)
+		}
+	}
+}
