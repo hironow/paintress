@@ -35,25 +35,28 @@ func TestCheckStatus_StatusLabel_Unknown_IsNotOK(t *testing.T) {
 	}
 }
 
-func TestCheckStatus_JSONRoundTrip_UnknownIsNotOK(t *testing.T) {
-	// RED-first: if domain has MarshalJSON/UnmarshalJSON, unknown label
-	// must NOT be silently converted to CheckOK.
-	// After GAP-048 fix, domain will have no JSON methods and this test
-	// verifies that json.Marshal uses the integer representation (no MarshalJSON).
+func TestCheckStatus_JSONUnmarshal_UnknownLabelMustError(t *testing.T) {
+	// CheckStatus has no custom UnmarshalJSON (transport removed in GAP-048).
+	// Unknown string labels MUST produce an unmarshal error — they must never
+	// be silently converted to any known status (CheckOK, CheckWarn, etc.).
+	unknownLabels := []string{`"UNKNOWN"`, `"INVALID"`, `""`, `"ok"`, `"fail"`}
+	for _, raw := range unknownLabels {
+		var status domain.CheckStatus
+		err := json.Unmarshal([]byte(raw), &status)
+		if err == nil {
+			t.Errorf("json.Unmarshal(%s) should error (no custom unmarshaler), but got status=%d", raw, status)
+		}
+	}
+}
 
-	// Marshal a known status
+func TestCheckStatus_JSONMarshal_UsesInteger(t *testing.T) {
+	// Without custom MarshalJSON, CheckStatus serializes as its integer value.
+	// This ensures domain has no transport responsibility.
 	data, err := json.Marshal(domain.CheckFail)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Attempt to unmarshal an unknown label
-	unknownJSON := []byte(`"UNKNOWN_STATUS"`)
-	var status domain.CheckStatus
-	err = json.Unmarshal(unknownJSON, &status)
-	// After MarshalJSON/UnmarshalJSON removal, this should fail (no custom unmarshaler)
-	// or at minimum, status should NOT be CheckOK
-	if err == nil && status == domain.CheckOK {
-		t.Errorf("unknown JSON label %q was silently converted to CheckOK (fail-open); data=%s", unknownJSON, data)
+	if string(data) != "1" {
+		t.Errorf("json.Marshal(CheckFail) = %s, want \"1\" (integer, no custom MarshalJSON)", data)
 	}
 }
