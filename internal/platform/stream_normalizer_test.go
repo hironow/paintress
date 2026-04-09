@@ -165,6 +165,56 @@ func TestStreamNormalizer_Result_SavesUsageForSessionEnd(t *testing.T) {
 	}
 }
 
+func TestStreamNormalizer_OutputPassesValidation(t *testing.T) {
+	t.Parallel()
+	n := platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
+	n.SetCodingSessionID("sess-contract")
+
+	// session_start via system:init
+	initMsg := &platform.StreamMessage{
+		Type:      "system",
+		Subtype:   "init",
+		SessionID: "provider-1",
+		Model:     "opus",
+	}
+	initRaw, _ := json.Marshal(initMsg)
+	if ev := n.Normalize(initMsg, initRaw); ev != nil {
+		if err := domain.ValidateSessionStreamEvent(*ev); err != nil {
+			t.Errorf("session_start failed validation: %v", err)
+		}
+	} else {
+		t.Fatal("expected session_start event from system:init")
+	}
+
+	// tool_use via assistant message
+	content := []map[string]any{{
+		"type":  "tool_use",
+		"id":    "toolu_99",
+		"name":  "Write",
+		"input": json.RawMessage(`{}`),
+	}}
+	msgJSON := map[string]any{"content": content}
+	messageBytes, _ := json.Marshal(msgJSON)
+	toolMsg := &platform.StreamMessage{
+		Type:    "assistant",
+		Message: messageBytes,
+	}
+	toolRaw, _ := json.Marshal(toolMsg)
+	if ev := n.Normalize(toolMsg, toolRaw); ev != nil {
+		if err := domain.ValidateSessionStreamEvent(*ev); err != nil {
+			t.Errorf("tool_use_start failed validation: %v", err)
+		}
+	} else {
+		t.Fatal("expected tool_use_start event")
+	}
+
+	// session_end
+	endEv := n.SessionEnd("provider-1", nil)
+	if err := domain.ValidateSessionStreamEvent(endEv); err != nil {
+		t.Errorf("session_end failed validation: %v", err)
+	}
+}
+
 func TestStreamNormalizer_SessionEnd(t *testing.T) {
 	t.Parallel()
 	n := platform.NewStreamNormalizer("sightjack", domain.ProviderClaudeCode)

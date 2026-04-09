@@ -90,8 +90,8 @@ func TruncateField(s string, maxBytes int) (string, bool) {
 	return s[:limit] + "...", true
 }
 
-// validateSessionStreamEvent checks required fields.
-func validateSessionStreamEvent(e SessionStreamEvent) error {
+// ValidateSessionStreamEvent checks required fields.
+func ValidateSessionStreamEvent(e SessionStreamEvent) error {
 	if e.Tool == "" {
 		return fmt.Errorf("session stream event: tool is required")
 	}
