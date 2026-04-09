@@ -20,7 +20,7 @@ func NewStepProgressReader(store port.EventStore) port.StepProgressReader {
 }
 
 func (r *eventStepProgressReader) ReadStepProgress(ctx context.Context) (*domain.WaveStepProgress, error) {
-	events, _, err := r.store.LoadAll()
+	events, _, err := r.store.LoadAll(ctx)
 	if err != nil {
 		return nil, err
 	}
