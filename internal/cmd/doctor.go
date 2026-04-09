@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,20 @@ import (
 	"github.com/hironow/paintress/internal/usecase"
 	"github.com/spf13/cobra"
 )
+
+// doctorJSONCheck is the JSON-serializable form of DoctorCheck for cmd output.
+type doctorJSONCheck struct {
+	Name    string `json:"name"`
+	Status  string `json:"status"` // "OK", "FAIL", "WARN", "SKIP", "FIX"
+	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
+}
+
+// doctorJSONOutput is the JSON-serializable doctor output.
+type doctorJSONOutput struct {
+	Checks  []doctorJSONCheck     `json:"checks"`
+	Metrics *domain.DoctorMetrics `json:"metrics,omitempty"`
+}
 
 func newDoctorCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -77,15 +92,21 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	metrics = usecase.ComputeSuccessRate(cmd.Context(), eventStore)
 
 	if outputFmt == "json" {
-		output := domain.DoctorOutput{
-			Checks:  checks,
-			Metrics: metrics,
+		jsonChecks := make([]doctorJSONCheck, len(checks))
+		for i, c := range checks {
+			jsonChecks[i] = doctorJSONCheck{
+				Name:    c.Name,
+				Status:  c.Status.StatusLabel(),
+				Message: c.Message,
+				Hint:    c.Hint,
+			}
 		}
-		out, err := domain.FormatDoctorOutputJSON(output)
+		output := doctorJSONOutput{Checks: jsonChecks, Metrics: metrics}
+		data, err := json.MarshalIndent(output, "", "  ")
 		if err != nil {
-			return err
+			return fmt.Errorf("format doctor JSON: %w", err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout(), out)
+		fmt.Fprintln(cmd.OutOrStdout(), string(data))
 		if hasFail {
 			return &domain.SilentError{Err: fmt.Errorf("some checks failed")}
 		}
