@@ -45,7 +45,7 @@ func checkDeadLetters(continent string) domain.DoctorCheck {
 			Name:    "dead-letters",
 			Status:  domain.CheckWarn,
 			Message: fmt.Sprintf("%d dead-lettered outbox item(s)", count),
-			Hint:    "these items failed delivery 3+ times and are permanently stuck — inspect outbox.db in .expedition/.run/",
+			Hint:    "run 'paintress dead-letters purge --execute' to remove",
 		}
 	}
 	return domain.DoctorCheck{
