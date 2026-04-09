@@ -13,9 +13,12 @@ import (
 // seqAllocLatest provides the global SeqNr watermark (from SQLite counter, not event scan).
 // Pass nil if SeqCounter is not available — snapshot will be saved at SeqNr=0.
 func Rebuild(ctx context.Context, cmd domain.RebuildCommand, events port.EventStore, projector domain.EventApplier, snapshots port.SnapshotStore, seqAllocLatest func() (uint64, error), aggregateType string, logger domain.Logger) error {
-	allEvents, _, err := events.LoadAll(ctx)
+	allEvents, loadResult, err := events.LoadAll(ctx)
 	if err != nil {
 		return fmt.Errorf("load events: %w", err)
+	}
+	if loadResult.CorruptLineCount > 0 {
+		logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 
 	logger.Info("rebuilding projections from %d event(s)", len(allEvents))

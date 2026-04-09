@@ -29,9 +29,12 @@ func Status(ctx context.Context, baseDir string, logger domain.Logger) domain.St
 	// Load all events for expedition stats
 	store := NewEventStore(stateDir, logger)
 
-	allEvents, _, err := store.LoadAll(ctx)
+	allEvents, loadResult, err := store.LoadAll(ctx)
 	if err != nil {
 		return report
+	}
+	if loadResult.CorruptLineCount > 0 {
+		logger.Warn("event store: %d corrupt line(s) skipped", loadResult.CorruptLineCount)
 	}
 	if len(allEvents) == 0 {
 		return report
