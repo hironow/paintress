@@ -360,6 +360,7 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 				}
 				return
 			}
+			// Use Background: caller ctx may be cancelled, but session_end must still publish.
 			e.StreamBus.Publish(context.Background(), endEv)
 		}
 	}()
