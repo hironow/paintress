@@ -174,7 +174,7 @@ func TestDeadLettersPurge_JSONOutput_DryRun(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := outBuf.String()
-	if !strings.Contains(out, `"count":2`) {
+	if !strings.Contains(out, `"dead_letters":2`) {
 		t.Errorf("expected count:2 in JSON output, got: %q", out)
 	}
 	if !strings.Contains(out, `"purged":0`) {
@@ -202,7 +202,7 @@ func TestDeadLettersPurge_JSONOutput_Execute(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	out := outBuf.String()
-	if !strings.Contains(out, `"count":2`) {
+	if !strings.Contains(out, `"dead_letters":2`) {
 		t.Errorf("expected count:2 in JSON output, got: %q", out)
 	}
 	if !strings.Contains(out, `"purged":2`) {

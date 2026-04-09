@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -57,6 +60,18 @@ func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Pre-flight: check DB exists to avoid creating dirs/DB as side effect
+	dbPath := filepath.Join(repoPath, domain.StateDir, ".run", "outbox.db")
+	if _, statErr := os.Stat(dbPath); statErr != nil {
+		outputFmt, _ := cmd.Flags().GetString("output")
+		if outputFmt == "json" {
+			fmt.Fprintln(cmd.OutOrStdout(), `{"dead_letters":0,"purged":0}`)
+		} else {
+			fmt.Fprintln(cmd.ErrOrStderr(), "No dead-lettered items.")
+		}
+		return nil
+	}
+
 	store, err := session.NewOutboxStoreForDir(repoPath)
 	if err != nil {
 		return fmt.Errorf("open outbox store: %w", err)
@@ -75,7 +90,7 @@ func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
 
 	if outputFmt == "json" {
 		out := struct {
-			Count  int `json:"count"`
+			Count  int `json:"dead_letters"`
 			Purged int `json:"purged"`
 		}{Count: count}
 
