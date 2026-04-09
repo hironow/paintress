@@ -82,30 +82,15 @@ type PruneResult struct {
 }
 
 // DoctorCheck represents the result of checking a single external command.
+// DoctorCheck holds the outcome of a single doctor check.
 type DoctorCheck struct {
-	Name    string      `json:"name"`
-	Status  CheckStatus `json:"status"`
-	Message string      `json:"message"`
-	Hint    string      `json:"hint,omitempty"`
-}
-
-// DoctorOutput is the structured output for the doctor command.
-// When metrics are not available (no repo-path), Metrics is nil and omitted from JSON.
-type DoctorOutput struct {
-	Checks  []DoctorCheck  `json:"checks"`
-	Metrics *DoctorMetrics `json:"metrics,omitempty"`
+	Name    string
+	Status  CheckStatus
+	Message string
+	Hint    string
 }
 
 // DoctorMetrics holds computed metrics for a repository.
 type DoctorMetrics struct {
 	SuccessRate string `json:"success_rate"`
-}
-
-// FormatDoctorOutputJSON returns the DoctorOutput as a pretty-printed JSON string.
-func FormatDoctorOutputJSON(output DoctorOutput) (string, error) {
-	data, err := json.MarshalIndent(output, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
 }
