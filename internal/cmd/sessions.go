@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"text/tabwriter"
 
@@ -41,11 +40,11 @@ func newSessionsListCmd() *cobra.Command {
 		Short: "List recorded coding sessions",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			logger := cmd.Context().Value(loggerKey).(domain.Logger)
-			absPath, _ := filepath.Abs(repoPath)
-			if info, err := os.Stat(filepath.Join(absPath, domain.StateDir)); err != nil || !info.IsDir() {
-				return fmt.Errorf("state directory %s not found at %s — run 'paintress init' first", domain.StateDir, absPath)
+			_, stateDirPath, err := resolveSessionsDir(cmd)
+			if err != nil {
+				return err
 			}
-			dbPath := filepath.Join(absPath, domain.StateDir, ".run", "sessions.db")
+			dbPath := filepath.Join(stateDirPath, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
 			if err != nil {
@@ -90,7 +89,7 @@ func newSessionsListCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (running, completed, failed, abandoned)")
 	cmd.Flags().IntVar(&limit, "limit", 20, "Max results")
-	cmd.Flags().StringVar(&repoPath, "path", ".", "Repository path")
+	cmd.Flags().StringVar(&repoPath, "path", "", "Repository path")
 	return cmd
 }
 
@@ -104,11 +103,11 @@ func newSessionsEnterCmd() *cobra.Command {
 		Short: "Re-enter an AI coding session interactively",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			absPath, _ := filepath.Abs(repoPath)
-			if info, err := os.Stat(filepath.Join(absPath, domain.StateDir)); err != nil || !info.IsDir() {
-				return fmt.Errorf("state directory %s not found at %s — run 'paintress init' first", domain.StateDir, absPath)
+			repoRoot, stateDirPath, resolveErr := resolveSessionsDir(cmd)
+			if resolveErr != nil {
+				return resolveErr
 			}
-			dbPath := filepath.Join(absPath, domain.StateDir, ".run", "sessions.db")
+			dbPath := filepath.Join(stateDirPath, ".run", "sessions.db")
 
 			store, err := session.NewSQLiteCodingSessionStore(dbPath)
 			if err != nil {
@@ -132,18 +131,18 @@ func newSessionsEnterCmd() *cobra.Command {
 			}
 
 			if rec.ProviderSessionID == "" {
-				return fmt.Errorf("session %q has no provider session ID", rec.ID)
+				return fmt.Errorf("session %s has no provider session ID", rec.ID)
 			}
 			if rec.WorkDir == "" {
-				return fmt.Errorf("session %q has no WorkDir recorded", rec.ID)
+				return fmt.Errorf("session %s has no work directory recorded", rec.ID)
 			}
 
-			claudeCmd := loadClaudeCmd(absPath)
+			claudeCmd := loadClaudeCmd(repoRoot)
 			enterCfg := session.EnterConfig{
 				ProviderCmd:       claudeCmd,
 				ProviderSessionID: rec.ProviderSessionID,
 				WorkDir:           rec.WorkDir,
-				ConfigBase:        absPath,
+				ConfigBase:        repoRoot,
 				Stdin:             cmd.InOrStdin(),
 				Stdout:            cmd.OutOrStdout(),
 				Stderr:            cmd.ErrOrStderr(),
@@ -152,6 +151,6 @@ func newSessionsEnterCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&providerID, "provider-id", "", "Resume by provider session ID directly")
-	cmd.Flags().StringVar(&repoPath, "path", ".", "Repository path")
+	cmd.Flags().StringVar(&repoPath, "path", "", "Repository path")
 	return cmd
 }
