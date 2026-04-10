@@ -10,10 +10,13 @@ import (
 
 // ComputeSuccessRate loads all events and computes success rate metrics.
 // Returns nil metrics when no events exist or loading fails.
-func ComputeSuccessRate(ctx context.Context, eventStore port.EventStore) *domain.DoctorMetrics {
-	events, _, err := eventStore.LoadAll(ctx)
+func ComputeSuccessRate(ctx context.Context, eventStore port.EventStore, logger domain.Logger) *domain.DoctorMetrics {
+	events, loadResult, err := eventStore.LoadAll(ctx)
 	if err != nil || len(events) == 0 {
 		return &domain.DoctorMetrics{SuccessRate: "no events"}
+	}
+	if loadResult.CorruptLineCount > 0 && logger != nil {
+		logger.Warn("doctor: %d corrupt event lines skipped", loadResult.CorruptLineCount)
 	}
 
 	rate := domain.SuccessRate(events)
