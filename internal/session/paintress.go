@@ -98,6 +98,9 @@ type Paintress struct {
 	targetProvider port.TargetProvider
 	trackingMode   domain.TrackingMode
 
+	// Session store: owned by Paintress, closed by CloseRunner().
+	sessionStore *SQLiteCodingSessionStore
+
 	// Gommage recovery: tracks retry attempts per failure streak
 	recoveryDecider   port.RecoveryDecider
 	checkpointScanner port.CheckpointScanner
@@ -180,8 +183,10 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		approver:        approver,
 		retryTracker:    harness.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
-		claude:          newTrackedClaudeRunner(cfgCopy, primary, logger),
 	}
+	runner, sessStore := NewTrackedRunner(cfgCopy, primary, logger)
+	p.claude = runner
+	p.sessionStore = sessStore
 
 	if !cfg.NoDev {
 		p.devServer = NewDevServer(
@@ -208,14 +213,18 @@ func SetStreamBus(bus port.SessionStreamPublisher) {
 }
 
 // SharedStreamBus returns the process-wide stream bus (may be nil).
-// Use this when constructing ClaudeAdapter directly outside of newTrackedClaudeRunner.
+// Use this when constructing ClaudeAdapter directly outside of NewTrackedRunner.
 func SharedStreamBus() port.SessionStreamPublisher {
 	return sharedStreamBus
 }
 
-// newTrackedClaudeRunner creates a ClaudeAdapter wrapped with session tracking.
-// Best-effort: if the session store cannot be opened, returns the plain adapter.
-func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logger) port.ClaudeRunner {
+// NewTrackedRunner creates a ClaudeAdapter wrapped with session tracking.
+// This is the standard path for resumable provider-backed invocations.
+// Retry is NOT included — paintress manages retry at the expedition level.
+// Store ownership: caller-owned via the returned *SQLiteCodingSessionStore.
+// The caller MUST close the store when the runner is no longer needed (see CloseRunner).
+// Best-effort: if the session store cannot be opened, returns (adapter, nil).
+func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
 	adapter := &ClaudeAdapter{
 		ClaudeCmd:  cfg.ClaudeCmd,
 		Model:      model,
@@ -230,11 +239,20 @@ func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logge
 		if logger != nil {
 			logger.Debug("session tracking unavailable: %v", err)
 		}
-		return adapter
+		return adapter, nil
 	}
-	// NOTE: store is not closed here — it lives for the duration of the Paintress instance.
-	// SQLite WAL mode handles this safely; the connection is released when the process exits.
-	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
+	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode), store
+}
+
+// CloseRunner closes the underlying session store opened by NewTrackedRunner.
+// Store ownership: instance-owned. Caller MUST call CloseRunner when the Paintress
+// instance is no longer needed (e.g. defer after NewPaintress).
+// Safe to call multiple times or when no store was opened.
+func (p *Paintress) CloseRunner() {
+	if p.sessionStore != nil {
+		p.sessionStore.Close()
+		p.sessionStore = nil
+	}
 }
 
 // SetEmitter sets the event emitter for the session.

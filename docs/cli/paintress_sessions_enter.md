@@ -10,7 +10,7 @@ paintress sessions enter [session-record-id] [flags]
 
 ```
   -h, --help                 help for enter
-      --path string          Repository path (default ".")
+      --path string          Repository path
       --provider-id string   Resume by provider session ID directly
 ```
 

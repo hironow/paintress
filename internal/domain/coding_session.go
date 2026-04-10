@@ -28,8 +28,8 @@ var knownProviders = map[string]Provider{
 	string(ProviderKiro):       ProviderKiro,
 }
 
-// parseProvider validates and returns a Provider from a raw string.
-func parseProvider(s string) (Provider, error) {
+// ParseProvider validates and returns a Provider from a raw string.
+func ParseProvider(s string) (Provider, error) {
 	p, ok := knownProviders[s]
 	if !ok {
 		return "", fmt.Errorf("unknown provider: %q", s)

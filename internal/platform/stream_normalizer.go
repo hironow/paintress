@@ -104,7 +104,6 @@ func (n *StreamNormalizer) SessionEnd(providerSessionID string, runErr error) do
 	}
 	dataJSON, _ := json.Marshal(data)
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSessionEnd, dataJSON)
-	// Prefer explicit providerSessionID; fall back to stream-captured value.
 	if providerSessionID != "" {
 		ev.ProviderSessionID = providerSessionID
 	} else {
@@ -223,6 +222,7 @@ func (n *StreamNormalizer) normalizeResult(msg *StreamMessage) *domain.SessionSt
 	if msg.Duration > 0 {
 		n.lastDuration = msg.Duration
 	}
+	// Capture provider session ID from result if not yet captured.
 	if n.sessionID == "" && msg.SessionID != "" {
 		n.sessionID = msg.SessionID
 	}
