@@ -13,7 +13,7 @@ import (
 )
 
 // checkDeadLetters reports outbox items that have exceeded max retry count.
-func checkDeadLetters(continent string) domain.DoctorCheck {
+func checkDeadLetters(ctx context.Context, continent string) domain.DoctorCheck {
 	// Check DB file exists before opening (avoid creating dirs/DB as side effect)
 	dbPath := filepath.Join(continent, domain.StateDir, ".run", "outbox.db")
 	if _, err := os.Stat(dbPath); err != nil {
@@ -32,7 +32,7 @@ func checkDeadLetters(continent string) domain.DoctorCheck {
 		}
 	}
 	defer store.Close()
-	count, err := store.DeadLetterCount(context.Background())
+	count, err := store.DeadLetterCount(ctx)
 	if err != nil {
 		return domain.DoctorCheck{
 			Name:    "dead-letters",

@@ -94,7 +94,7 @@ func OverrideLookPath(fn func(cmd string) (string, error)) func() {
 // additional checks for .expedition/ structure and config.yaml are included
 // as warnings (not required).
 // When repair is true, auto-fixable issues are repaired in-place.
-func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
+func RunDoctor(ctx context.Context, claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck {
 	commands := []struct {
 		name     string
 		required bool
@@ -126,8 +126,8 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 		}
 
 		// Try to get version (best-effort, 500ms timeout)
-		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		out, err := newShellCmd(ctx, cmd.name, "--version").Output()
+		vCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		out, err := newShellCmd(vCtx, cmd.name, "--version").Output()
 		cancel()
 
 		var versionStr string
@@ -152,8 +152,8 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 		}
 	}
 	if ghOK {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		cmd := exec.CommandContext(ctx, "gh", "auth", "status")
+		ghCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		cmd := exec.CommandContext(ghCtx, "gh", "auth", "status")
 		out, err := cmd.CombinedOutput()
 		cancel()
 		checks = append(checks, checkGHScopes(string(out), err))
@@ -162,8 +162,8 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 	if strings.TrimSpace(continent) != "" {
 		checks = append(checks, checkContinent(continent, repair))
 		checks = append(checks, checkConfig(continent))
-		checks = append(checks, checkGitRepo(continent))
-		checks = append(checks, checkGitRemote(continent))
+		checks = append(checks, checkGitRepo(ctx, continent))
+		checks = append(checks, checkGitRemote(ctx, continent))
 		checks = append(checks, checkWritability(continent))
 		skillResult := checkSkills(continent)
 		if repair && (skillResult.Status == domain.CheckFail || skillResult.Status == domain.CheckWarn) {
@@ -184,7 +184,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 			checks = append(checks, skillResult)
 		}
 		checks = append(checks, checkEventStore(continent))
-		checks = append(checks, checkDeadLetters(continent))
+		checks = append(checks, checkDeadLetters(ctx, continent))
 
 		// External connectivity checks (skip if claude binary not found)
 		claudeOK := false
@@ -216,8 +216,8 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 				Message: "skipped (claude not available)",
 			})
 		} else {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			cmd := newShellCmd(ctx, claudeCmd, "mcp", "list")
+			mcpCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			cmd := newShellCmd(mcpCtx, claudeCmd, "mcp", "list")
 			out, err := cmd.Output()
 			cancel()
 			mcpOutput := string(out)
@@ -243,7 +243,7 @@ func RunDoctor(claudeCmd string, continent string, repair bool, mode domain.Trac
 
 			// Inference: runs independently of mcp list result.
 			// MCP config issues don't affect core inference capability.
-			inferCtx, inferCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
 			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
 			// Filter CLAUDECODE only for the doctor inference probe to prevent
 			// nested-session errors. Other subprocesses must preserve CLAUDECODE.
@@ -424,9 +424,9 @@ func checkContinent(continent string, repair bool) domain.DoctorCheck {
 
 // checkGitRepo verifies that the continent directory is inside a git repository.
 // Returns a Warning-level check.
-func checkGitRepo(continent string) domain.DoctorCheck {
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	cmd := exec.CommandContext(ctx, "git", "-C", continent, "rev-parse", "--git-dir")
+func checkGitRepo(ctx context.Context, continent string) domain.DoctorCheck {
+	gitCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	cmd := exec.CommandContext(gitCtx, "git", "-C", continent, "rev-parse", "--git-dir")
 	out, err := cmd.Output()
 	cancel()
 	if err != nil {
@@ -448,9 +448,9 @@ func checkGitRepo(continent string) domain.DoctorCheck {
 // checkGitRemote verifies that the git repository has at least one remote configured.
 // Paintress creates Pull Requests for Linear issues, so a remote is required.
 // Returns a Warning-level check.
-func checkGitRemote(continent string) domain.DoctorCheck {
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	cmd := exec.CommandContext(ctx, "git", "-C", continent, "remote")
+func checkGitRemote(ctx context.Context, continent string) domain.DoctorCheck {
+	remCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	cmd := exec.CommandContext(remCtx, "git", "-C", continent, "remote")
 	out, err := cmd.Output()
 	cancel()
 	if err != nil {

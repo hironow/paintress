@@ -361,7 +361,8 @@ func (p *Paintress) Run(ctx context.Context) int {
 			return 1
 		}
 		defer func() {
-			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			// Detached context: pool shutdown must complete even if parent ctx cancelled.
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 			defer shutdownCancel()
 			p.pool.Shutdown(shutdownCtx)
 		}()

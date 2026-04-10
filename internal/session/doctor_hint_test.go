@@ -1,6 +1,7 @@
 package session_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -158,7 +159,7 @@ func TestCheckSkills_NotFound_HasHint(t *testing.T) {
 
 func TestRunDoctor_BinaryNotFound_HasHint(t *testing.T) {
 	// given: use a nonexistent claude command
-	checks := session.RunDoctor("nonexistent-claude-xyz-99999", "", false, domain.ModeWave)
+	checks := session.RunDoctor(context.Background(), "nonexistent-claude-xyz-99999", "", false, domain.ModeWave)
 
 	// then: the claude check should have a hint
 	for _, c := range checks {
