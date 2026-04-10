@@ -89,7 +89,8 @@ func newSessionsListCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (running, completed, failed, abandoned)")
 	cmd.Flags().IntVar(&limit, "limit", 20, "Max results")
-	cmd.Flags().StringVar(&repoPath, "path", "", "Repository path")
+	cmd.Flags().StringVar(&repoPath, "path", "", "Repository root path")
+	cmd.Flags().String("config", "", "Config file path (overrides default <stateDir>/config.yaml)")
 	return cmd
 }
 
@@ -138,6 +139,9 @@ func newSessionsEnterCmd() *cobra.Command {
 			}
 
 			configPath := filepath.Join(stateDirPath, "config.yaml")
+			if f := cmd.Flags().Lookup("config"); f != nil && cmd.Flags().Changed("config") {
+				configPath, _ = cmd.Flags().GetString("config")
+			}
 			cfg, cfgErr := loadSessionsConfig(configPath)
 			if cfgErr != nil {
 				return fmt.Errorf("load config %s: %w", configPath, cfgErr)
@@ -155,6 +159,7 @@ func newSessionsEnterCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&providerID, "provider-id", "", "Resume by provider session ID directly")
-	cmd.Flags().StringVar(&repoPath, "path", "", "Repository path")
+	cmd.Flags().StringVar(&repoPath, "path", "", "Repository root path")
+	cmd.Flags().String("config", "", "Config file path (overrides default <stateDir>/config.yaml)")
 	return cmd
 }
