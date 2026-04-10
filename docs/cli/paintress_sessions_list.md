@@ -9,9 +9,10 @@ paintress sessions list [flags]
 ### Options
 
 ```
+      --config string   Config file path (overrides default <stateDir>/config.yaml)
   -h, --help            help for list
       --limit int       Max results (default 20)
-      --path string     Repository path
+      --path string     Repository root path
       --status string   Filter by status (running, completed, failed, abandoned)
 ```
 

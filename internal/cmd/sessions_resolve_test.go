@@ -41,6 +41,25 @@ func TestResolveSessionsDir_PathFlag(t *testing.T) {
 	}
 }
 
+func TestResolveSessionsDir_ConfigFlag(t *testing.T) {
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, domain.StateDir)
+	os.MkdirAll(stateDir, 0755)
+	configPath := filepath.Join(stateDir, "config.yaml")
+	os.WriteFile(configPath, []byte("claude_cmd: echo\n"), 0644)
+
+	cmd := newTestCmd(true)
+	cmd.Flags().Set("config", configPath)
+
+	repoRoot, _, err := resolveSessionsDir(cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repoRoot != dir {
+		t.Errorf("repoRoot = %q, want %q", repoRoot, dir)
+	}
+}
+
 func TestResolveSessionsDir_CwdFallback(t *testing.T) {
 	dir := t.TempDir()
 	// Resolve symlinks to handle macOS /var → /private/var
@@ -58,6 +77,29 @@ func TestResolveSessionsDir_CwdFallback(t *testing.T) {
 	}
 	if repoRoot != dir {
 		t.Errorf("repoRoot = %q, want %q", repoRoot, dir)
+	}
+}
+
+func TestResolveSessionsDir_PathOverridesConfig(t *testing.T) {
+	pathDir := t.TempDir()
+	os.MkdirAll(filepath.Join(pathDir, domain.StateDir), 0755)
+
+	configDir := t.TempDir()
+	configStateDir := filepath.Join(configDir, domain.StateDir)
+	os.MkdirAll(configStateDir, 0755)
+	configPath := filepath.Join(configStateDir, "config.yaml")
+	os.WriteFile(configPath, []byte("claude_cmd: echo\n"), 0644)
+
+	cmd := newTestCmd(true)
+	cmd.Flags().Set("path", pathDir)
+	cmd.Flags().Set("config", configPath)
+
+	repoRoot, _, err := resolveSessionsDir(cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repoRoot != pathDir {
+		t.Errorf("--path should override --config: repoRoot = %q, want %q", repoRoot, pathDir)
 	}
 }
 

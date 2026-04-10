@@ -9,8 +9,9 @@ paintress sessions enter [session-record-id] [flags]
 ### Options
 
 ```
+      --config string        Config file path (overrides default <stateDir>/config.yaml)
   -h, --help                 help for enter
-      --path string          Repository path
+      --path string          Repository root path
       --provider-id string   Resume by provider session ID directly
 ```
 

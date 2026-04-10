@@ -123,3 +123,81 @@ func TestSessionsEnter_ByProviderID(t *testing.T) {
 		t.Errorf("expected --resume provider-sess-002, got: %q", output)
 	}
 }
+
+func TestSessionsEnter_ByPathFlag(t *testing.T) {
+	// given
+	workDir := t.TempDir()
+	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-003", workDir)
+
+	var stdout bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("sessions enter --path failed: %v", err)
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "--resume provider-sess-003") {
+		t.Errorf("expected --resume provider-sess-003, got: %q", output)
+	}
+}
+
+func TestSessionsEnter_NoWorkDir(t *testing.T) {
+	// given
+	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-004", "")
+
+	var stdout bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err == nil {
+		t.Fatal("expected error for session with no work directory")
+	}
+	if !strings.Contains(err.Error(), "has no work directory recorded") {
+		t.Errorf("error = %q, want 'has no work directory recorded'", err)
+	}
+}
+
+func TestSessionsEnter_ConfigBaseIsRepoRoot(t *testing.T) {
+	// Regression test: ConfigBase must be repoRoot, not stateDir.
+
+	// given: config + settings.json in correct location
+	workDir := t.TempDir()
+	repoRoot, recordID := setupSessionsEnterEnv(t, "provider-sess-037", workDir)
+
+	// Create settings.json at the correct location (repoRoot/.expedition/.claude/settings.json)
+	settingsDir := filepath.Join(repoRoot, domain.StateDir, ".claude")
+	os.MkdirAll(settingsDir, 0755)
+	os.WriteFile(filepath.Join(settingsDir, "settings.json"), []byte(`{"key":"value"}`), 0644)
+
+	var stdout bytes.Buffer
+	rootCmd := NewRootCommand()
+	rootCmd.SetArgs([]string{"sessions", "enter", "--path", repoRoot, recordID})
+	rootCmd.SetOut(&stdout)
+	rootCmd.SetErr(&bytes.Buffer{})
+
+	// when
+	err := rootCmd.Execute()
+
+	// then
+	if err != nil {
+		t.Fatalf("sessions enter failed: %v", err)
+	}
+	output := stdout.String()
+	// --settings flag should be present (settings.json exists at correct path)
+	if !strings.Contains(output, "--settings") {
+		t.Errorf("expected --settings flag (ConfigBase=repoRoot resolves correctly), got: %q", output)
+	}
+}
