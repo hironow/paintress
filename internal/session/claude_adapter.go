@@ -156,7 +156,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
 			if vErr := domain.ValidateSessionStreamEvent(endEvent); vErr != nil {
 				if a.Logger != nil {
-					a.Logger.Warn("stream event dropped (invalid): %v", vErr)
+					a.Logger.Warn("session_end event dropped (invalid): %v", vErr)
 				}
 				return
 			}

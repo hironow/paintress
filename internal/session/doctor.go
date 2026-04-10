@@ -20,7 +20,7 @@ var installSkillsRefFn = func() error {
 	return cmd.Run()
 }
 
-// findSkillsRefDirFn searches for skills-ref submodule directory.
+// findSkillsRefDirFn searches for skills-ref submodule directory relative to baseDir.
 var findSkillsRefDirFn = findSkillsRefDir
 
 // generateSkillsFn regenerates SKILL.md files via ValidateContinent.
@@ -28,10 +28,10 @@ var generateSkillsFn = func(continent string) error {
 	return ValidateContinent(continent, nil)
 }
 
-func findSkillsRefDir() string {
+func findSkillsRefDir(baseDir string) string {
 	candidates := []string{
-		filepath.Join("..", "skills-ref"),
-		filepath.Join("..", "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "skills-ref"),
+		filepath.Join(baseDir, "..", "..", "skills-ref"),
 	}
 	for _, c := range candidates {
 		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
@@ -49,7 +49,7 @@ func OverrideInstallSkillsRef(fn func() error) func() {
 }
 
 // OverrideFindSkillsRefDir replaces the skills-ref directory finder for testing.
-func OverrideFindSkillsRefDir(fn func() string) func() {
+func OverrideFindSkillsRefDir(fn func(string) string) func() {
 	old := findSkillsRefDirFn
 	findSkillsRefDirFn = fn
 	return func() { findSkillsRefDirFn = old }
@@ -272,7 +272,7 @@ func RunDoctor(ctx context.Context, claudeCmd string, continent string, repair b
 	}
 
 	// --- skills-ref toolchain ---
-	checks = append(checks, checkSkillsRefToolchain(repair)...)
+	checks = append(checks, checkSkillsRefToolchain(continent, repair)...)
 
 	// --- Repair: stale PID cleanup ---
 	if repair && continent != "" {
@@ -306,7 +306,7 @@ func findSkillsRefBin() (string, error) {
 }
 
 // checkSkillsRefToolchain verifies that skills-ref tooling is available.
-func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
+func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 	if path, err := findSkillsRefBin(); err == nil {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckOK,
@@ -321,7 +321,7 @@ func checkSkillsRefToolchain(repair bool) []domain.DoctorCheck {
 			Hint:    `install uv (https://docs.astral.sh/uv/) or "uv tool install skills-ref"`,
 		}}
 	}
-	subDir := findSkillsRefDirFn()
+	subDir := findSkillsRefDirFn(baseDir)
 	if subDir != "" {
 		return []domain.DoctorCheck{{
 			Name: "skills-ref", Status: domain.CheckWarn,
