@@ -141,7 +141,7 @@ func (e *Expedition) BuildPrompt(ctxArgs ...context.Context) string {
 	if len(ctxArgs) > 0 && ctxArgs[0] != nil {
 		ctx = ctxArgs[0]
 	} else {
-		ctx = context.Background()
+		ctx = context.Background() // nosemgrep: gap050-session-context-background [permanent] — variadic backward compat: tests and dry-run callers omit ctx
 	}
 	projCfg, err := LoadProjectConfig(e.Continent)
 	if err != nil {
