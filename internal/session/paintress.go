@@ -180,7 +180,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		approver:        approver,
 		retryTracker:    harness.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
-		claude:          newTrackedClaudeRunner(cfgCopy, primary, logger),
+		claude:          NewTrackedRunner(cfgCopy, primary, logger),
 	}
 
 	if !cfg.NoDev {
@@ -208,14 +208,18 @@ func SetStreamBus(bus port.SessionStreamPublisher) {
 }
 
 // SharedStreamBus returns the process-wide stream bus (may be nil).
-// Use this when constructing ClaudeAdapter directly outside of newTrackedClaudeRunner.
+// Use this when constructing ClaudeAdapter directly outside of NewTrackedRunner.
 func SharedStreamBus() port.SessionStreamPublisher {
 	return sharedStreamBus
 }
 
-// newTrackedClaudeRunner creates a ClaudeAdapter wrapped with session tracking.
+// NewTrackedRunner creates a ClaudeAdapter wrapped with session tracking.
+// This is the standard path for resumable provider-backed invocations.
+// Retry is NOT included — paintress manages retry at the expedition level.
+// Store ownership: instance-owned. The store lives for the Paintress instance lifetime
+// and is released when the process exits (SQLite WAL mode).
 // Best-effort: if the session store cannot be opened, returns the plain adapter.
-func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logger) port.ClaudeRunner {
+func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) port.ClaudeRunner {
 	adapter := &ClaudeAdapter{
 		ClaudeCmd:  cfg.ClaudeCmd,
 		Model:      model,
@@ -232,8 +236,8 @@ func newTrackedClaudeRunner(cfg domain.Config, model string, logger domain.Logge
 		}
 		return adapter
 	}
-	// NOTE: store is not closed here — it lives for the duration of the Paintress instance.
-	// SQLite WAL mode handles this safely; the connection is released when the process exits.
+	// Store ownership: instance-owned. Not closed here — lives for Paintress instance lifetime.
+	// SQLite WAL mode handles concurrent access; connection released on process exit.
 	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode)
 }
 

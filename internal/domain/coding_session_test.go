@@ -1,5 +1,5 @@
 package domain
-// white-box-reason: tests unexported domain functions (parseProvider, excludeIssuesByLabel, etc.)
+// white-box-reason: tests unexported domain functions (excludeIssuesByLabel, etc.) and exported ParseProvider
 
 import (
 	"testing"
@@ -22,12 +22,12 @@ func TestParseProvider_ValidProviders(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.input, func(t *testing.T) {
 			t.Parallel()
-			got, err := parseProvider(tc.input)
+			got, err := ParseProvider(tc.input)
 			if err != nil {
-				t.Fatalf("parseProvider(%q) error: %v", tc.input, err)
+				t.Fatalf("ParseProvider(%q) error: %v", tc.input, err)
 			}
 			if got != tc.want {
-				t.Errorf("parseProvider(%q) = %q, want %q", tc.input, got, tc.want)
+				t.Errorf("ParseProvider(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
 	}
@@ -35,9 +35,9 @@ func TestParseProvider_ValidProviders(t *testing.T) {
 
 func TestParseProvider_InvalidProvider(t *testing.T) {
 	t.Parallel()
-	_, err := parseProvider("unknown-tool")
+	_, err := ParseProvider("unknown-tool")
 	if err == nil {
-		t.Fatal("parseProvider(unknown-tool) should return error")
+		t.Fatal("ParseProvider(unknown-tool) should return error")
 	}
 }
 
