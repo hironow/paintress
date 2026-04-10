@@ -11,7 +11,7 @@ paintress sessions list [flags]
 ```
   -h, --help            help for list
       --limit int       Max results (default 20)
-      --path string     Repository path (default ".")
+      --path string     Repository path
       --status string   Filter by status (running, completed, failed, abandoned)
 ```
 
