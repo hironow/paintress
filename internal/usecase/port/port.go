@@ -265,7 +265,7 @@ type ProjectOps interface {
 
 // DoctorOps runs diagnostic checks.
 type DoctorOps interface {
-	RunDoctor(claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck
+	RunDoctor(ctx context.Context, claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck
 }
 
 // RunLockStore provides cross-process run locking backed by persistent storage.

@@ -1,7 +1,8 @@
 package session
 
-// white-box-reason: tests that ClaudeAdapter emits exactly 1 session_end via StreamBus
-// and that CodingSessionID propagates through RunOption → normalizer → event
+// white-box-reason: tests that ClaudeAdapter emits exactly 1 session_end via StreamBus,
+// that CodingSessionID propagates through RunOption → normalizer → event,
+// and that child spans inherit the caller's trace ID (GAP-TST-051).
 
 import (
 	"context"
@@ -15,7 +16,29 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/usecase/port"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
+
+// setupInternalTestTracer installs an InMemoryExporter with a synchronous span
+// processor for white-box tests in package session. Restores global TracerProvider
+// after the test.
+func setupInternalTestTracer(t *testing.T) *tracetest.InMemoryExporter {
+	t.Helper()
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp))
+	prev := otel.GetTracerProvider()
+	oldTracer := platform.Tracer
+	otel.SetTracerProvider(tp)
+	platform.Tracer = tp.Tracer("paintress-internal-test")
+	t.Cleanup(func() {
+		tp.Shutdown(context.Background())
+		otel.SetTracerProvider(prev)
+		platform.Tracer = oldTracer
+	})
+	return exp
+}
 
 // fakeStreamJSON returns minimal Claude stream-json output for testing.
 func fakeStreamJSON() string {
@@ -112,6 +135,50 @@ drain:
 		t.Errorf("expected at least 2 events (start + end), got %d", len(events))
 		for i, ev := range events {
 			fmt.Printf("  event[%d]: type=%s\n", i, ev.Type)
+		}
+	}
+}
+
+func TestStreamBusWiring_SessionEndInheritsParentTrace(t *testing.T) {
+	exp := setupInternalTestTracer(t)
+
+	bus := platform.NewInProcessSessionBus()
+	defer bus.Close()
+
+	old := sharedStreamBus
+	SetStreamBus(bus)
+	defer func() { sharedStreamBus = old }()
+
+	adapter := &ClaudeAdapter{
+		ClaudeCmd: "fake-claude",
+		Model:     "test",
+		Logger:    &domain.NopLogger{},
+		StreamBus: bus,
+		ToolName:  "paintress",
+		NewCmd: func(ctx context.Context, name string, args ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "printf", "%s", fakeStreamJSON())
+		},
+	}
+
+	// Create parent span
+	parentCtx, parentSpan := platform.Tracer.Start(context.Background(), "test.parent")
+	defer parentSpan.End()
+	parentTraceID := parentSpan.SpanContext().TraceID()
+
+	_, err := adapter.RunDetailed(parentCtx, "trace test", os.Stdout)
+	if err != nil {
+		t.Fatalf("RunDetailed: %v", err)
+	}
+
+	// Verify child spans inherit parent trace
+	spans := exp.GetSpans()
+	if len(spans) == 0 {
+		t.Fatal("expected at least one span from RunDetailed")
+	}
+	for _, s := range spans {
+		if s.SpanContext.TraceID() != parentTraceID {
+			t.Errorf("span %q trace ID = %s, want parent trace ID = %s",
+				s.Name, s.SpanContext.TraceID(), parentTraceID)
 		}
 	}
 }

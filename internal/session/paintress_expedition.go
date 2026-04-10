@@ -93,7 +93,8 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 		releaseWorkDir := func() {
 			if p.pool != nil && workDir != "" {
 				_, relSpan := platform.Tracer.Start(expCtx, "worktree.release") // nosemgrep: adr0003-otel-span-without-defer-end — relSpan.End() called after Release() [permanent]
-				rCtx, rCancel := context.WithTimeout(context.Background(), worktreeReleaseTimeout)
+				// Detached context: worktree release must complete even if parent ctx cancelled.
+				rCtx, rCancel := context.WithTimeout(context.WithoutCancel(expCtx), worktreeReleaseTimeout)
 				defer rCancel()
 				if err := p.pool.Release(rCtx, workDir); err != nil {
 					p.Logger.Warn("worktree release: %v", err)

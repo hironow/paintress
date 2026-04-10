@@ -76,7 +76,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	repair, _ := cmd.Flags().GetBool("repair")
 	linearFlag, _ := cmd.Flags().GetBool("linear")
 	mode := domain.NewTrackingMode(linearFlag)
-	checks := session.RunDoctor(claudeCmd, continent, repair, mode)
+	checks := session.RunDoctor(cmd.Context(), claudeCmd, continent, repair, mode)
 
 	hasFail := false
 	for _, c := range checks {

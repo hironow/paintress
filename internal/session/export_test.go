@@ -5,6 +5,12 @@ package session
 // export_test.go exposes unexported symbols for external tests (package session_test).
 // This is a standard Go pattern used by the stdlib (e.g., net/http/export_test.go).
 
+import (
+	"context"
+
+	"github.com/hironow/paintress/internal/domain"
+)
+
 var ExportWatchFlag = watchFlag
 var ExportWatchInbox = watchInbox
 var ExportShellName = shellName
@@ -16,8 +22,17 @@ var ExportCheckClaudeAuth = checkClaudeAuth
 var ExportCheckLinearMCP = checkLinearMCP
 var ExportCheckContinent = checkContinent
 var ExportCheckConfig = checkConfig
-var ExportCheckGitRepo = checkGitRepo
-var ExportCheckGitRemote = checkGitRemote
+
+// ExportCheckGitRepo wraps checkGitRepo with a background context for tests.
+func ExportCheckGitRepo(continent string) domain.DoctorCheck {
+	return checkGitRepo(context.Background(), continent)
+}
+
+// ExportCheckGitRemote wraps checkGitRemote with a background context for tests.
+func ExportCheckGitRemote(continent string) domain.DoctorCheck {
+	return checkGitRemote(context.Background(), continent)
+}
+
 var ExportCheckWritability = checkWritability
 var ExportCheckSkills = checkSkills
 var ExportCheckEventStore = checkEventStore
