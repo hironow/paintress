@@ -137,9 +137,13 @@ func newSessionsEnterCmd() *cobra.Command {
 				return fmt.Errorf("session %s has no work directory recorded", rec.ID)
 			}
 
-			claudeCmd := loadClaudeCmd(repoRoot)
+			configPath := filepath.Join(stateDirPath, "config.yaml")
+			cfg, cfgErr := loadSessionsConfig(configPath)
+			if cfgErr != nil {
+				return fmt.Errorf("load config %s: %w", configPath, cfgErr)
+			}
 			enterCfg := session.EnterConfig{
-				ProviderCmd:       claudeCmd,
+				ProviderCmd:       cfg.ClaudeCmd,
 				ProviderSessionID: rec.ProviderSessionID,
 				WorkDir:           rec.WorkDir,
 				ConfigBase:        repoRoot,

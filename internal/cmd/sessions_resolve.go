@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 const sessionsToolName = "paintress"
@@ -37,4 +40,29 @@ func resolveSessionsDir(cmd *cobra.Command) (repoRoot, stateDirPath string, err 
 		return "", "", fmt.Errorf("state directory not found: %s (run '%s init' first)", stateDirPath, sessionsToolName)
 	}
 	return repoRoot, stateDirPath, nil
+}
+
+// sessionsConfig holds the minimal config fields needed by sessions enter.
+type sessionsConfig struct {
+	ClaudeCmd string `yaml:"claude_cmd"`
+}
+
+// loadSessionsConfig reads config for sessions enter.
+// Missing file → default ClaudeCmd (graceful). Malformed YAML → error (fail-fast).
+func loadSessionsConfig(path string) (*sessionsConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return &sessionsConfig{ClaudeCmd: domain.DefaultClaudeCmd}, nil
+		}
+		return nil, err
+	}
+	cfg := &sessionsConfig{ClaudeCmd: domain.DefaultClaudeCmd}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		return nil, err
+	}
+	if cfg.ClaudeCmd == "" {
+		cfg.ClaudeCmd = domain.DefaultClaudeCmd
+	}
+	return cfg, nil
 }
