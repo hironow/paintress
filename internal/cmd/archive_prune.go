@@ -62,7 +62,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	if execute && cmd.Flags().Changed("dry-run") {
 		return fmt.Errorf("--execute and --dry-run are mutually exclusive")
 	}
-	repoPath, err := resolveRepoPath(args)
+	repoPath, err := resolveTargetDir(args)
 	if err != nil {
 		return err
 	}

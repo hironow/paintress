@@ -23,7 +23,7 @@ If path is omitted, the current working directory is used.`,
   paintress rebuild /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot, err := resolveRepoPath(args)
+			repoRoot, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}

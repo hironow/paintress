@@ -67,7 +67,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	outputFmt, _ := cmd.Flags().GetString("output")
 
 	// Resolve continent: explicit arg or current working directory (aligned with amadeus/sightjack)
-	continent, err := resolveRepoPath(args)
+	continent, err := resolveTargetDir(args)
 	if err != nil {
 		return fmt.Errorf("resolve repo path: %w", err)
 	}

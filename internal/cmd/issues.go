@@ -42,7 +42,7 @@ If path is omitted, the current working directory is used.`,
 }
 
 func runIssues(cmd *cobra.Command, args []string) error {
-	absPath, err := resolveRepoPath(args)
+	absPath, err := resolveTargetDir(args)
 	if err != nil {
 		return err
 	}

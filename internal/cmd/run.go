@@ -98,7 +98,7 @@ func configFromProject(pc *domain.ProjectConfig) domain.Config {
 }
 
 func runExpedition(cmd *cobra.Command, args []string) error {
-	continent, err := resolveRepoPath(args)
+	continent, err := resolveTargetDir(args)
 	if err != nil {
 		return err
 	}

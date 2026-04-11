@@ -32,7 +32,7 @@ flags for interactive prompts. This must be run once before
   paintress init --force --team MY --project Hades /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoPath, err := resolveRepoPath(args)
+			repoPath, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("resolve repo path: %w", err)
 			}

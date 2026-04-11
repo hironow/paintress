@@ -13,7 +13,7 @@ import (
 )
 
 func TestInitCommand_NoArgs_FallsBackToCwd(t *testing.T) {
-	// given — no repo-path arg; resolveRepoPath falls back to os.Getwd()
+	// given — no repo-path arg; resolveTargetDir falls back to os.Getwd()
 	// Use a tempdir as cwd so init hits "already exists" (if seeded) or succeeds
 	// without polluting the real working directory with .expedition/.
 	dir := t.TempDir()

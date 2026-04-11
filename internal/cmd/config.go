@@ -31,7 +31,7 @@ func newConfigShowCommand() *cobra.Command {
 		Long:  "Display the project configuration from .expedition/config.yaml.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoPath, err := resolveRepoPath(args)
+			repoPath, err := resolveTargetDir(args)
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
 			}
@@ -88,9 +88,9 @@ Supported keys:
 			var repoPath string
 			var err error
 			if len(args) == 3 {
-				repoPath, err = resolveRepoPath(args[2:])
+				repoPath, err = resolveTargetDir(args[2:])
 			} else {
-				repoPath, err = resolveRepoPath(nil)
+				repoPath, err = resolveTargetDir(nil)
 			}
 			if err != nil {
 				return fmt.Errorf("invalid path: %w", err)
