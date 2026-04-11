@@ -1,6 +1,4 @@
-package session
-
-// white-box-reason: session internals: tests unexported LocalNotifier cmdFactory injection
+package session_test
 
 import (
 	"context"
@@ -9,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hironow/paintress/internal/session"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
@@ -20,13 +19,11 @@ func TestLocalNotifier_Darwin_CommandShape(t *testing.T) {
 	// given
 	var capturedName string
 	var capturedArgs []string
-	n := &LocalNotifier{
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			capturedName = name
-			capturedArgs = args
-			return exec.Command("true")
-		},
-	}
+	n := session.NewLocalNotifierForTest("", func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedName = name
+		capturedArgs = args
+		return exec.Command("true")
+	})
 
 	// when
 	err := n.Notify(context.Background(), "Test Title", "Test Message")
@@ -51,14 +48,11 @@ func TestLocalNotifier_Linux_CommandShape(t *testing.T) {
 	// given: force linux path regardless of runtime
 	var capturedName string
 	var capturedArgs []string
-	n := &LocalNotifier{
-		forceOS: "linux",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			capturedName = name
-			capturedArgs = args
-			return exec.Command("true")
-		},
-	}
+	n := session.NewLocalNotifierForTest("linux", func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedName = name
+		capturedArgs = args
+		return exec.Command("true")
+	})
 
 	// when
 	err := n.Notify(context.Background(), "Test Title", "Test Message")
@@ -79,14 +73,11 @@ func TestLocalNotifier_Windows_CommandShape(t *testing.T) {
 	// given: force windows
 	var capturedName string
 	var capturedArgs []string
-	n := &LocalNotifier{
-		forceOS: "windows",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			capturedName = name
-			capturedArgs = args
-			return exec.Command("true")
-		},
-	}
+	n := session.NewLocalNotifierForTest("windows", func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedName = name
+		capturedArgs = args
+		return exec.Command("true")
+	})
 
 	// when
 	err := n.Notify(context.Background(), "Test Title", "Test Message")
@@ -109,13 +100,10 @@ func TestLocalNotifier_Windows_CommandShape(t *testing.T) {
 
 func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 	// given: force unsupported OS
-	n := &LocalNotifier{
-		forceOS: "freebsd",
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			t.Error("should not invoke command for unsupported OS")
-			return exec.Command("true")
-		},
-	}
+	n := session.NewLocalNotifierForTest("freebsd", func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		t.Error("should not invoke command for unsupported OS")
+		return exec.Command("true")
+	})
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -129,13 +117,10 @@ func TestLocalNotifier_UnsupportedOS_FallsBack(t *testing.T) {
 func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 	// given
 	var capturedShellCmd string
-	n := &CmdNotifier{
-		cmdTemplate: `curl -d {title}: {message} https://example.com`,
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			capturedShellCmd = args[len(args)-1] // last arg to "sh -c ..."
-			return exec.Command("true")
-		},
-	}
+	n := session.NewCmdNotifierForTest(`curl -d {title}: {message} https://example.com`, func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedShellCmd = args[len(args)-1] // last arg to "sh -c ..."
+		return exec.Command("true")
+	})
 
 	// when
 	err := n.Notify(context.Background(), "Paintress", "HIGH severity D-Mail")
@@ -160,13 +145,10 @@ func TestCmdNotifier_PlaceholderReplacement(t *testing.T) {
 func TestCmdNotifier_EscapesShellMetacharacters(t *testing.T) {
 	// given: message with shell metacharacters that could cause injection
 	var capturedShellCmd string
-	n := &CmdNotifier{
-		cmdTemplate: `echo {message}`,
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			capturedShellCmd = args[len(args)-1]
-			return exec.Command("true")
-		},
-	}
+	n := session.NewCmdNotifierForTest(`echo {message}`, func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedShellCmd = args[len(args)-1]
+		return exec.Command("true")
+	})
 
 	// when: message contains shell metacharacters
 	_ = n.Notify(context.Background(), "Title", `"; rm -rf /; echo "`)
@@ -195,7 +177,7 @@ func TestShellQuoteUnix(t *testing.T) {
 		{"", "''"},
 	}
 	for _, tt := range tests {
-		got := ShellQuoteUnix(tt.input)
+		got := session.ShellQuoteUnix(tt.input)
 		if got != tt.want {
 			t.Errorf("ShellQuoteUnix(%q) = %q, want %q", tt.input, got, tt.want)
 		}
@@ -215,7 +197,7 @@ func TestShellQuoteCmd(t *testing.T) {
 		{"", `""`},
 	}
 	for _, tt := range tests {
-		got := ShellQuoteCmd(tt.input)
+		got := session.ShellQuoteCmd(tt.input)
 		if got != tt.want {
 			t.Errorf("ShellQuoteCmd(%q) = %q, want %q", tt.input, got, tt.want)
 		}
@@ -225,13 +207,10 @@ func TestShellQuoteCmd(t *testing.T) {
 func TestCmdNotifier_Timeout(t *testing.T) {
 	// given — a command factory that captures the context deadline
 	var capturedCtx context.Context
-	n := &CmdNotifier{
-		cmdTemplate: `echo {message}`,
-		cmdFactory: func(ctx context.Context, name string, args ...string) *exec.Cmd {
-			capturedCtx = ctx
-			return exec.Command("true")
-		},
-	}
+	n := session.NewCmdNotifierForTest(`echo {message}`, func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		capturedCtx = ctx
+		return exec.Command("true")
+	})
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")
@@ -253,7 +232,7 @@ func TestCmdNotifier_Timeout(t *testing.T) {
 
 func TestCmdNotifier_EmptyTemplate(t *testing.T) {
 	// given
-	n := NewCmdNotifier("")
+	n := session.NewCmdNotifier("")
 
 	// when
 	err := n.Notify(context.Background(), "Title", "Message")

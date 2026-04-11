@@ -1,12 +1,11 @@
-package session
+package session_test
 
 import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
-
-// white-box-reason: session internals: tests unexported corrective metadata matching helper
 
 func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 	meta := domain.CorrectionMetadata{
@@ -19,7 +18,7 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 		CorrectiveAction: "retry",
 		RetryAllowed:     domain.BoolPtr(true),
 	}
-	expedition := &Expedition{
+	expedition := &session.Expedition{
 		InboxDMails: []domain.DMail{{
 			Name:     "feedback-1",
 			Wave:     &domain.WaveReference{ID: "wave-1", Step: "step-1"},
@@ -29,7 +28,7 @@ func TestCorrectionMetadataForReport_MatchesWaveTarget(t *testing.T) {
 	}
 	report := &domain.ExpeditionReport{IssueID: "ENG-1"}
 
-	got := correctionMetadataForReport(report, expedition)
+	got := session.ExportCorrectionMetadataForReport(report, expedition)
 
 	if got.CorrelationID != "corr-wave" {
 		t.Fatalf("CorrelationID = %q, want corr-wave", got.CorrelationID)
@@ -63,7 +62,7 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 		RetryAllowed:     domain.BoolPtr(false),
 		EscalationReason: "high-severity",
 	}
-	expedition := &Expedition{
+	expedition := &session.Expedition{
 		InboxDMails: []domain.DMail{{
 			Name:     "feedback-1",
 			Issues:   []string{"ENG-2"},
@@ -73,7 +72,7 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 	report := &domain.ExpeditionReport{IssueID: "ENG-2"}
 	mail := domain.DMail{Name: "pt-report-eng-2", Kind: "report", Description: "done"}
 
-	annotateReportDMail(&mail, report, expedition)
+	session.ExportAnnotateReportDMail(&mail, report, expedition)
 
 	got := domain.CorrectionMetadataFromMap(mail.Metadata)
 	if got.CorrelationID != "corr-issue" {
@@ -97,7 +96,7 @@ func TestAnnotateReportDMail_UsesIssueMatchFallback(t *testing.T) {
 }
 
 func TestCorrectionMetadataForReport_AcceptsLegacyV1WithoutSchemaVersion(t *testing.T) {
-	expedition := &Expedition{
+	expedition := &session.Expedition{
 		InboxDMails: []domain.DMail{{
 			Name:   "feedback-legacy",
 			Issues: []string{"ENG-3"},
@@ -111,7 +110,7 @@ func TestCorrectionMetadataForReport_AcceptsLegacyV1WithoutSchemaVersion(t *test
 	}
 	report := &domain.ExpeditionReport{IssueID: "ENG-3"}
 
-	got := correctionMetadataForReport(report, expedition)
+	got := session.ExportCorrectionMetadataForReport(report, expedition)
 
 	if got.ConsumerSchemaVersion() != domain.ImprovementSchemaVersion {
 		t.Fatalf("ConsumerSchemaVersion = %q, want %q", got.ConsumerSchemaVersion(), domain.ImprovementSchemaVersion)

@@ -7,8 +7,11 @@ package session
 
 import (
 	"context"
+	"testing"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 var ExportWatchFlag = watchFlag
@@ -59,3 +62,30 @@ func NewCmdNotifierForTest(cmdTemplate string, factory cmdFactoryFunc) *CmdNotif
 
 // ExportBuildIsolationFlags exposes buildIsolationFlags for contract testing.
 func ExportBuildIsolationFlags(cfg EnterConfig) []string { return buildIsolationFlags(cfg) }
+
+// ExportSetMaxWaitDuration overrides maxWaitDuration for external tests.
+func ExportSetMaxWaitDuration(d time.Duration) func() {
+	old := maxWaitDuration
+	maxWaitDuration = d
+	return func() { maxWaitDuration = old }
+}
+
+// ExportNewLocalGitExecutor returns a localGitExecutor as port.GitExecutor for external tests.
+func ExportNewLocalGitExecutor() port.GitExecutor {
+	return &localGitExecutor{}
+}
+
+// ExportInitGitRepoForWorktreeWithCommit wraps initGitRepoForWorktreeWithCommit for external tests.
+func ExportInitGitRepoForWorktreeWithCommit(t *testing.T) string {
+	return initGitRepoForWorktreeWithCommit(t)
+}
+
+// ExportCorrectionMetadataForReport wraps correctionMetadataForReport for external tests.
+func ExportCorrectionMetadataForReport(report *domain.ExpeditionReport, expedition *Expedition) domain.CorrectionMetadata {
+	return correctionMetadataForReport(report, expedition)
+}
+
+// ExportAnnotateReportDMail wraps annotateReportDMail for external tests.
+func ExportAnnotateReportDMail(mail *domain.DMail, report *domain.ExpeditionReport, expedition *Expedition) {
+	annotateReportDMail(mail, report, expedition)
+}

@@ -1,5 +1,4 @@
-// white-box-reason: tests WaitForDMail function
-package session
+package session_test
 
 import (
 	"context"
@@ -7,15 +6,8 @@ import (
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/session"
 )
-
-type nopLogger struct{}
-
-func (nopLogger) Info(_ string, _ ...any)  {}
-func (nopLogger) Warn(_ string, _ ...any)  {}
-func (nopLogger) OK(_ string, _ ...any)    {}
-func (nopLogger) Error(_ string, _ ...any) {}
-func (nopLogger) Debug(_ string, _ ...any) {}
 
 func TestWaitForDMail_ArrivalReturnsDMail(t *testing.T) {
 	// given
@@ -24,7 +16,7 @@ func TestWaitForDMail_ArrivalReturnsDMail(t *testing.T) {
 	ch <- sent
 
 	// when
-	got, err := WaitForDMail(context.Background(), ch, time.Minute, nopLogger{})
+	got, err := session.WaitForDMail(context.Background(), ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -46,7 +38,7 @@ func TestWaitForDMail_TimeoutReturnsNil(t *testing.T) {
 	ch := make(chan domain.DMail)
 
 	// when
-	got, err := WaitForDMail(context.Background(), ch, 10*time.Millisecond, nopLogger{})
+	got, err := session.WaitForDMail(context.Background(), ch, 10*time.Millisecond, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -64,7 +56,7 @@ func TestWaitForDMail_CancelReturnsNil(t *testing.T) {
 	cancel()
 
 	// when
-	got, err := WaitForDMail(ctx, ch, time.Minute, nopLogger{})
+	got, err := session.WaitForDMail(ctx, ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -81,7 +73,7 @@ func TestWaitForDMail_ClosedChannelReturnsNil(t *testing.T) {
 	close(ch)
 
 	// when
-	got, err := WaitForDMail(context.Background(), ch, time.Minute, nopLogger{})
+	got, err := session.WaitForDMail(context.Background(), ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
@@ -94,14 +86,13 @@ func TestWaitForDMail_ClosedChannelReturnsNil(t *testing.T) {
 
 func TestWaitForDMail_ZeroTimeout_UsesMaxWaitDuration(t *testing.T) {
 	// given — timeout=0 should use maxWaitDuration safety cap, not block forever
-	old := maxWaitDuration
-	maxWaitDuration = 20 * time.Millisecond
-	t.Cleanup(func() { maxWaitDuration = old })
+	restore := session.ExportSetMaxWaitDuration(20 * time.Millisecond)
+	t.Cleanup(restore)
 	ch := make(chan domain.DMail) // no D-Mail will arrive
 
 	// when
 	start := time.Now()
-	got, err := WaitForDMail(context.Background(), ch, 0, nopLogger{})
+	got, err := session.WaitForDMail(context.Background(), ch, 0, &domain.NopLogger{})
 	elapsed := time.Since(start)
 
 	// then — should return within safety cap, not hang
@@ -131,7 +122,7 @@ func TestWaitForDMail_PreservesAllFields(t *testing.T) {
 	ch <- sent
 
 	// when
-	got, err := WaitForDMail(context.Background(), ch, time.Minute, nopLogger{})
+	got, err := session.WaitForDMail(context.Background(), ch, time.Minute, &domain.NopLogger{})
 
 	// then
 	if err != nil {
