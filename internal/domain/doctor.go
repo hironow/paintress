@@ -11,6 +11,19 @@ const (
 	CheckFixed
 )
 
+// DoctorCheck holds the outcome of a single doctor check.
+type DoctorCheck struct {
+	Name    string
+	Status  CheckStatus
+	Message string
+	Hint    string // optional remediation hint shown on failure
+}
+
+// DoctorMetrics holds computed metrics for a repository.
+type DoctorMetrics struct {
+	SuccessRate string `json:"success_rate"`
+}
+
 // StatusLabel returns a display string for the check status.
 func (s CheckStatus) StatusLabel() string {
 	switch s {
