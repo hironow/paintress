@@ -28,7 +28,7 @@ func EnsureRunDir(stateDir string) error {
 // eventsource is the event persistence adapter (AWS Event Sourcing pattern).
 // cmd layer should use this instead of importing eventsource directly (ADR S0008).
 func NewEventStore(stateDir string, logger domain.Logger) port.EventStore {
-	raw := eventsource.NewFileEventStore(filepath.Join(stateDir, "events"), logger)
+	raw := eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)
 	return NewSpanEventStore(raw)
 }
 
@@ -52,7 +52,7 @@ func EnsureCutover(ctx context.Context, stateDir, aggregateType string, logger d
 		return nil, fmt.Errorf("ensure cutover: seq counter: %w", err)
 	}
 	ss := eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
-	raw := eventsource.NewFileEventStore(filepath.Join(stateDir, "events"), logger)
+	raw := eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)
 	if _, err := eventsource.RunCutover(ctx, raw, ss, sc, aggregateType, logger); err != nil {
 		sc.Close()
 		return nil, fmt.Errorf("ensure cutover: %w", err)

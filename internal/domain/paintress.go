@@ -81,16 +81,3 @@ type PruneResult struct {
 	Deleted    int      // number of files actually removed (0 in dry-run)
 }
 
-// DoctorCheck represents the result of checking a single external command.
-// DoctorCheck holds the outcome of a single doctor check.
-type DoctorCheck struct {
-	Name    string
-	Status  CheckStatus
-	Message string
-	Hint    string
-}
-
-// DoctorMetrics holds computed metrics for a repository.
-type DoctorMetrics struct {
-	SuccessRate string `json:"success_rate"`
-}
