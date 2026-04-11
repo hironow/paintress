@@ -1,19 +1,19 @@
-package session
-
-// white-box-reason: session internals: tests AcquireContext and worktree health check behavior
+package session_test
 
 import (
 	"context"
 	"testing"
+
+	"github.com/hironow/paintress/internal/session"
 )
 
 // TestAcquireContext_HealthyWorktreeReturnsPath verifies AcquireContext returns
 // a valid worktree path when the worktree is healthy.
 func TestAcquireContext_HealthyWorktreeReturnsPath(t *testing.T) {
 	// given: a real worktree pool with one healthy worktree
-	dir := initGitRepoForWorktreeWithCommit(t)
-	git := &localGitExecutor{}
-	pool := NewWorktreePool(git, dir, "main", "", 1)
+	dir := session.ExportInitGitRepoForWorktreeWithCommit(t)
+	git := session.ExportNewLocalGitExecutor()
+	pool := session.NewWorktreePool(git, dir, "main", "", 1)
 	if err := pool.Init(context.Background()); err != nil {
 		t.Fatalf("pool.Init: %v", err)
 	}
@@ -38,9 +38,9 @@ func TestAcquireContext_HealthyWorktreeReturnsPath(t *testing.T) {
 // returns an error when the context is canceled before a worktree is available.
 func TestAcquireContext_CanceledContextReturnsError(t *testing.T) {
 	// given: pool with no available worktrees (all acquired)
-	dir := initGitRepoForWorktreeWithCommit(t)
-	git := &localGitExecutor{}
-	pool := NewWorktreePool(git, dir, "main", "", 1)
+	dir := session.ExportInitGitRepoForWorktreeWithCommit(t)
+	git := session.ExportNewLocalGitExecutor()
+	pool := session.NewWorktreePool(git, dir, "main", "", 1)
 	if err := pool.Init(context.Background()); err != nil {
 		t.Fatalf("pool.Init: %v", err)
 	}
@@ -70,9 +70,9 @@ func TestAcquireContext_CanceledContextReturnsError(t *testing.T) {
 // still functions as a convenience wrapper around AcquireContext.
 func TestAcquire_LegacyWrapperStillWorks(t *testing.T) {
 	// given
-	dir := initGitRepoForWorktreeWithCommit(t)
-	git := &localGitExecutor{}
-	pool := NewWorktreePool(git, dir, "main", "", 1)
+	dir := session.ExportInitGitRepoForWorktreeWithCommit(t)
+	git := session.ExportNewLocalGitExecutor()
+	pool := session.NewWorktreePool(git, dir, "main", "", 1)
 	if err := pool.Init(context.Background()); err != nil {
 		t.Fatalf("pool.Init: %v", err)
 	}

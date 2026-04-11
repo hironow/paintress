@@ -1128,13 +1128,13 @@ func TestCheckSkillsRefToolchain_SubDirExistsButNotOnPath(t *testing.T) {
 		return "", fmt.Errorf("not found: %s", cmd)
 	})
 	defer restoreLookPath()
-	restoreFindDir := session.OverrideFindSkillsRefDir(func() string {
+	restoreFindDir := session.OverrideFindSkillsRefDir(func(_ string) string {
 		return "/some/path/skills-ref"
 	})
 	defer restoreFindDir()
 
 	// when
-	checks := session.ExportCheckSkillsRefToolchain(false)
+	checks := session.ExportCheckSkillsRefToolchain(t.TempDir(), false)
 
 	// then — should be WARN, not OK
 	if len(checks) == 0 {
@@ -1157,7 +1157,7 @@ func TestCheckSkillsRefToolchain_InstallSuccessButNotOnPath(t *testing.T) {
 		return "", fmt.Errorf("not found: %s", cmd)
 	})
 	defer restoreLookPath()
-	restoreFindDir := session.OverrideFindSkillsRefDir(func() string {
+	restoreFindDir := session.OverrideFindSkillsRefDir(func(_ string) string {
 		return ""
 	})
 	defer restoreFindDir()
@@ -1167,7 +1167,7 @@ func TestCheckSkillsRefToolchain_InstallSuccessButNotOnPath(t *testing.T) {
 	defer restoreInstall()
 
 	// when — repair=true
-	checks := session.ExportCheckSkillsRefToolchain(true)
+	checks := session.ExportCheckSkillsRefToolchain(t.TempDir(), true)
 
 	// then — should be WARN (install succeeded but not on PATH)
 	if len(checks) == 0 {
