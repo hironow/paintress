@@ -2,10 +2,8 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -132,25 +130,6 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-// resolveRepoPath returns the absolute path from the first arg or cwd.
-// Validates that the path exists and is a directory.
-func resolveRepoPath(args []string) (string, error) {
-	if len(args) > 0 {
-		abs, err := filepath.Abs(args[0])
-		if err != nil {
-			return "", fmt.Errorf("resolve path: %w", err)
-		}
-		info, err := os.Stat(abs)
-		if err != nil {
-			return "", fmt.Errorf("path not found: %w", err)
-		}
-		if !info.IsDir() {
-			return "", fmt.Errorf("not a directory: %s", abs)
-		}
-		return abs, nil
-	}
-	return os.Getwd()
-}
 
 // loggerFrom extracts the domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).

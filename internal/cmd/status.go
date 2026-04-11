@@ -28,7 +28,7 @@ Use -o json for machine-readable JSON output to stdout.`,
   paintress status -o json /path/to/repo`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			baseDir, err := resolveRepoPath(args)
+			baseDir, err := resolveTargetDir(args)
 			if err != nil {
 				return err
 			}

@@ -304,6 +304,14 @@ clean:
     rm -rf dist/ coverage.out
     go clean
 
+# Validate goreleaser config
+release-check:
+    goreleaser check
+
+# Snapshot GoReleaser build (no publish)
+release-snapshot:
+    goreleaser release --snapshot --clean
+
 # Tag a new release (validates semver, clean state, no regression)
 release version:
     #!/usr/bin/env bash

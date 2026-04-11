@@ -55,7 +55,7 @@ Use --execute to perform actual deletion.`,
 }
 
 func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
-	repoPath, err := resolveRepoPath(args)
+	repoPath, err := resolveTargetDir(args)
 	if err != nil {
 		return err
 	}
