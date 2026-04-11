@@ -211,16 +211,26 @@ func (s *SQLiteOutboxStore) Flush(ctx context.Context) (int, error) {
 		flushed++
 	}
 
+	// Count dead-letter items before committing (while we hold the conn).
+	var deadCount int
+	if scanErr := conn.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM staged WHERE flushed = 0 AND retry_count >= ?`, maxRetryCount).Scan(&deadCount); scanErr != nil {
+		span.RecordError(scanErr)
+		span.SetAttributes(attribute.String("error.stage", "outbox.dead_letter_count"))
+	}
+
 	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "outbox.flush"))
 		return 0, fmt.Errorf("outbox store: commit: %w", err)
 	}
 	committed = true
-	span.SetAttributes(
-		attribute.Int("flush.success.count", flushed),
-		attribute.Int("flush.retry.count", retryCount),
-	)
+	span.SetAttributes(attribute.Int("flush.retry.count", retryCount))
+	span.SetAttributes(attribute.Int("flush.success.count", flushed))
+	if deadCount > 0 {
+		span.SetAttributes(attribute.Int("flush.dead_letter.count", deadCount))
+	}
+
 	return flushed, nil
 }
 
