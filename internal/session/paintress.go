@@ -222,7 +222,7 @@ func SharedStreamBus() port.SessionStreamPublisher {
 // This is the standard path for resumable provider-backed invocations.
 // Retry is NOT included — paintress manages retry at the expedition level.
 // Store ownership: caller-owned via the returned *SQLiteCodingSessionStore.
-// The caller MUST close the store when the runner is no longer needed (see CloseRunner).
+// The caller MUST nil-check store before calling store.Close().
 // Best-effort: if the session store cannot be opened, returns (adapter, nil).
 func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
 	adapter := &ClaudeAdapter{
@@ -233,15 +233,29 @@ func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (po
 		StreamBus:  sharedStreamBus,
 		ToolName:   "paintress",
 	}
-	dbPath := filepath.Join(cfg.Continent, domain.StateDir, ".run", "sessions.db")
+	return WrapWithSessionTracking(adapter, cfg.Continent, domain.ProviderClaudeCode, logger)
+}
+
+// WrapWithSessionTracking adds session persistence to a ClaudeRunner.
+// The runner must also implement DetailedRunner for session ID capture.
+// Best-effort: returns (runner, nil) when the session store cannot be opened
+// or the runner does not implement DetailedRunner.
+// Caller MUST nil-check store before calling store.Close().
+// This is the canonical factory helper shared across all AI coding tools.
+func WrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+	detailed, ok := runner.(port.DetailedRunner)
+	if !ok {
+		return runner, nil
+	}
+	dbPath := filepath.Join(baseDir, domain.StateDir, ".run", "sessions.db")
 	store, err := NewSQLiteCodingSessionStore(dbPath)
 	if err != nil {
 		if logger != nil {
 			logger.Debug("session tracking unavailable: %v", err)
 		}
-		return adapter, nil
+		return runner, nil
 	}
-	return NewSessionTrackingAdapter(adapter, store, domain.ProviderClaudeCode), store
+	return NewSessionTrackingAdapter(detailed, store, provider), store
 }
 
 // CloseRunner closes the underlying session store opened by NewTrackedRunner.
