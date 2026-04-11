@@ -25,6 +25,7 @@ and can be listed, filtered, and re-entered interactively.
 ### Options inherited from parent commands
 
 ```
+  -c, --config string   Config file path
   -l, --lang string     Output language: en, ja (default from config)
       --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)

@@ -85,8 +85,8 @@ func TestSessionsEnter_ByConfigFlag(t *testing.T) {
 
 	var stderr bytes.Buffer
 	rootCmd := NewRootCommand()
-	// Use --config to point to the custom config explicitly
-	rootCmd.SetArgs([]string{"sessions", "enter", "--config", configPath, rec.ID})
+	// Use --config at root level (canonical: root persistent flag, not sessions local)
+	rootCmd.SetArgs([]string{"--config", configPath, "sessions", "enter", rec.ID})
 	rootCmd.SetOut(&bytes.Buffer{})
 	rootCmd.SetErr(&stderr)
 

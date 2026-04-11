@@ -103,6 +103,7 @@ func NewRootCommand() *cobra.Command {
 		})
 	})
 
+	rootCmd.PersistentFlags().StringP("config", "c", "", "Config file path")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (respects NO_COLOR env)")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress all stderr output")

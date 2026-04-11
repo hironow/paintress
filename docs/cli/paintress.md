@@ -9,6 +9,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 ### Options
 
 ```
+  -c, --config string   Config file path
   -h, --help            help for paintress
   -l, --lang string     Output language: en, ja (default from config)
       --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
