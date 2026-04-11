@@ -9,7 +9,6 @@ paintress sessions list [flags]
 ### Options
 
 ```
-      --config string   Config file path (overrides default <stateDir>/config.yaml)
   -h, --help            help for list
       --limit int       Max results (default 20)
       --path string     Repository root path
@@ -19,6 +18,7 @@ paintress sessions list [flags]
 ### Options inherited from parent commands
 
 ```
+  -c, --config string   Config file path
   -l, --lang string     Output language: en, ja (default from config)
       --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)

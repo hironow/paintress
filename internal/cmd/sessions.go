@@ -90,7 +90,6 @@ func newSessionsListCommand() *cobra.Command {
 	cmd.Flags().StringVar(&statusFilter, "status", "", "Filter by status (running, completed, failed, abandoned)")
 	cmd.Flags().IntVar(&limit, "limit", 20, "Max results")
 	cmd.Flags().StringVar(&repoPath, "path", "", "Repository root path")
-	cmd.Flags().String("config", "", "Config file path (overrides default <stateDir>/config.yaml)")
 	return cmd
 }
 
@@ -160,6 +159,5 @@ func newSessionsEnterCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&providerID, "provider-id", "", "Resume by provider session ID directly")
 	cmd.Flags().StringVar(&repoPath, "path", "", "Repository root path")
-	cmd.Flags().String("config", "", "Config file path (overrides default <stateDir>/config.yaml)")
 	return cmd
 }

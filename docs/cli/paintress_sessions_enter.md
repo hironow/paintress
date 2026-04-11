@@ -9,7 +9,6 @@ paintress sessions enter [session-record-id] [flags]
 ### Options
 
 ```
-      --config string        Config file path (overrides default <stateDir>/config.yaml)
   -h, --help                 help for enter
       --path string          Repository root path
       --provider-id string   Resume by provider session ID directly
@@ -18,6 +17,7 @@ paintress sessions enter [session-record-id] [flags]
 ### Options inherited from parent commands
 
 ```
+  -c, --config string   Config file path
   -l, --lang string     Output language: en, ja (default from config)
       --linear          Use Linear MCP for issue tracking (default: wave-centric mode)
       --no-color        Disable colored output (respects NO_COLOR env)
