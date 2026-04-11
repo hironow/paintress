@@ -16,7 +16,7 @@ import (
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// scriptRunner implements port.ClaudeRunner by executing a shell script.
+// scriptRunner implements port.ProviderRunner by executing a shell script.
 // It passes the prompt via -p flag so test scripts can extract it.
 type scriptRunner struct {
 	script string

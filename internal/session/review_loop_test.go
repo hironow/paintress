@@ -20,7 +20,7 @@ import (
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// shellRunner implements port.ClaudeRunner by executing a shell script directly.
+// shellRunner implements port.ProviderRunner by executing a shell script directly.
 // Used in white-box tests as a replacement for ClaudeAdapter to avoid stream-json parsing.
 type shellRunner struct {
 	script string

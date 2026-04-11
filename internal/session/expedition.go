@@ -226,12 +226,12 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 
 	model := e.Reserve.ActiveModel()
 
-	expCtx, invokeSpan := platform.Tracer.Start(expCtx, "claude.invoke",
+	expCtx, invokeSpan := platform.Tracer.Start(expCtx, "provider.invoke",
 		trace.WithAttributes(
 			append([]attribute.KeyValue{
-				attribute.String("claude.model", platform.SanitizeUTF8(model)),
+				attribute.String("provider.model", platform.SanitizeUTF8(model)),
 				attribute.Int("expedition.number", e.Number),
-				attribute.Int("claude.timeout_sec", e.Config.TimeoutSec),
+				attribute.Int("provider.timeout_sec", e.Config.TimeoutSec),
 			}, platform.GenAISpanAttrs(model)...)...,
 		),
 	)

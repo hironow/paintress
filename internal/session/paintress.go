@@ -82,7 +82,7 @@ type Paintress struct {
 	notifier    port.Notifier
 	approver    port.Approver
 	outboxStore port.OutboxStore // transactional outbox for D-Mail delivery
-	claude      port.ClaudeRunner
+	claude      port.ProviderRunner
 	seqAlloc    port.SeqAllocator
 
 	// Retry tracking: maps sorted issue keys to attempt count
@@ -224,7 +224,7 @@ func SharedStreamBus() port.SessionStreamPublisher {
 // Store ownership: caller-owned via the returned *SQLiteCodingSessionStore.
 // The caller MUST nil-check store before calling store.Close().
 // Best-effort: if the session store cannot be opened, returns (adapter, nil).
-func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
 	adapter := &ClaudeAdapter{
 		ClaudeCmd:  cfg.ClaudeCmd,
 		Model:      model,
@@ -236,13 +236,13 @@ func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (po
 	return WrapWithSessionTracking(adapter, cfg.Continent, domain.ProviderClaudeCode, logger)
 }
 
-// WrapWithSessionTracking adds session persistence to a ClaudeRunner.
+// WrapWithSessionTracking adds session persistence to a ProviderRunner.
 // The runner must also implement DetailedRunner for session ID capture.
 // Best-effort: returns (runner, nil) when the session store cannot be opened
 // or the runner does not implement DetailedRunner.
 // Caller MUST nil-check store before calling store.Close().
 // This is the canonical factory helper shared across all AI coding tools.
-func WrapWithSessionTracking(runner port.ClaudeRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ClaudeRunner, *SQLiteCodingSessionStore) {
+func WrapWithSessionTracking(runner port.ProviderRunner, baseDir string, provider domain.Provider, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
 	detailed, ok := runner.(port.DetailedRunner)
 	if !ok {
 		return runner, nil

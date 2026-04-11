@@ -20,7 +20,7 @@ func (*projectOps) LoadProjectConfig(absPath string) (*domain.ProjectConfig, err
 	return LoadProjectConfig(absPath)
 }
 
-func (*projectOps) FetchIssuesViaMCP(ctx context.Context, runner port.ClaudeRunner, team, project, workDir string) ([]domain.Issue, error) {
+func (*projectOps) FetchIssuesViaMCP(ctx context.Context, runner port.ProviderRunner, team, project, workDir string) ([]domain.Issue, error) {
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		return nil, fmt.Errorf("create work dir: %w", err)
 	}
