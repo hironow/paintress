@@ -54,7 +54,7 @@ func TestExpedition_Run_RecordsPromptBuildDurationOnSpan(t *testing.T) {
 	spans := exporter.GetSpans()
 	var found bool
 	for _, s := range spans {
-		if s.Name != "claude.invoke" {
+		if s.Name != "provider.invoke" {
 			continue
 		}
 		for _, attr := range s.Attributes {

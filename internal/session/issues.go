@@ -18,7 +18,7 @@ import (
 
 // FetchIssuesViaMCP invokes Claude CLI with Linear MCP tools to fetch issues.
 // Claude writes the result as a JSON array to a temp file in workDir.
-func FetchIssuesViaMCP(ctx context.Context, runner port.ClaudeRunner, team, project, workDir string) ([]domain.Issue, error) {
+func FetchIssuesViaMCP(ctx context.Context, runner port.ProviderRunner, team, project, workDir string) ([]domain.Issue, error) {
 	ctx, span := platform.Tracer.Start(ctx, "paintress.issues")
 	defer span.End()
 

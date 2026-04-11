@@ -175,7 +175,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 	spans := exporter.GetSpans()
 	var found bool
 	for _, s := range spans {
-		if s.Name == "claude.invoke" {
+		if s.Name == "provider.invoke" {
 			for _, ev := range s.Events {
 				if ev.Name == "expedition.timeout" {
 					found = true
@@ -214,7 +214,7 @@ func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
 			}
 
 			// Cross-tool conformance: claude.model and claude.timeout_sec must be present
-			conformanceAttrs := []string{"claude.model", "claude.timeout_sec"}
+			conformanceAttrs := []string{"provider.model", "provider.timeout_sec"}
 			for _, key := range conformanceAttrs {
 				var attrFound bool
 				for _, attr := range s.Attributes {

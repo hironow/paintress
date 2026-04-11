@@ -10,7 +10,7 @@ import (
 )
 
 // FetchIssues loads project config and fetches Linear issues via the project ops interface.
-func FetchIssues(ctx context.Context, absPath string, runner port.ClaudeRunner, stateFilter []string, ops port.ProjectOps) ([]domain.Issue, error) {
+func FetchIssues(ctx context.Context, absPath string, runner port.ProviderRunner, stateFilter []string, ops port.ProjectOps) ([]domain.Issue, error) {
 	cfg, err := ops.LoadProjectConfig(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
