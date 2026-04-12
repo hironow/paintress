@@ -184,7 +184,14 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		retryTracker:    harness.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
 	}
-	runner, sessStore := NewTrackedRunner(cfgCopy, primary, logger)
+	pac := ProviderAdapterConfig{
+		Cmd:        cfgCopy.ClaudeCmd,
+		Model:      primary,
+		TimeoutSec: cfgCopy.TimeoutSec,
+		BaseDir:    cfgCopy.Continent,
+		ToolName:   "paintress",
+	}
+	runner, sessStore := NewTrackedRunner(pac, logger)
 	p.claude = runner
 	p.sessionStore = sessStore
 
@@ -219,21 +226,21 @@ func SharedStreamBus() port.SessionStreamPublisher {
 }
 
 // NewTrackedRunner creates a ClaudeAdapter wrapped with session tracking.
-// This is the standard path for resumable provider-backed invocations.
+// Accepts the canonical ProviderAdapterConfig shape (same as amadeus).
 // Retry is NOT included — paintress manages retry at the expedition level.
 // Store ownership: caller-owned via the returned *SQLiteCodingSessionStore.
 // The caller MUST nil-check store before calling store.Close().
 // Best-effort: if the session store cannot be opened, returns (adapter, nil).
-func NewTrackedRunner(cfg domain.Config, model string, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
+func NewTrackedRunner(pac ProviderAdapterConfig, logger domain.Logger) (port.ProviderRunner, *SQLiteCodingSessionStore) {
 	adapter := &ClaudeAdapter{
-		ClaudeCmd:  cfg.ClaudeCmd,
-		Model:      model,
-		TimeoutSec: cfg.TimeoutSec,
+		ClaudeCmd:  pac.Cmd,
+		Model:      pac.Model,
+		TimeoutSec: pac.TimeoutSec,
 		Logger:     logger,
 		StreamBus:  sharedStreamBus,
-		ToolName:   "paintress",
+		ToolName:   pac.ToolName,
 	}
-	return WrapWithSessionTracking(adapter, cfg.Continent, domain.ProviderClaudeCode, logger)
+	return WrapWithSessionTracking(adapter, pac.BaseDir, domain.ProviderClaudeCode, logger)
 }
 
 // WrapWithSessionTracking adds session persistence to a ProviderRunner.

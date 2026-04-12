@@ -50,7 +50,7 @@ func TestExpedition_Run_RecordsPromptBuildDurationOnSpan(t *testing.T) {
 	// when
 	e.Run(ctx)
 
-	// then: the claude.invoke span must have expedition.prompt_build_ms attribute
+	// then: the provider.invoke span must have expedition.prompt_build_ms attribute
 	spans := exporter.GetSpans()
 	var found bool
 	for _, s := range spans {
@@ -71,6 +71,6 @@ func TestExpedition_Run_RecordsPromptBuildDurationOnSpan(t *testing.T) {
 		for _, s := range spans {
 			names = append(names, s.Name)
 		}
-		t.Errorf("expected expedition.prompt_build_ms attribute on claude.invoke span, spans seen: %v", names)
+		t.Errorf("expected expedition.prompt_build_ms attribute on provider.invoke span, spans seen: %v", names)
 	}
 }
