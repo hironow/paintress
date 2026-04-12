@@ -442,5 +442,41 @@ func TestRetryRunner_RunDetailed_FallsBackToRun(t *testing.T) {
 	}
 }
 
+// fakePartialOutputRunner returns non-empty output even when returning an error.
+// This exercises the contract that Run preserves partial output on failure.
+type fakePartialOutputRunner struct {
+	output string
+	err    error
+}
+
+func (f *fakePartialOutputRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	return f.output, f.err
+}
+
+func TestRetryRunner_PreservesPartialOutputOnError(t *testing.T) {
+	// given: inner runner returns partial output alongside an error
+	inner := &fakePartialOutputRunner{
+		output: "partial-result",
+		err:    errors.New("provider failed"),
+	}
+	runner := &session.RetryRunner{
+		Inner:       inner,
+		MaxAttempts: 1,
+		BaseDelay:   0,
+		Logger:      &domain.NopLogger{},
+	}
+
+	// when
+	output, err := runner.Run(context.Background(), "test", io.Discard)
+
+	// then: error is returned AND partial output is preserved
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if output != "partial-result" {
+		t.Errorf("expected partial output preserved, got %q", output)
+	}
+}
+
 // Verify RetryRunner satisfies the ProviderRunner interface at compile time.
 var _ port.ProviderRunner = (*session.RetryRunner)(nil)

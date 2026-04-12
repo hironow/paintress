@@ -103,10 +103,7 @@ func (r *RetryRunner) Run(ctx context.Context, prompt string, w io.Writer, opts 
 		output, runErr = r.Inner.Run(ctx, prompt, w, opts...)
 		return runErr
 	})
-	if err != nil {
-		return "", err
-	}
-	return output, nil
+	return output, err
 }
 
 // RunDetailed executes the inner runner with retry, returning the last RunResult.
