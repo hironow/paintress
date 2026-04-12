@@ -34,22 +34,25 @@ func (r *RetryRunner) logger() domain.Logger {
 }
 
 // retryLoop executes fn with exponential backoff retry.
-// The entire loop is bounded by Timeout.
+// The entire loop is bounded by Timeout. fn receives the current attempt number.
 func (r *RetryRunner) retryLoop(ctx context.Context, fn func(ctx context.Context, attempt int) error) error {
 	maxAttempts := r.MaxAttempts
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
+
 	if r.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
 		defer cancel()
 	}
+
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		// Circuit breaker: skip remaining retries when rate-limited
 		if r.CircuitBreaker != nil {
 			if cbErr := r.CircuitBreaker.Allow(ctx); cbErr != nil {
 				attrs := []attribute.KeyValue{
