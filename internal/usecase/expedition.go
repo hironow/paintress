@@ -2,6 +2,9 @@ package usecase
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/harness"
@@ -24,8 +27,10 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
 	}
 	registerExpeditionPolicies(engine, logger, notifier, metrics)
 
+	expeditionID := fmt.Sprintf("expedition-%d-%d", time.Now().UnixMilli(), os.Getpid())
 	agg := domain.NewExpeditionAggregate()
-	emitter := NewExpeditionEventEmitter(ctx, agg, eventStore, engine, logger)
+	agg.SetExpeditionID(expeditionID)
+	emitter := NewExpeditionEventEmitter(ctx, agg, eventStore, engine, logger, expeditionID)
 	runner.SetEmitter(emitter)
 
 	// Wire pre-flight triage if archiver is available

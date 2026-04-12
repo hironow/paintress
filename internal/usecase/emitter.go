@@ -13,12 +13,14 @@ import (
 // It wraps the aggregate + event store + dispatcher.
 // Emit chain: agg.Record*() → store.Append() → dispatch (best-effort).
 type expeditionEventEmitter struct {
-	agg        *domain.ExpeditionAggregate
-	store      port.EventStore
-	dispatcher port.EventDispatcher
-	logger     domain.Logger
-	seqAlloc   port.SeqAllocator
-	ctx        context.Context //nolint:containedctx // stored for trace propagation into emit chain
+	agg          *domain.ExpeditionAggregate
+	store        port.EventStore
+	dispatcher   port.EventDispatcher
+	logger       domain.Logger
+	seqAlloc     port.SeqAllocator
+	expeditionID string // enriches events with correlation metadata
+	prevID       string // previous event ID for causation chain
+	ctx          context.Context //nolint:containedctx // stored for trace propagation into emit chain
 }
 
 // SetSeqAllocator injects a SeqAllocator for SeqNr allocation into emitted events.
@@ -34,21 +36,27 @@ func NewExpeditionEventEmitter(
 	store port.EventStore,
 	dispatcher port.EventDispatcher,
 	logger domain.Logger,
+	expeditionID string,
 ) port.ExpeditionEventEmitter {
 	return &expeditionEventEmitter{
-		agg:        agg,
-		store:      store,
-		dispatcher: dispatcher,
-		logger:     logger,
-		ctx:        ctx,
+		agg:          agg,
+		store:        store,
+		dispatcher:   dispatcher,
+		logger:       logger,
+		expeditionID: expeditionID,
+		ctx:          ctx,
 	}
 }
 
-// emit persists events and dispatches (best-effort).
+// emit enriches events with correlation metadata, persists, and dispatches.
 func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
 	ctx := e.ctx
-	if e.seqAlloc != nil {
-		for i := range events {
+	for i := range events {
+		events[i].CorrelationID = e.expeditionID
+		if e.prevID != "" {
+			events[i].CausationID = e.prevID
+		}
+		if e.seqAlloc != nil {
 			seq, err := e.seqAlloc.AllocSeqNr(ctx)
 			if err != nil {
 				return fmt.Errorf("alloc seq nr: %w", err)
@@ -60,6 +68,10 @@ func (e *expeditionEventEmitter) emit(events ...domain.Event) error {
 		if _, err := e.store.Append(ctx, events...); err != nil {
 			return fmt.Errorf("append events: %w", err)
 		}
+	}
+	// Update causation chain after successful store
+	if len(events) > 0 {
+		e.prevID = events[len(events)-1].ID
 	}
 	if e.dispatcher != nil {
 		for _, ev := range events {

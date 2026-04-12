@@ -11,6 +11,7 @@ const AggregateTypeExpedition = "expedition"
 // ExpeditionAggregate owns expedition lifecycle state and produces events.
 // It tracks consecutive failures for gommage decisions and gradient state.
 type ExpeditionAggregate struct {
+	expeditionID        string
 	consecutiveFailures int
 	escalationFired     bool
 	recoveryAttempts    int
@@ -22,6 +23,16 @@ func NewExpeditionAggregate() *ExpeditionAggregate {
 	return &ExpeditionAggregate{}
 }
 
+// SetExpeditionID sets the expedition ID (used for event correlation).
+func (a *ExpeditionAggregate) SetExpeditionID(id string) {
+	a.expeditionID = id
+}
+
+// ExpeditionID returns the current expedition ID.
+func (a *ExpeditionAggregate) ExpeditionID() string {
+	return a.expeditionID
+}
+
 // nextEvent creates an event tagged with expedition aggregate identity.
 func (a *ExpeditionAggregate) nextEvent(eventType EventType, data any, now time.Time) (Event, error) {
 	a.seqNr++
@@ -29,6 +40,7 @@ func (a *ExpeditionAggregate) nextEvent(eventType EventType, data any, now time.
 	if err != nil {
 		return ev, err
 	}
+	ev.AggregateID = a.expeditionID
 	ev.AggregateType = AggregateTypeExpedition
 	ev.SeqNr = a.seqNr
 	return ev, nil
