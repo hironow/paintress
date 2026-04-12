@@ -184,13 +184,7 @@ func NewPaintress(cfg domain.Config, logger domain.Logger, dataOut io.Writer, er
 		retryTracker:    harness.NewRetryTracker(),
 		recoveryDecider: recoveryDecider,
 	}
-	pac := ProviderAdapterConfig{
-		Cmd:        cfgCopy.ClaudeCmd,
-		Model:      primary,
-		TimeoutSec: cfgCopy.TimeoutSec,
-		BaseDir:    cfgCopy.Continent,
-		ToolName:   "paintress",
-	}
+	pac := AdapterConfigFromProjectConfig(cfgCopy, primary)
 	runner, sessStore := NewTrackedRunner(pac, logger)
 	p.claude = runner
 	p.sessionStore = sessStore
