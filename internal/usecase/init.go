@@ -7,6 +7,10 @@ import (
 
 // RunInit delegates project initialization to the InitRunner port.
 // The InitCommand is already valid by construction (parse-don't-validate).
-func RunInit(cmd domain.InitCommand, runner port.InitRunner) error {
-	return runner.InitProject(cmd.RepoPath().String(), cmd.Team().String(), cmd.Project().String())
+func RunInit(cmd domain.InitCommand, runner port.InitRunner) ([]string, error) {
+	return runner.InitProject(
+		cmd.RepoPath().String(),
+		port.WithTeam(cmd.Team().String()),
+		port.WithProject(cmd.Project().String()),
+	)
 }

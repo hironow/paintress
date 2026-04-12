@@ -6,22 +6,21 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/usecase"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 type stubInitRunner struct {
-	called   bool
-	repoPath string
-	team     string
-	project  string
-	err      error
+	called  bool
+	baseDir string
+	config  port.InitConfig
+	err     error
 }
 
-func (s *stubInitRunner) InitProject(repoPath, team, project string) error {
+func (s *stubInitRunner) InitProject(baseDir string, opts ...port.InitOption) ([]string, error) {
 	s.called = true
-	s.repoPath = repoPath
-	s.team = team
-	s.project = project
-	return s.err
+	s.baseDir = baseDir
+	s.config = port.ApplyInitOptions(opts...)
+	return nil, s.err
 }
 
 func TestRunInit_ValidCommand(t *testing.T) {
@@ -29,7 +28,7 @@ func TestRunInit_ValidCommand(t *testing.T) {
 	rp, _ := domain.NewRepoPath("/tmp/repo")
 	cmd := domain.NewInitCommand(rp, domain.NewTeam("MY"), domain.NewProject("Hades"))
 
-	err := usecase.RunInit(cmd, runner)
+	_, err := usecase.RunInit(cmd, runner)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -37,14 +36,14 @@ func TestRunInit_ValidCommand(t *testing.T) {
 	if !runner.called {
 		t.Fatal("expected InitProject to be called")
 	}
-	if runner.repoPath != "/tmp/repo" {
-		t.Errorf("expected repoPath /tmp/repo, got %q", runner.repoPath)
+	if runner.baseDir != "/tmp/repo" {
+		t.Errorf("expected baseDir /tmp/repo, got %q", runner.baseDir)
 	}
-	if runner.team != "MY" {
-		t.Errorf("expected team MY, got %q", runner.team)
+	if runner.config.Team != "MY" {
+		t.Errorf("expected team MY, got %q", runner.config.Team)
 	}
-	if runner.project != "Hades" {
-		t.Errorf("expected project Hades, got %q", runner.project)
+	if runner.config.Project != "Hades" {
+		t.Errorf("expected project Hades, got %q", runner.config.Project)
 	}
 }
 
@@ -53,7 +52,7 @@ func TestRunInit_RunnerError(t *testing.T) {
 	rp, _ := domain.NewRepoPath("/tmp/repo")
 	cmd := domain.NewInitCommand(rp, domain.NewTeam(""), domain.NewProject(""))
 
-	err := usecase.RunInit(cmd, runner)
+	_, err := usecase.RunInit(cmd, runner)
 
 	if err == nil {
 		t.Fatal("expected error from runner")
