@@ -11,7 +11,7 @@ import (
 type ExpeditionDurationBreakdown struct {
 	// PromptBuildDuration is the time spent in BuildPrompt() before Claude is invoked.
 	PromptBuildDuration time.Duration
-	// InvokeDuration is the wall-clock time from claude.invoke span start to end.
+	// InvokeDuration is the wall-clock time from provider.invoke span start to end.
 	InvokeDuration time.Duration
 }
 
