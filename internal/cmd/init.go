@@ -51,7 +51,7 @@ flags for interactive prompts. This must be run once before
 			}
 			initCmd := domain.NewInitCommand(rp, domain.NewTeam(team), domain.NewProject(project))
 			runner := &session.InitAdapter{Stderr: cmd.ErrOrStderr()}
-			if err := usecase.RunInit(initCmd, runner); err != nil {
+			if _, err := usecase.RunInit(initCmd, runner); err != nil {
 				return err
 			}
 
