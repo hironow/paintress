@@ -161,10 +161,10 @@ func TestRetryRunner_RecordsProviderStateOnRetryEvent(t *testing.T) {
 	if parent == nil {
 		t.Fatal("missing retry-parent span")
 	}
-	if got := eventAttrString(parent, "claude.retry", domain.MetadataProviderState); got != string(domain.ProviderStateActive) {
+	if got := eventAttrString(parent, "provider.retry", domain.MetadataProviderState); got != string(domain.ProviderStateActive) {
 		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateActive)
 	}
-	if got := eventAttrInt(parent, "claude.retry", domain.MetadataProviderRetryBudget); got != 1 {
+	if got := eventAttrInt(parent, "provider.retry", domain.MetadataProviderRetryBudget); got != 1 {
 		t.Fatalf("provider_retry_budget = %d, want 1", got)
 	}
 }
@@ -318,13 +318,13 @@ func TestRetryRunner_RecordsProviderStateOnBlockedEvent(t *testing.T) {
 	if parent == nil {
 		t.Fatal("missing retry-blocked-parent span")
 	}
-	if got := eventAttrString(parent, "claude.blocked", domain.MetadataProviderState); got != string(domain.ProviderStateWaiting) {
+	if got := eventAttrString(parent, "provider.blocked", domain.MetadataProviderState); got != string(domain.ProviderStateWaiting) {
 		t.Fatalf("provider_state = %q, want %q", got, domain.ProviderStateWaiting)
 	}
-	if got := eventAttrString(parent, "claude.blocked", domain.MetadataProviderReason); got != "rate_limit" {
+	if got := eventAttrString(parent, "provider.blocked", domain.MetadataProviderReason); got != "rate_limit" {
 		t.Fatalf("provider_reason = %q, want rate_limit", got)
 	}
-	if got := eventAttrInt(parent, "claude.blocked", domain.MetadataProviderRetryBudget); got != 0 {
+	if got := eventAttrInt(parent, "provider.blocked", domain.MetadataProviderRetryBudget); got != 0 {
 		t.Fatalf("provider_retry_budget = %d, want 0", got)
 	}
 }
@@ -439,6 +439,42 @@ func TestRetryRunner_RunDetailed_FallsBackToRun(t *testing.T) {
 	}
 	if result.ProviderSessionID != "" {
 		t.Errorf("expected empty ProviderSessionID, got %q", result.ProviderSessionID)
+	}
+}
+
+// fakePartialOutputRunner returns non-empty output even when returning an error.
+// This exercises the contract that Run preserves partial output on failure.
+type fakePartialOutputRunner struct {
+	output string
+	err    error
+}
+
+func (f *fakePartialOutputRunner) Run(_ context.Context, _ string, _ io.Writer, _ ...port.RunOption) (string, error) {
+	return f.output, f.err
+}
+
+func TestRetryRunner_PreservesPartialOutputOnError(t *testing.T) {
+	// given: inner runner returns partial output alongside an error
+	inner := &fakePartialOutputRunner{
+		output: "partial-result",
+		err:    errors.New("provider failed"),
+	}
+	runner := &session.RetryRunner{
+		Inner:       inner,
+		MaxAttempts: 1,
+		BaseDelay:   0,
+		Logger:      &domain.NopLogger{},
+	}
+
+	// when
+	output, err := runner.Run(context.Background(), "test", io.Discard)
+
+	// then: error is returned AND partial output is preserved
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if output != "partial-result" {
+		t.Errorf("expected partial output preserved, got %q", output)
 	}
 }
 
