@@ -60,8 +60,10 @@ func NewCmdNotifierForTest(cmdTemplate string, factory cmdFactoryFunc) *CmdNotif
 	return &CmdNotifier{cmdTemplate: cmdTemplate, cmdFactory: factory}
 }
 
-// ExportBuildIsolationFlags exposes buildIsolationFlags for contract testing.
-func ExportBuildIsolationFlags(cfg EnterConfig) []string { return buildIsolationFlags(cfg) }
+// ExportBuildIsolationFlags exposes BuildClaudeIsolationFlags for contract testing.
+func ExportBuildIsolationFlags(configBase string) []string {
+	return BuildClaudeIsolationFlags(configBase)
+}
 
 // ExportSetMaxWaitDuration overrides maxWaitDuration for external tests.
 func ExportSetMaxWaitDuration(d time.Duration) func() {
