@@ -8,7 +8,7 @@ import (
 )
 
 // Tracer is the package-level OTel tracer. Initialized to noop so library
-// consumers can use paintress without calling InitTracer. The session layer
+// consumers can use paintress without calling InitTracer. The cmd layer
 // replaces this with a recording tracer when an OTLP endpoint is configured.
 var Tracer trace.Tracer = noop.NewTracerProvider().Tracer("paintress")
 
