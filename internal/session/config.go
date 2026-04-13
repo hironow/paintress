@@ -31,7 +31,7 @@ func ValidateContinent(continent string, logger domain.Logger) error {
 	stateDir := filepath.Join(continent, domain.StateDir)
 
 	// Core directories + mail dirs + journal
-	if err := EnsureStateDir(stateDir, WithMailDirs(), WithExtraDirs("journal")); err != nil {
+	if _, err := EnsureStateDir(stateDir, WithMailDirs(), WithExtraDirs("journal")); err != nil {
 		return err
 	}
 
