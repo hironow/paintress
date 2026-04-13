@@ -1,7 +1,6 @@
 package session_test
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +14,7 @@ func TestInitProject_WritesConfig(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	err := session.InitProject(dir, "ENG", "backend", io.Discard)
+	_, err := session.InitProject(dir, "ENG", "backend")
 
 	// then
 	if err != nil {
@@ -38,7 +37,7 @@ func TestInitProject_SkipOptionalProject(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	err := session.InitProject(dir, "MY", "", io.Discard)
+	_, err := session.InitProject(dir, "MY", "")
 
 	// then
 	if err != nil {
@@ -61,7 +60,7 @@ func TestInitProject_CreatesExpeditionDir(t *testing.T) {
 	dir := t.TempDir()
 
 	// when
-	err := session.InitProject(dir, "MY", "", io.Discard)
+	_, err := session.InitProject(dir, "MY", "")
 
 	// then
 	if err != nil {
@@ -82,7 +81,7 @@ func TestInitProject_ConfigFileExists(t *testing.T) {
 	dir := t.TempDir()
 
 	// when — first init succeeds
-	err := session.InitProject(dir, "MY", "", io.Discard)
+	_, err := session.InitProject(dir, "MY", "")
 	if err != nil {
 		t.Fatalf("first InitProject: %v", err)
 	}

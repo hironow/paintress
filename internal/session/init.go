@@ -2,7 +2,6 @@ package session
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -14,17 +13,16 @@ import (
 // directly (no interactive prompts). Also runs ValidateContinent to ensure
 // directory structure is set up. If config.yaml already exists, existing
 // values are preserved (merged over defaults), with CLI values winning.
-func InitProject(repoPath, team, project string, w io.Writer) error {
-	if w == nil {
-		w = io.Discard
-	}
+// Returns an InitResult recording what was created/updated.
+func InitProject(repoPath, team, project string) (*InitResult, error) {
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
+		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
-	if err := ValidateContinent(absPath, nil); err != nil {
-		return fmt.Errorf("continent validation: %w", err)
+	result, err := ValidateContinent(absPath, nil)
+	if err != nil {
+		return result, fmt.Errorf("continent validation: %w", err)
 	}
 
 	cfg := domain.DefaultProjectConfig()
@@ -44,10 +42,10 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 			var defaultMap map[string]any
 			defaultData, marshalErr := yaml.Marshal(cfg)
 			if marshalErr != nil {
-				return marshalErr
+				return result, marshalErr
 			}
 			if err := yaml.Unmarshal(defaultData, &defaultMap); err != nil {
-				return err
+				return result, err
 			}
 
 			// existing values override defaults
@@ -62,11 +60,11 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 
 			merged, err := yaml.Marshal(defaultMap)
 			if err != nil {
-				return err
+				return result, err
 			}
 			var mergedCfg domain.ProjectConfig
 			if err := yaml.Unmarshal(merged, &mergedCfg); err != nil {
-				return err
+				return result, err
 			}
 			cfg = mergedCfg
 		}
@@ -74,17 +72,11 @@ func InitProject(repoPath, team, project string, w io.Writer) error {
 	}
 
 	if err := SaveProjectConfig(absPath, &cfg); err != nil {
-		return fmt.Errorf("save config: %w", err)
+		return result, fmt.Errorf("save config: %w", err)
 	}
+	result.Add(domain.StateDir+"/config.yaml", InitUpdated, "")
 
-	fmt.Fprintf(w, "\nConfig saved to %s\n", domain.ProjectConfigPath(absPath))
-	if cfg.Tracker.Team != "" {
-		fmt.Fprintf(w, "  Linear team:    %s\n", cfg.Tracker.Team)
-	}
-	if cfg.Tracker.Project != "" {
-		fmt.Fprintf(w, "  Linear project: %s\n", cfg.Tracker.Project)
-	}
-	return nil
+	return result, nil
 }
 
 // deepMerge merges src into dst recursively. src values override dst values.

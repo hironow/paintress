@@ -50,9 +50,12 @@ flags for interactive prompts. This must be run once before
 				return err
 			}
 			initCmd := domain.NewInitCommand(rp, domain.NewTeam(team), domain.NewProject(project))
-			runner := &session.InitAdapter{Stderr: cmd.ErrOrStderr()}
-			if _, err := usecase.RunInit(initCmd, runner); err != nil {
+			adapter := &session.InitAdapter{}
+			if _, err := usecase.RunInit(initCmd, adapter); err != nil {
 				return err
+			}
+			if adapter.LastResult != nil {
+				session.PrintInitResult(cmd.ErrOrStderr(), adapter.LastResult)
 			}
 
 			otelBackend, _ := cmd.Flags().GetString("otel-backend")
