@@ -1183,3 +1183,16 @@ func TestCheckSkillsRefToolchain_InstallSuccessButNotOnPath(t *testing.T) {
 		t.Errorf("hint should mention PATH, got: %s", checks[0].Hint)
 	}
 }
+
+func TestCheckFsnotify_Available(t *testing.T) {
+	// when
+	result := session.CheckFsnotify()
+
+	// then: should succeed on any normal test environment
+	if result.Status != domain.CheckOK {
+		t.Errorf("expected CheckOK, got %v: %s", result.Status, result.Message)
+	}
+	if result.Name != "fsnotify" {
+		t.Errorf("expected name 'fsnotify', got: %s", result.Name)
+	}
+}

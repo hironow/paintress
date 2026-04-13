@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 )
@@ -186,6 +187,7 @@ func RunDoctor(ctx context.Context, claudeCmd string, continent string, repair b
 		}
 		checks = append(checks, checkEventStore(continent))
 		checks = append(checks, checkDeadLetters(ctx, continent))
+		checks = append(checks, CheckFsnotify())
 
 		// External connectivity checks (skip if claude binary not found)
 		claudeOK := false
@@ -355,6 +357,26 @@ func checkSkillsRefToolchain(baseDir string, repair bool) []domain.DoctorCheck {
 		Message: "uv found but skills-ref not installed",
 		Hint:    `run "paintress doctor --repair" or "uv tool install skills-ref"`,
 	}}
+}
+
+// CheckFsnotify verifies that the OS file watcher is available.
+// On Linux, inotify limits can prevent watcher creation.
+func CheckFsnotify() domain.DoctorCheck {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return domain.DoctorCheck{
+			Name:    "fsnotify",
+			Status:  domain.CheckFail,
+			Message: fmt.Sprintf("cannot create file watcher: %v", err),
+			Hint:    "on Linux, increase inotify limit: sysctl fs.inotify.max_user_watches=524288",
+		}
+	}
+	defer w.Close()
+	return domain.DoctorCheck{
+		Name:    "fsnotify",
+		Status:  domain.CheckOK,
+		Message: "file watcher available",
+	}
 }
 
 // checkContinent verifies the .expedition/ directory structure exists.
