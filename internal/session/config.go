@@ -24,15 +24,17 @@ var expeditionGitignoreEntries = []string{
 // ValidateContinent ensures the .expedition directory structure exists.
 // Uses the shared EnsureStateDir helper for core directories, then adds
 // paintress-specific journal/ dir and skill templates.
-func ValidateContinent(continent string, logger domain.Logger) error {
+// Returns an InitResult recording what was created or skipped.
+func ValidateContinent(continent string, logger domain.Logger) (*InitResult, error) {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
 	stateDir := filepath.Join(continent, domain.StateDir)
 
 	// Core directories + mail dirs + journal
-	if _, err := EnsureStateDir(stateDir, WithMailDirs(), WithExtraDirs("journal")); err != nil {
-		return err
+	result, err := EnsureStateDir(stateDir, WithMailDirs(), WithExtraDirs("journal"))
+	if err != nil {
+		return result, err
 	}
 
 	// Skill templates (idempotent sync from embedded FS)
@@ -40,12 +42,12 @@ func ValidateContinent(continent string, logger domain.Logger) error {
 	for _, dir := range skillDirs {
 		skillDir := filepath.Join(stateDir, "skills", dir)
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
-			return err
+			return result, err
 		}
 		skillFile := filepath.Join(skillDir, "SKILL.md")
 		content, err := fs.ReadFile(platform.SkillsFS, filepath.Join("templates", "skills", dir, "SKILL.md"))
 		if err != nil {
-			return fmt.Errorf("read embedded skill %s: %w", dir, err)
+			return result, fmt.Errorf("read embedded skill %s: %w", dir, err)
 		}
 		existing, readErr := os.ReadFile(skillFile)
 		if readErr != nil || !bytesEqual(existing, content) {
@@ -53,13 +55,21 @@ func ValidateContinent(continent string, logger domain.Logger) error {
 				logger.Info("updated SKILL.md: %s (template changed)", dir)
 			}
 			if err := os.WriteFile(skillFile, content, 0644); err != nil {
-				return err
+				return result, err
 			}
+			result.Add(domain.StateDir+"/skills/"+dir+"/", InitUpdated, "")
+		} else {
+			result.Add(domain.StateDir+"/skills/"+dir+"/", InitSkipped, "")
 		}
 	}
 
 	// Gitignore (append-only)
-	return EnsureGitignoreEntries(filepath.Join(stateDir, ".gitignore"), expeditionGitignoreEntries)
+	if err := EnsureGitignoreEntries(filepath.Join(stateDir, ".gitignore"), expeditionGitignoreEntries); err != nil {
+		return result, err
+	}
+	result.Add(domain.StateDir+"/.gitignore", InitUpdated, "")
+
+	return result, nil
 }
 
 // bytesEqual compares two byte slices without importing bytes.

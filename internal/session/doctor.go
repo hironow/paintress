@@ -25,7 +25,8 @@ var findSkillsRefDirFn = findSkillsRefDir
 
 // generateSkillsFn regenerates SKILL.md files via ValidateContinent.
 var generateSkillsFn = func(continent string) error {
-	return ValidateContinent(continent, nil)
+	_, err := ValidateContinent(continent, nil)
+	return err
 }
 
 func findSkillsRefDir(baseDir string) string {

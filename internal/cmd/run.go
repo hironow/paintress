@@ -217,7 +217,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 	defer seqCounter.Close()
 
-	if err := session.ValidateContinent(cfg.Continent, logger); err != nil {
+	if _, err := session.ValidateContinent(cfg.Continent, logger); err != nil {
 		return err
 	}
 
