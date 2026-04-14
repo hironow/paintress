@@ -8,7 +8,7 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
-	"github.com/hironow/paintress/internal/usecase"
+	"github.com/hironow/paintress/internal/usecase/port"
 	"github.com/spf13/cobra"
 )
 
@@ -45,13 +45,12 @@ flags for interactive prompts. This must be run once before
 
 			team, _ := cmd.Flags().GetString("team")
 			project, _ := cmd.Flags().GetString("project")
-			rp, err := domain.NewRepoPath(repoPath)
-			if err != nil {
-				return err
-			}
-			initCmd := domain.NewInitCommand(rp, domain.NewTeam(team), domain.NewProject(project))
 			adapter := &session.InitAdapter{}
-			if _, err := usecase.RunInit(initCmd, adapter); err != nil {
+			if _, err := adapter.InitProject(
+				repoPath,
+				port.WithTeam(team),
+				port.WithProject(project),
+			); err != nil {
 				return err
 			}
 			if adapter.LastResult != nil {
