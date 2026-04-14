@@ -81,7 +81,7 @@ type ComputedConfig struct{}
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 // Runtime-only fields (Continent, DryRun, OutputFormat) are NOT persisted here.
 type ProjectConfig struct {
-	Tracker        IssueTrackerConfig `yaml:"tracker"`
+	Tracker        IssueTrackerConfig `yaml:"tracker,omitempty"`
 	Lang           string             `yaml:"lang,omitempty"`
 	MaxExpeditions int                `yaml:"max_expeditions,omitempty"`
 	TimeoutSec     int                `yaml:"timeout_sec,omitempty"`
@@ -122,9 +122,9 @@ func DefaultProjectConfig() ProjectConfig {
 
 // IssueTrackerConfig holds issue tracker integration settings.
 type IssueTrackerConfig struct {
-	Team    string `yaml:"team"`
-	Project string `yaml:"project"`
-	Cycle   string `yaml:"cycle"`
+	Team    string `yaml:"team,omitempty"`
+	Project string `yaml:"project,omitempty"`
+	Cycle   string `yaml:"cycle,omitempty"`
 }
 
 // TrackerTeam returns the issue tracker team key (e.g. "MY").
