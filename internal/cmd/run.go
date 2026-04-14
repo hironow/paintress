@@ -235,8 +235,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	defer p.CloseRunner()
 	p.SetSeqAllocator(seqCounter)
 	p.SetCheckpointScanner(session.NewCheckpointScanner(continent))
-	rp, rpErr := domain.NewRepoPath(continent)
-	if rpErr != nil {
+	if _, rpErr := domain.NewRepoPath(continent); rpErr != nil {
 		return rpErr
 	}
 
@@ -252,7 +251,9 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	logger.Info("paintress run: starting initial expedition cycle (mode=%s)...", mode)
-	exitCode, ucErr := usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)
+	usecase.PrepareExpeditionRunner(ctx, p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)
+	exitCode := p.Run(ctx)
+	var ucErr error
 	if ucErr != nil {
 		summary := p.HandoverSummary()
 		return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{
@@ -319,7 +320,9 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 		defer p.CloseRunner()
 		p.SetSeqAllocator(seqCounter)
 		p.SetCheckpointScanner(session.NewCheckpointScanner(continent))
-		exitCode, ucErr = usecase.RunExpeditions(ctx, domain.NewRunExpeditionCommand(rp), p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)
+		usecase.PrepareExpeditionRunner(ctx, p, eventStore, logger, notifier, &platform.OTelPolicyMetrics{}, session.NewInboxArchiver(nil), p, cfg.Continent, cfg.MaxRetries, mode, targetProvider)
+		exitCode = p.Run(ctx)
+		ucErr = nil
 		if ucErr != nil {
 			summary := p.HandoverSummary()
 			return tryWriteHandover(ctx, ucErr, continent, domain.HandoverState{

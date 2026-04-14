@@ -11,16 +11,16 @@ import (
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// RunExpeditions delegates to the expedition runner.
-// Creates aggregate + EventEmitter with PolicyEngine as dispatcher, injects via SetEmitter.
-// The RunExpeditionCommand is already valid by construction (parse-don't-validate).
-func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
+// PrepareExpeditionRunner wires the expedition runner with EventEmitter, PolicyEngine,
+// pre-flight triager, and feedback handler. Called by cmd (composition root).
+// After calling this, the caller invokes runner.Run(ctx) directly.
+func PrepareExpeditionRunner(ctx context.Context,
 	runner port.ExpeditionRunner, eventStore port.EventStore, logger domain.Logger,
 	notifier port.Notifier, metrics port.PolicyMetrics,
 	archiver port.InboxArchiver, followUp port.FollowUpRunner,
 	continent string, maxRetries int,
 	mode domain.TrackingMode, targetProvider port.TargetProvider,
-) (int, error) {
+) {
 	engine := NewPolicyEngine(logger)
 	if metrics == nil {
 		metrics = &port.NopPolicyMetrics{}
@@ -54,6 +54,4 @@ func RunExpeditions(ctx context.Context, cmd domain.RunExpeditionCommand,
 	if targetProvider != nil {
 		runner.SetTargetProvider(targetProvider)
 	}
-
-	return runner.Run(ctx), nil
 }
