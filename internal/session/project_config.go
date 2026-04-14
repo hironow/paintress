@@ -144,5 +144,6 @@ func SaveProjectConfig(continent string, cfg *domain.ProjectConfig) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	header := "# paintress configuration\n# Run 'paintress init --force' to regenerate with defaults\n\n"
+	return os.WriteFile(path, []byte(header+string(data)), 0644)
 }
