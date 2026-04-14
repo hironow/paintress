@@ -223,7 +223,7 @@ func TestValidateContinent_GitignoresInboxAndOutbox(t *testing.T) {
 	}
 }
 
-func TestValidateContinent_ArchiveIsNotGitignored(t *testing.T) {
+func TestValidateContinent_ArchiveAndInsightsAreGitignored(t *testing.T) {
 	dir := t.TempDir()
 
 	if _, err := session.ValidateContinent(dir, nil); err != nil {
@@ -234,8 +234,11 @@ func TestValidateContinent_ArchiveIsNotGitignored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .gitignore: %v", err)
 	}
-	if strings.Contains(string(content), "archive/") {
-		t.Errorf(".gitignore should NOT contain archive/, got: %q", string(content))
+	if !strings.Contains(string(content), "archive/") {
+		t.Error("expected archive/ in .gitignore (runtime data)")
+	}
+	if !strings.Contains(string(content), "insights/") {
+		t.Error("expected insights/ in .gitignore (runtime data)")
 	}
 }
 

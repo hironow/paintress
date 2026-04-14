@@ -15,6 +15,8 @@ var expeditionGitignoreEntries = []string{
 	".run/",
 	"inbox/",
 	"outbox/",
+	"archive/",
+	"insights/",
 	".otel.env",
 	"events/",
 	".mcp.json",
