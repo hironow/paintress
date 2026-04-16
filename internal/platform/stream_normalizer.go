@@ -7,6 +7,17 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 )
 
+// mustJSON marshals v to JSON, returning an empty object on failure.
+// json.Marshal only fails for non-serializable types (chan, func, circular pointers);
+// all callers in this file use map[string]any or map[string]string, so failure is unreachable.
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
+}
+
 // subagentToolNames lists tool names that indicate subagent creation.
 // Provider-agnostic: Claude Code uses "Task"/"Agent", others may differ.
 var subagentToolNames = map[string]bool{
@@ -102,7 +113,7 @@ func (n *StreamNormalizer) SessionEnd(providerSessionID string, runErr error) do
 	if n.lastDuration > 0 {
 		data["duration_ms"] = n.lastDuration
 	}
-	dataJSON, _ := json.Marshal(data)
+	dataJSON := mustJSON(data)
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamSessionEnd, dataJSON)
 	if providerSessionID != "" {
 		ev.ProviderSessionID = providerSessionID
@@ -119,7 +130,7 @@ func (n *StreamNormalizer) normalizeInit(msg *StreamMessage) *domain.SessionStre
 	for _, s := range msg.MCPServers {
 		servers = append(servers, map[string]string{"name": s.Name, "status": s.Status})
 	}
-	data, _ := json.Marshal(map[string]any{
+	data := mustJSON(map[string]any{
 		"model":       msg.Model,
 		"tools":       tools,
 		"mcp_servers": servers,
@@ -130,15 +141,15 @@ func (n *StreamNormalizer) normalizeInit(msg *StreamMessage) *domain.SessionStre
 
 func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.SessionStreamEvent {
 	// Check for tool_use (including subagent starts).
-	toolBlocks, _ := msg.ExtractToolUse()
-	if len(toolBlocks) > 0 {
+	toolBlocks, err := msg.ExtractToolUse()
+	if err == nil && len(toolBlocks) > 0 {
 		// Emit first tool_use as the event (multiple tools in one message are rare).
 		tool := toolBlocks[0]
 		if subagentToolNames[tool.Name] {
 			return n.normalizeSubagentStart(tool, msg)
 		}
-		summary, _ := truncateInput(tool.Input, 200)
-		data, _ := json.Marshal(map[string]any{
+		summary := truncateInput(tool.Input, 200)
+		data := mustJSON(map[string]any{
 			"tool_name":      tool.Name,
 			"tool_id":        tool.ID,
 			"parent_tool_id": msg.ParentToolUseID,
@@ -149,12 +160,13 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	}
 
 	// Check for thinking blocks.
-	am, _ := msg.ParseAssistantMessage()
-	if am != nil {
+	am, err := msg.ParseAssistantMessage()
+	if err == nil && am != nil {
 		for _, block := range am.Content {
 			if block.Type == "thinking" && block.Thinking != "" {
-				text, _ := domain.TruncateField(block.Thinking, domain.RawFieldMaxBytes)
-				data, _ := json.Marshal(map[string]string{"text": text})
+				text, wasTruncated := domain.TruncateField(block.Thinking, domain.RawFieldMaxBytes)
+				_ = wasTruncated
+				data := mustJSON(map[string]string{"text": text})
 				ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamThinking, data)
 				return &ev
 			}
@@ -162,10 +174,11 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 	}
 
 	// Text output.
-	text, _ := msg.ExtractText()
-	if text != "" {
-		truncated, _ := domain.TruncateField(text, domain.RawFieldMaxBytes)
-		data, _ := json.Marshal(map[string]string{"text": truncated})
+	text, err := msg.ExtractText()
+	if err == nil && text != "" {
+		truncated, wasTruncated := domain.TruncateField(text, domain.RawFieldMaxBytes)
+		_ = wasTruncated
+		data := mustJSON(map[string]string{"text": truncated})
 		ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamAssistantText, data)
 		return &ev
 	}
@@ -176,8 +189,8 @@ func (n *StreamNormalizer) normalizeAssistant(msg *StreamMessage) *domain.Sessio
 func (n *StreamNormalizer) normalizeSubagentStart(tool ContentBlock, msg *StreamMessage) *domain.SessionStreamEvent {
 	subID := fmt.Sprintf("sub_%s", tool.ID)
 	n.subagents[tool.ID] = subID
-	desc, _ := truncateInput(tool.Input, 200)
-	data, _ := json.Marshal(map[string]any{
+	desc := truncateInput(tool.Input, 200)
+	data := mustJSON(map[string]any{
 		"subagent_id":       subID,
 		"parent_session_id": n.codingSessionID,
 		"description":       desc,
@@ -192,7 +205,7 @@ func (n *StreamNormalizer) normalizeToolResult(msg *StreamMessage) *domain.Sessi
 	// Check if this is a subagent end.
 	if subID, ok := n.subagents[msg.ToolUseID]; ok {
 		delete(n.subagents, msg.ToolUseID)
-		data, _ := json.Marshal(map[string]any{
+		data := mustJSON(map[string]any{
 			"subagent_id": subID,
 			"status":      "completed",
 		})
@@ -201,7 +214,7 @@ func (n *StreamNormalizer) normalizeToolResult(msg *StreamMessage) *domain.Sessi
 		return &ev
 	}
 
-	data, _ := json.Marshal(map[string]any{
+	data := mustJSON(map[string]any{
 		"tool_id": msg.ToolUseID,
 		"status":  "completed",
 	})
@@ -230,7 +243,7 @@ func (n *StreamNormalizer) normalizeResult(msg *StreamMessage) *domain.SessionSt
 }
 
 func (n *StreamNormalizer) normalizeHookStart(msg *StreamMessage) *domain.SessionStreamEvent {
-	data, _ := json.Marshal(map[string]string{
+	data := mustJSON(map[string]string{
 		"hook_name":  msg.HookName,
 		"hook_event": msg.HookEvent,
 		"command":    msg.Command,
@@ -244,7 +257,7 @@ func (n *StreamNormalizer) normalizeHookResult(msg *StreamMessage) *domain.Sessi
 	if msg.ExitCode != nil {
 		exitCode = *msg.ExitCode
 	}
-	data, _ := json.Marshal(map[string]any{
+	data := mustJSON(map[string]any{
 		"hook_name": msg.HookName,
 		"exit_code": exitCode,
 		"outcome":   msg.Outcome,
@@ -260,13 +273,13 @@ func (n *StreamNormalizer) normalizeRateLimit(msg *StreamMessage) *domain.Sessio
 		data["resets_at"] = msg.RateLimitInfo.ResetsAt
 		data["utilization"] = msg.RateLimitInfo.Utilization
 	}
-	dataJSON, _ := json.Marshal(data)
+	dataJSON := mustJSON(data)
 	ev := domain.NewSessionStreamEvent(n.toolName, n.provider, domain.StreamRateLimit, dataJSON)
 	return &ev
 }
 
 func (n *StreamNormalizer) normalizeError(msg *StreamMessage) *domain.SessionStreamEvent {
-	data, _ := json.Marshal(map[string]any{
+	data := mustJSON(map[string]any{
 		"message":     msg.Result,
 		"recoverable": false,
 	})
@@ -275,10 +288,12 @@ func (n *StreamNormalizer) normalizeError(msg *StreamMessage) *domain.SessionStr
 }
 
 // truncateInput extracts a summary from tool input JSON.
-func truncateInput(input json.RawMessage, maxLen int) (string, bool) {
+// The bool from TruncateField (wasTruncated) is intentionally unused here.
+func truncateInput(input json.RawMessage, maxLen int) string {
 	if len(input) == 0 {
-		return "", false
+		return ""
 	}
-	s := string(input)
-	return domain.TruncateField(s, maxLen)
+	s, wasTruncated := domain.TruncateField(string(input), maxLen)
+	_ = wasTruncated
+	return s
 }
