@@ -46,8 +46,8 @@ func runIssues(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	outputFmt, _ := cmd.Flags().GetString("output")
-	stateRaw, _ := cmd.Flags().GetString("state")
+	outputFmt := mustString(cmd, "output")
+	stateRaw := mustString(cmd, "state")
 
 	var stateFilter []string
 	if stateRaw != "" {

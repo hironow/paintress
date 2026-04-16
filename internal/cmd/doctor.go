@@ -64,7 +64,7 @@ Use --repair to auto-fix repairable issues (stale PID, missing SKILL.md, etc.).`
 }
 
 func runDoctor(cmd *cobra.Command, args []string) error {
-	outputFmt, _ := cmd.Flags().GetString("output")
+	outputFmt := mustString(cmd, "output")
 
 	// Resolve continent: explicit arg or current working directory (aligned with amadeus/sightjack)
 	continent, err := resolveTargetDir(args)
@@ -73,8 +73,8 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	claudeCmd := loadClaudeCmd(continent)
-	repair, _ := cmd.Flags().GetBool("repair")
-	linearFlag, _ := cmd.Flags().GetBool("linear")
+	repair := mustBool(cmd, "repair")
+	linearFlag := mustBool(cmd, "linear")
 	mode := domain.NewTrackingMode(linearFlag)
 	checks := session.RunDoctor(cmd.Context(), claudeCmd, continent, repair, mode)
 

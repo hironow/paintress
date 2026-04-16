@@ -43,7 +43,7 @@ If path is omitted, the current working directory is used.`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Set language global
-			lang, _ := cmd.Flags().GetString("lang")
+			lang := mustString(cmd, "lang")
 			if lang != "" {
 				domain.Lang = lang
 			}
@@ -110,8 +110,8 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	// Preflight: verify required binaries exist
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	claudeCmd, _ := cmd.Flags().GetString("claude-cmd")
+	dryRun := mustBool(cmd, "dry-run")
+	claudeCmd := mustString(cmd, "claude-cmd")
 	bins := []string{"git"}
 	if !dryRun {
 		bins = append(bins, claudeCmd)
@@ -134,57 +134,57 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 	cfg := configFromProject(projectCfg)
 	cfg.Continent = continent
-	cfg.DryRun, _ = cmd.Flags().GetBool("dry-run")
-	cfg.OutputFormat, _ = cmd.Flags().GetString("output")
+	cfg.DryRun = mustBool(cmd, "dry-run")
+	cfg.OutputFormat = mustString(cmd, "output")
 
 	// Override with explicitly-set CLI flags only
 	if cmd.Flags().Changed("max-expeditions") {
-		cfg.MaxExpeditions, _ = cmd.Flags().GetInt("max-expeditions")
+		cfg.MaxExpeditions = mustInt(cmd, "max-expeditions")
 	}
 	if cmd.Flags().Changed("timeout") {
-		cfg.TimeoutSec, _ = cmd.Flags().GetInt("timeout")
+		cfg.TimeoutSec = mustInt(cmd, "timeout")
 	}
 	if cmd.Flags().Changed("model") {
-		cfg.Model, _ = cmd.Flags().GetString("model")
+		cfg.Model = mustString(cmd, "model")
 	}
 	if cmd.Flags().Changed("base-branch") {
-		cfg.BaseBranch, _ = cmd.Flags().GetString("base-branch")
+		cfg.BaseBranch = mustString(cmd, "base-branch")
 	}
 	if cmd.Flags().Changed("claude-cmd") {
-		cfg.ClaudeCmd, _ = cmd.Flags().GetString("claude-cmd")
+		cfg.ClaudeCmd = mustString(cmd, "claude-cmd")
 	}
 	if cmd.Flags().Changed("dev-cmd") {
-		cfg.DevCmd, _ = cmd.Flags().GetString("dev-cmd")
+		cfg.DevCmd = mustString(cmd, "dev-cmd")
 	}
 	if cmd.Flags().Changed("dev-dir") {
-		cfg.DevDir, _ = cmd.Flags().GetString("dev-dir")
+		cfg.DevDir = mustString(cmd, "dev-dir")
 	}
 	if cmd.Flags().Changed("dev-url") {
-		cfg.DevURL, _ = cmd.Flags().GetString("dev-url")
+		cfg.DevURL = mustString(cmd, "dev-url")
 	}
 	if cmd.Flags().Changed("review-cmd") {
-		cfg.ReviewCmd, _ = cmd.Flags().GetString("review-cmd")
+		cfg.ReviewCmd = mustString(cmd, "review-cmd")
 	}
 	if cmd.Flags().Changed("workers") {
-		cfg.Workers, _ = cmd.Flags().GetInt("workers")
+		cfg.Workers = mustInt(cmd, "workers")
 	}
 	if cmd.Flags().Changed("setup-cmd") {
-		cfg.SetupCmd, _ = cmd.Flags().GetString("setup-cmd")
+		cfg.SetupCmd = mustString(cmd, "setup-cmd")
 	}
 	if cmd.Flags().Changed("no-dev") {
-		cfg.NoDev, _ = cmd.Flags().GetBool("no-dev")
+		cfg.NoDev = mustBool(cmd, "no-dev")
 	}
 	if cmd.Flags().Changed("notify-cmd") {
-		cfg.NotifyCmd, _ = cmd.Flags().GetString("notify-cmd")
+		cfg.NotifyCmd = mustString(cmd, "notify-cmd")
 	}
 	if cmd.Flags().Changed("approve-cmd") {
-		cfg.ApproveCmd, _ = cmd.Flags().GetString("approve-cmd")
+		cfg.ApproveCmd = mustString(cmd, "approve-cmd")
 	}
 	if cmd.Flags().Changed("auto-approve") {
-		cfg.AutoApprove, _ = cmd.Flags().GetBool("auto-approve")
+		cfg.AutoApprove = mustBool(cmd, "auto-approve")
 	}
 	if cmd.Flags().Changed("idle-timeout") {
-		cfg.IdleTimeout, _ = cmd.Flags().GetDuration("idle-timeout")
+		cfg.IdleTimeout = mustDuration(cmd, "idle-timeout")
 	}
 
 	// Derive review-cmd from base-branch if neither CLI nor config set it
@@ -193,7 +193,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	// Set language global: CLI flag > config > fallback "ja"
-	lang, _ := cmd.Flags().GetString("lang")
+	lang := mustString(cmd, "lang")
 	if lang == "" {
 		lang = projectCfg.Lang
 	}
@@ -240,7 +240,7 @@ func runExpedition(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve tracking mode from --linear flag
-	linearFlag, _ := cmd.Flags().GetBool("linear")
+	linearFlag := mustBool(cmd, "linear")
 	mode := domain.NewTrackingMode(linearFlag)
 
 	// Build target provider for wave mode

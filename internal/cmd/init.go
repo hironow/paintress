@@ -37,14 +37,14 @@ flags for interactive prompts. This must be run once before
 				return fmt.Errorf("resolve repo path: %w", err)
 			}
 
-			force, _ := cmd.Flags().GetBool("force")
+			force := mustBool(cmd, "force")
 			cfgPath := domain.ProjectConfigPath(repoPath)
 			if _, err := os.Stat(cfgPath); err == nil && !force {
 				return fmt.Errorf("%s already exists\nUse --force to overwrite", cfgPath)
 			}
 
-			team, _ := cmd.Flags().GetString("team")
-			project, _ := cmd.Flags().GetString("project")
+			team := mustString(cmd, "team")
+			project := mustString(cmd, "project")
 			adapter := &session.InitAdapter{}
 			if _, err := adapter.InitProject(
 				repoPath,
@@ -57,10 +57,10 @@ flags for interactive prompts. This must be run once before
 				session.PrintInitResult(cmd.ErrOrStderr(), adapter.LastResult)
 			}
 
-			otelBackend, _ := cmd.Flags().GetString("otel-backend")
+			otelBackend := mustString(cmd, "otel-backend")
 			if otelBackend != "" {
-				otelEntity, _ := cmd.Flags().GetString("otel-entity")
-				otelProject, _ := cmd.Flags().GetString("otel-project")
+				otelEntity := mustString(cmd, "otel-entity")
+				otelProject := mustString(cmd, "otel-project")
 				content, otelErr := platform.OtelEnvContent(otelBackend, otelEntity, otelProject)
 				if otelErr != nil {
 					return otelErr

@@ -39,7 +39,7 @@ git-tracked, so deletions should be reviewed and committed.`,
   paintress archive-prune --rebuild-index`,
 		Args: cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			days, _ := cmd.Flags().GetInt("days")
+			days := mustInt(cmd, "days")
 			if _, err := domain.NewDays(days); err != nil {
 				return fmt.Errorf("--days: %w", err)
 			}
@@ -58,7 +58,7 @@ git-tracked, so deletions should be reviewed and committed.`,
 }
 
 func runArchivePrune(cmd *cobra.Command, args []string) error {
-	execute, _ := cmd.Flags().GetBool("execute")
+	execute := mustBool(cmd, "execute")
 	if execute && cmd.Flags().Changed("dry-run") {
 		return fmt.Errorf("--execute and --dry-run are mutually exclusive")
 	}
@@ -66,11 +66,11 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	days, _ := cmd.Flags().GetInt("days")
-	outputFmt, _ := cmd.Flags().GetString("output")
+	days := mustInt(cmd, "days")
+	outputFmt := mustString(cmd, "output")
 	stateDir := filepath.Join(repoPath, domain.StateDir)
 
-	rebuildIndex, _ := cmd.Flags().GetBool("rebuild-index")
+	rebuildIndex := mustBool(cmd, "rebuild-index")
 	if rebuildIndex {
 		if execute {
 			return fmt.Errorf("--rebuild-index cannot be combined with --execute")
@@ -180,7 +180,7 @@ func runArchivePrune(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	yes, _ := cmd.Flags().GetBool("yes")
+	yes := mustBool(cmd, "yes")
 	if !yes {
 		fmt.Fprintf(ew, "\nDelete these %d file(s)? [y/N] ", totalCandidates)
 		scanner := bufio.NewScanner(cmd.InOrStdin())
