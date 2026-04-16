@@ -9,9 +9,12 @@ import (
 
 // RecordExpedition increments the paintress.expedition.total OTel counter.
 func RecordExpedition(ctx context.Context, status, model string) {
-	c, _ := Meter.Int64Counter("paintress.expedition.total",
+	c, err := Meter.Int64Counter("paintress.expedition.total",
 		metric.WithDescription("Total expedition completions"),
 	)
+	if err != nil {
+		return
+	}
 	c.Add(ctx, 1,
 		metric.WithAttributes(
 			attribute.String("status", SanitizeUTF8(status)),
@@ -22,9 +25,12 @@ func RecordExpedition(ctx context.Context, status, model string) {
 
 // RecordEventEmitError increments the paintress.event.emit_error.total OTel counter.
 func RecordEventEmitError(ctx context.Context, eventType string) {
-	c, _ := Meter.Int64Counter("paintress.event.emit_error.total",
+	c, err := Meter.Int64Counter("paintress.event.emit_error.total",
 		metric.WithDescription("Count of event emission failures"),
 	)
+	if err != nil {
+		return
+	}
 	c.Add(ctx, 1,
 		metric.WithAttributes(
 			attribute.String("event_type", SanitizeUTF8(eventType)),
