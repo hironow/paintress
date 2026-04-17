@@ -181,10 +181,10 @@ func scanRecord(row scanner) (domain.CodingSessionRecord, error) {
 	}
 	rec.Provider = domain.Provider(provider)
 	rec.Status = domain.SessionStatus(status)
-	if t, err := time.Parse(time.RFC3339Nano, createdAt); err == nil {
+	if t, parseErr := time.Parse(time.RFC3339Nano, createdAt); parseErr == nil {
 		rec.CreatedAt = t
 	}
-	if t, err := time.Parse(time.RFC3339Nano, updatedAt); err == nil {
+	if t, parseErr := time.Parse(time.RFC3339Nano, updatedAt); parseErr == nil {
 		rec.UpdatedAt = t
 	}
 	if metaJSON != "" {
