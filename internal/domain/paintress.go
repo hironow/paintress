@@ -76,7 +76,7 @@ func ExitCode(err error) int {
 }
 
 // PruneResult holds the outcome of an archive prune operation.
-type PruneResult struct {
+type PruneResult struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Candidates is an operation result slice, not a domain aggregate; FCC wrapping adds complexity with no safety benefit [permanent]
 	Candidates []string // basenames of files older than threshold
 	Deleted    int      // number of files actually removed (0 in dry-run)
 }

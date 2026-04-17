@@ -240,13 +240,13 @@ type RetryAttemptedData struct {
 }
 
 // EscalatedData is the payload for EventEscalated.
-type EscalatedData struct {
+type EscalatedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }
 
 // ResolvedData is the payload for EventResolved.
-type ResolvedData struct {
+type ResolvedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }
@@ -254,7 +254,7 @@ type ResolvedData struct {
 // SpecRegisteredData is the payload for EventSpecRegistered.
 // Records a wave specification from a D-Mail so that wave/step definitions
 // persist in the event store after the D-Mail is archived.
-type SpecRegisteredData struct {
+type SpecRegisteredData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Steps is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	WaveID string        `json:"wave_id"`
 	Steps  []WaveStepDef `json:"steps"`
 	Source string        `json:"source"` // D-Mail name for tracing

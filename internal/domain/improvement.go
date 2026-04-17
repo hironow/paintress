@@ -64,7 +64,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct {
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- RoutingHistory/OwnerHistory are audit trail slices; FCC wrapping would break YAML marshaling [permanent]
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity
@@ -87,7 +87,7 @@ type CorrectionMetadata struct {
 	Outcome             ImprovementOutcome
 }
 
-type ImprovementEvent struct {
+type ImprovementEvent struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- RoutingHistory/OwnerHistory are JSON/YAML event payload fields; FCC wrapping would break marshaling [permanent]
 	SchemaVersion       string             `json:"schema_version" yaml:"schema_version"`
 	FailureType         FailureType        `json:"failure_type" yaml:"failure_type"`
 	Severity            Severity           `json:"severity,omitempty" yaml:"severity,omitempty"`

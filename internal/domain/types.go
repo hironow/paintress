@@ -25,7 +25,7 @@ type IndexEntry struct {
 
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
-type HandoverState struct {
+type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Completed/Remaining are signal-interrupt state snapshots; FCC wrapping would add complexity with no safety benefit [permanent]
 	Tool         string // "paintress"
 	Operation    string // "expedition"
 	Timestamp    time.Time
