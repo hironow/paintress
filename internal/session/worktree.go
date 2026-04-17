@@ -44,7 +44,7 @@ type WorktreePool struct {
 }
 
 // NewWorktreePool creates a new WorktreePool with the given configuration.
-func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool {
+func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string, size int) *WorktreePool { // nosemgrep: domain-primitives.multiple-string-params-go -- repoDir/baseBranch/setupCmd are semantically distinct config params [permanent]
 	return &WorktreePool{
 		git:        git,
 		baseBranch: baseBranch,

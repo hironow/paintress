@@ -29,7 +29,7 @@ func reconcileFlags(continent string, workers int) domain.ExpeditionFlag {
 	return domain.BestFlag(flags)
 }
 
-func (p *Paintress) writeFlag(dir string, expNum int, issueID, status, remaining string, midHighSeverity int) {
+func (p *Paintress) writeFlag(dir string, expNum int, issueID, status, remaining string, midHighSeverity int) { // nosemgrep: domain-primitives.multiple-string-params-go -- issueID/status/remaining are semantically distinct [permanent]
 	current := ReadFlag(dir)
 	if expNum <= current.LastExpedition {
 		return

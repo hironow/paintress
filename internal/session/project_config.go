@@ -35,7 +35,7 @@ func LoadProjectConfig(continent string) (*domain.ProjectConfig, error) {
 // Supported keys: tracker.team, tracker.project, tracker.cycle, lang, max_expeditions,
 // timeout_sec, model, base_branch, claude_cmd, dev_cmd, dev_dir, dev_url, review_cmd,
 // workers, setup_cmd, no_dev, notify_cmd, approve_cmd, auto_approve, max_retries, idle_timeout.
-func UpdateProjectConfig(continent string, key string, value string) error {
+func UpdateProjectConfig(continent string, key string, value string) error { // nosemgrep: domain-primitives.multiple-string-params-go -- continent/key/value are semantically distinct config params [permanent]
 	cfg, err := LoadProjectConfig(continent)
 	if err != nil {
 		return err

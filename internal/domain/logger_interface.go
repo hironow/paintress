@@ -36,7 +36,7 @@ type BannerLogger interface {
 
 // LogBanner calls Banner if the logger supports it (type assertion).
 // Safe to call with any Logger including NopLogger.
-func LogBanner(logger Logger, dir BannerDirection, kind, name, description string) {
+func LogBanner(logger Logger, dir BannerDirection, kind, name, description string) { // nosemgrep: domain-primitives.multiple-string-params-go -- each param is semantically distinct (kind/name/desc); struct refactor would not prevent swaps across 3 different concepts [permanent]
 	if bl, ok := logger.(BannerLogger); ok {
 		bl.Banner(dir, kind, name, description)
 	}

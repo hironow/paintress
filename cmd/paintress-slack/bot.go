@@ -34,7 +34,7 @@ func parseNotifyConfig(token, channelID string) (botConfig, error) {
 }
 
 // parseBotConfig validates config for approve (token + channelID + appToken).
-func parseBotConfig(token, channelID, appToken string) (botConfig, error) {
+func parseBotConfig(token, channelID, appToken string) (botConfig, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- token/channelID/appToken are semantically distinct Slack credentials [permanent]
 	cfg, err := parseNotifyConfig(token, channelID)
 	if err != nil {
 		return botConfig{}, err

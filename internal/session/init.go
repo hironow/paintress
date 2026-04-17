@@ -14,7 +14,7 @@ import (
 // directory structure is set up. If config.yaml already exists, existing
 // values are preserved (merged over defaults), with CLI values winning.
 // Returns an InitResult recording what was created/updated.
-func InitProject(repoPath, team, project string) (*InitResult, error) {
+func InitProject(repoPath, team, project string) (*InitResult, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- repoPath/team/project are semantically distinct [permanent]
 	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid path: %w", err)

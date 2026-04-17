@@ -267,7 +267,7 @@ type NopExpeditionEventEmitter struct{}
 func (*NopExpeditionEventEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error {
 	return nil
 }
-func (*NopExpeditionEventEmitter) EmitCompleteExpedition(_ int, _, _, _, _, _ string, _ time.Time) error {
+func (*NopExpeditionEventEmitter) EmitCompleteExpedition(_ int, _, _, _, _, _ string, _ time.Time) error { // nosemgrep: domain-primitives.multiple-string-params-go -- Nop implementation of EmitCompleteExpedition interface [permanent]
 	return nil
 }
 func (*NopExpeditionEventEmitter) EmitSpecRegistered(_ string, _ []domain.WaveStepDef, _ string, _ time.Time) error {

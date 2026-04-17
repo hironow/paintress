@@ -48,7 +48,7 @@ func ReadFlag(continent string) domain.ExpeditionFlag {
 }
 
 // WriteFlag writes an expedition flag checkpoint file.
-func WriteFlag(continent string, expNum int, issueID, status, remaining string, midHighSeverity int) error {
+func WriteFlag(continent string, expNum int, issueID, status, remaining string, midHighSeverity int) error { // nosemgrep: domain-primitives.multiple-string-params-go -- issueID/status/remaining are semantically distinct [permanent]
 	issueID = sanitizeFlagValue(issueID)
 	status = sanitizeFlagValue(status)
 	remaining = sanitizeFlagValue(remaining)

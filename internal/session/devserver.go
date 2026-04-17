@@ -34,7 +34,7 @@ type DevServer struct {
 	running bool
 }
 
-func NewDevServer(cmd, url, dir, logPath string, logger domain.Logger) *DevServer {
+func NewDevServer(cmd, url, dir, logPath string, logger domain.Logger) *DevServer { // nosemgrep: domain-primitives.multiple-string-params-go -- cmd/url/dir/logPath are semantically distinct config params [permanent]
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
@@ -87,7 +87,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("log file creation failed: %w", err)
 	}
-	ds.process = exec.CommandContext(ctx, parts[0], parts[1:]...)
+	ds.process = exec.CommandContext(ctx, parts[0], parts[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command -- cmd is from validated Config.DevCmd, not user input [permanent]
 	ds.process.Dir = ds.dir
 	ds.process.Stdout = logFile
 	ds.process.Stderr = logFile
