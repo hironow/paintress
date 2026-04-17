@@ -15,7 +15,7 @@ const (
 	StatusParseError
 )
 
-type ExpeditionReport struct {
+type ExpeditionReport struct { // nosemgrep: domain-primitives.public-string-field-go -- PRUrl is a plain record field; newtype adds no safety benefit [permanent]
 	Expedition         int
 	IssueID            string
 	IssueTitle         string
@@ -37,7 +37,7 @@ type ExpeditionReport struct {
 }
 
 // PRIndexEntry represents a single PR URL entry extracted from an expedition report.
-type PRIndexEntry struct {
+type PRIndexEntry struct { // nosemgrep: domain-primitives.public-string-field-go -- PRUrl is a plain record field; newtype adds no safety benefit [permanent]
 	Expedition int    `json:"expedition"`
 	IssueID    string `json:"issue_id"`
 	PRUrl      string `json:"pr_url"`
