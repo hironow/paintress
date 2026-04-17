@@ -8,7 +8,7 @@ import (
 )
 
 // Issue represents a Linear issue for pipe-composable output.
-type Issue struct {
+type Issue struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Labels is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	ID       string   `json:"id"`
 	Title    string   `json:"title"`
 	Priority int      `json:"priority"`

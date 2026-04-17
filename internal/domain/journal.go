@@ -7,7 +7,7 @@ func JournalDir(continent string) string {
 }
 
 // JournalEntry is a structured journal record.
-type JournalEntry struct {
+type JournalEntry struct { // nosemgrep: domain-primitives.public-string-field-go -- PRUrl is a plain URL record field; newtype wrapping adds no safety benefit [permanent]
 	Expedition  int
 	Date        string
 	IssueID     string

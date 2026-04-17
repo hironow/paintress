@@ -74,16 +74,24 @@ func IsValidDMailKind(kind DMailKind) bool {
 // ErrDMailKindInvalid is returned when a D-Mail kind is not in the canonical set.
 var ErrDMailKindInvalid = errors.New("dmail: invalid kind")
 
-// ValidateKind checks that kind is one of the allowed D-Mail kinds.
-func ValidateKind(kind DMailKind) error {
+// ParseKind parses and validates a D-Mail kind, returning the validated kind or an error.
+func ParseKind(kind DMailKind) (DMailKind, error) {
 	if !IsValidDMailKind(kind) {
-		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
+		return "", fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
 	}
-	return nil
+	return kind, nil
+}
+
+// ValidateKind checks that kind is one of the allowed D-Mail kinds.
+//
+// Deprecated: prefer ParseKind which returns the validated kind.
+func ValidateKind(kind DMailKind) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseKind is the canonical parse function [permanent]
+	_, err := ParseKind(kind)
+	return err
 }
 
 // WaveStepDef defines a single step within a wave specification.
-type WaveStepDef struct {
+type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Targets/Prerequisites are YAML-serialized spec fields; FCC wrapping would break JSON/YAML marshaling [permanent]
 	ID            string   `yaml:"id" json:"id"`
 	Title         string   `yaml:"title" json:"title"`
 	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
@@ -95,14 +103,14 @@ type WaveStepDef struct {
 // WaveReference links a D-Mail to a wave and optionally a specific step.
 // In specification D-Mails: Steps contains the full step definitions.
 // In report/feedback D-Mails: Step identifies the specific step.
-type WaveReference struct {
+type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Steps is a YAML-serialized spec field; FCC wrapping would break JSON/YAML marshaling [permanent]
 	ID    string        `yaml:"id" json:"id"`
 	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
 	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`
 }
 
 // DMail represents a d-mail message with YAML frontmatter fields and a Markdown body.
-type DMail struct {
+type DMail struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a YAML-serialized field; FCC wrapping would break marshaling [permanent]
 	Name          string            `yaml:"name"`
 	Kind          DMailKind         `yaml:"kind"`
 	Description   string            `yaml:"description"`

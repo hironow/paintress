@@ -22,7 +22,7 @@ Do not change the Linear issue status — it stays in its current state until th
 //
 //	{file}   → review working directory
 //	{branch} → current git branch name
-func ExpandReviewCmd(cmd, dir, branch string) string {
+func ExpandReviewCmd(cmd, dir, branch string) string { // nosemgrep: domain-primitives.multiple-string-params-go -- cmd/dir/branch are semantically distinct template expansion params [permanent]
 	cmd = strings.ReplaceAll(cmd, "{file}", dir)
 	cmd = strings.ReplaceAll(cmd, "{branch}", branch)
 	return cmd

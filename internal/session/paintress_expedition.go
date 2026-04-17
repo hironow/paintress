@@ -36,7 +36,7 @@ func expeditionWaveRef(e *Expedition) (waveID, stepID string) {
 // OTel metric is recorded directly with model attribution.
 // waveID and stepID are set from the expedition target when available.
 // Returns an error if event persistence fails — expedition completion is critical.
-func (p *Paintress) emitExpeditionCompleted(ctx context.Context, exp int, status, issueID, bugsFound, model, waveID, stepID string) error {
+func (p *Paintress) emitExpeditionCompleted(ctx context.Context, exp int, status, issueID, bugsFound, model, waveID, stepID string) error { // nosemgrep: domain-primitives.multiple-string-params-go -- status/issueID/bugsFound/model/waveID/stepID are semantically distinct [permanent]
 	platform.RecordExpedition(ctx, status, model)
 	return p.Emitter.EmitCompleteExpedition(exp, status, issueID, bugsFound, waveID, stepID, time.Now())
 }
@@ -427,7 +427,7 @@ func (p *Paintress) handleExpeditionError(expCtx context.Context, expSpan trace.
 // dispatchExpeditionResult parses the expedition output, dispatches based on
 // status (complete/success/skipped/failed/parse-error), and updates counters.
 // Returns errComplete when all issues are done; nil otherwise.
-func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output, model string, expStart time.Time) error {
+func (p *Paintress) dispatchExpeditionResult(ctx context.Context, expCtx context.Context, expSpan trace.Span, exp int, expedition *Expedition, flagDir, workDir, output, model string, expStart time.Time) error { // nosemgrep: domain-primitives.multiple-string-params-go -- flagDir/workDir/output/model are semantically distinct [permanent]
 	// Archive ALL inbox D-Mails when this function returns, regardless of status.
 	// Without this, D-Mails remain in inbox and re-trigger waiting mode infinitely.
 	defer func() {

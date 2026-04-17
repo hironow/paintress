@@ -91,7 +91,7 @@ func (e *expeditionEventEmitter) EmitStartExpedition(expedition, worker int, mod
 	return e.emit(ev)
 }
 
-func (e *expeditionEventEmitter) EmitCompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) error {
+func (e *expeditionEventEmitter) EmitCompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) error { // nosemgrep: domain-primitives.multiple-string-params-go -- status/issueID/bugsFound/waveID/stepID are semantically distinct [permanent]
 	events, err := e.agg.CompleteExpedition(expedition, status, issueID, bugsFound, waveID, stepID, now)
 	if err != nil {
 		return err

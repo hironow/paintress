@@ -126,23 +126,23 @@ func TestSessionStreamEvent_WithRaw(t *testing.T) {
 	}
 }
 
-func TestValidateSessionStreamEvent(t *testing.T) {
+func TestParseSessionStreamEvent(t *testing.T) {
 	t.Parallel()
 
 	valid := NewSessionStreamEvent("sightjack", ProviderClaudeCode, StreamSessionStart, nil)
-	if err := ValidateSessionStreamEvent(valid); err != nil {
+	if _, err := ParseSessionStreamEvent(valid); err != nil {
 		t.Errorf("valid event should pass: %v", err)
 	}
 
 	noTool := valid
 	noTool.Tool = ""
-	if err := ValidateSessionStreamEvent(noTool); err == nil {
+	if _, err := ParseSessionStreamEvent(noTool); err == nil {
 		t.Error("missing tool should fail")
 	}
 
 	noType := valid
 	noType.Type = ""
-	if err := ValidateSessionStreamEvent(noType); err == nil {
+	if _, err := ParseSessionStreamEvent(noType); err == nil {
 		t.Error("missing type should fail")
 	}
 }

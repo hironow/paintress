@@ -111,7 +111,7 @@ func StatusColor(s domain.CheckStatus) string {
 	}
 }
 
-func (l *Logger) logLine(prefix, color, format string, args ...any) {
+func (l *Logger) logLine(prefix, color, format string, args ...any) { // nosemgrep: domain-primitives.multiple-string-params-go -- internal log helper; params are semantically distinct [permanent]
 	msg := fmt.Sprintf(format, args...)
 	ts := time.Now().Format("15:04:05")
 	l.mu.Lock()
@@ -156,7 +156,7 @@ func (l *Logger) Debug(format string, args ...any) {
 
 // Banner prints an inverted-color banner line for D-Mail intent logging.
 // The description is truncated to 50 characters to keep banners compact.
-func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) {
+func (l *Logger) Banner(dir domain.BannerDirection, kind, name, description string) { // nosemgrep: domain-primitives.multiple-string-params-go -- semantically distinct params; matches BannerLogger interface [permanent]
 	desc := description
 	if len(desc) > 50 {
 		desc = desc[:47] + "..."

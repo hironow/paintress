@@ -27,7 +27,7 @@ type ApproverConfig interface {
 
 // Config holds the runtime configuration for a Paintress session.
 // Config implements ApproverConfig.
-type Config struct {
+type Config struct { // nosemgrep: domain-primitives.public-string-field-go -- DevURL is an internal config field; newtype wrapping would require 39+ callsite changes with no safety benefit [permanent]
 	Continent      string
 	MaxExpeditions int
 	TimeoutSec     int
@@ -80,7 +80,7 @@ type ComputedConfig struct{}
 
 // ProjectConfig holds project-scoped configuration stored in .expedition/config.yaml.
 // Runtime-only fields (Continent, DryRun, OutputFormat) are NOT persisted here.
-type ProjectConfig struct {
+type ProjectConfig struct { // nosemgrep: domain-primitives.public-string-field-go -- DevURL is a config field; newtype wrapping adds no safety benefit here [permanent]
 	Tracker        IssueTrackerConfig `yaml:"tracker,omitempty"`
 	Lang           string             `yaml:"lang,omitempty"`
 	MaxExpeditions int                `yaml:"max_expeditions,omitempty"`

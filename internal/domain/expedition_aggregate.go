@@ -73,7 +73,7 @@ func ValidExpeditionStatus(s string) bool {
 // On success, consecutive failures are reset. On failure, they increment.
 // Returns the expedition.completed event plus a gradient.changed event if applicable.
 // waveID and stepID are optional wave references for the Read Model.
-func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) ([]Event, error) {
+func (a *ExpeditionAggregate) CompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) ([]Event, error) { // nosemgrep: domain-primitives.multiple-string-params-go -- each param is semantically distinct (status/issueID/bugsFound/waveID/stepID) [permanent]
 	if !ValidExpeditionStatus(status) {
 		return nil, fmt.Errorf("unrecognized expedition status: %q", status)
 	}

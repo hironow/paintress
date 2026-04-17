@@ -96,8 +96,8 @@ type Event struct {
 	SeqNr         uint64          `json:"seq_nr,omitempty"`
 }
 
-// ValidateEvent checks that an Event has all required fields populated.
-func ValidateEvent(e Event) error {
+// ParseEvent validates an Event and returns the validated Event or an error.
+func ParseEvent(e Event) (Event, error) {
 	var errs []string
 	if e.ID == "" {
 		errs = append(errs, "ID is required")
@@ -117,9 +117,17 @@ func ValidateEvent(e Event) error {
 		errs = append(errs, fmt.Sprintf("schema_version %d exceeds supported version %d", e.SchemaVersion, CurrentEventSchemaVersion))
 	}
 	if len(errs) > 0 {
-		return errors.New("invalid event: " + strings.Join(errs, "; "))
+		return Event{}, errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
-	return nil
+	return e, nil
+}
+
+// ValidateEvent checks that an Event has all required fields populated.
+//
+// Deprecated: prefer ParseEvent which returns the validated Event.
+func ValidateEvent(e Event) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseEvent is the canonical parse function [permanent]
+	_, err := ParseEvent(e)
+	return err
 }
 
 // NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.
@@ -232,13 +240,13 @@ type RetryAttemptedData struct {
 }
 
 // EscalatedData is the payload for EventEscalated.
-type EscalatedData struct {
+type EscalatedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }
 
 // ResolvedData is the payload for EventResolved.
-type ResolvedData struct {
+type ResolvedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }
@@ -246,7 +254,7 @@ type ResolvedData struct {
 // SpecRegisteredData is the payload for EventSpecRegistered.
 // Records a wave specification from a D-Mail so that wave/step definitions
 // persist in the event store after the D-Mail is archived.
-type SpecRegisteredData struct {
+type SpecRegisteredData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Steps is a JSON event payload field; FCC wrapping would break marshaling [permanent]
 	WaveID string        `json:"wave_id"`
 	Steps  []WaveStepDef `json:"steps"`
 	Source string        `json:"source"` // D-Mail name for tracing

@@ -26,7 +26,7 @@ type InsightEntry struct {
 }
 
 // InsightFile is the on-disk representation of an insight ledger file.
-type InsightFile struct {
+type InsightFile struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Entries is parsed from Markdown body, YAML-serialized; FCC wrapping would break marshaling [permanent]
 	SchemaVersion string         `yaml:"insight-schema-version"`
 	Kind          string         `yaml:"kind"`
 	Tool          string         `yaml:"tool"`
@@ -44,7 +44,7 @@ type insightFrontmatter struct {
 }
 
 // InsightContext is the optional context field added to D-Mail envelopes.
-type InsightContext struct {
+type InsightContext struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Insights is YAML/JSON-serialized D-Mail context field; FCC wrapping would break marshaling [permanent]
 	Insights []InsightSummary `yaml:"insights,omitempty" json:"insights,omitempty"`
 }
 

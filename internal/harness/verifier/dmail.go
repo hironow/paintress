@@ -14,28 +14,36 @@ var validActions = map[string]bool{
 	"resolve":  true,
 }
 
-// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
-func ValidateDMail(d domain.DMail) error {
+// ParseDMail validates a DMail against D-Mail schema v1, returning the validated DMail or an error.
+func ParseDMail(d domain.DMail) (domain.DMail, error) {
 	if d.SchemaVersion == "" {
-		return fmt.Errorf("dmail: dmail-schema-version is required")
+		return domain.DMail{}, fmt.Errorf("dmail: dmail-schema-version is required")
 	}
 	if d.SchemaVersion != domain.DMailSchemaVersion {
-		return fmt.Errorf("dmail: unsupported dmail-schema-version: %q (want %q)", d.SchemaVersion, domain.DMailSchemaVersion)
+		return domain.DMail{}, fmt.Errorf("dmail: unsupported dmail-schema-version: %q (want %q)", d.SchemaVersion, domain.DMailSchemaVersion)
 	}
 	if d.Name == "" {
-		return fmt.Errorf("dmail: name is required")
+		return domain.DMail{}, fmt.Errorf("dmail: name is required")
 	}
 	if d.Kind == "" {
-		return fmt.Errorf("dmail: kind is required")
+		return domain.DMail{}, fmt.Errorf("dmail: kind is required")
 	}
-	if err := domain.ValidateKind(d.Kind); err != nil {
-		return err
+	if _, err := domain.ParseKind(d.Kind); err != nil {
+		return domain.DMail{}, err
 	}
 	if d.Description == "" {
-		return fmt.Errorf("dmail: description is required")
+		return domain.DMail{}, fmt.Errorf("dmail: description is required")
 	}
 	if d.Action != "" && !validActions[d.Action] {
-		return fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", d.Action)
+		return domain.DMail{}, fmt.Errorf("dmail: invalid action %q (valid: retry, escalate, resolve)", d.Action)
 	}
-	return nil
+	return d, nil
+}
+
+// ValidateDMail checks that a DMail conforms to D-Mail schema v1.
+//
+// Deprecated: prefer ParseDMail which returns the validated DMail.
+func ValidateDMail(d domain.DMail) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseDMail is the canonical parse function [permanent]
+	_, err := ParseDMail(d)
+	return err
 }

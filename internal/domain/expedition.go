@@ -5,7 +5,7 @@ import (
 )
 
 // PromptData holds all dynamic values injected into the expedition prompt template.
-type PromptData struct {
+type PromptData struct { // nosemgrep: domain-primitives.public-string-field-go -- DevURL is a template injection field; newtype adds no safety benefit [permanent]
 	Number          int
 	Timestamp       string
 	Bt              string // "`"

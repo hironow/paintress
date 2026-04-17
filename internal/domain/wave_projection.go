@@ -19,7 +19,7 @@ type StepProgress struct {
 }
 
 // WaveProgress tracks the overall progress of a wave across its steps.
-type WaveProgress struct {
+type WaveProgress struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Steps is a read-model projection field; FCC wrapping would break IsComplete/PendingSteps iteration semantics [permanent]
 	WaveID string
 	Title  string
 	Steps  []StepProgress

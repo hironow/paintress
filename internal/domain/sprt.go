@@ -42,25 +42,34 @@ type SPRTState struct {
 	LowerBound float64 // B = log(beta/(1-alpha))
 }
 
-// ValidateSPRTConfig checks that cfg values will not produce NaN/Inf in
-// the log-likelihood computation. Returns an error describing the violation.
-func ValidateSPRTConfig(cfg SPRTConfig) error {
+// ParseSPRTConfig validates an SPRTConfig and returns the validated config or an error.
+// It checks that values will not produce NaN/Inf in the log-likelihood computation.
+func ParseSPRTConfig(cfg SPRTConfig) (SPRTConfig, error) {
 	if cfg.P0 <= 0 || cfg.P0 >= 1 {
-		return fmt.Errorf("P0 must be in (0,1), got %g", cfg.P0)
+		return SPRTConfig{}, fmt.Errorf("P0 must be in (0,1), got %g", cfg.P0)
 	}
 	if cfg.P1 <= 0 || cfg.P1 >= 1 {
-		return fmt.Errorf("P1 must be in (0,1), got %g", cfg.P1)
+		return SPRTConfig{}, fmt.Errorf("P1 must be in (0,1), got %g", cfg.P1)
 	}
 	if cfg.P0 >= cfg.P1 {
-		return fmt.Errorf("P0 must be less than P1 (got P0=%g, P1=%g)", cfg.P0, cfg.P1)
+		return SPRTConfig{}, fmt.Errorf("P0 must be less than P1 (got P0=%g, P1=%g)", cfg.P0, cfg.P1)
 	}
 	if cfg.Alpha <= 0 || cfg.Alpha >= 1 {
-		return fmt.Errorf("Alpha must be in (0,1), got %g", cfg.Alpha)
+		return SPRTConfig{}, fmt.Errorf("Alpha must be in (0,1), got %g", cfg.Alpha)
 	}
 	if cfg.Beta <= 0 || cfg.Beta >= 1 {
-		return fmt.Errorf("Beta must be in (0,1), got %g", cfg.Beta)
+		return SPRTConfig{}, fmt.Errorf("Beta must be in (0,1), got %g", cfg.Beta)
 	}
-	return nil
+	return cfg, nil
+}
+
+// ValidateSPRTConfig checks that cfg values will not produce NaN/Inf in
+// the log-likelihood computation. Returns an error describing the violation.
+//
+// Deprecated: prefer ParseSPRTConfig which returns the validated config.
+func ValidateSPRTConfig(cfg SPRTConfig) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseSPRTConfig is the canonical parse function [permanent]
+	_, err := ParseSPRTConfig(cfg)
+	return err
 }
 
 // SPRT runs a Sequential Probability Ratio Test on expedition results.
