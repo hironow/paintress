@@ -364,14 +364,15 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		if expNormalizer != nil && e.StreamBus != nil {
 			// providerSessionID="" → SessionEnd falls back to stream-captured value
 			endEv := expNormalizer.SessionEnd("", expRunErr)
-			if vErr := domain.ValidateSessionStreamEvent(endEv); vErr != nil {
+			parsedEnd, vErr := domain.ParseSessionStreamEvent(endEv)
+			if vErr != nil {
 				if e.Logger != nil {
 					e.Logger.Warn("stream event dropped (invalid): %v", vErr)
 				}
 				return
 			}
 			// Use publishCtx (WithoutCancel): preserves trace baggage while surviving cancellation.
-			e.StreamBus.Publish(publishCtx, endEv)
+			e.StreamBus.Publish(publishCtx, parsedEnd)
 		}
 	}()
 
@@ -399,13 +400,14 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 			expNormalizer = platform.NewStreamNormalizer("paintress", domain.ProviderClaudeCode)
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := expNormalizer.Normalize(msg, raw); ev != nil {
-					if vErr := domain.ValidateSessionStreamEvent(*ev); vErr != nil {
+					parsedEv, vErr := domain.ParseSessionStreamEvent(*ev)
+					if vErr != nil {
 						if e.Logger != nil {
 							e.Logger.Warn("stream event dropped (invalid): %v", vErr)
 						}
 						return
 					}
-					e.StreamBus.Publish(expCtx, *ev)
+					e.StreamBus.Publish(expCtx, parsedEv)
 				}
 			})
 		}

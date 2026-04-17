@@ -179,7 +179,7 @@ func TestStreamNormalizer_OutputPassesValidation(t *testing.T) {
 	}
 	initRaw, _ := json.Marshal(initMsg)
 	if ev := n.Normalize(initMsg, initRaw); ev != nil {
-		if err := domain.ValidateSessionStreamEvent(*ev); err != nil {
+		if _, err := domain.ParseSessionStreamEvent(*ev); err != nil {
 			t.Errorf("session_start failed validation: %v", err)
 		}
 	} else {
@@ -201,7 +201,7 @@ func TestStreamNormalizer_OutputPassesValidation(t *testing.T) {
 	}
 	toolRaw, _ := json.Marshal(toolMsg)
 	if ev := n.Normalize(toolMsg, toolRaw); ev != nil {
-		if err := domain.ValidateSessionStreamEvent(*ev); err != nil {
+		if _, err := domain.ParseSessionStreamEvent(*ev); err != nil {
 			t.Errorf("tool_use_start failed validation: %v", err)
 		}
 	} else {
@@ -210,7 +210,7 @@ func TestStreamNormalizer_OutputPassesValidation(t *testing.T) {
 
 	// session_end
 	endEv := n.SessionEnd("provider-1", nil)
-	if err := domain.ValidateSessionStreamEvent(endEv); err != nil {
+	if _, err := domain.ParseSessionStreamEvent(endEv); err != nil {
 		t.Errorf("session_end failed validation: %v", err)
 	}
 }

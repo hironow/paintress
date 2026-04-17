@@ -154,14 +154,15 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		normalizer.SetCodingSessionID(rc.CodingSessionID)
 		defer func() {
 			endEvent := normalizer.SessionEnd(providerSessionID, runResultErr)
-			if vErr := domain.ValidateSessionStreamEvent(endEvent); vErr != nil {
+			parsedEnd, vErr := domain.ParseSessionStreamEvent(endEvent)
+			if vErr != nil {
 				if a.Logger != nil {
 					a.Logger.Warn("session_end event dropped (invalid): %v", vErr)
 				}
 				return
 			}
 			// Use publishCtx (WithoutCancel): preserves trace baggage while surviving cancellation.
-			a.StreamBus.Publish(publishCtx, endEvent)
+			a.StreamBus.Publish(publishCtx, parsedEnd)
 		}()
 	}
 
@@ -178,13 +179,14 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		if normalizer != nil {
 			emitter.SetStreamMessageHandler(func(msg *platform.StreamMessage, raw json.RawMessage) {
 				if ev := normalizer.Normalize(msg, raw); ev != nil {
-					if vErr := domain.ValidateSessionStreamEvent(*ev); vErr != nil {
+					parsedEv, vErr := domain.ParseSessionStreamEvent(*ev)
+					if vErr != nil {
 						if a.Logger != nil {
 							a.Logger.Warn("stream event dropped (invalid): %v", vErr)
 						}
 						return
 					}
-					a.StreamBus.Publish(ctx, *ev)
+					a.StreamBus.Publish(ctx, parsedEv)
 				}
 			})
 		}
@@ -245,7 +247,7 @@ func (a *ClaudeAdapter) RunDetailed(ctx context.Context, prompt string, w io.Wri
 		if rawEvents := emitter.RawEvents(); len(rawEvents) > 0 {
 			span.SetAttributes(attribute.StringSlice("stream.raw_events", platform.SanitizeUTF8Slice(rawEvents)))
 		}
-		if result != nil && result.SessionID != "" {
+		if result.SessionID != "" {
 			providerSessionID = result.SessionID
 			span.SetAttributes(platform.GenAISessionAttrs(result.SessionID)...)
 		}

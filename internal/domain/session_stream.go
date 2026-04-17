@@ -104,10 +104,3 @@ func ParseSessionStreamEvent(e SessionStreamEvent) (SessionStreamEvent, error) {
 	return e, nil
 }
 
-// ValidateSessionStreamEvent checks required fields.
-//
-// Deprecated: prefer ParseSessionStreamEvent which returns the validated event.
-func ValidateSessionStreamEvent(e SessionStreamEvent) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseSessionStreamEvent is the canonical parse function [permanent]
-	_, err := ParseSessionStreamEvent(e)
-	return err
-}
