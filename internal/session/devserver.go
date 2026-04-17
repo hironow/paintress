@@ -87,7 +87,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("log file creation failed: %w", err)
 	}
-	ds.process = exec.CommandContext(ctx, parts[0], parts[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command -- cmd is from validated Config.DevCmd, not user input [permanent]
+	ds.process = exec.CommandContext(ctx, parts[0], parts[1:]...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command,semgrep.lod-excessive-dot-chain -- cmd is from validated Config.DevCmd, not user input; exec.CommandContext assignment is standard os/exec API shape [permanent]
 	ds.process.Dir = ds.dir
 	ds.process.Stdout = logFile
 	ds.process.Stderr = logFile
