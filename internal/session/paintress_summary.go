@@ -20,7 +20,8 @@ func reconcileFlags(continent string, workers int) domain.ExpeditionFlag {
 	}
 	pattern := filepath.Join(continent, domain.StateDir, ".run", "worktrees", "*",
 		domain.StateDir, ".run", "flag.md")
-	matches, _ := filepath.Glob(pattern)
+	matches, matchErr := filepath.Glob(pattern)
+	_ = matchErr // filepath.Glob only errs on malformed patterns; literal pattern is safe
 	for _, match := range matches {
 		base := filepath.Dir(filepath.Dir(filepath.Dir(match)))
 		flags = append(flags, ReadFlag(base))

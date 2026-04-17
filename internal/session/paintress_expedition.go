@@ -164,7 +164,9 @@ func (p *Paintress) runWorker(ctx context.Context, workerID int, startExp int, l
 						// Try remaining targets
 						claimed := false
 						for _, t := range targets[1:] {
-							if ok2, _ := p.claimRegistry.TryClaim(t.ID, exp); ok2 {
+							ok2, holderExp := p.claimRegistry.TryClaim(t.ID, exp)
+							_ = holderExp
+							if ok2 {
 								target = t
 								claimed = true
 								break

@@ -88,7 +88,10 @@ func CheckContextBudget(streamJSON string, baseDir string) domain.DoctorCheck {
 		// Resolve baseDir: fall back to cwd if empty
 		resolvedDir := baseDir
 		if resolvedDir == "" {
-			resolvedDir, _ = os.Getwd()
+			cwd, cwdErr := os.Getwd()
+			if cwdErr == nil {
+				resolvedDir = cwd
+			}
 		}
 		projectSettings := filepath.Join(resolvedDir, ".claude", "settings.json")
 		if _, err := os.Stat(projectSettings); err == nil {

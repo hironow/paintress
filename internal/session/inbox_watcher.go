@@ -43,7 +43,11 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm domain
 	eventCount := 0
 
 	// Initial scan: catch files that already exist before the event loop starts.
-	entries, _ := os.ReadDir(inboxDir)
+	entries, err := os.ReadDir(inboxDir)
+	if err != nil {
+		span.RecordError(err)
+		entries = nil
+	}
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
 			continue
