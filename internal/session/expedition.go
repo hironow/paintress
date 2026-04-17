@@ -419,15 +419,24 @@ func (e *Expedition) Run(ctx context.Context) (string, error) {
 		for _, msg := range messages {
 			switch msg.Type {
 			case "assistant":
-				text, _ := msg.ExtractText()
+				text, err := msg.ExtractText()
+				if err != nil && e.Logger != nil {
+					e.Logger.Info("extract text: %v", err)
+				}
 				if text != "" {
-					writer.Write([]byte(text))
+					if _, wErr := writer.Write([]byte(text)); wErr != nil && e.Logger != nil {
+						e.Logger.Info("stream write: %v", wErr)
+					}
 					output.WriteString(text)
 				}
 				if e.Reserve.CheckOutput(text) {
 					invokeSpan.AddEvent("rate_limit.detected")
 				}
-				if am, _ := msg.ParseAssistantMessage(); am != nil {
+				if am, err := msg.ParseAssistantMessage(); err != nil {
+					if e.Logger != nil {
+						e.Logger.Info("parse assistant message: %v", err)
+					}
+				} else if am != nil {
 					if am.Model != "" {
 						responseModel = am.Model
 					}

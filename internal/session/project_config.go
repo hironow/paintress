@@ -56,78 +56,78 @@ func UpdateProjectConfig(continent string, key string, value string) error {
 func setProjectConfigField(cfg *domain.ProjectConfig, key string, value string) error {
 	switch key {
 	case "tracker.team":
-		cfg.Tracker.Team = value
+		cfg.Tracker.Team = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "tracker.project":
-		cfg.Tracker.Project = value
+		cfg.Tracker.Project = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "tracker.cycle":
-		cfg.Tracker.Cycle = value
+		cfg.Tracker.Cycle = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "lang":
 		if !domain.ValidLang(value) {
 			return fmt.Errorf("invalid lang %q: must be ja or en", value)
 		}
-		cfg.Lang = value
+		cfg.Lang = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "max_expeditions":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid max_expeditions %q: must be non-negative integer", value)
 		}
-		cfg.MaxExpeditions = n
+		cfg.MaxExpeditions = n // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "timeout_sec":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid timeout_sec %q: must be non-negative integer", value)
 		}
-		cfg.TimeoutSec = n
+		cfg.TimeoutSec = n // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "model":
-		cfg.Model = value
+		cfg.Model = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "base_branch":
-		cfg.BaseBranch = value
+		cfg.BaseBranch = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "claude_cmd":
-		cfg.ClaudeCmd = value
+		cfg.ClaudeCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "dev_cmd":
-		cfg.DevCmd = value
+		cfg.DevCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "dev_dir":
-		cfg.DevDir = value
+		cfg.DevDir = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "dev_url":
-		cfg.DevURL = value
+		cfg.DevURL = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "review_cmd":
-		cfg.ReviewCmd = value
+		cfg.ReviewCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "workers":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid workers %q: must be non-negative integer", value)
 		}
-		cfg.Workers = n
+		cfg.Workers = n // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "setup_cmd":
-		cfg.SetupCmd = value
+		cfg.SetupCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "no_dev":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
 			return fmt.Errorf("invalid no_dev %q: must be true or false", value)
 		}
-		cfg.NoDev = b
+		cfg.NoDev = b // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "notify_cmd":
-		cfg.NotifyCmd = value
+		cfg.NotifyCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "approve_cmd":
-		cfg.ApproveCmd = value
+		cfg.ApproveCmd = value // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "auto_approve":
 		b, err := strconv.ParseBool(value)
 		if err != nil {
 			return fmt.Errorf("invalid auto_approve %q: must be true or false", value)
 		}
-		cfg.AutoApprove = b
+		cfg.AutoApprove = b // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "max_retries":
 		n, err := strconv.Atoi(value)
 		if err != nil || n < 0 {
 			return fmt.Errorf("invalid max_retries %q: must be non-negative integer", value)
 		}
-		cfg.MaxRetries = n
+		cfg.MaxRetries = n // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	case "idle_timeout":
 		d, err := time.ParseDuration(value)
 		if err != nil {
 			return fmt.Errorf("invalid idle_timeout %q: %w", value, err)
 		}
-		cfg.IdleTimeout = d
+		cfg.IdleTimeout = d // nosemgrep: immutability.no-pointer-field-mutation-go -- config setter pattern: mutation is intentional at config load time; immutable builder rewrite is over-engineering for CLI config [permanent]
 	default:
 		return fmt.Errorf("unknown config key %q", key)
 	}

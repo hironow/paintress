@@ -281,7 +281,10 @@ func RunDoctor(ctx context.Context, claudeCmd string, continent string, repair b
 	if repair && continent != "" {
 		pidPath := filepath.Join(continent, domain.StateDir, "watch.pid")
 		if data, err := os.ReadFile(pidPath); err == nil {
-			pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
+			pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+			if err != nil {
+				pid = 0
+			}
 			if pid > 0 && !platform.IsProcessAlive(pid) {
 				_ = os.Remove(pidPath)
 				checks = append(checks, domain.DoctorCheck{

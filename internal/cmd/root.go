@@ -49,18 +49,18 @@ func NewRootCommand() *cobra.Command {
 		SilenceErrors: true, // nosemgrep: cobra-silence-errors-without-output — main.go handles error output [permanent]
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			applyOtelEnv(domain.StateDir)
-			noColor, _ := cmd.Flags().GetBool("no-color")
+			noColor := mustBool(cmd, "no-color")
 			if noColor {
 				os.Setenv("NO_COLOR", "1")
 			}
-			verbose, _ := cmd.Flags().GetBool("verbose")
+			verbose := mustBool(cmd, "verbose")
 			out := cmd.ErrOrStderr()
-			quiet, _ := cmd.Flags().GetBool("quiet")
+			quiet := mustBool(cmd, "quiet")
 			if quiet {
 				out = io.Discard
 			}
 			logger := platform.NewLogger(out, verbose)
-			outputFmt, _ := cmd.Flags().GetString("output")
+			outputFmt := mustString(cmd, "output")
 			if outputFmt != "json" {
 				logger.Header("paintress", Version)
 				logger.Section(cmd.Name())

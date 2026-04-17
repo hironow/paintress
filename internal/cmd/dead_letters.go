@@ -63,7 +63,7 @@ func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
 	// Pre-flight: check DB exists to avoid creating dirs/DB as side effect
 	dbPath := filepath.Join(repoPath, domain.StateDir, ".run", "outbox.db")
 	if _, statErr := os.Stat(dbPath); statErr != nil {
-		outputFmt, _ := cmd.Flags().GetString("output")
+		outputFmt := mustString(cmd, "output")
 		if outputFmt == "json" {
 			fmt.Fprintln(cmd.OutOrStdout(), `{"dead_letters":0,"purged":0}`)
 		} else {
@@ -83,8 +83,8 @@ func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	execute, _ := cmd.Flags().GetBool("execute")
-	outputFmt, _ := cmd.Flags().GetString("output")
+	execute := mustBool(cmd, "execute")
+	outputFmt := mustString(cmd, "output")
 	w := cmd.OutOrStdout()
 	ew := cmd.ErrOrStderr()
 
@@ -122,7 +122,7 @@ func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	yes, _ := cmd.Flags().GetBool("yes")
+	yes := mustBool(cmd, "yes")
 	if !yes {
 		fmt.Fprintf(ew, "\nPurge %d dead-lettered item(s)? [y/N] ", count)
 		scanner := bufio.NewScanner(cmd.InOrStdin())
