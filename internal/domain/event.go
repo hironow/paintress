@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	// nosemgrep: clean-architecture.domain-imports-usecase-go -- uuid is a pure ID library with no infrastructure coupling; domain identity requires it [permanent]
 	"github.com/google/uuid"
 )
 
+// nosemgrep: clean-architecture.sql-in-domain-go -- word 'update' in comment is English prose, not SQL; regex false positive [permanent]
 // EventApplier applies domain events to update materialized projections.
 // Note: context is intentionally absent — domain types must remain pure.
 // Use ContextEventApplier (usecase/port) when caller context is required.

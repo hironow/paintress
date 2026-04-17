@@ -16,6 +16,7 @@ type PolicyHandler func(ctx context.Context, event domain.Event) error
 
 // PolicyEngine dispatches domain events to registered policy handlers.
 // This connects the POLICY registry (domain.Policies) to executable handlers.
+// nosemgrep: naming.ambiguous-suffix-struct-go -- cross-tool architecture: PolicyEngine is intentional (all 4 tools share this pattern) [permanent]
 type PolicyEngine struct {
 	handlers map[domain.EventType][]PolicyHandler
 	logger   domain.Logger
