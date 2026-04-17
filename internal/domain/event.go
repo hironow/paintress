@@ -96,8 +96,8 @@ type Event struct {
 	SeqNr         uint64          `json:"seq_nr,omitempty"`
 }
 
-// ValidateEvent checks that an Event has all required fields populated.
-func ValidateEvent(e Event) error {
+// ParseEvent validates an Event and returns the validated Event or an error.
+func ParseEvent(e Event) (Event, error) {
 	var errs []string
 	if e.ID == "" {
 		errs = append(errs, "ID is required")
@@ -117,9 +117,17 @@ func ValidateEvent(e Event) error {
 		errs = append(errs, fmt.Sprintf("schema_version %d exceeds supported version %d", e.SchemaVersion, CurrentEventSchemaVersion))
 	}
 	if len(errs) > 0 {
-		return errors.New("invalid event: " + strings.Join(errs, "; "))
+		return Event{}, errors.New("invalid event: " + strings.Join(errs, "; "))
 	}
-	return nil
+	return e, nil
+}
+
+// ValidateEvent checks that an Event has all required fields populated.
+//
+// Deprecated: prefer ParseEvent which returns the validated Event.
+func ValidateEvent(e Event) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseEvent is the canonical parse function [permanent]
+	_, err := ParseEvent(e)
+	return err
 }
 
 // NewEvent creates a new Event with a UUID, the given timestamp, and marshaled data payload.

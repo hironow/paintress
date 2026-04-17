@@ -26,7 +26,7 @@ func (e *localGitExecutor) Git(ctx context.Context, dir string, args ...string) 
 }
 
 func (e *localGitExecutor) Shell(ctx context.Context, dir string, command string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), command)
+	cmd := exec.CommandContext(ctx, shellName(), shellFlag(), command) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command -- command is from validated Config.SetupCmd, not user input [permanent]
 	cmd.Dir = dir
 	return cmd.CombinedOutput()
 }
@@ -56,13 +56,22 @@ func NewWorktreePool(git port.GitExecutor, repoDir, baseBranch, setupCmd string,
 	}
 }
 
-// ValidateBaseBranch verifies that the given branch exists as a local git ref.
-func ValidateBaseBranch(ctx context.Context, git port.GitExecutor, repoDir, branch string) error {
+// ParseBaseBranch verifies that the given branch exists as a local git ref,
+// returning the branch name or an error.
+func ParseBaseBranch(ctx context.Context, git port.GitExecutor, repoDir, branch string) (string, error) {
 	_, err := git.Git(ctx, repoDir, "rev-parse", "--verify", branch)
 	if err != nil {
-		return fmt.Errorf("base branch %q does not exist as a git ref: %w", branch, err)
+		return "", fmt.Errorf("base branch %q does not exist as a git ref: %w", branch, err)
 	}
-	return nil
+	return branch, nil
+}
+
+// ValidateBaseBranch verifies that the given branch exists as a local git ref.
+//
+// Deprecated: prefer ParseBaseBranch which returns the validated branch name.
+func ValidateBaseBranch(ctx context.Context, git port.GitExecutor, repoDir, branch string) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseBaseBranch is the canonical parse function [permanent]
+	_, err := ParseBaseBranch(ctx, git, repoDir, branch)
+	return err
 }
 
 // Init prunes stale worktree references and creates fresh worktrees for each worker.

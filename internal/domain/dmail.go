@@ -74,12 +74,20 @@ func IsValidDMailKind(kind DMailKind) bool {
 // ErrDMailKindInvalid is returned when a D-Mail kind is not in the canonical set.
 var ErrDMailKindInvalid = errors.New("dmail: invalid kind")
 
-// ValidateKind checks that kind is one of the allowed D-Mail kinds.
-func ValidateKind(kind DMailKind) error {
+// ParseKind parses and validates a D-Mail kind, returning the validated kind or an error.
+func ParseKind(kind DMailKind) (DMailKind, error) {
 	if !IsValidDMailKind(kind) {
-		return fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
+		return "", fmt.Errorf("invalid D-Mail kind %q: %w", kind, ErrDMailKindInvalid)
 	}
-	return nil
+	return kind, nil
+}
+
+// ValidateKind checks that kind is one of the allowed D-Mail kinds.
+//
+// Deprecated: prefer ParseKind which returns the validated kind.
+func ValidateKind(kind DMailKind) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseKind is the canonical parse function [permanent]
+	_, err := ParseKind(kind)
+	return err
 }
 
 // WaveStepDef defines a single step within a wave specification.

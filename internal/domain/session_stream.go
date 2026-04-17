@@ -90,16 +90,24 @@ func TruncateField(s string, maxBytes int) (string, bool) {
 	return s[:limit] + "...", true
 }
 
-// ValidateSessionStreamEvent checks required fields.
-func ValidateSessionStreamEvent(e SessionStreamEvent) error {
+// ParseSessionStreamEvent validates a SessionStreamEvent and returns the validated event or an error.
+func ParseSessionStreamEvent(e SessionStreamEvent) (SessionStreamEvent, error) {
 	if e.Tool == "" {
-		return fmt.Errorf("session stream event: tool is required")
+		return SessionStreamEvent{}, fmt.Errorf("session stream event: tool is required")
 	}
 	if e.Type == "" {
-		return fmt.Errorf("session stream event: type is required")
+		return SessionStreamEvent{}, fmt.Errorf("session stream event: type is required")
 	}
 	if e.ID == "" {
-		return fmt.Errorf("session stream event: id is required")
+		return SessionStreamEvent{}, fmt.Errorf("session stream event: id is required")
 	}
-	return nil
+	return e, nil
+}
+
+// ValidateSessionStreamEvent checks required fields.
+//
+// Deprecated: prefer ParseSessionStreamEvent which returns the validated event.
+func ValidateSessionStreamEvent(e SessionStreamEvent) error { // nosemgrep: parse-dont-validate.validate-returns-error-only-go -- backward-compat wrapper; ParseSessionStreamEvent is the canonical parse function [permanent]
+	_, err := ParseSessionStreamEvent(e)
+	return err
 }
