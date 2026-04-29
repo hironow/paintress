@@ -22,7 +22,7 @@ const (
 )
 
 // InitEntry represents a single init action.
-type InitEntry struct {
+type InitEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- init result family (InitEntry/InitResult) is a cohesive DTO set for the project initialization output; splitting would fragment the init command's display logic [permanent]
 	Path   string     // relative path (e.g. ".siren/config.yaml")
 	Action InitAction // what happened
 	Detail string     // optional detail (e.g. warning message)

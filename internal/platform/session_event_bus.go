@@ -11,7 +11,7 @@ import (
 const publishTimeout = 100 * time.Millisecond
 
 // BusSubscriber receives session stream events from an InProcessSessionBus.
-type BusSubscriber struct {
+type BusSubscriber struct { // nosemgrep: structure.multiple-exported-structs-go -- session bus family; BusSubscriber is the concrete subscriber for InProcessSessionBus; co-location with InProcessSessionBus is required for correct channel lifecycle management [permanent]
 	ch   chan domain.SessionStreamEvent
 	done chan struct{}
 	once sync.Once

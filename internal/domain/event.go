@@ -82,7 +82,7 @@ func AllValidEventTypes() map[EventType]bool {
 const CurrentEventSchemaVersion uint8 = 1
 
 // Event is the envelope for all domain events in the event store.
-type Event struct {
+type Event struct { // nosemgrep: structure.multiple-exported-structs-go -- event envelope + event payload family (AppendResult/LoadResult/ExpeditionStartedData/...) are a cohesive event-sourcing schema; splitting would fragment the event store contract [permanent]
 	SchemaVersion uint8           `json:"schema_version,omitempty"`
 	ID            string          `json:"id"`
 	Type          EventType       `json:"type"`
@@ -146,12 +146,12 @@ func NewEvent(eventType EventType, data any, timestamp time.Time) (Event, error)
 }
 
 // AppendResult captures metrics from an event store Append operation.
-type AppendResult struct {
+type AppendResult struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	BytesWritten int // total bytes written to event files
 }
 
 // LoadResult captures metrics from an event store Load operation.
-type LoadResult struct {
+type LoadResult struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	FileCount        int // number of .jsonl files scanned
 	CorruptLineCount int // number of lines skipped due to parse errors
 }
@@ -164,14 +164,14 @@ func EventsDir(continent string) string {
 // --- Event payload types ---
 
 // ExpeditionStartedData is the payload for EventExpeditionStarted.
-type ExpeditionStartedData struct {
+type ExpeditionStartedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Expedition int    `json:"expedition"`
 	Worker     int    `json:"worker"`
 	Model      string `json:"model"`
 }
 
 // ExpeditionCompletedData is the payload for EventExpeditionCompleted.
-type ExpeditionCompletedData struct {
+type ExpeditionCompletedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Expedition int    `json:"expedition"`
 	Status     string `json:"status"`
 	IssueID    string `json:"issue_id,omitempty"`
@@ -181,28 +181,28 @@ type ExpeditionCompletedData struct {
 }
 
 // DMailStagedData is the payload for EventDMailStaged.
-type DMailStagedData struct {
+type DMailStagedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Name string `json:"name"`
 }
 
 // DMailFlushedData is the payload for EventDMailFlushed.
-type DMailFlushedData struct {
+type DMailFlushedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Count int `json:"count"`
 }
 
 // DMailArchivedData is the payload for EventDMailArchived.
-type DMailArchivedData struct {
+type DMailArchivedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Name string `json:"name"`
 }
 
 // GradientChangedData is the payload for EventGradientChanged.
-type GradientChangedData struct {
+type GradientChangedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Level    int    `json:"level"`
 	Operator string `json:"operator"`
 }
 
 // GommageTriggeredData is the payload for EventGommageTriggered.
-type GommageTriggeredData struct {
+type GommageTriggeredData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Expedition          int          `json:"expedition"`
 	ConsecutiveFailures int          `json:"consecutive_failures"`
 	Class               GommageClass `json:"class,omitempty"`
@@ -211,7 +211,7 @@ type GommageTriggeredData struct {
 }
 
 // GommageRecoveryData is the payload for EventGommageRecovery.
-type GommageRecoveryData struct {
+type GommageRecoveryData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Expedition int          `json:"expedition"`
 	Class      GommageClass `json:"class"`
 	Action     string       `json:"action"`
@@ -220,7 +220,7 @@ type GommageRecoveryData struct {
 }
 
 // ExpeditionCheckpointData is the payload for EventExpeditionCheckpoint.
-type ExpeditionCheckpointData struct {
+type ExpeditionCheckpointData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Expedition  int    `json:"expedition"`
 	Phase       string `json:"phase"`
 	WorkDir     string `json:"work_dir"`
@@ -228,25 +228,25 @@ type ExpeditionCheckpointData struct {
 }
 
 // InboxReceivedData is the payload for EventInboxReceived.
-type InboxReceivedData struct {
+type InboxReceivedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	Name     string `json:"name"`
 	Severity string `json:"severity"`
 }
 
 // RetryAttemptedData is the payload for EventRetryAttempted.
-type RetryAttemptedData struct {
+type RetryAttemptedData struct { // nosemgrep: structure.multiple-exported-structs-go -- event payload family cohesive set; see Event [permanent]
 	DMail   string `json:"dmail"`
 	Attempt int    `json:"attempt"`
 }
 
 // EscalatedData is the payload for EventEscalated.
-type EscalatedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a JSON event payload field; FCC wrapping would break marshaling [permanent]
+type EscalatedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Issues is a JSON event payload field (no FCC benefit); event payload family cohesive set; see Event [permanent]
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }
 
 // ResolvedData is the payload for EventResolved.
-type ResolvedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Issues is a JSON event payload field; FCC wrapping would break marshaling [permanent]
+type ResolvedData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Issues is a JSON event payload field (no FCC benefit); event payload family cohesive set; see Event [permanent]
 	DMail  string   `json:"dmail"`
 	Issues []string `json:"issues"`
 }
@@ -254,7 +254,7 @@ type ResolvedData struct { // nosemgrep: first-class-collection.raw-slice-field-
 // SpecRegisteredData is the payload for EventSpecRegistered.
 // Records a wave specification from a D-Mail so that wave/step definitions
 // persist in the event store after the D-Mail is archived.
-type SpecRegisteredData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Steps is a JSON event payload field; FCC wrapping would break marshaling [permanent]
+type SpecRegisteredData struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Steps is a JSON event payload field (no FCC benefit); event payload family cohesive set; see Event [permanent]
 	WaveID string        `json:"wave_id"`
 	Steps  []WaveStepDef `json:"steps"`
 	Source string        `json:"source"` // D-Mail name for tracing

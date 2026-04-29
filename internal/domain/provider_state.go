@@ -37,7 +37,7 @@ const (
 	MetadataProviderResumeWhen  = "provider_resume_when"
 )
 
-type ProviderStateSnapshot struct {
+type ProviderStateSnapshot struct { // nosemgrep: structure.multiple-exported-structs-go -- provider state family; ProviderStateSnapshot is the canonical read-model for provider circuit-breaker state; single-file colocation with state constants is intentional [permanent]
 	State           ProviderState
 	Reason          string
 	RetryBudget     int

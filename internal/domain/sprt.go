@@ -16,7 +16,7 @@ const (
 
 // SPRTConfig holds parameters for the Sequential Probability Ratio Test.
 // Based on AgentAssay (arXiv:2603.02601) defaults.
-type SPRTConfig struct {
+type SPRTConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- SPRT family; SPRTConfig co-locates with SPRTVerdict constants and DefaultSPRTConfig; splitting would fragment the AgentAssay statistical testing module [permanent]
 	P0    float64 // null hypothesis success rate (regression threshold)
 	P1    float64 // alternative hypothesis success rate (expected)
 	Alpha float64 // type I error rate (false FAIL)

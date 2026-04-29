@@ -10,7 +10,7 @@ import (
 const StateDir = ".expedition"
 
 // RunSummary holds the results of a paintress loop run.
-type RunSummary struct {
+type RunSummary struct { // nosemgrep: structure.multiple-exported-structs-go -- run outcome family (RunSummary/DeviationError/SilentError/PruneResult) are cohesive exit-path types; splitting would fragment ExitCode dispatch logic [permanent]
 	Total           int64  `json:"total"`
 	Success         int64  `json:"success"`
 	Skipped         int64  `json:"skipped"`
@@ -31,7 +31,7 @@ func FormatSummaryJSON(s RunSummary) (string, error) {
 
 // DeviationError is returned when expedition finds deviations (failures detected).
 // Callers can use errors.As to distinguish deviation from runtime errors.
-type DeviationError struct {
+type DeviationError struct { // nosemgrep: structure.multiple-exported-structs-go -- run outcome family cohesive set; see RunSummary [permanent]
 	Failed int
 }
 
@@ -48,7 +48,7 @@ func (e *DeviationError) Error() string {
 // SilentError wraps an error whose message has already been printed to stderr
 // by the command itself. main.go should suppress output for this error
 // while still honouring the exit code via ExitCode.
-type SilentError struct{ Err error }
+type SilentError struct{ Err error } // nosemgrep: structure.multiple-exported-structs-go -- run outcome family cohesive set; see RunSummary [permanent]
 
 func (e *SilentError) Error() string { return e.Err.Error() }
 func (e *SilentError) Unwrap() error { return e.Err }

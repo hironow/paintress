@@ -6,7 +6,7 @@ import (
 )
 
 // ReflectionCycle holds review data from one review-fix cycle.
-type ReflectionCycle struct {
+type ReflectionCycle struct { // nosemgrep: structure.multiple-exported-structs-go -- reflection family (ReflectionCycle/ReflectionAccumulator) are cohesive types for the review-fix cycle stagnation detector; splitting would fragment the accumulator API [permanent]
 	Number   int
 	Comments string
 	TagCount int

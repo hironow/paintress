@@ -10,7 +10,7 @@ const (
 )
 
 // StepProgress tracks the status and attempt count for a single wave step.
-type StepProgress struct {
+type StepProgress struct { // nosemgrep: structure.multiple-exported-structs-go -- wave projection family (StepProgress/WaveProgress/WaveStepProgress) is a cohesive read-model set for wave step tracking; splitting would fragment IsComplete/PendingSteps projection logic [permanent]
 	StepID     string
 	Title      string
 	Status     StepStatus

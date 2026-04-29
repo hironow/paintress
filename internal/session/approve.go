@@ -27,7 +27,7 @@ func BuildApprover(cfg domain.ApproverConfig, input io.Reader, promptOut io.Writ
 
 // StdinApprover prompts the human on a terminal and reads y/yes for approval.
 // Empty input or any other response is treated as denial (safe default).
-type StdinApprover struct {
+type StdinApprover struct { // nosemgrep: structure.multiple-exported-structs-go -- approver family; StdinApprover is the concrete implementation of port.Approver; co-location with related types is intentional for the session composition layer [permanent]
 	reader io.Reader
 	writer io.Writer
 }

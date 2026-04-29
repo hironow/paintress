@@ -64,7 +64,7 @@ const (
 	MetadataImprovementSchemaVersion = "improvement_schema_version"
 )
 
-type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- RoutingHistory/OwnerHistory are audit trail slices; FCC wrapping would break YAML marshaling [permanent]
+type CorrectionMetadata struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- RoutingHistory/OwnerHistory are audit trail slices (no FCC benefit); improvement domain family; CorrectionMetadata is canonical for D-Mail correction routing [permanent]
 	SchemaVersion       string
 	FailureType         FailureType
 	Severity            Severity

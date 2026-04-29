@@ -91,7 +91,7 @@ func ValidateKind(kind DMailKind) error { // nosemgrep: parse-dont-validate.vali
 }
 
 // WaveStepDef defines a single step within a wave specification.
-type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Targets/Prerequisites are YAML-serialized spec fields; FCC wrapping would break JSON/YAML marshaling [permanent]
+type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Targets/Prerequisites are YAML-serialized spec fields (no FCC benefit); D-Mail wire-format DTO family is cohesive YAML/JSON serialization set [permanent]
 	ID            string   `yaml:"id" json:"id"`
 	Title         string   `yaml:"title" json:"title"`
 	Description   string   `yaml:"description,omitempty" json:"description,omitempty"`
@@ -103,7 +103,7 @@ type WaveStepDef struct { // nosemgrep: first-class-collection.raw-slice-field-d
 // WaveReference links a D-Mail to a wave and optionally a specific step.
 // In specification D-Mails: Steps contains the full step definitions.
 // In report/feedback D-Mails: Step identifies the specific step.
-type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Steps is a YAML-serialized spec field; FCC wrapping would break JSON/YAML marshaling [permanent]
+type WaveReference struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Steps is a YAML-serialized spec field (no FCC benefit); D-Mail wire-format DTO family cohesive set; see WaveStepDef [permanent]
 	ID    string        `yaml:"id" json:"id"`
 	Step  string        `yaml:"step,omitempty" json:"step,omitempty"`
 	Steps []WaveStepDef `yaml:"steps,omitempty" json:"steps,omitempty"`

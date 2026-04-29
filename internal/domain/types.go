@@ -13,7 +13,7 @@ type shutdownKey struct{}
 var ShutdownKey = shutdownKey{}
 
 // IndexEntry represents one line in the archive index JSONL file.
-type IndexEntry struct {
+type IndexEntry struct { // nosemgrep: structure.multiple-exported-structs-go -- domain types family (IndexEntry/HandoverState/Lumina/ProviderErrorInfo/Policy) are miscellaneous domain value types that do not form coherent sub-modules; single-file colocation avoids file proliferation [permanent]
 	Timestamp string `json:"ts"`
 	Operation string `json:"op"`
 	Issue     string `json:"issue"`
@@ -25,7 +25,7 @@ type IndexEntry struct {
 
 // HandoverState captures in-progress work state when an operation is
 // interrupted by a signal. The struct is pure data — no context, no I/O.
-type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go -- Completed/Remaining are signal-interrupt state snapshots; FCC wrapping would add complexity with no safety benefit [permanent]
+type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field-domain-go,structure.multiple-exported-structs-go -- Completed/Remaining are signal-interrupt state snapshots (no FCC benefit); domain types family cohesive set; see IndexEntry [permanent]
 	Tool         string // "paintress"
 	Operation    string // "expedition"
 	Timestamp    time.Time
@@ -36,7 +36,7 @@ type HandoverState struct { // nosemgrep: first-class-collection.raw-slice-field
 }
 
 // Lumina represents a learned passive skill extracted from past expedition journals.
-type Lumina struct {
+type Lumina struct { // nosemgrep: structure.multiple-exported-structs-go -- domain types family cohesive set; see IndexEntry [permanent]
 	Pattern string // The learned pattern / lesson
 	Source  string // Which journal(s) contributed
 	Uses    int    // How many times this pattern appeared
@@ -55,7 +55,7 @@ const (
 )
 
 // ProviderErrorInfo holds the classified result of a provider error.
-type ProviderErrorInfo struct {
+type ProviderErrorInfo struct { // nosemgrep: structure.multiple-exported-structs-go -- domain types family cohesive set; see IndexEntry [permanent]
 	Kind    ProviderErrorKind
 	ResetAt time.Time // parsed reset time (zero if unknown)
 }
