@@ -34,7 +34,7 @@ func (m TrackingMode) IsWave() bool { return m == ModeWave }
 func (m TrackingMode) String() string { return string(m) }
 
 // RepoPath is an always-valid non-empty repository path.
-type RepoPath struct{ v string }
+type RepoPath struct{ v string } // nosemgrep: structure.multiple-exported-structs-go -- domain primitive family (RepoPath/Team/Project/Days) are cohesive value-object newtypes for validated inputs; splitting would fragment constructor+accessor pairs [permanent]
 
 // NewRepoPath parses a raw string into a RepoPath.
 // Returns an error if the path is empty.
@@ -50,7 +50,7 @@ func (r RepoPath) String() string { return r.v }
 
 // Team is a semantic wrapper for a Linear team key.
 // Empty string is valid (means "not specified").
-type Team struct{ v string }
+type Team struct{ v string } // nosemgrep: structure.multiple-exported-structs-go -- domain primitive family cohesive set; see RepoPath [permanent]
 
 // NewTeam creates a Team from a raw string. All values are valid.
 func NewTeam(raw string) Team { return Team{v: raw} }
@@ -63,7 +63,7 @@ func (t Team) IsEmpty() bool { return t.v == "" }
 
 // Project is a semantic wrapper for a Linear project name.
 // Empty string is valid (means "not specified").
-type Project struct{ v string }
+type Project struct{ v string } // nosemgrep: structure.multiple-exported-structs-go -- domain primitive family cohesive set; see RepoPath [permanent]
 
 // NewProject creates a Project from a raw string. All values are valid.
 func NewProject(raw string) Project { return Project{v: raw} }

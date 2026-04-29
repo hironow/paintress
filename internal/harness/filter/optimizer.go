@@ -10,7 +10,7 @@ import (
 
 // EvalCase is a universal evaluation case for prompt optimization.
 // Prompt-agnostic: works with any instruction type.
-type EvalCase struct {
+type EvalCase struct { // nosemgrep: structure.multiple-exported-structs-go,structure.exported-struct-and-interface-go -- prompt optimization family (EvalCase/OptimizedResult) are cohesive DTOs for the PromptOptimizer port; EvalCase and PromptOptimizer co-locate as a single port contract; splitting would fragment the optimizer API [permanent]
 	UID         string            // unique identifier
 	Input       string            // input data (diff, scan result, etc.)
 	GroundTruth string            // expected output
@@ -18,7 +18,7 @@ type EvalCase struct {
 }
 
 // OptimizedResult is the result of a prompt optimization run.
-type OptimizedResult struct {
+type OptimizedResult struct { // nosemgrep: structure.exported-struct-and-interface-go -- prompt optimization family cohesive set; see EvalCase [permanent]
 	Template   string              // optimized template text
 	Score      float64             // final score [0.0, 1.0]
 	Iterations int                 // number of iterations run

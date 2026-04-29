@@ -12,7 +12,7 @@ const (
 )
 
 // DoctorCheck holds the outcome of a single doctor check.
-type DoctorCheck struct {
+type DoctorCheck struct { // nosemgrep: structure.multiple-exported-structs-go -- doctor result family (DoctorCheck/DoctorMetrics) are cohesive diagnostic output types; splitting would fragment the doctor command's read model [permanent]
 	Name    string
 	Status  CheckStatus
 	Message string

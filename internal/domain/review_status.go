@@ -6,7 +6,7 @@ import (
 )
 
 // ReviewGateStatus holds the outcome of the review gate for PR body reporting.
-type ReviewGateStatus struct {
+type ReviewGateStatus struct { // nosemgrep: structure.multiple-exported-structs-go -- review gate family (ReviewGateStatus/ReviewCycleHistory) are cohesive read-model types for PR review gate tracking; splitting would fragment FormatSection/FormatStallWarning logic [permanent]
 	Passed       bool
 	Skipped      bool
 	Cycle        int

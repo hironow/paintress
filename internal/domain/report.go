@@ -15,7 +15,7 @@ const (
 	StatusParseError
 )
 
-type ExpeditionReport struct { // nosemgrep: domain-primitives.public-string-field-go -- PRUrl is a plain record field; newtype adds no safety benefit [permanent]
+type ExpeditionReport struct { // nosemgrep: domain-primitives.public-string-field-go,structure.multiple-exported-structs-go -- PRUrl is a plain record field (no newtype benefit); report read-model family; ExpeditionReport is the canonical per-expedition output record [permanent]
 	Expedition         int
 	IssueID            string
 	IssueTitle         string

@@ -20,7 +20,7 @@ func defaultCmdFactory(ctx context.Context, name string, args ...string) *exec.C
 
 // LocalNotifier sends desktop notifications using OS-native commands.
 // darwin: osascript, linux: notify-send, others: returns ErrUnsupportedOS.
-type LocalNotifier struct {
+type LocalNotifier struct { // nosemgrep: structure.multiple-exported-structs-go -- notifier family; LocalNotifier is the concrete implementation of port.Notifier; single-file colocation with platform detection logic is intentional [permanent]
 	cmdFactory cmdFactoryFunc
 	forceOS    string // for testing; empty = use runtime.GOOS
 }

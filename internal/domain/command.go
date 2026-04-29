@@ -3,7 +3,7 @@ package domain
 // RunExpeditionCommand represents the intent to run a paintress expedition.
 // Independent of cobra — framework concerns are separated at the cmd layer.
 // Fields are unexported; use NewRunExpeditionCommand to construct a valid instance.
-type RunExpeditionCommand struct {
+type RunExpeditionCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- command family (RunExpeditionCommand/InitCommand/RebuildCommand/ArchivePruneCommand) is a cohesive set of domain commands per event-storming design; splitting across files would fragment the COMMAND layer [permanent]
 	repoPath RepoPath
 }
 
@@ -17,7 +17,7 @@ func (c RunExpeditionCommand) RepoPath() RepoPath { return c.repoPath }
 
 // InitCommand represents the intent to initialize a paintress project.
 // Fields are unexported; use NewInitCommand to construct a valid instance.
-type InitCommand struct {
+type InitCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- command family cohesive set; see RunExpeditionCommand [permanent]
 	repoPath RepoPath
 	team     Team
 	project  Project
@@ -39,7 +39,7 @@ func (c InitCommand) Project() Project { return c.project }
 
 // RebuildCommand represents the intent to rebuild projections from the event store.
 // Fields are unexported; use NewRebuildCommand to construct a valid instance.
-type RebuildCommand struct {
+type RebuildCommand struct { // nosemgrep: structure.multiple-exported-structs-go -- command family cohesive set; see RunExpeditionCommand [permanent]
 	repoPath RepoPath
 }
 

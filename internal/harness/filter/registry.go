@@ -26,7 +26,7 @@ type promptFile struct {
 }
 
 // PromptConfig is the read-only view of a loaded prompt template.
-type PromptConfig struct {
+type PromptConfig struct { // nosemgrep: structure.multiple-exported-structs-go -- prompt registry family (PromptConfig/PromptRegistry) is a cohesive template loading set; splitting would break NewRegistryFromFS locality [permanent]
 	Name        string
 	Version     string
 	Description string
