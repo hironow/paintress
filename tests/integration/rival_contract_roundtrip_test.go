@@ -14,7 +14,7 @@
 //	testdata/rival/event-sourced-v1.md  — full v1.1 contract, domain_style: event-sourced
 //
 // Each test reads its fixture from disk via `domain.ParseDMail`, then
-// runs `policy.ParseRivalContractBody` and `policy.ParseRivalContractMetadata`
+// runs `harness.ParseRivalContractBody` and `harness.ParseRivalContractMetadata`
 // against the parsed mail. Assertions check the canonical Go struct
 // shape (Title, six section presence, schema, id, revision, DomainStyle)
 // rather than re-asserting raw bytes — byte-level invariants are owned
@@ -34,14 +34,14 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/harness/policy"
+	"github.com/hironow/paintress/internal/harness"
 )
 
 // loadRivalFixture reads a Rival Contract D-Mail fixture from disk and
 // parses it via the canonical parsers. It returns the parsed mail, the
 // parsed body, the parsed metadata, and the metadata-parser ok flag.
 // Failures are reported via t.Fatalf with the fixture path attached.
-func loadRivalFixture(t *testing.T, path string) (domain.DMail, policy.RivalContract, policy.RivalContractMetadata, bool) {
+func loadRivalFixture(t *testing.T, path string) (domain.DMail, harness.RivalContract, harness.RivalContractMetadata, bool) {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -52,7 +52,7 @@ func loadRivalFixture(t *testing.T, path string) (domain.DMail, policy.RivalCont
 		t.Fatalf("ParseDMail %s: %v", path, err)
 	}
 
-	body, bodyOK, bodyErr := policy.ParseRivalContractBody(mail.Body)
+	body, bodyOK, bodyErr := harness.ParseRivalContractBody(mail.Body)
 	if bodyErr != nil {
 		t.Fatalf("ParseRivalContractBody %s: %v", path, bodyErr)
 	}
@@ -60,7 +60,7 @@ func loadRivalFixture(t *testing.T, path string) (domain.DMail, policy.RivalCont
 		t.Fatalf("ParseRivalContractBody %s: ok=false (fixture is not a Rival Contract v1 body)", path)
 	}
 
-	meta, metaOK, metaErr := policy.ParseRivalContractMetadata(mail.Metadata)
+	meta, metaOK, metaErr := harness.ParseRivalContractMetadata(mail.Metadata)
 	if metaErr != nil {
 		t.Fatalf("ParseRivalContractMetadata %s: %v", path, metaErr)
 	}
@@ -117,8 +117,8 @@ func TestRivalContractRoundTrip_CanonicalSpecV1_ParsesIdentically(t *testing.T) 
 	if !metaOK {
 		t.Fatal("ParseRivalContractMetadata: ok=false on canonical golden")
 	}
-	if meta.Schema != policy.SchemaRivalContractV1 {
-		t.Errorf("Schema: got %q, want %q", meta.Schema, policy.SchemaRivalContractV1)
+	if meta.Schema != harness.SchemaRivalContractV1 {
+		t.Errorf("Schema: got %q, want %q", meta.Schema, harness.SchemaRivalContractV1)
 	}
 	if meta.ID != "canonical-spec-v1" {
 		t.Errorf("ID: got %q, want %q", meta.ID, "canonical-spec-v1")
@@ -153,8 +153,8 @@ func TestRivalContractRoundTrip_LegacyV1_GracefulFallback(t *testing.T) {
 	if !metaOK {
 		t.Fatal("ParseRivalContractMetadata: ok=false on legacy v1 fixture")
 	}
-	if meta.Schema != policy.SchemaRivalContractV1 {
-		t.Errorf("Schema: got %q, want %q", meta.Schema, policy.SchemaRivalContractV1)
+	if meta.Schema != harness.SchemaRivalContractV1 {
+		t.Errorf("Schema: got %q, want %q", meta.Schema, harness.SchemaRivalContractV1)
 	}
 	if meta.Revision != 1 {
 		t.Errorf("Revision: got %d, want 1", meta.Revision)
@@ -180,11 +180,11 @@ func TestRivalContractRoundTrip_EventSourcedV1_DomainStyleAccepted(t *testing.T)
 	if !metaOK {
 		t.Fatal("ParseRivalContractMetadata: ok=false on event-sourced v1.1 fixture")
 	}
-	if meta.Schema != policy.SchemaRivalContractV1 {
-		t.Errorf("Schema: got %q, want %q", meta.Schema, policy.SchemaRivalContractV1)
+	if meta.Schema != harness.SchemaRivalContractV1 {
+		t.Errorf("Schema: got %q, want %q", meta.Schema, harness.SchemaRivalContractV1)
 	}
-	if meta.DomainStyle != policy.DomainStyleEventSourced {
-		t.Errorf("DomainStyle: got %q, want %q", meta.DomainStyle, policy.DomainStyleEventSourced)
+	if meta.DomainStyle != harness.DomainStyleEventSourced {
+		t.Errorf("DomainStyle: got %q, want %q", meta.DomainStyle, harness.DomainStyleEventSourced)
 	}
 	// And the body's Domain section reflects event-sourced grammar.
 	if !strings.Contains(body.Domain, "Event:") || !strings.Contains(body.Domain, "Aggregate:") {
