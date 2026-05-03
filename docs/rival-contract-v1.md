@@ -171,3 +171,60 @@ Legacy v1 D-Mails (no `domain_style` key) produce a rendered expedition
 prompt that is bit-identical to the v1 prompt. The v1.1 branch is opt-in
 purely through producer-emitted metadata. Tools that haven't been
 upgraded continue to work unchanged.
+
+## v1.2 additions — integration test coverage
+
+Rival Contract v1.2 is a test-only minor revision. The schema name
+remains `rival-contract-v1` and no production code path changed. paintress
+gains consumer-side cross-tool round-trip integration coverage that
+parses the SAME canonical-spec D-Mail bytes that sightjack's real
+producer emits.
+
+Plan: [`refs/plans/2026-05-03-rival-contract-v1-2-integration-e2e.md`](../../refs/plans/2026-05-03-rival-contract-v1-2-integration-e2e.md).
+
+### Consumer round-trip integration
+
+`tests/integration/rival_contract_roundtrip_test.go` reads three
+committed fixtures and exercises paintress's parser end-to-end:
+
+| Fixture | Asserts |
+|---|---|
+| `tests/integration/testdata/rival/canonical-spec-v1.md` | byte-identical copy of sj's produced `canonical-spec-v1.md`; pt parses it via `ParseRivalContractBody` + `ParseRivalContractMetadata` and the result matches the canonical Go struct expectation |
+| `tests/integration/testdata/rival/legacy-spec.md` | legacy v1 (no `domain_style`) gracefully falls back to the v1 surface — no panic, no rejected metadata |
+| `tests/integration/testdata/rival/event-sourced-v1.md` | a v1.1 D-Mail with `metadata.domain_style: event-sourced` parses correctly and the event-sourced code path is reached |
+
+Three integration tests total. The producer is sightjack, the consumer
+is paintress, and the canonical fixture is **byte-identical** to sj's
+producer output. A regression in sj's `ComposeSpecification` breaks
+paintress's roundtrip test; a regression in paintress's parser breaks
+the same test. Cross-tool drift is caught either way.
+
+### Test seam: harness facade re-export
+
+`internal/harness` carries a layer-dep semgrep rule that prevents
+external packages (including `tests/integration/`) from importing
+`internal/harness/policy` directly. Rather than relax the rule, v1.2 added
+a thin re-export facade in `internal/harness` that surfaces the symbols
+the integration test needs (`ParseRivalContractBody`,
+`ParseRivalContractMetadata`, `RivalContract*` types,
+`FormatRivalContractForPrompt`). This is a structural-only change —
+**no runtime behavior changed**; the facade is a test seam alone.
+
+### Canonical fixture sync (gap-check)
+
+`refs/scripts/check_rival_canonical_fixture.sh` (added in v1.2 and wired
+into `just gap-check-rival-contract`) verifies that paintress's three
+fixtures are byte-identical to sightjack's source-of-truth copies under
+`sightjack/tests/integration/testdata/rival/`. Drift between producer
+and consumer fixtures fails the gap-check before merge.
+
+### What did NOT change
+
+- Schema (still `rival-contract-v1`; v1 invariants 1-13 maintained).
+- The expedition prompt rendering surface (v1 + v1.1 outputs are
+  bit-identical to before).
+- The `domain_style` accept/reject behavior added in v1.1.
+- Any production code path. The harness re-export facade is a test seam
+  with no callers outside `tests/integration/`.
+
+v1.2 is purely additive test code and structural test seams.
