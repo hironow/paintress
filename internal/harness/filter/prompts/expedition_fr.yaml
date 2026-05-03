@@ -13,6 +13,7 @@ variables:
   environment_section: "Pre-rendered environment lines"
   context_section: "Pre-rendered injected context block with header (or empty)"
   inbox_section: "Pre-rendered D-Mail inbox block with header (or empty)"
+  has_event_sourced_contract: "true if any inbox spec D-Mail has metadata.domain_style: event-sourced (Rival Contract v1.1)"
   mission_section: "Mission rules of engagement text"
 template: |
   # Expédition #{number} — {timestamp}
@@ -48,7 +49,20 @@ template: |
   ## Environnement
   {environment_section}
   {context_section}
-  {inbox_section}
+  {inbox_section}{#if has_event_sourced_contract}
+
+  ## Event-Sourced Domain Glossary (Glossaire de domaine événementiel)
+
+  Lorsque le Rival Contract ci-dessus est étiqueté `domain_style: event-sourced`, utilisez ces ancres de vocabulaire pour lire sa section `## Domain` :
+
+  - **Command (Commande) :** une intention de changer l'état, exprimée au présent (p.ex. `ValidateSessionForRequest`). Émise par des humains ou des systèmes en amont.
+  - **Event (Événement) :** un fait qui s'est produit, exprimé au passé (p.ex. `SessionValidationFailed`). Les événements sont immuables et constituent la source de vérité.
+  - **Read Model (Modèle de lecture) :** une projection dérivée des événements que les appelants consomment pour décider. Reconstructible à partir des événements et jamais autoritaire en soi.
+  - **Aggregate (Agrégat) :** la frontière de cohérence qui décide quelles Commandes sont acceptées et quels Événements sont émis.
+  - **Policy (Politique) :** une automatisation `WHEN [event] THEN [command]` qui transforme un événement en commande suivante, découplant les réactions des initiateurs.
+
+  Traitez tout point `## Domain` qui nomme une Commande, un Événement, un Read Model, un Agrégat ou une Politique comme une ancre de vocabulaire ; n'inventez pas de termes qui chevauchent dans votre implémentation.
+  {/if}
 
   ## Contract Boundaries (Rival Contract v1)
 

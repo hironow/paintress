@@ -77,6 +77,12 @@ var MustDefaultPromptRegistry = filter.MustDefault
 // FormatDMailForPrompt formats d-mails for prompt injection.
 var FormatDMailForPrompt = filter.FormatDMailForPrompt
 
+// HasEventSourcedContract reports whether any inbox D-Mail is a Rival
+// Contract v1 specification with metadata.domain_style: event-sourced
+// (Rival Contract v1.1, Phase 1.1A). Callers pair this with
+// FormatDMailForPrompt to populate domain.PromptData from one inbox scan.
+var HasEventSourcedContract = filter.HasEventSourcedContract
+
 // BuildFollowUpPrompt builds a follow-up prompt for matched D-Mails.
 var BuildFollowUpPrompt = filter.BuildFollowUpPrompt
 
