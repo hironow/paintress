@@ -5,33 +5,77 @@ import (
 	"strings"
 
 	"github.com/hironow/paintress/internal/domain"
+	"github.com/hironow/paintress/internal/harness/policy"
 )
 
 // FormatDMailForPrompt formats d-mails as a human-readable Markdown section
 // for injection into expedition prompts. Returns empty string for empty input.
+//
+// Specification D-Mails whose body parses as a Rival Contract v1 contract
+// are rendered through the focused FormatRivalContractForPrompt path so
+// that Intent, Steps, Boundaries, and Evidence are emphasized over the raw
+// per-D-Mail header. Legacy specification bodies (no `# Contract:` heading
+// or partial v1 bodies) gracefully fall back to the existing per-D-Mail
+// header + body path.
 func FormatDMailForPrompt(dmails []domain.DMail) string {
 	if len(dmails) == 0 {
 		return ""
 	}
 	var buf strings.Builder
 	for _, dm := range dmails {
-		fmt.Fprintf(&buf, "### %s (%s)\n\n", dm.Name, dm.Kind)
-		fmt.Fprintf(&buf, "**Description:** %s\n", dm.Description)
-		if len(dm.Issues) > 0 {
-			fmt.Fprintf(&buf, "**Issues:** %s\n", strings.Join(dm.Issues, ", "))
+		if rendered, ok := renderRivalContractDMail(dm); ok {
+			buf.WriteString(rendered)
+			continue
 		}
-		if dm.Severity != "" {
-			fmt.Fprintf(&buf, "**Severity:** %s\n", dm.Severity)
-		}
-		if dm.Body != "" {
-			buf.WriteString("\n")
-			buf.WriteString(dm.Body)
-			if !strings.HasSuffix(dm.Body, "\n") {
-				buf.WriteString("\n")
-			}
-		}
-		buf.WriteString("\n")
+		buf.WriteString(renderLegacyDMail(dm))
 	}
+	return buf.String()
+}
+
+// renderRivalContractDMail returns a focused Rival Contract section for a
+// specification D-Mail whose body parses as a complete Rival Contract v1
+// body. The second return value is false when the D-Mail is not a Rival
+// Contract (legacy spec, partial body, or non-spec kind), signalling the
+// caller to fall back to the legacy render.
+func renderRivalContractDMail(dm domain.DMail) (string, bool) {
+	if dm.Kind != domain.KindSpecification {
+		return "", false
+	}
+	if dm.Body == "" {
+		return "", false
+	}
+	contract, ok, err := policy.ParseRivalContractBody(dm.Body)
+	if err != nil || !ok {
+		return "", false
+	}
+	rendered := policy.FormatRivalContractForPrompt(contract)
+	if !strings.HasSuffix(rendered, "\n") {
+		rendered += "\n"
+	}
+	return rendered + "\n", true
+}
+
+// renderLegacyDMail formats a D-Mail through the original per-D-Mail header
+// + body path. This path remains the canonical render for non-spec D-Mails
+// and for legacy specification bodies that pre-date Rival Contract v1.
+func renderLegacyDMail(dm domain.DMail) string {
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "### %s (%s)\n\n", dm.Name, dm.Kind)
+	fmt.Fprintf(&buf, "**Description:** %s\n", dm.Description)
+	if len(dm.Issues) > 0 {
+		fmt.Fprintf(&buf, "**Issues:** %s\n", strings.Join(dm.Issues, ", "))
+	}
+	if dm.Severity != "" {
+		fmt.Fprintf(&buf, "**Severity:** %s\n", dm.Severity)
+	}
+	if dm.Body != "" {
+		buf.WriteString("\n")
+		buf.WriteString(dm.Body)
+		if !strings.HasSuffix(dm.Body, "\n") {
+			buf.WriteString("\n")
+		}
+	}
+	buf.WriteString("\n")
 	return buf.String()
 }
 
