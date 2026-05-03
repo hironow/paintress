@@ -8,6 +8,34 @@ import (
 	"github.com/hironow/paintress/internal/harness/policy"
 )
 
+// HasEventSourcedContract reports whether any inbox D-Mail is a
+// Rival Contract v1 specification carrying metadata.domain_style ==
+// "event-sourced". The check is pure: it never inspects environment
+// variables, ADRs, or any side channel — only the D-Mail metadata as
+// parsed by policy.ParseRivalContractMetadata.
+//
+// Callers (e.g. internal/session/expedition.go) pair this with
+// FormatDMailForPrompt: one inbox scan, two derived fields. Consumers of
+// PromptData (the prompt template) flip the canonical command/event/
+// read-model glossary preamble on this boolean. For missing/generic/mixed
+// (or no Rival Contract spec at all), this returns false and the
+// rendered prompt remains bit-identical to the legacy v1 surface.
+func HasEventSourcedContract(dmails []domain.DMail) bool {
+	for _, dm := range dmails {
+		if dm.Kind != domain.KindSpecification {
+			continue
+		}
+		meta, ok, err := policy.ParseRivalContractMetadata(dm.Metadata)
+		if err != nil || !ok {
+			continue
+		}
+		if meta.DomainStyle == policy.DomainStyleEventSourced {
+			return true
+		}
+	}
+	return false
+}
+
 // FormatDMailForPrompt formats d-mails as a human-readable Markdown section
 // for injection into expedition prompts. Returns empty string for empty input.
 //

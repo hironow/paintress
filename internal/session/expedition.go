@@ -149,22 +149,28 @@ func (e *Expedition) BuildPrompt(ctxArgs ...context.Context) string {
 		projCfg = &domain.ProjectConfig{}
 	}
 
+	// loadInboxSection populates e.InboxDMails (via inboxOnce) and returns
+	// the formatted inbox text. We pre-render the inbox first so we can
+	// then derive the v1.1 HasEventSourcedContract flag from the same scan.
+	inboxSection := e.loadInboxSection(ctx)
+
 	data := domain.PromptData{
-		Number:          e.Number,
-		Timestamp:       time.Now().Format("2006-01-02 15:04:05"),
-		Bt:              "`",
-		Cb:              "```",
-		LuminaSection:   harness.FormatLuminaForPrompt(e.Luminas),
-		GradientSection: e.Gradient.FormatForPrompt(),
-		ReserveSection:  e.Reserve.FormatForPrompt(),
-		BaseBranch:      e.Config.BaseBranch,
-		DevURL:          e.Config.DevURL,
-		ContextSection:  e.loadContextSection() + e.resumeSection(),
-		InboxSection:    e.loadInboxSection(ctx),
-		LinearTeam:      projCfg.TrackerTeam(),
-		LinearProject:   projCfg.TrackerProject(),
-		MissionSection:  harness.MissionText(harness.MustDefaultPromptRegistry(), domain.Lang, e.Target != nil),
-		WaveTarget:      e.Target,
+		Number:                  e.Number,
+		Timestamp:               time.Now().Format("2006-01-02 15:04:05"),
+		Bt:                      "`",
+		Cb:                      "```",
+		LuminaSection:           harness.FormatLuminaForPrompt(e.Luminas),
+		GradientSection:         e.Gradient.FormatForPrompt(),
+		ReserveSection:          e.Reserve.FormatForPrompt(),
+		BaseBranch:              e.Config.BaseBranch,
+		DevURL:                  e.Config.DevURL,
+		ContextSection:          e.loadContextSection() + e.resumeSection(),
+		InboxSection:            inboxSection,
+		LinearTeam:              projCfg.TrackerTeam(),
+		LinearProject:           projCfg.TrackerProject(),
+		MissionSection:          harness.MissionText(harness.MustDefaultPromptRegistry(), domain.Lang, e.Target != nil),
+		WaveTarget:              e.Target,
+		HasEventSourcedContract: harness.HasEventSourcedContract(e.InboxDMails),
 	}
 
 	return harness.RenderExpeditionPrompt(harness.MustDefaultPromptRegistry(), domain.Lang, data)

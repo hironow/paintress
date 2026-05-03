@@ -14,6 +14,7 @@ variables:
   context_section: "Pre-rendered injected context block with header (or empty)"
   inbox_section: "Pre-rendered D-Mail inbox block with header (or empty)"
   is_wave_mode: "true if wave mode, false/empty if linear mode"
+  has_event_sourced_contract: "true if any inbox spec D-Mail has metadata.domain_style: event-sourced (Rival Contract v1.1)"
   mission_section: "Mission rules of engagement text"
 template: |
   # Expedition #{number} — {timestamp}
@@ -74,7 +75,20 @@ template: |
   ## 環境情報
   {environment_section}
   {context_section}
-  {inbox_section}
+  {inbox_section}{#if has_event_sourced_contract}
+
+  ## Event-Sourced Domain Glossary（イベントソース語彙）
+
+  上記の Rival Contract が `domain_style: event-sourced` でタグ付けされている場合、その `## Domain` セクションを読むときに以下の語彙を参照すること：
+
+  - **Command（コマンド）：** 状態変更の意図。現在形で表現する（例：`ValidateSessionForRequest`）。人間または上流システムから発行される。
+  - **Event（イベント）：** 起きた事実。過去形で表現する（例：`SessionValidationFailed`）。イベントは不変で真実の出所となる。
+  - **Read Model（リードモデル）：** イベントから派生する投影。呼び出し側が判断材料として消費する。イベントから再構築可能であり、それ自体は権威ではない。
+  - **Aggregate（集約）：** どの Command を受理しどの Event を発行するかを決める一貫性境界。
+  - **Policy（ポリシー）：** `WHEN [event] THEN [command]` の自動化。あるイベントを次のコマンドに変換し、反応を発行元から切り離す。
+
+  `## Domain` 内で Command / Event / Read Model / Aggregate / Policy として明示された名前は語彙アンカーとして扱い、実装側で重複する用語を勝手に作らないこと。
+  {/if}
 
   ## Contract Boundaries（Rival Contract v1）
 

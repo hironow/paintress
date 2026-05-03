@@ -26,16 +26,17 @@ func RenderExpeditionPrompt(reg *PromptRegistry, lang string, data domain.Prompt
 	numberStr := fmt.Sprintf("%d", data.Number)
 
 	vars := map[string]string{
-		"number":              numberStr,
-		"timestamp":           data.Timestamp,
-		"lumina_section":      data.LuminaSection,
-		"gradient_section":    data.GradientSection,
-		"scope_section":       renderScopeSection(lang, data),
-		"environment_section": renderEnvironmentSection(lang, data),
-		"context_section":     renderContextSection(lang, data),
-		"inbox_section":       renderInboxSection(lang, data),
-		"mission_section":     data.MissionSection,
-		"is_wave_mode":        boolFlag(data.WaveTarget != nil),
+		"number":                     numberStr,
+		"timestamp":                  data.Timestamp,
+		"lumina_section":             data.LuminaSection,
+		"gradient_section":           data.GradientSection,
+		"scope_section":              renderScopeSection(lang, data),
+		"environment_section":        renderEnvironmentSection(lang, data),
+		"context_section":            renderContextSection(lang, data),
+		"inbox_section":              renderInboxSection(lang, data),
+		"mission_section":            data.MissionSection,
+		"is_wave_mode":               boolFlag(data.WaveTarget != nil),
+		"has_event_sourced_contract": boolFlag(data.HasEventSourcedContract),
 	}
 
 	result, err := reg.Expand(name, vars)
