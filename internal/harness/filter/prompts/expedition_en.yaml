@@ -50,6 +50,10 @@ template: |
   {context_section}
   {inbox_section}
 
+  ## Contract Boundaries (Rival Contract v1)
+
+  When a specification D-Mail in your inbox is rendered as a Rival Contract (heading `# Rival Contract: ...`), treat its `## Boundaries` section as authoritative. If Boundaries conflict with patterns inferred from the codebase, prefer Boundaries. The contract `## Steps` and `## Evidence` sections supplement — they do NOT replace — the assigned scope above; implement only the unit of work you were assigned.
+
   ## Mission — Rules of Engagement
 
   {mission_section}

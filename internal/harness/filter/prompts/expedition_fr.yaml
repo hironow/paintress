@@ -50,6 +50,10 @@ template: |
   {context_section}
   {inbox_section}
 
+  ## Contract Boundaries (Rival Contract v1)
+
+  Lorsqu'une spécification D-Mail de votre boîte de réception est rendue en tant que Rival Contract (titre `# Rival Contract: ...`), traitez sa section `## Boundaries` comme faisant autorité. If Boundaries conflict with patterns inferred from the codebase, prefer Boundaries. (Si les Boundaries entrent en conflit avec les patterns inférés du codebase, préférez les Boundaries.) Les sections `## Steps` et `## Evidence` du contrat **complètent** la portée assignée ci-dessus — elles ne la **remplacent pas**. N'implémentez que l'unité de travail qui vous a été assignée.
+
   ## Mission — Règles d'engagement
 
   {mission_section}
