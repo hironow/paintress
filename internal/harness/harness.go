@@ -131,3 +131,29 @@ type OptimizedResult = filter.OptimizedResult
 
 var SavePrompt = filter.Save
 var PromptsDir = filter.PromptsDir
+
+// --- policy: Rival Contract v1 / v1.1 (re-exported for tests/integration) ---
+// These re-exports satisfy the harness-facade-only layer rule for callers
+// outside the harness package (tests/integration/) that need to parse
+// Rival Contract D-Mails for cross-tool round-trip verification.
+
+type RivalContract = policy.RivalContract
+type RivalContractMetadata = policy.RivalContractMetadata
+type EvidenceItem = policy.EvidenceItem
+type CurrentContract = policy.CurrentContract
+type ContractConflict = policy.ContractConflict
+
+const (
+	SchemaRivalContractV1   = policy.SchemaRivalContractV1
+	DomainStyleEventSourced = policy.DomainStyleEventSourced
+	DomainStyleGeneric      = policy.DomainStyleGeneric
+	DomainStyleMixed        = policy.DomainStyleMixed
+)
+
+var (
+	ParseRivalContractBody     = policy.ParseRivalContractBody
+	ParseRivalContractMetadata = policy.ParseRivalContractMetadata
+	ParseEvidenceItems         = policy.ParseEvidenceItems
+	DeriveContractID           = policy.DeriveContractID
+	FormatRivalContractForPrompt = policy.FormatRivalContractForPrompt
+)
