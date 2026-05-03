@@ -115,3 +115,59 @@ the legacy path.
 
 - [`refs/plans/2026-05-03-rival-contract-v1.md`](../../refs/plans/2026-05-03-rival-contract-v1.md) — full design, phase plan, risks
 - [`refs/scripts/check_rival_contract_docs.sh`](../../refs/scripts/check_rival_contract_docs.sh) — gap-check enforcement
+
+## v1.1 additions
+
+Rival Contract v1.1 is a purely additive minor extension. The schema name
+remains `rival-contract-v1`. paintress, as a consumer, gains a new
+optional branch in the expedition prompt that activates when an inbox
+specification carries `metadata.domain_style: event-sourced`.
+
+Plan: [`refs/plans/2026-05-03-rival-contract-v1-1-extensions.md`](../../refs/plans/2026-05-03-rival-contract-v1-1-extensions.md).
+
+### `metadata.domain_style` accepted by the parser
+
+`ParseRivalContractMetadata` accepts an OPTIONAL `domain_style` key with
+exactly three enumerated values: `event-sourced`, `generic`, `mixed`.
+Unknown values are rejected. A missing key parses as the empty string and
+is treated as `generic` by paintress (no behavior change).
+
+The parser never infers `domain_style` from ADRs, environment variables,
+or any other side channel. The metadata map is the only signal.
+
+### Expedition prompt glossary preamble
+
+When at least one Rival Contract v1 specification D-Mail in the inbox
+carries `metadata.domain_style == "event-sourced"`, the rendered
+expedition prompt prepends a canonical command / event / read-model /
+aggregate glossary preamble to the locale prompt body
+(`internal/harness/filter/prompts/expedition_en.yaml`,
+`expedition_ja.yaml`, `expedition_fr.yaml`). The preamble normalizes
+vocabulary so the implementing agent reasons about the `## Domain`
+section in event-sourcing terms.
+
+When no inbox D-Mail carries the `event-sourced` value (missing key,
+`generic`, or `mixed`), the rendered prompt is bit-identical to the
+legacy v1 surface. There is no scoring change, no flow change, no new
+prompt section.
+
+The branching boolean is computed by
+`filter.HasEventSourcedContract(dmails)`. The function is pure and reads
+only D-Mail metadata — never ADRs, never wave context.
+
+### What paintress does NOT do
+
+- paintress never SETS `domain_style`. The producer (sightjack) is the
+  only writer; paintress is read-only with respect to contract metadata.
+- paintress does not invoke the producer-side REASONS Canvas export
+  subcommand. That projection is a sightjack-only tool; pt's expedition
+  flow has no need for it.
+- paintress does not mutate the inbox D-Mail. The contract content
+  remains the source of truth as in v1.
+
+### Backward compatibility
+
+Legacy v1 D-Mails (no `domain_style` key) produce a rendered expedition
+prompt that is bit-identical to the v1 prompt. The v1.1 branch is opt-in
+purely through producer-emitted metadata. Tools that haven't been
+upgraded continue to work unchanged.
