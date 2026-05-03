@@ -3,11 +3,11 @@ module github.com/hironow/paintress
 go 1.26
 
 require (
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/alitto/pond/v2 v2.7.1
 	github.com/bwmarrin/discordgo v0.29.0
 	github.com/creativeprojects/go-selfupdate v1.5.2
-	github.com/fsnotify/fsnotify v1.9.0
+	github.com/fsnotify/fsnotify v1.10.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
 	github.com/slack-go/slack v0.23.0
