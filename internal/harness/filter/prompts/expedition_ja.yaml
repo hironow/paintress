@@ -76,6 +76,10 @@ template: |
   {context_section}
   {inbox_section}
 
+  ## Contract Boundaries（Rival Contract v1）
+
+  受信箱の specification D-Mail が Rival Contract 形式（見出し `# Rival Contract: ...`）で表示されている場合、その `## Boundaries` セクションを権威ある制約として扱うこと。If Boundaries conflict with patterns inferred from the codebase, prefer Boundaries.（境界がコードベースから推測したパターンと衝突する場合は、境界を優先せよ。）契約の `## Steps` と `## Evidence` は上の作業範囲を **補完する** ものであり、**置き換えるものではない**。割り当てられた作業単位のみを実装すること。
+
   ## ミッション — 行動規範
 
   {mission_section}
