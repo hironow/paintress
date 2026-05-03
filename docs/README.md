@@ -13,6 +13,7 @@
 - [approval-contract.md](approval-contract.md) — Three-way approval contract design
 - [dmail-protocol-conventions.md](dmail-protocol-conventions.md) — D-Mail filename uniqueness and archive retention conventions
 - [dmail-protocol.md](dmail-protocol.md) — D-Mail protocol implementation details
+- [rival-contract-v1.md](rival-contract-v1.md) — Rival Contract v1 (paintress as consumer; expedition prompt ingestion)
 - [testing.md](testing.md) — Test strategy and conventions
 
 ## CLI Reference
