@@ -1516,7 +1516,7 @@ func TestDMailLifecycle_FullFlow(t *testing.T) {
 	wantArchived := map[string]string{
 		"feedback-d-071.md":           "implementation-feedback",
 		"pt-report-my-42_00000000.md": "report",
-		"spec-my-42.md":              "specification",
+		"spec-my-42.md":               "specification",
 	}
 	for _, entry := range archiveEntries {
 		expectedKind, ok := wantArchived[entry.Name()]
@@ -1860,5 +1860,60 @@ func TestArchiveInboxDMail_PropagatesEmitterError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "readonly fs") {
 		t.Errorf("error should contain root cause, got: %s", err.Error())
+	}
+}
+
+func TestSendDMail_InjectsProjectIDFromEnv(t *testing.T) {
+	// given
+	t.Setenv("RUNOPS_PROJECT_ID", "alpha-bridge")
+	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
+	dm := domain.DMail{
+		Name:        "pt-report-projectid_00000000",
+		Kind:        "report",
+		Description: "project_id injection",
+		Body:        "# Hello\n",
+	}
+
+	// when
+	if err := session.SendDMail(context.Background(), store, dm, nil); err != nil {
+		t.Fatalf("SendDMail: %v", err)
+	}
+
+	// then
+	outboxPath := filepath.Join(domain.OutboxDir(continent), dm.Name+".md")
+	data, _ := os.ReadFile(outboxPath)
+	parsed, _ := domain.ParseDMail(data)
+	if got := parsed.Metadata["project_id"]; got != "alpha-bridge" {
+		t.Errorf("project_id: got %q, want %q", got, "alpha-bridge")
+	}
+}
+
+func TestSendDMail_OmitsProjectIDWhenUnresolved(t *testing.T) {
+	// given — env unset + tmp HOME so cwd inference cannot match projects/<id>
+	t.Setenv("RUNOPS_PROJECT_ID", "")
+	t.Setenv("HOME", t.TempDir())
+	continent := t.TempDir()
+	ensureExpeditionDirs(t, continent)
+	store := testOutboxStore(t, continent)
+	dm := domain.DMail{
+		Name:        "pt-report-projectid-omit_00000000",
+		Kind:        "report",
+		Description: "no project_id",
+		Body:        "# Hello\n",
+	}
+
+	// when
+	if err := session.SendDMail(context.Background(), store, dm, nil); err != nil {
+		t.Fatalf("SendDMail: %v", err)
+	}
+
+	// then — legacy single-mode: no project_id key
+	outboxPath := filepath.Join(domain.OutboxDir(continent), dm.Name+".md")
+	data, _ := os.ReadFile(outboxPath)
+	parsed, _ := domain.ParseDMail(data)
+	if _, present := parsed.Metadata["project_id"]; present {
+		t.Errorf("project_id should be omitted when unresolved, got %q", parsed.Metadata["project_id"])
 	}
 }
