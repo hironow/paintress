@@ -36,6 +36,7 @@ and can be listed, filtered, and re-entered interactively.
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
-* [paintress sessions enter](paintress_sessions_enter.md)  - Re-enter an AI coding session interactively
-* [paintress sessions list](paintress_sessions_list.md)  - List recorded coding sessions
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress sessions enter](paintress_sessions_enter.md)	 - Re-enter an AI coding session interactively
+* [paintress sessions list](paintress_sessions_list.md)	 - List recorded coding sessions
+

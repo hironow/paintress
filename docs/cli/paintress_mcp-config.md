@@ -39,5 +39,6 @@ this allowlist when the file exists.
 
 ### SEE ALSO
 
-* [paintress](paintress.md)  - Claude Code expedition orchestrator
-* [paintress mcp-config generate](paintress_mcp-config_generate.md)  - Generate .mcp.json and .claude/settings.json for subprocess isolation
+* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress mcp-config generate](paintress_mcp-config_generate.md)	 - Generate .mcp.json and .claude/settings.json for subprocess isolation
+
