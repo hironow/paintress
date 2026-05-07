@@ -33,8 +33,8 @@ func TestUpdatePRReviewGate_Integration(t *testing.T) {
 	logger := platform.NewLogger(os.Stderr, false)
 	prURL := "https://github.com/test/repo/pull/42"
 	status := domain.ReviewGateStatus{
-		Passed: true,
-		Cycle:  1,
+		Passed:    true,
+		Cycle:     1,
 		MaxCycles: 3,
 	}
 

@@ -80,4 +80,3 @@ type PruneResult struct { // nosemgrep: first-class-collection.raw-slice-field-d
 	Candidates []string // basenames of files older than threshold
 	Deleted    int      // number of files actually removed (0 in dry-run)
 }
-

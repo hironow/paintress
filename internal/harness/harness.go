@@ -151,9 +151,9 @@ const (
 )
 
 var (
-	ParseRivalContractBody     = policy.ParseRivalContractBody
-	ParseRivalContractMetadata = policy.ParseRivalContractMetadata
-	ParseEvidenceItems         = policy.ParseEvidenceItems
-	DeriveContractID           = policy.DeriveContractID
+	ParseRivalContractBody       = policy.ParseRivalContractBody
+	ParseRivalContractMetadata   = policy.ParseRivalContractMetadata
+	ParseEvidenceItems           = policy.ParseEvidenceItems
+	DeriveContractID             = policy.DeriveContractID
 	FormatRivalContractForPrompt = policy.FormatRivalContractForPrompt
 )

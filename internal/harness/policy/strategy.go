@@ -29,4 +29,3 @@ func StrategyForCycle(cycle int) FixStrategy {
 	idx := (cycle - 1) % len(strategies)
 	return strategies[idx]
 }
-

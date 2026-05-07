@@ -40,6 +40,7 @@
 ### Task 1: Domain — GommageClass type + ClassifyGommage
 
 **Files:**
+
 - Create: `internal/domain/gommage_classifier.go`
 - Create: `internal/domain/gommage_classifier_test.go`
 
@@ -50,64 +51,64 @@
 package domain_test
 
 import (
-	"testing"
+ "testing"
 
-	"github.com/hironow/paintress/internal/domain"
+ "github.com/hironow/paintress/internal/domain"
 )
 
 func TestClassifyGommage_Timeout(t *testing.T) {
-	reasons := []string{"timeout after 120s", "timeout after 120s", "timeout after 120s"}
-	got := domain.ClassifyGommage(reasons)
-	if got != domain.GommageClassTimeout {
-		t.Errorf("got %q, want %q", got, domain.GommageClassTimeout)
-	}
+ reasons := []string{"timeout after 120s", "timeout after 120s", "timeout after 120s"}
+ got := domain.ClassifyGommage(reasons)
+ if got != domain.GommageClassTimeout {
+  t.Errorf("got %q, want %q", got, domain.GommageClassTimeout)
+ }
 }
 
 func TestClassifyGommage_RateLimit(t *testing.T) {
-	reasons := []string{"rate_limit: model overloaded", "rate_limit: 429", "rate_limit: quota"}
-	got := domain.ClassifyGommage(reasons)
-	if got != domain.GommageClassRateLimit {
-		t.Errorf("got %q, want %q", got, domain.GommageClassRateLimit)
-	}
+ reasons := []string{"rate_limit: model overloaded", "rate_limit: 429", "rate_limit: quota"}
+ got := domain.ClassifyGommage(reasons)
+ if got != domain.GommageClassRateLimit {
+  t.Errorf("got %q, want %q", got, domain.GommageClassRateLimit)
+ }
 }
 
 func TestClassifyGommage_ParseError(t *testing.T) {
-	reasons := []string{"parse_error: no markers", "parse_error: invalid json", "parse_error: truncated"}
-	got := domain.ClassifyGommage(reasons)
-	if got != domain.GommageClassParseError {
-		t.Errorf("got %q, want %q", got, domain.GommageClassParseError)
-	}
+ reasons := []string{"parse_error: no markers", "parse_error: invalid json", "parse_error: truncated"}
+ got := domain.ClassifyGommage(reasons)
+ if got != domain.GommageClassParseError {
+  t.Errorf("got %q, want %q", got, domain.GommageClassParseError)
+ }
 }
 
 func TestClassifyGommage_Blocker(t *testing.T) {
-	reasons := []string{"blocker: PR stuck", "blocker: merge conflict", "blocker: CI failed"}
-	got := domain.ClassifyGommage(reasons)
-	if got != domain.GommageClassBlocker {
-		t.Errorf("got %q, want %q", got, domain.GommageClassBlocker)
-	}
+ reasons := []string{"blocker: PR stuck", "blocker: merge conflict", "blocker: CI failed"}
+ got := domain.ClassifyGommage(reasons)
+ if got != domain.GommageClassBlocker {
+  t.Errorf("got %q, want %q", got, domain.GommageClassBlocker)
+ }
 }
 
 func TestClassifyGommage_Systematic(t *testing.T) {
-	reasons := []string{"unknown error A", "unknown error B", "unknown error C"}
-	got := domain.ClassifyGommage(reasons)
-	if got != domain.GommageClassSystematic {
-		t.Errorf("got %q, want %q", got, domain.GommageClassSystematic)
-	}
+ reasons := []string{"unknown error A", "unknown error B", "unknown error C"}
+ got := domain.ClassifyGommage(reasons)
+ if got != domain.GommageClassSystematic {
+  t.Errorf("got %q, want %q", got, domain.GommageClassSystematic)
+ }
 }
 
 func TestClassifyGommage_Mixed_NoMajority(t *testing.T) {
-	reasons := []string{"timeout after 120s", "rate_limit: 429", "blocker: stuck"}
-	got := domain.ClassifyGommage(reasons)
-	if got != domain.GommageClassSystematic {
-		t.Errorf("mixed with no majority should be systematic, got %q", got)
-	}
+ reasons := []string{"timeout after 120s", "rate_limit: 429", "blocker: stuck"}
+ got := domain.ClassifyGommage(reasons)
+ if got != domain.GommageClassSystematic {
+  t.Errorf("mixed with no majority should be systematic, got %q", got)
+ }
 }
 
 func TestClassifyGommage_Empty(t *testing.T) {
-	got := domain.ClassifyGommage(nil)
-	if got != domain.GommageClassSystematic {
-		t.Errorf("empty reasons should be systematic, got %q", got)
-	}
+ got := domain.ClassifyGommage(nil)
+ if got != domain.GommageClassSystematic {
+  t.Errorf("empty reasons should be systematic, got %q", got)
+ }
 }
 ```
 
@@ -128,44 +129,44 @@ import "strings"
 type GommageClass string
 
 const (
-	GommageClassTimeout    GommageClass = "timeout"
-	GommageClassParseError GommageClass = "parse_error"
-	GommageClassRateLimit  GommageClass = "rate_limit"
-	GommageClassBlocker    GommageClass = "blocker"
-	GommageClassSystematic GommageClass = "systematic"
+ GommageClassTimeout    GommageClass = "timeout"
+ GommageClassParseError GommageClass = "parse_error"
+ GommageClassRateLimit  GommageClass = "rate_limit"
+ GommageClassBlocker    GommageClass = "blocker"
+ GommageClassSystematic GommageClass = "systematic"
 )
 
 // classKeywords maps each class to its detection keywords.
 var classKeywords = map[GommageClass]string{
-	GommageClassTimeout:    "timeout",
-	GommageClassRateLimit:  "rate_limit",
-	GommageClassParseError: "parse_error",
-	GommageClassBlocker:    "blocker",
+ GommageClassTimeout:    "timeout",
+ GommageClassRateLimit:  "rate_limit",
+ GommageClassParseError: "parse_error",
+ GommageClassBlocker:    "blocker",
 }
 
 // ClassifyGommage inspects recent failure reasons and returns the dominant class.
 // Majority-vote over keyword matching. If no majority, returns GommageClassSystematic.
 func ClassifyGommage(reasons []string) GommageClass {
-	if len(reasons) == 0 {
-		return GommageClassSystematic
-	}
-	counts := make(map[GommageClass]int)
-	for _, reason := range reasons {
-		lower := strings.ToLower(reason)
-		for class, keyword := range classKeywords {
-			if strings.Contains(lower, keyword) {
-				counts[class]++
-				break // one class per reason
-			}
-		}
-	}
-	majority := (len(reasons) + 1) / 2 // >50%
-	for class, count := range counts {
-		if count >= majority {
-			return class
-		}
-	}
-	return GommageClassSystematic
+ if len(reasons) == 0 {
+  return GommageClassSystematic
+ }
+ counts := make(map[GommageClass]int)
+ for _, reason := range reasons {
+  lower := strings.ToLower(reason)
+  for class, keyword := range classKeywords {
+   if strings.Contains(lower, keyword) {
+    counts[class]++
+    break // one class per reason
+   }
+  }
+ }
+ majority := (len(reasons) + 1) / 2 // >50%
+ for class, count := range counts {
+  if count >= majority {
+   return class
+  }
+ }
+ return GommageClassSystematic
 }
 ```
 
@@ -185,6 +186,7 @@ cd /Users/nino/tap/paintress && git add internal/domain/gommage_classifier.go in
 ### Task 2: Domain — RecoveryDecision type + cooldownForClass
 
 **Files:**
+
 - Create: `internal/domain/gommage_recovery.go`
 - Create: `internal/domain/gommage_recovery_test.go`
 
@@ -195,50 +197,50 @@ cd /Users/nino/tap/paintress && git add internal/domain/gommage_classifier.go in
 package domain_test
 
 import (
-	"testing"
-	"time"
+ "testing"
+ "time"
 
-	"github.com/hironow/paintress/internal/domain"
+ "github.com/hironow/paintress/internal/domain"
 )
 
 func TestCooldownForClass_Timeout(t *testing.T) {
-	got := domain.CooldownForClass(domain.GommageClassTimeout, 1)
-	if got != 30*time.Second {
-		t.Errorf("timeout retry 1: got %v, want 30s", got)
-	}
-	got = domain.CooldownForClass(domain.GommageClassTimeout, 2)
-	if got != 90*time.Second {
-		t.Errorf("timeout retry 2: got %v, want 90s", got)
-	}
+ got := domain.CooldownForClass(domain.GommageClassTimeout, 1)
+ if got != 30*time.Second {
+  t.Errorf("timeout retry 1: got %v, want 30s", got)
+ }
+ got = domain.CooldownForClass(domain.GommageClassTimeout, 2)
+ if got != 90*time.Second {
+  t.Errorf("timeout retry 2: got %v, want 90s", got)
+ }
 }
 
 func TestCooldownForClass_RateLimit(t *testing.T) {
-	got := domain.CooldownForClass(domain.GommageClassRateLimit, 1)
-	if got != 60*time.Second {
-		t.Errorf("rate_limit retry 1: got %v, want 60s", got)
-	}
-	got = domain.CooldownForClass(domain.GommageClassRateLimit, 2)
-	if got != 180*time.Second {
-		t.Errorf("rate_limit retry 2: got %v, want 180s", got)
-	}
+ got := domain.CooldownForClass(domain.GommageClassRateLimit, 1)
+ if got != 60*time.Second {
+  t.Errorf("rate_limit retry 1: got %v, want 60s", got)
+ }
+ got = domain.CooldownForClass(domain.GommageClassRateLimit, 2)
+ if got != 180*time.Second {
+  t.Errorf("rate_limit retry 2: got %v, want 180s", got)
+ }
 }
 
 func TestCooldownForClass_ParseError(t *testing.T) {
-	got := domain.CooldownForClass(domain.GommageClassParseError, 1)
-	if got != 5*time.Second {
-		t.Errorf("parse_error retry 1: got %v, want 5s", got)
-	}
+ got := domain.CooldownForClass(domain.GommageClassParseError, 1)
+ if got != 5*time.Second {
+  t.Errorf("parse_error retry 1: got %v, want 5s", got)
+ }
 }
 
 func TestRecoveryDecision_IsRetry(t *testing.T) {
-	d := domain.RecoveryDecision{Action: domain.RecoveryRetry}
-	if !d.IsRetry() {
-		t.Error("expected IsRetry true")
-	}
-	d2 := domain.RecoveryDecision{Action: domain.RecoveryHalt}
-	if d2.IsRetry() {
-		t.Error("expected IsRetry false for halt")
-	}
+ d := domain.RecoveryDecision{Action: domain.RecoveryRetry}
+ if !d.IsRetry() {
+  t.Error("expected IsRetry true")
+ }
+ d2 := domain.RecoveryDecision{Action: domain.RecoveryHalt}
+ if d2.IsRetry() {
+  t.Error("expected IsRetry false for halt")
+ }
 }
 ```
 
@@ -258,42 +260,42 @@ import "time"
 type RecoveryAction string
 
 const (
-	RecoveryRetry RecoveryAction = "retry"
-	RecoveryHalt  RecoveryAction = "halt"
+ RecoveryRetry RecoveryAction = "retry"
+ RecoveryHalt  RecoveryAction = "halt"
 )
 
 // RecoveryDecision is the aggregate's verdict on what to do after Gommage.
 type RecoveryDecision struct {
-	Action      RecoveryAction
-	Class       GommageClass
-	Cooldown    time.Duration
-	RetryNum    int
-	MaxRetry    int
-	KeepWorkDir bool
+ Action      RecoveryAction
+ Class       GommageClass
+ Cooldown    time.Duration
+ RetryNum    int
+ MaxRetry    int
+ KeepWorkDir bool
 }
 
 // IsRetry returns true if the decision is to retry.
 func (d RecoveryDecision) IsRetry() bool {
-	return d.Action == RecoveryRetry
+ return d.Action == RecoveryRetry
 }
 
 // cooldown base values per class.
 var cooldownBase = map[GommageClass][2]time.Duration{
-	GommageClassTimeout:    {30 * time.Second, 90 * time.Second},
-	GommageClassRateLimit:  {60 * time.Second, 180 * time.Second},
-	GommageClassParseError: {5 * time.Second, 15 * time.Second},
+ GommageClassTimeout:    {30 * time.Second, 90 * time.Second},
+ GommageClassRateLimit:  {60 * time.Second, 180 * time.Second},
+ GommageClassParseError: {5 * time.Second, 15 * time.Second},
 }
 
 // CooldownForClass returns the cooldown duration for a given class and retry number (1-indexed).
 func CooldownForClass(class GommageClass, retryNum int) time.Duration {
-	base, ok := cooldownBase[class]
-	if !ok {
-		return 0
-	}
-	if retryNum <= 1 {
-		return base[0]
-	}
-	return base[1]
+ base, ok := cooldownBase[class]
+ if !ok {
+  return 0
+ }
+ if retryNum <= 1 {
+  return base[0]
+ }
+ return base[1]
 }
 ```
 
@@ -312,6 +314,7 @@ cd /Users/nino/tap/paintress && git add internal/domain/gommage_recovery.go inte
 ### Task 3: Domain — ExpeditionAggregate.DecideRecovery + event extensions
 
 **Files:**
+
 - Modify: `internal/domain/expedition_aggregate.go`
 - Modify: `internal/domain/expedition_aggregate_test.go`
 - Modify: `internal/domain/event.go`
@@ -329,11 +332,11 @@ Extend `GommageTriggeredData`:
 
 ```go
 type GommageTriggeredData struct {
-	Expedition          int          `json:"expedition"`
-	ConsecutiveFailures int          `json:"consecutive_failures"`
-	Class               GommageClass `json:"class,omitempty"`
-	RecoveryAction      string       `json:"recovery_action,omitempty"`
-	RetryNum            int          `json:"retry_num,omitempty"`
+ Expedition          int          `json:"expedition"`
+ ConsecutiveFailures int          `json:"consecutive_failures"`
+ Class               GommageClass `json:"class,omitempty"`
+ RecoveryAction      string       `json:"recovery_action,omitempty"`
+ RetryNum            int          `json:"retry_num,omitempty"`
 }
 ```
 
@@ -341,18 +344,18 @@ Add new data structs:
 
 ```go
 type GommageRecoveryData struct {
-	Expedition int          `json:"expedition"`
-	Class      GommageClass `json:"class"`
-	Action     string       `json:"action"`
-	RetryNum   int          `json:"retry_num"`
-	Cooldown   string       `json:"cooldown"`
+ Expedition int          `json:"expedition"`
+ Class      GommageClass `json:"class"`
+ Action     string       `json:"action"`
+ RetryNum   int          `json:"retry_num"`
+ Cooldown   string       `json:"cooldown"`
 }
 
 type ExpeditionCheckpointData struct {
-	Expedition  int    `json:"expedition"`
-	Phase       string `json:"phase"`
-	WorkDir     string `json:"work_dir"`
-	CommitCount int    `json:"commit_count"`
+ Expedition  int    `json:"expedition"`
+ Phase       string `json:"phase"`
+ WorkDir     string `json:"work_dir"`
+ CommitCount int    `json:"commit_count"`
 }
 ```
 
@@ -362,61 +365,61 @@ Add to `internal/domain/expedition_aggregate_test.go`:
 
 ```go
 func TestDecideRecovery_RetryOnTimeout(t *testing.T) {
-	agg := domain.NewExpeditionAggregate()
-	reasons := []string{"timeout", "timeout", "timeout"}
-	d := agg.DecideRecovery(reasons)
-	if d.Action != domain.RecoveryRetry {
-		t.Errorf("expected retry, got %s", d.Action)
-	}
-	if d.Class != domain.GommageClassTimeout {
-		t.Errorf("expected timeout class, got %s", d.Class)
-	}
-	if d.RetryNum != 1 {
-		t.Errorf("expected retryNum=1, got %d", d.RetryNum)
-	}
+ agg := domain.NewExpeditionAggregate()
+ reasons := []string{"timeout", "timeout", "timeout"}
+ d := agg.DecideRecovery(reasons)
+ if d.Action != domain.RecoveryRetry {
+  t.Errorf("expected retry, got %s", d.Action)
+ }
+ if d.Class != domain.GommageClassTimeout {
+  t.Errorf("expected timeout class, got %s", d.Class)
+ }
+ if d.RetryNum != 1 {
+  t.Errorf("expected retryNum=1, got %d", d.RetryNum)
+ }
 }
 
 func TestDecideRecovery_RetryOnRateLimit(t *testing.T) {
-	agg := domain.NewExpeditionAggregate()
-	reasons := []string{"rate_limit: 429", "rate_limit: 429", "rate_limit: 429"}
-	d := agg.DecideRecovery(reasons)
-	if d.Action != domain.RecoveryRetry {
-		t.Errorf("expected retry, got %s", d.Action)
-	}
-	if d.Class != domain.GommageClassRateLimit {
-		t.Errorf("expected rate_limit, got %s", d.Class)
-	}
+ agg := domain.NewExpeditionAggregate()
+ reasons := []string{"rate_limit: 429", "rate_limit: 429", "rate_limit: 429"}
+ d := agg.DecideRecovery(reasons)
+ if d.Action != domain.RecoveryRetry {
+  t.Errorf("expected retry, got %s", d.Action)
+ }
+ if d.Class != domain.GommageClassRateLimit {
+  t.Errorf("expected rate_limit, got %s", d.Class)
+ }
 }
 
 func TestDecideRecovery_HaltOnBlocker(t *testing.T) {
-	agg := domain.NewExpeditionAggregate()
-	reasons := []string{"blocker: stuck", "blocker: stuck", "blocker: stuck"}
-	d := agg.DecideRecovery(reasons)
-	if d.Action != domain.RecoveryHalt {
-		t.Errorf("expected halt for blocker, got %s", d.Action)
-	}
+ agg := domain.NewExpeditionAggregate()
+ reasons := []string{"blocker: stuck", "blocker: stuck", "blocker: stuck"}
+ d := agg.DecideRecovery(reasons)
+ if d.Action != domain.RecoveryHalt {
+  t.Errorf("expected halt for blocker, got %s", d.Action)
+ }
 }
 
 func TestDecideRecovery_HaltAfterMaxRetries(t *testing.T) {
-	agg := domain.NewExpeditionAggregate()
-	reasons := []string{"timeout", "timeout", "timeout"}
-	agg.DecideRecovery(reasons) // retry 1
-	agg.DecideRecovery(reasons) // retry 2
-	d := agg.DecideRecovery(reasons) // should halt
-	if d.Action != domain.RecoveryHalt {
-		t.Errorf("expected halt after max retries, got %s", d.Action)
-	}
+ agg := domain.NewExpeditionAggregate()
+ reasons := []string{"timeout", "timeout", "timeout"}
+ agg.DecideRecovery(reasons) // retry 1
+ agg.DecideRecovery(reasons) // retry 2
+ d := agg.DecideRecovery(reasons) // should halt
+ if d.Action != domain.RecoveryHalt {
+  t.Errorf("expected halt after max retries, got %s", d.Action)
+ }
 }
 
 func TestDecideRecovery_ResetOnSuccess(t *testing.T) {
-	agg := domain.NewExpeditionAggregate()
-	reasons := []string{"timeout", "timeout", "timeout"}
-	agg.DecideRecovery(reasons) // retry 1
-	agg.ResetRecovery()         // success happened
-	d := agg.DecideRecovery(reasons) // should be retry 1 again
-	if d.RetryNum != 1 {
-		t.Errorf("expected retryNum=1 after reset, got %d", d.RetryNum)
-	}
+ agg := domain.NewExpeditionAggregate()
+ reasons := []string{"timeout", "timeout", "timeout"}
+ agg.DecideRecovery(reasons) // retry 1
+ agg.ResetRecovery()         // success happened
+ d := agg.DecideRecovery(reasons) // should be retry 1 again
+ if d.RetryNum != 1 {
+  t.Errorf("expected retryNum=1 after reset, got %d", d.RetryNum)
+ }
 }
 ```
 
@@ -433,29 +436,29 @@ const maxRecoveryAttempts = 2
 
 // DecideRecovery classifies the failure streak and decides retry vs halt.
 func (a *ExpeditionAggregate) DecideRecovery(reasons []string) RecoveryDecision {
-	class := ClassifyGommage(reasons)
-	switch class {
-	case GommageClassTimeout, GommageClassRateLimit, GommageClassParseError:
-		if a.recoveryAttempts >= maxRecoveryAttempts {
-			return RecoveryDecision{Action: RecoveryHalt, Class: class}
-		}
-		a.recoveryAttempts++
-		return RecoveryDecision{
-			Action:      RecoveryRetry,
-			Class:       class,
-			Cooldown:    CooldownForClass(class, a.recoveryAttempts),
-			RetryNum:    a.recoveryAttempts,
-			MaxRetry:    maxRecoveryAttempts,
-			KeepWorkDir: true,
-		}
-	default:
-		return RecoveryDecision{Action: RecoveryHalt, Class: class}
-	}
+ class := ClassifyGommage(reasons)
+ switch class {
+ case GommageClassTimeout, GommageClassRateLimit, GommageClassParseError:
+  if a.recoveryAttempts >= maxRecoveryAttempts {
+   return RecoveryDecision{Action: RecoveryHalt, Class: class}
+  }
+  a.recoveryAttempts++
+  return RecoveryDecision{
+   Action:      RecoveryRetry,
+   Class:       class,
+   Cooldown:    CooldownForClass(class, a.recoveryAttempts),
+   RetryNum:    a.recoveryAttempts,
+   MaxRetry:    maxRecoveryAttempts,
+   KeepWorkDir: true,
+  }
+ default:
+  return RecoveryDecision{Action: RecoveryHalt, Class: class}
+ }
 }
 
 // ResetRecovery clears recovery attempts. Called when consecutiveFailures resets.
 func (a *ExpeditionAggregate) ResetRecovery() {
-	a.recoveryAttempts = 0
+ a.recoveryAttempts = 0
 }
 ```
 
@@ -480,6 +483,7 @@ cd /Users/nino/tap/paintress && git add internal/domain/expedition_aggregate.go 
 ### Task 4: Port + Emitter — new EmitGommageRecovery + EmitCheckpoint
 
 **Files:**
+
 - Modify: `internal/usecase/port/port.go`
 - Modify: `internal/usecase/emitter.go`
 
@@ -500,15 +504,15 @@ In `expedition_aggregate.go`:
 
 ```go
 func (a *ExpeditionAggregate) RecordGommageRecovery(expedition int, class GommageClass, action string, retryNum int, cooldown string, now time.Time) (Event, error) {
-	return a.nextEvent(EventGommageRecovery, GommageRecoveryData{
-		Expedition: expedition, Class: class, Action: action, RetryNum: retryNum, Cooldown: cooldown,
-	}, now)
+ return a.nextEvent(EventGommageRecovery, GommageRecoveryData{
+  Expedition: expedition, Class: class, Action: action, RetryNum: retryNum, Cooldown: cooldown,
+ }, now)
 }
 
 func (a *ExpeditionAggregate) RecordCheckpoint(expedition int, phase, workDir string, commitCount int, now time.Time) (Event, error) {
-	return a.nextEvent(EventExpeditionCheckpoint, ExpeditionCheckpointData{
-		Expedition: expedition, Phase: phase, WorkDir: workDir, CommitCount: commitCount,
-	}, now)
+ return a.nextEvent(EventExpeditionCheckpoint, ExpeditionCheckpointData{
+  Expedition: expedition, Phase: phase, WorkDir: workDir, CommitCount: commitCount,
+ }, now)
 }
 ```
 
@@ -516,19 +520,19 @@ func (a *ExpeditionAggregate) RecordCheckpoint(expedition int, phase, workDir st
 
 ```go
 func (e *expeditionEventEmitter) EmitGommageRecovery(expedition int, class, action string, retryNum int, cooldown string, now time.Time) error {
-	ev, err := e.agg.RecordGommageRecovery(expedition, domain.GommageClass(class), action, retryNum, cooldown, now)
-	if err != nil {
-		return err
-	}
-	return e.emit(ev)
+ ev, err := e.agg.RecordGommageRecovery(expedition, domain.GommageClass(class), action, retryNum, cooldown, now)
+ if err != nil {
+  return err
+ }
+ return e.emit(ev)
 }
 
 func (e *expeditionEventEmitter) EmitCheckpoint(expedition int, phase, workDir string, commitCount int, now time.Time) error {
-	ev, err := e.agg.RecordCheckpoint(expedition, phase, workDir, commitCount, now)
-	if err != nil {
-		return err
-	}
-	return e.emit(ev)
+ ev, err := e.agg.RecordCheckpoint(expedition, phase, workDir, commitCount, now)
+ if err != nil {
+  return err
+ }
+ return e.emit(ev)
 }
 ```
 
@@ -552,6 +556,7 @@ cd /Users/nino/tap/paintress && git add internal/usecase/port/port.go internal/u
 ### Task 5: Session — executeRecovery + injectParseErrorLumina
 
 **Files:**
+
 - Create: `internal/session/gommage_recovery.go`
 - Create: `internal/session/gommage_recovery_test.go`
 - Modify: `internal/session/gommage_insight.go`
@@ -563,49 +568,49 @@ cd /Users/nino/tap/paintress && git add internal/usecase/port/port.go internal/u
 package session
 
 import (
-	"context"
-	"testing"
-	"time"
+ "context"
+ "testing"
+ "time"
 
-	"github.com/hironow/paintress/internal/domain"
+ "github.com/hironow/paintress/internal/domain"
 )
 
 func TestExecuteRecovery_RetryTimeout(t *testing.T) {
-	// white-box-reason: needs access to Paintress.reserve and Paintress.Emitter
-	p := newTestPaintress(t)
-	decision := domain.RecoveryDecision{
-		Action: domain.RecoveryRetry, Class: domain.GommageClassTimeout,
-		Cooldown: 1 * time.Millisecond, RetryNum: 1, MaxRetry: 2, KeepWorkDir: true,
-	}
-	ctx := context.Background()
-	got := p.executeRecovery(ctx, decision, 1, nil)
-	if !got {
-		t.Error("expected true (retry) for timeout recovery")
-	}
+ // white-box-reason: needs access to Paintress.reserve and Paintress.Emitter
+ p := newTestPaintress(t)
+ decision := domain.RecoveryDecision{
+  Action: domain.RecoveryRetry, Class: domain.GommageClassTimeout,
+  Cooldown: 1 * time.Millisecond, RetryNum: 1, MaxRetry: 2, KeepWorkDir: true,
+ }
+ ctx := context.Background()
+ got := p.executeRecovery(ctx, decision, 1, nil)
+ if !got {
+  t.Error("expected true (retry) for timeout recovery")
+ }
 }
 
 func TestExecuteRecovery_HaltSystematic(t *testing.T) {
-	p := newTestPaintress(t)
-	decision := domain.RecoveryDecision{Action: domain.RecoveryHalt, Class: domain.GommageClassSystematic}
-	ctx := context.Background()
-	got := p.executeRecovery(ctx, decision, 1, nil)
-	if got {
-		t.Error("expected false (halt) for systematic")
-	}
+ p := newTestPaintress(t)
+ decision := domain.RecoveryDecision{Action: domain.RecoveryHalt, Class: domain.GommageClassSystematic}
+ ctx := context.Background()
+ got := p.executeRecovery(ctx, decision, 1, nil)
+ if got {
+  t.Error("expected false (halt) for systematic")
+ }
 }
 
 func TestExecuteRecovery_ContextCancelled(t *testing.T) {
-	p := newTestPaintress(t)
-	decision := domain.RecoveryDecision{
-		Action: domain.RecoveryRetry, Class: domain.GommageClassRateLimit,
-		Cooldown: 10 * time.Second, RetryNum: 1, MaxRetry: 2, KeepWorkDir: true,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	got := p.executeRecovery(ctx, decision, 1, nil)
-	if got {
-		t.Error("expected false when context is cancelled")
-	}
+ p := newTestPaintress(t)
+ decision := domain.RecoveryDecision{
+  Action: domain.RecoveryRetry, Class: domain.GommageClassRateLimit,
+  Cooldown: 10 * time.Second, RetryNum: 1, MaxRetry: 2, KeepWorkDir: true,
+ }
+ ctx, cancel := context.WithCancel(context.Background())
+ cancel()
+ got := p.executeRecovery(ctx, decision, 1, nil)
+ if got {
+  t.Error("expected false when context is cancelled")
+ }
 }
 ```
 
@@ -620,51 +625,51 @@ Run: `cd /Users/nino/tap/paintress && go test ./internal/session/ -run TestExecu
 package session
 
 import (
-	"context"
-	"time"
+ "context"
+ "time"
 
-	"github.com/hironow/paintress/internal/domain"
+ "github.com/hironow/paintress/internal/domain"
 )
 
 // executeRecovery performs class-specific recovery. Returns true to retry same issue.
 func (p *Paintress) executeRecovery(ctx context.Context, decision domain.RecoveryDecision, exp int, expedition *Expedition) bool {
-	switch decision.Action {
-	case domain.RecoveryRetry:
-		p.Logger.Warn("gommage recovery: %s (retry %d/%d, cooldown %s)",
-			decision.Class, decision.RetryNum, decision.MaxRetry, decision.Cooldown)
+ switch decision.Action {
+ case domain.RecoveryRetry:
+  p.Logger.Warn("gommage recovery: %s (retry %d/%d, cooldown %s)",
+   decision.Class, decision.RetryNum, decision.MaxRetry, decision.Cooldown)
 
-		switch decision.Class {
-		case domain.GommageClassTimeout:
-			p.reserve.ForceReserve()
-		case domain.GommageClassParseError:
-			injectParseErrorLumina(p.config.Continent, p.Logger)
-		}
+  switch decision.Class {
+  case domain.GommageClassTimeout:
+   p.reserve.ForceReserve()
+  case domain.GommageClassParseError:
+   injectParseErrorLumina(p.config.Continent, p.Logger)
+  }
 
-		_ = p.Emitter.EmitGommageRecovery(exp, string(decision.Class),
-			string(decision.Action), decision.RetryNum, decision.Cooldown.String(), time.Now())
+  _ = p.Emitter.EmitGommageRecovery(exp, string(decision.Class),
+   string(decision.Action), decision.RetryNum, decision.Cooldown.String(), time.Now())
 
-		select {
-		case <-time.After(decision.Cooldown):
-			return true
-		case <-ctx.Done():
-			return false
-		}
-	case domain.RecoveryHalt:
-		return false
-	}
-	return false
+  select {
+  case <-time.After(decision.Cooldown):
+   return true
+  case <-ctx.Done():
+   return false
+  }
+ case domain.RecoveryHalt:
+  return false
+ }
+ return false
 }
 
 // injectParseErrorLumina writes a corrective hint for the next expedition attempt.
 func injectParseErrorLumina(continent string, logger interface{ Warn(string, ...any) }) {
-	w := NewInsightWriter(domain.InsightsDir(continent), domain.RunDir(continent))
-	entry := domain.InsightEntry{
-		Title: "parse-error-recovery",
-		What:  "Previous expedition output could not be parsed",
-		Why:   "Claude output did not contain expected report markers",
-		How:   "Ensure output follows the exact report format with markers",
-	}
-	_ = w.Append("lumina-recovery.md", "recovery", "paintress", entry)
+ w := NewInsightWriter(domain.InsightsDir(continent), domain.RunDir(continent))
+ entry := domain.InsightEntry{
+  Title: "parse-error-recovery",
+  What:  "Previous expedition output could not be parsed",
+  Why:   "Claude output did not contain expected report markers",
+  How:   "Ensure output follows the exact report format with markers",
+ }
+ _ = w.Append("lumina-recovery.md", "recovery", "paintress", entry)
 }
 ```
 
@@ -680,9 +685,9 @@ Add `class` to the Extra map:
 
 ```go
 Extra: map[string]string{
-	"failure-type":   "gommage",
-	"gradient-level": "0",
-	"gommage-class":  string(class),
+ "failure-type":   "gommage",
+ "gradient-level": "0",
+ "gommage-class":  string(class),
 },
 ```
 
@@ -707,6 +712,7 @@ cd /Users/nino/tap/paintress && git add internal/session/gommage_recovery.go int
 ### Task 6: Session — Checkpoint + Resume + Orphan Cleanup
 
 **Files:**
+
 - Create: `internal/session/gommage_checkpoint.go`
 - Create: `internal/session/gommage_checkpoint_test.go`
 
@@ -717,52 +723,52 @@ cd /Users/nino/tap/paintress && git add internal/session/gommage_recovery.go int
 package session
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
-	"testing"
+ "os"
+ "os/exec"
+ "path/filepath"
+ "testing"
 )
 
 func TestBuildResumeContext_WithCommits(t *testing.T) {
-	// white-box-reason: tests internal buildResumeContext function
-	dir := t.TempDir()
-	// Set up a git repo with a commit
-	run := func(args ...string) {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		cmd.Run()
-	}
-	run("init")
-	run("config", "user.email", "test@test.com")
-	run("config", "user.name", "test")
-	os.WriteFile(filepath.Join(dir, "file.go"), []byte("package main"), 0644)
-	run("add", ".")
-	run("commit", "-m", "initial")
+ // white-box-reason: tests internal buildResumeContext function
+ dir := t.TempDir()
+ // Set up a git repo with a commit
+ run := func(args ...string) {
+  cmd := exec.Command("git", args...)
+  cmd.Dir = dir
+  cmd.Run()
+ }
+ run("init")
+ run("config", "user.email", "test@test.com")
+ run("config", "user.name", "test")
+ os.WriteFile(filepath.Join(dir, "file.go"), []byte("package main"), 0644)
+ run("add", ".")
+ run("commit", "-m", "initial")
 
-	ctx := buildResumeContext(dir)
-	if ctx == "" {
-		t.Error("expected non-empty resume context")
-	}
+ ctx := buildResumeContext(dir)
+ if ctx == "" {
+  t.Error("expected non-empty resume context")
+ }
 }
 
 func TestBuildResumeContext_EmptyRepo(t *testing.T) {
-	dir := t.TempDir()
-	cmd := exec.Command("git", "init")
-	cmd.Dir = dir
-	cmd.Run()
+ dir := t.TempDir()
+ cmd := exec.Command("git", "init")
+ cmd.Dir = dir
+ cmd.Run()
 
-	ctx := buildResumeContext(dir)
-	// Should still return something (empty diff is fine)
-	if ctx == "" {
-		t.Error("expected non-empty context even for empty repo")
-	}
+ ctx := buildResumeContext(dir)
+ // Should still return something (empty diff is fine)
+ if ctx == "" {
+  t.Error("expected non-empty context even for empty repo")
+ }
 }
 
 func TestCleanOrphanWorktrees_NoOrphans(t *testing.T) {
-	// white-box-reason: tests cleanOrphanWorktrees on Paintress struct
-	p := newTestPaintress(t)
-	// Should not panic or error with no worktrees
-	p.cleanOrphanWorktrees()
+ // white-box-reason: tests cleanOrphanWorktrees on Paintress struct
+ p := newTestPaintress(t)
+ // Should not panic or error with no worktrees
+ p.cleanOrphanWorktrees()
 }
 ```
 
@@ -777,94 +783,94 @@ Run: `cd /Users/nino/tap/paintress && go test ./internal/session/ -run "TestBuil
 package session
 
 import (
-	"os/exec"
-	"strings"
-	"time"
+ "os/exec"
+ "strings"
+ "time"
 )
 
 // CheckpointPhase tracks expedition progress for resume.
 type CheckpointPhase string
 
 const (
-	CheckpointWorktreeReady   CheckpointPhase = "worktree_ready"
-	CheckpointSubprocessStart CheckpointPhase = "subprocess_started"
+ CheckpointWorktreeReady   CheckpointPhase = "worktree_ready"
+ CheckpointSubprocessStart CheckpointPhase = "subprocess_started"
 )
 
 // IncompleteExpedition represents an unfinished expedition found at startup.
 type IncompleteExpedition struct {
-	Expedition int
-	WorkDir    string
-	Phase      CheckpointPhase
+ Expedition int
+ WorkDir    string
+ Phase      CheckpointPhase
 }
 
 // saveCheckpoint records expedition progress as an event.
 func (p *Paintress) saveCheckpoint(exp int, phase CheckpointPhase, workDir string) {
-	commitCount := countCommits(workDir)
-	_ = p.Emitter.EmitCheckpoint(exp, string(phase), workDir, commitCount, time.Now())
+ commitCount := countCommits(workDir)
+ _ = p.Emitter.EmitCheckpoint(exp, string(phase), workDir, commitCount, time.Now())
 }
 
 // countCommits returns the number of commits on HEAD above the base.
 func countCommits(workDir string) int {
-	cmd := exec.Command("git", "rev-list", "--count", "HEAD")
-	cmd.Dir = workDir
-	out, err := cmd.Output()
-	if err != nil {
-		return 0
-	}
-	s := strings.TrimSpace(string(out))
-	var n int
-	for _, c := range s {
-		if c >= '0' && c <= '9' {
-			n = n*10 + int(c-'0')
-		}
-	}
-	return n
+ cmd := exec.Command("git", "rev-list", "--count", "HEAD")
+ cmd.Dir = workDir
+ out, err := cmd.Output()
+ if err != nil {
+  return 0
+ }
+ s := strings.TrimSpace(string(out))
+ var n int
+ for _, c := range s {
+  if c >= '0' && c <= '9' {
+   n = n*10 + int(c-'0')
+  }
+ }
+ return n
 }
 
 // buildResumeContext generates lightweight context for --continue.
 func buildResumeContext(workDir string) string {
-	var b strings.Builder
-	b.WriteString("Previous progress in worktree:\n")
+ var b strings.Builder
+ b.WriteString("Previous progress in worktree:\n")
 
-	logCmd := exec.Command("git", "log", "--oneline", "-10")
-	logCmd.Dir = workDir
-	if out, err := logCmd.Output(); err == nil && len(out) > 0 {
-		b.WriteString("Commits:\n")
-		b.Write(out)
-	}
+ logCmd := exec.Command("git", "log", "--oneline", "-10")
+ logCmd.Dir = workDir
+ if out, err := logCmd.Output(); err == nil && len(out) > 0 {
+  b.WriteString("Commits:\n")
+  b.Write(out)
+ }
 
-	statCmd := exec.Command("git", "diff", "--stat")
-	statCmd.Dir = workDir
-	if out, err := statCmd.Output(); err == nil && len(out) > 0 {
-		b.WriteString("\nUncommitted changes:\n")
-		b.Write(out)
-	}
+ statCmd := exec.Command("git", "diff", "--stat")
+ statCmd.Dir = workDir
+ if out, err := statCmd.Output(); err == nil && len(out) > 0 {
+  b.WriteString("\nUncommitted changes:\n")
+  b.Write(out)
+ }
 
-	return b.String()
+ return b.String()
 }
 
 // cleanOrphanWorktrees removes worktrees from previous sessions.
 func (p *Paintress) cleanOrphanWorktrees() {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
-	cmd.Dir = p.config.Continent
-	out, err := cmd.Output()
-	if err != nil {
-		return
-	}
-	// Parse worktree list, find .expedition pattern, check age
-	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(line, "worktree ") {
-			path := strings.TrimPrefix(line, "worktree ")
-			if strings.Contains(path, ".expedition") || strings.Contains(path, "paintress-wt-") {
-				// Check if older than 1 hour
-				rmCmd := exec.Command("git", "worktree", "remove", "--force", path)
-				rmCmd.Dir = p.config.Continent
-				if rmErr := rmCmd.Run(); rmErr != nil {
-					p.Logger.Warn("orphan worktree cleanup: %v", rmErr)
-				}
-			}
-		}
-	}
+ cmd := exec.Command("git", "worktree", "list", "--porcelain")
+ cmd.Dir = p.config.Continent
+ out, err := cmd.Output()
+ if err != nil {
+  return
+ }
+ // Parse worktree list, find .expedition pattern, check age
+ for _, line := range strings.Split(string(out), "\n") {
+  if strings.HasPrefix(line, "worktree ") {
+   path := strings.TrimPrefix(line, "worktree ")
+   if strings.Contains(path, ".expedition") || strings.Contains(path, "paintress-wt-") {
+    // Check if older than 1 hour
+    rmCmd := exec.Command("git", "worktree", "remove", "--force", path)
+    rmCmd.Dir = p.config.Continent
+    if rmErr := rmCmd.Run(); rmErr != nil {
+     p.Logger.Warn("orphan worktree cleanup: %v", rmErr)
+    }
+   }
+  }
+ }
 }
 ```
 
@@ -887,6 +893,7 @@ cd /Users/nino/tap/paintress && git add internal/session/gommage_checkpoint.go i
 ### Task 7: Integration — Wire everything into expedition loop
 
 **Files:**
+
 - Modify: `internal/session/paintress_expedition.go` (L215-236)
 - Modify: `internal/session/paintress.go` (startup)
 
@@ -1018,6 +1025,7 @@ cd /Users/nino/tap/paintress && git add internal/session/paintress_expedition.go
 ### Task 8: Docs + Lint + Final Verification
 
 **Files:**
+
 - Modify: `docs/` as needed
 - Run: full quality pipeline
 

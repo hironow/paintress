@@ -24,7 +24,7 @@ func TestFileEventStore_AppendAndLoadAll(t *testing.T) {
 	}
 
 	// when
-	if _, err := store.Append(context.Background(),ev); err != nil {
+	if _, err := store.Append(context.Background(), ev); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 	events, _, err := store.LoadAll(context.Background())
@@ -71,7 +71,7 @@ func TestFileEventStore_DailyRotation(t *testing.T) {
 		domain.ExpeditionCompletedData{Expedition: 1, Status: "success"}, day2)
 
 	// when
-	if _, err := store.Append(context.Background(),ev1, ev2); err != nil {
+	if _, err := store.Append(context.Background(), ev1, ev2); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 
@@ -115,10 +115,10 @@ func TestFileEventStore_LoadSince(t *testing.T) {
 	ev3, _ := domain.NewEvent(domain.EventExpeditionStarted,
 		domain.ExpeditionStartedData{Expedition: 2}, t3)
 
-	_, _ = store.Append(context.Background(),ev1, ev2, ev3)
+	_, _ = store.Append(context.Background(), ev1, ev2, ev3)
 
 	// when: load events after t1
-	events, _, err := store.LoadSince(context.Background(),t1)
+	events, _, err := store.LoadSince(context.Background(), t1)
 
 	// then: only ev2 and ev3
 	if err != nil {
@@ -139,7 +139,7 @@ func TestFileEventStore_Append_RejectsInvalidEvent(t *testing.T) {
 	invalid := domain.Event{} // all fields empty
 
 	// when
-	_, err := store.Append(context.Background(),invalid)
+	_, err := store.Append(context.Background(), invalid)
 
 	// then
 	if err == nil {
@@ -158,7 +158,7 @@ func TestFileEventStore_StableOrderForSameTimestamp(t *testing.T) {
 	ev2, _ := domain.NewEvent(domain.EventDMailFlushed,
 		domain.DMailFlushedData{Count: 1}, now)
 
-	_, _ = store.Append(context.Background(),ev1, ev2)
+	_, _ = store.Append(context.Background(), ev1, ev2)
 
 	// when
 	events, _, err := store.LoadAll(context.Background())
@@ -189,12 +189,12 @@ func TestFileEventStore_LoadAfterSeqNr_FiltersAndSorts(t *testing.T) {
 	ev2.SeqNr = 2
 	ev3, _ := domain.NewEvent(domain.EventExpeditionStarted, nil, now.Add(2*time.Second))
 	ev3.SeqNr = 3
-	if _, err := store.Append(context.Background(),ev1, ev2, ev3); err != nil {
+	if _, err := store.Append(context.Background(), ev1, ev2, ev3); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
 	// when
-	events, _, err := store.LoadAfterSeqNr(context.Background(),1)
+	events, _, err := store.LoadAfterSeqNr(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("load after seq nr: %v", err)
 	}
@@ -218,12 +218,12 @@ func TestFileEventStore_LoadAfterSeqNr_SkipsZeroSeqNr(t *testing.T) {
 	legacy, _ := domain.NewEvent(domain.EventExpeditionStarted, nil, time.Now())
 	postCutover, _ := domain.NewEvent(domain.EventExpeditionCompleted, nil, time.Now().Add(time.Second))
 	postCutover.SeqNr = 1
-	if _, err := store.Append(context.Background(),legacy, postCutover); err != nil {
+	if _, err := store.Append(context.Background(), legacy, postCutover); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
 	// when
-	events, _, err := store.LoadAfterSeqNr(context.Background(),0)
+	events, _, err := store.LoadAfterSeqNr(context.Background(), 0)
 	if err != nil {
 		t.Fatalf("load after seq nr: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestFileEventStore_LatestSeqNr(t *testing.T) {
 	ev1.SeqNr = 3
 	ev2, _ := domain.NewEvent(domain.EventExpeditionCompleted, nil, now.Add(time.Second))
 	ev2.SeqNr = 7
-	if _, err := store.Append(context.Background(),ev1, ev2); err != nil {
+	if _, err := store.Append(context.Background(), ev1, ev2); err != nil {
 		t.Fatalf("append: %v", err)
 	}
 
