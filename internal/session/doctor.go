@@ -642,4 +642,3 @@ func checkSkills(continent string) domain.DoctorCheck {
 		Message: fmt.Sprintf("%s (%d skills OK)", skillsDir, found),
 	}
 }
-

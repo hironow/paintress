@@ -131,7 +131,6 @@ func NewRootCommand() *cobra.Command {
 	return rootCmd
 }
 
-
 // loggerFrom extracts the domain.Logger from the cobra command context.
 // Falls back to a stderr logger if PersistentPreRunE was not executed (e.g., in tests).
 func loggerFrom(cmd *cobra.Command) domain.Logger {

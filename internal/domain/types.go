@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-
 // shutdownKey is the context key for the outer (shutdown) context.
 type shutdownKey struct{}
 

@@ -60,12 +60,12 @@ func renderExpeditionPromptForLang(t *testing.T, lang string, dmails []domain.DM
 	t.Helper()
 	reg := filter.MustDefault()
 	data := domain.PromptData{
-		Number:                 1,
-		Timestamp:              "2026-05-03 12:00:00",
-		BaseBranch:             "main",
-		ReserveSection:         "Reserve OK",
-		InboxSection:           filter.FormatDMailForPrompt(dmails),
-		MissionSection:         "mission",
+		Number:                  1,
+		Timestamp:               "2026-05-03 12:00:00",
+		BaseBranch:              "main",
+		ReserveSection:          "Reserve OK",
+		InboxSection:            filter.FormatDMailForPrompt(dmails),
+		MissionSection:          "mission",
 		HasEventSourcedContract: filter.HasEventSourcedContract(dmails),
 	}
 	return filter.RenderExpeditionPrompt(reg, lang, data)

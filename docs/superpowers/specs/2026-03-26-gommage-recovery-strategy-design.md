@@ -135,17 +135,20 @@ This makes `ClassifyGommage(reasons []string)` a true pure function — it only 
 ## Worktree Lifecycle
 
 ### During Recovery Retry
+
 - `releaseWorkDir()` is NOT called
 - Worktree preserves committed and uncommitted changes
 - Next retry starts Claude subprocess in the same worktree
 - Claude receives `git log --oneline base..HEAD` + `git diff --stat` as context
 
 ### Cleanup Policy (3 layers)
+
 1. **On retry success**: Normal expedition flow — PR created, worktree cleaned up after PR dispatch
 2. **On retry cap reached (halt)**: `releaseWorkDir()` called as in current behavior
 3. **On session startup**: `cleanOrphanWorktrees()` detects worktrees with stale checkpoints (>1h) and removes them
 
 ### Resume on Session Restart
+
 1. `paintress run` checks event store for `expedition.checkpoint` events without a subsequent `expedition.completed`
 2. Returns `[]IncompleteExpedition` — one per unfinished worker. Under `--workers=N`, up to N incomplete expeditions may exist
 3. For each incomplete: if worktree still exists on disk and git state is valid, resume that expedition
@@ -156,6 +159,7 @@ This makes `ClassifyGommage(reasons []string)` a true pure function — it only 
 ## Domain Types
 
 ### `GommageClass` (new type in `domain/gommage_classifier.go`)
+
 ```go
 type GommageClass string
 // Constants: GommageClassTimeout, GommageClassRateLimit,
@@ -163,6 +167,7 @@ type GommageClass string
 ```
 
 ### `RecoveryDecision` (new type in `domain/gommage_recovery.go`)
+
 ```go
 type RecoveryDecision struct {
     Action      RecoveryAction  // "retry" or "halt"
@@ -175,11 +180,13 @@ type RecoveryDecision struct {
 ```
 
 ### `ExpeditionAggregate` changes
+
 - New field: `recoveryAttempts int` — scoped to current failure streak, resets when `consecutiveFailures` resets (on any success). In-memory only, not event-sourced (derived from streak state).
 - New method: `DecideRecovery(reasons []string) RecoveryDecision`
 - New method: `ResetRecovery()` — called when `consecutiveFailures` resets (success or manual reset). Clears `recoveryAttempts` to 0.
 
 ### Event data extensions
+
 - `GommageTriggeredData`: adds `Class`, `RecoveryAction`, `RetryNum` (all `omitempty`)
 - New: `GommageRecoveryData` for `gommage.recovery` event
 - New: `ExpeditionCheckpointData` for `expedition.checkpoint` event
@@ -187,10 +194,12 @@ type RecoveryDecision struct {
 ## Session Types
 
 ### `gommage_recovery.go`
+
 - `executeRecovery(ctx, decision, exp, expedition) bool` — returns true to retry
 - `injectParseErrorLumina(continent, logger)` — writes corrective Lumina hint
 
 ### `gommage_checkpoint.go`
+
 - `saveCheckpoint(exp, phase, workDir)` — records progress event
 - `resumeIncompleteExpeditions() []IncompleteExpedition` — startup resume (returns all incomplete, one per worker)
 - `buildResumeContext(workDir string) string` — `git log --oneline` + `git diff --stat`
@@ -211,6 +220,7 @@ Recovery span event: `gommage.recovery` with class and cooldown attributes.
 ## Negative Feedback Properties
 
 The design maintains a negative feedback regime:
+
 - Transient failures self-heal without human escalation
 - Recovery cap (2 retries) prevents runaway retry loops
 - Each successful recovery reduces future Gommage probability (counter reset)

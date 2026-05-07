@@ -28,5 +28,4 @@ paintress sessions enter [session-record-id] [flags]
 
 ### SEE ALSO
 
-* [paintress sessions](paintress_sessions.md)	 - Manage AI coding sessions
-
+* [paintress sessions](paintress_sessions.md)  - Manage AI coding sessions

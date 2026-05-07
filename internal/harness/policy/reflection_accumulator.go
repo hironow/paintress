@@ -58,4 +58,3 @@ func (a *ReflectionAccumulator) FormatForPrompt() string {
 	}
 	return sb.String()
 }
-

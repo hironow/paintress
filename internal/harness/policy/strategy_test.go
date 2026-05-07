@@ -70,4 +70,3 @@ func TestStrategyForCycle_RotationPattern(t *testing.T) {
 		}
 	}
 }
-

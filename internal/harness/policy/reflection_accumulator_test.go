@@ -107,4 +107,3 @@ func TestReflectionAccumulator_IsStagnantWithOneCycle(t *testing.T) {
 		t.Error("IsStagnant = true, want false (only one cycle — no baseline)")
 	}
 }
-

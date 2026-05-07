@@ -2,8 +2,8 @@ package domain_test
 
 import (
 	"encoding/json"
-	"strings"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 

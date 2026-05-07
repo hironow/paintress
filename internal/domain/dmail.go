@@ -46,13 +46,13 @@ const DMailSchemaVersion = "1"
 type DMailKind string
 
 const (
-	KindSpecification    DMailKind = "specification"
-	KindReport           DMailKind = "report"
-	KindDesignFeedback   DMailKind = "design-feedback"
-	KindImplFeedback     DMailKind = "implementation-feedback"
-	KindConvergence      DMailKind = "convergence"
-	KindCIResult         DMailKind = "ci-result"
-	KindStallEscalation  DMailKind = "stall-escalation"
+	KindSpecification   DMailKind = "specification"
+	KindReport          DMailKind = "report"
+	KindDesignFeedback  DMailKind = "design-feedback"
+	KindImplFeedback    DMailKind = "implementation-feedback"
+	KindConvergence     DMailKind = "convergence"
+	KindCIResult        DMailKind = "ci-result"
+	KindStallEscalation DMailKind = "stall-escalation"
 )
 
 // ValidDMailKinds is the canonical set of allowed D-Mail kinds per schema v1.

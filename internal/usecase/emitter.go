@@ -18,8 +18,8 @@ type expeditionEventEmitter struct {
 	dispatcher   port.EventDispatcher
 	logger       domain.Logger
 	seqAlloc     port.SeqAllocator
-	expeditionID string // enriches events with correlation metadata
-	prevID       string // previous event ID for causation chain
+	expeditionID string          // enriches events with correlation metadata
+	prevID       string          // previous event ID for causation chain
 	ctx          context.Context //nolint:containedctx // stored for trace propagation into emit chain
 }
 

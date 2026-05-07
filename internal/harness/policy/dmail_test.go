@@ -84,7 +84,6 @@ func TestDMailMarshal_IdempotencyKey(t *testing.T) {
 	}
 }
 
-
 func TestDMailMarshal_ActionFieldRoundTrip(t *testing.T) {
 	// given
 	dm := domain.DMail{

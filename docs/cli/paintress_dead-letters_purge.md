@@ -51,5 +51,4 @@ paintress dead-letters purge [path] [flags]
 
 ### SEE ALSO
 
-* [paintress dead-letters](paintress_dead-letters.md)	 - Manage dead-lettered outbox items
-
+* [paintress dead-letters](paintress_dead-letters.md)  - Manage dead-lettered outbox items

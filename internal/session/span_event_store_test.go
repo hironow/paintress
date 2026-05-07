@@ -84,7 +84,7 @@ func TestSpanEventStore_IncludesAllAttributes(t *testing.T) {
 	// Exercise all three operations
 	evt, _ := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "test"}, time.Now())
 	store.Append(context.Background(), evt)            // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
-	store.LoadAll(context.Background())              // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
+	store.LoadAll(context.Background())                // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
 	store.LoadSince(context.Background(), time.Time{}) // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
 
 	spans := exp.GetSpans()
@@ -138,7 +138,7 @@ func TestSpanEventStore_NoPIILeakage(t *testing.T) {
 
 	evt, _ := domain.NewEvent(domain.EventDMailStaged, domain.DMailStagedData{Name: "secret-dmail"}, time.Now())
 	store.Append(context.Background(), evt)            // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
-	store.LoadAll(context.Background())              // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
+	store.LoadAll(context.Background())                // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
 	store.LoadSince(context.Background(), time.Time{}) // nosemgrep: adr0003-otel-span-without-defer-end -- test exercises wrapper [permanent]
 
 	spans := exp.GetSpans()
