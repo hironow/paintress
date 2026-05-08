@@ -15,6 +15,7 @@ import (
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/platform/actortype"
 	"github.com/hironow/paintress/internal/platform/projectid"
 	"github.com/hironow/paintress/internal/usecase/port"
 )
@@ -29,6 +30,13 @@ func SendDMail(ctx context.Context, store port.OutboxStore, d domain.DMail, emit
 		d.SchemaVersion = domain.DMailSchemaVersion
 	}
 	d.Metadata = projectid.InjectProjectID(d.Metadata)
+	metadata, err := actortype.InjectActorType(d.Metadata)
+	if err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("error.stage", "paintress.dmail"))
+		return fmt.Errorf("dmail: actor type: %w", err)
+	}
+	d.Metadata = metadata
 	if err := harness.ValidateDMail(d); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.dmail"))
