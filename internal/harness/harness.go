@@ -108,7 +108,10 @@ var HasReviewComments = verifier.HasReviewComments
 var IsRateLimited = verifier.IsRateLimited
 
 // ValidateDMail checks that a DMail conforms to D-Mail schema v1.
-var ValidateDMail = verifier.ValidateDMail
+func ValidateDMail(d domain.DMail) error {
+	_, err := verifier.ParseDMail(d)
+	return err
+}
 
 // ClassifyProviderError classifies stderr output by provider.
 func ClassifyProviderError(provider domain.Provider, stderr string) domain.ProviderErrorInfo {

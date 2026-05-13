@@ -114,7 +114,7 @@ func FormatCapabilityViolationsSection(violations []CapabilityViolation) string 
 	sb.WriteString("## Capability Boundary Violations\n\n")
 	sb.WriteString("The following capability limitations were detected in past expeditions:\n\n")
 	for _, v := range violations {
-		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", v.Type, v.Message))
+		fmt.Fprintf(&sb, "- **%s**: %s\n", v.Type, v.Message)
 	}
 	sb.WriteString("\nAvoid actions that would trigger these limitations.\n")
 	return sb.String()

@@ -67,7 +67,7 @@ func TestRenderExpeditionPrompt_EventSourcedRenderShape(t *testing.T) {
 	if inbox < 0 || glossary < 0 || boundaries < 0 {
 		t.Fatalf("missing one of the markers: inbox=%d glossary=%d boundaries=%d", inbox, glossary, boundaries)
 	}
-	if !(inbox < glossary && glossary < boundaries) {
+	if inbox >= glossary || glossary >= boundaries {
 		t.Errorf("glossary must appear between inbox and Contract Boundaries; got positions inbox=%d glossary=%d boundaries=%d\nprompt:\n%s", inbox, glossary, boundaries, prompt)
 	}
 }
