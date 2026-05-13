@@ -613,7 +613,7 @@ func readContextFilesWithLogger(continent string, logger domain.Logger) (string,
 			return "", fmt.Errorf("reading context file %s: %w", e.Name(), err)
 		}
 		name := strings.TrimSuffix(e.Name(), ".md")
-		buf.WriteString(fmt.Sprintf("### %s\n\n", name))
+		fmt.Fprintf(&buf, "### %s\n\n", name)
 		buf.Write(content)
 		buf.WriteString("\n\n")
 		totalBytes += info.Size()

@@ -55,10 +55,10 @@ func ParseSPRTConfig(cfg SPRTConfig) (SPRTConfig, error) {
 		return SPRTConfig{}, fmt.Errorf("P0 must be less than P1 (got P0=%g, P1=%g)", cfg.P0, cfg.P1)
 	}
 	if cfg.Alpha <= 0 || cfg.Alpha >= 1 {
-		return SPRTConfig{}, fmt.Errorf("Alpha must be in (0,1), got %g", cfg.Alpha)
+		return SPRTConfig{}, fmt.Errorf("alpha must be in (0,1), got %g", cfg.Alpha)
 	}
 	if cfg.Beta <= 0 || cfg.Beta >= 1 {
-		return SPRTConfig{}, fmt.Errorf("Beta must be in (0,1), got %g", cfg.Beta)
+		return SPRTConfig{}, fmt.Errorf("beta must be in (0,1), got %g", cfg.Beta)
 	}
 	return cfg, nil
 }

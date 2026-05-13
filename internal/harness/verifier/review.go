@@ -11,10 +11,7 @@ func HasReviewComments(output string) bool {
 			return true
 		}
 	}
-	if strings.Contains(output, "Review comment") {
-		return true
-	}
-	return false
+	return strings.Contains(output, "Review comment")
 }
 
 // IsRateLimited reports whether the output contains rate/quota limiting signals.

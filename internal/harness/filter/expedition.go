@@ -97,32 +97,32 @@ func renderWaveTargetSection(lang string, data domain.PromptData) string {
 	switch lang {
 	case "ja":
 		b.WriteString("\n## Wave ターゲット\n\n")
-		b.WriteString(fmt.Sprintf("- **ステップ:** `%s` — %s\n", data.WaveTarget.ID, data.WaveTarget.Title))
+		fmt.Fprintf(&b, "- **ステップ:** `%s` — %s\n", data.WaveTarget.ID, data.WaveTarget.Title)
 		if data.WaveTarget.Description != "" {
-			b.WriteString(fmt.Sprintf("- **ウェーブ:** %s\n", data.WaveTarget.Description))
+			fmt.Fprintf(&b, "- **ウェーブ:** %s\n", data.WaveTarget.Description)
 		}
 		if data.WaveTarget.Acceptance != "" {
-			b.WriteString(fmt.Sprintf("- **完了条件:** %s\n", data.WaveTarget.Acceptance))
+			fmt.Fprintf(&b, "- **完了条件:** %s\n", data.WaveTarget.Acceptance)
 		}
 		b.WriteString("- このステップのみを実装すること。他のステップや無関係な issue には触れないこと。")
 	case "fr":
 		b.WriteString("\n## Cible Wave\n\n")
-		b.WriteString(fmt.Sprintf("- **Étape :** `%s` — %s\n", data.WaveTarget.ID, data.WaveTarget.Title))
+		fmt.Fprintf(&b, "- **Étape :** `%s` — %s\n", data.WaveTarget.ID, data.WaveTarget.Title)
 		if data.WaveTarget.Description != "" {
-			b.WriteString(fmt.Sprintf("- **Wave :** %s\n", data.WaveTarget.Description))
+			fmt.Fprintf(&b, "- **Wave :** %s\n", data.WaveTarget.Description)
 		}
 		if data.WaveTarget.Acceptance != "" {
-			b.WriteString(fmt.Sprintf("- **Critères d'acceptation :** %s\n", data.WaveTarget.Acceptance))
+			fmt.Fprintf(&b, "- **Critères d'acceptation :** %s\n", data.WaveTarget.Acceptance)
 		}
 		b.WriteString("- Implémenter UNIQUEMENT cette étape. Ne pas toucher aux autres étapes.")
 	default:
 		b.WriteString("\n## Wave Target\n\n")
-		b.WriteString(fmt.Sprintf("- **Step:** `%s` — %s\n", data.WaveTarget.ID, data.WaveTarget.Title))
+		fmt.Fprintf(&b, "- **Step:** `%s` — %s\n", data.WaveTarget.ID, data.WaveTarget.Title)
 		if data.WaveTarget.Description != "" {
-			b.WriteString(fmt.Sprintf("- **Wave:** %s\n", data.WaveTarget.Description))
+			fmt.Fprintf(&b, "- **Wave:** %s\n", data.WaveTarget.Description)
 		}
 		if data.WaveTarget.Acceptance != "" {
-			b.WriteString(fmt.Sprintf("- **Acceptance Criteria:** %s\n", data.WaveTarget.Acceptance))
+			fmt.Fprintf(&b, "- **Acceptance Criteria:** %s\n", data.WaveTarget.Acceptance)
 		}
 		b.WriteString("- Implement ONLY this step. Do not work on other steps or unrelated issues.")
 	}
@@ -134,9 +134,9 @@ func renderLinearScopeSection(lang string, data domain.PromptData) string {
 	switch lang {
 	case "ja":
 		b.WriteString("\n## Linear スコープ\n\n")
-		b.WriteString(fmt.Sprintf("- チーム: `%s`\n", data.LinearTeam))
+		fmt.Fprintf(&b, "- チーム: `%s`\n", data.LinearTeam)
 		if data.LinearProject != "" {
-			b.WriteString(fmt.Sprintf("- プロジェクト: `%s`\n", data.LinearProject))
+			fmt.Fprintf(&b, "- プロジェクト: `%s`\n", data.LinearProject)
 		}
 		if data.LinearProject != "" {
 			b.WriteString("- このチームとプロジェクトの issue のみを対象にすること。")
@@ -145,9 +145,9 @@ func renderLinearScopeSection(lang string, data domain.PromptData) string {
 		}
 	case "fr":
 		b.WriteString("\n## Scope Linear\n\n")
-		b.WriteString(fmt.Sprintf("- Équipe : `%s`\n", data.LinearTeam))
+		fmt.Fprintf(&b, "- Équipe : `%s`\n", data.LinearTeam)
 		if data.LinearProject != "" {
-			b.WriteString(fmt.Sprintf("- Projet : `%s`\n", data.LinearProject))
+			fmt.Fprintf(&b, "- Projet : `%s`\n", data.LinearProject)
 		}
 		if data.LinearProject != "" {
 			b.WriteString("- Ne traiter que les issues de cette équipe et de ce projet.")
@@ -156,9 +156,9 @@ func renderLinearScopeSection(lang string, data domain.PromptData) string {
 		}
 	default:
 		b.WriteString("\n## Linear Scope\n\n")
-		b.WriteString(fmt.Sprintf("- Team: `%s`\n", data.LinearTeam))
+		fmt.Fprintf(&b, "- Team: `%s`\n", data.LinearTeam)
 		if data.LinearProject != "" {
-			b.WriteString(fmt.Sprintf("- Project: `%s`\n", data.LinearProject))
+			fmt.Fprintf(&b, "- Project: `%s`\n", data.LinearProject)
 		}
 		if data.LinearProject != "" {
 			b.WriteString("- Only pick issues from this team and project.")
@@ -175,9 +175,9 @@ func renderEnvironmentSection(lang string, data domain.PromptData) string {
 	b.WriteString("- " + data.ReserveSection + "\n")
 	switch lang {
 	case "ja":
-		b.WriteString(fmt.Sprintf("- Base branch: `%s`\n", data.BaseBranch))
+		fmt.Fprintf(&b, "- Base branch: `%s`\n", data.BaseBranch)
 		if data.DevURL != "" {
-			b.WriteString(fmt.Sprintf("- Dev server: `%s`（verify mission で使用、既に起動済み）\n", data.DevURL))
+			fmt.Fprintf(&b, "- Dev server: `%s`（verify mission で使用、既に起動済み）\n", data.DevURL)
 		}
 		if data.WaveTarget != nil {
 			b.WriteString("- GitHub: Pull Request と Issues の両方を使用する\n")
@@ -187,9 +187,9 @@ func renderEnvironmentSection(lang string, data domain.PromptData) string {
 		}
 		b.WriteString("- 注意: MCP ツールは遅延ロード — 使用前に `ToolSearch` で利用可能なツールを検索すること")
 	case "fr":
-		b.WriteString(fmt.Sprintf("- Branche de base : `%s`\n", data.BaseBranch))
+		fmt.Fprintf(&b, "- Branche de base : `%s`\n", data.BaseBranch)
 		if data.DevURL != "" {
-			b.WriteString(fmt.Sprintf("- Serveur dev : `%s` (utilisé pour les missions verify, déjà lancé)\n", data.DevURL))
+			fmt.Fprintf(&b, "- Serveur dev : `%s` (utilisé pour les missions verify, déjà lancé)\n", data.DevURL)
 		}
 		if data.WaveTarget != nil {
 			b.WriteString("- GitHub : utiliser pour les Pull Requests et les Issues\n")
@@ -199,9 +199,9 @@ func renderEnvironmentSection(lang string, data domain.PromptData) string {
 		}
 		b.WriteString("- Note : les outils MCP sont en chargement différé — utiliser `ToolSearch` pour découvrir les outils disponibles avant utilisation")
 	default:
-		b.WriteString(fmt.Sprintf("- Base branch: `%s`\n", data.BaseBranch))
+		fmt.Fprintf(&b, "- Base branch: `%s`\n", data.BaseBranch)
 		if data.DevURL != "" {
-			b.WriteString(fmt.Sprintf("- Dev server: `%s` (used for verify missions, already running)\n", data.DevURL))
+			fmt.Fprintf(&b, "- Dev server: `%s` (used for verify missions, already running)\n", data.DevURL)
 		}
 		if data.WaveTarget != nil {
 			b.WriteString("- GitHub: use for both Pull Requests and Issues\n")

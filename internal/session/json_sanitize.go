@@ -52,7 +52,7 @@ func extractJSON(data []byte) []byte {
 	// Find first { or [
 	startObj := bytes.IndexByte(data, '{')
 	startArr := bytes.IndexByte(data, '[')
-	start := -1
+	var start int
 	var open, close byte
 	switch {
 	case startObj >= 0 && (startArr < 0 || startObj < startArr):

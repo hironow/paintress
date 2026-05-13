@@ -52,7 +52,7 @@ func (a *ReflectionAccumulator) FormatForPrompt() string {
 	var sb strings.Builder
 	sb.WriteString("## Previous review cycles\n\n")
 	for _, c := range a.cycles {
-		sb.WriteString(fmt.Sprintf("### Cycle %d (%d tag(s))\n\n", c.Number, c.TagCount))
+		fmt.Fprintf(&sb, "### Cycle %d (%d tag(s))\n\n", c.Number, c.TagCount)
 		sb.WriteString(c.Comments)
 		sb.WriteString("\n\n")
 	}

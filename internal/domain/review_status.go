@@ -25,9 +25,9 @@ func (s ReviewGateStatus) FormatSection() string {
 	}
 
 	if s.Passed {
-		sb.WriteString(fmt.Sprintf("- Status: **PASSED** (cycle %d/%d, 0 comments remaining)\n", s.Cycle, s.MaxCycles))
+		fmt.Fprintf(&sb, "- Status: **PASSED** (cycle %d/%d, 0 comments remaining)\n", s.Cycle, s.MaxCycles)
 	} else {
-		sb.WriteString(fmt.Sprintf("- Status: **NOT RESOLVED** (%d/%d cycles exhausted, comments remaining)\n", s.Cycle, s.MaxCycles))
+		fmt.Fprintf(&sb, "- Status: **NOT RESOLVED** (%d/%d cycles exhausted, comments remaining)\n", s.Cycle, s.MaxCycles)
 	}
 
 	return sb.String()
