@@ -94,18 +94,7 @@ func (s *MCPServer) handle(line []byte) error {
 	}
 	switch msg.Method {
 	case "tools/list":
-		return s.respond(msg.ID, map[string]any{
-			"tools": []map[string]any{
-				{
-					"name":        "paintress.ping",
-					"description": "Health check tool. Returns 'pong'. Real tools land in subsequent commits on feat/jun15-mcp-pivot.",
-					"inputSchema": map[string]any{
-						"type":       "object",
-						"properties": map[string]any{},
-					},
-				},
-			},
-		})
+		return s.respond(msg.ID, map[string]any{"tools": toolDescriptors()})
 	case "tools/call":
 		var call struct {
 			Name      string          `json:"name"`
@@ -114,17 +103,128 @@ func (s *MCPServer) handle(line []byte) error {
 		if err := json.Unmarshal(msg.Params, &call); err != nil {
 			return s.respondError(msg.ID, -32602, "invalid tools/call params")
 		}
-		if call.Name == "paintress.ping" {
-			return s.respond(msg.ID, map[string]any{
-				"content": []map[string]any{
-					{"type": "text", "text": "pong"},
-				},
-			})
+		switch call.Name {
+		case "paintress.ping":
+			return s.respond(msg.ID, textResult("pong"))
+		case "paintress.next_issue":
+			return s.respond(msg.ID, stubNextIssue())
+		case "paintress.update_gradient":
+			return s.respond(msg.ID, stubUpdateGradient(call.Arguments))
+		case "paintress.append_journal":
+			return s.respond(msg.ID, stubAppendJournal(call.Arguments))
+		default:
+			return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
 		}
-		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
 	default:
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("method not implemented: %s", msg.Method))
 	}
+}
+
+// toolDescriptors returns the Phase 1 MVP tool set. Each entry pins the
+// interface (name, description, inputSchema) so claude code clients see
+// a stable contract. The handler bodies (stubNextIssue / stubUpdateGradient
+// / stubAppendJournal) are placeholders that ship in subsequent commits
+// with real domain wiring.
+func toolDescriptors() []map[string]any {
+	return []map[string]any{
+		{
+			"name":        "paintress.ping",
+			"description": "Health check. Returns 'pong'.",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			"name":        "paintress.next_issue",
+			"description": "Return the next expedition target issue (Phase 1: stub returns a placeholder Issue payload until the domain wiring lands).",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+		},
+		{
+			"name":        "paintress.update_gradient",
+			"description": "Update the gradient gauge level by delta (Phase 1: stub returns the requested delta and a placeholder level).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"delta": map[string]any{"type": "integer", "description": "signed level change"},
+				},
+				"required": []any{"delta"},
+			},
+		},
+		{
+			"name":        "paintress.append_journal",
+			"description": "Append a journal entry (Phase 1: stub echoes the entry without persisting).",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"expedition":   map[string]any{"type": "integer"},
+					"date":         map[string]any{"type": "string"},
+					"issue_id":     map[string]any{"type": "string"},
+					"issue_title":  map[string]any{"type": "string"},
+					"mission_type": map[string]any{"type": "string"},
+					"status":       map[string]any{"type": "string"},
+					"reason":       map[string]any{"type": "string"},
+					"pr_url":       map[string]any{"type": "string"},
+				},
+				"required": []any{"expedition", "issue_id", "status"},
+			},
+		},
+	}
+}
+
+// textResult wraps a plain string into the MCP content envelope.
+func textResult(text string) map[string]any {
+	return map[string]any{"content": []map[string]any{{"type": "text", "text": text}}}
+}
+
+// jsonResult marshals data as JSON and returns an MCP content envelope.
+func jsonResult(data any) map[string]any {
+	body, err := json.Marshal(data)
+	if err != nil {
+		return textResult(fmt.Sprintf(`{"error":"marshal failed: %v"}`, err))
+	}
+	return map[string]any{"content": []map[string]any{{"type": "text", "text": string(body)}}}
+}
+
+// stubNextIssue returns a fixed placeholder Issue payload. Replaced by
+// real domain wiring in a subsequent commit on feat/jun15-mcp-pivot.
+func stubNextIssue() map[string]any {
+	return jsonResult(map[string]any{
+		"stub":     true,
+		"issue":    nil,
+		"reason":   "phase-1-mvp: real implementation lands when the domain wiring commit replaces this stub",
+		"contract": map[string]any{"id": "string", "title": "string", "priority": "integer", "status": "string", "labels": "array of string"},
+	})
+}
+
+// stubUpdateGradient echoes the requested delta with a placeholder new
+// level so claude code clients can exercise the contract end-to-end.
+func stubUpdateGradient(args json.RawMessage) map[string]any {
+	var payload struct {
+		Delta int `json:"delta"`
+	}
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &payload)
+	}
+	return jsonResult(map[string]any{
+		"stub":      true,
+		"delta":     payload.Delta,
+		"new_level": payload.Delta,
+		"reason":    "phase-1-mvp: real gradient gauge wiring lands when the harness/policy package is exposed",
+	})
+}
+
+// stubAppendJournal echoes the entry payload without persisting.
+func stubAppendJournal(args json.RawMessage) map[string]any {
+	var entry map[string]any
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &entry)
+	}
+	if entry == nil {
+		entry = map[string]any{}
+	}
+	return jsonResult(map[string]any{
+		"stub":   true,
+		"entry":  entry,
+		"reason": "phase-1-mvp: real journal append lands when domain.JournalEntry persistence is wired",
+	})
 }
 
 func (s *MCPServer) respond(id json.RawMessage, result any) error {
