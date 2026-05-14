@@ -18,12 +18,12 @@ MCP server pivot 完了時に削除する。
 - linked issue: `refs/HTMLification/docs/issues/0027-jun15-mcp-pivot.html`
 - codex review: initial / v2 / v3 を経て v4 plan landed (refs main `5afdaf4`)
 - Phase 1 MVP scope (= refs 0027 §8):
-  - [x] feat/jun15-mcp-pivot branch 作成 + scaffold commit
-  - [ ] MCP server endpoint (= `internal/adapter/input/mcp/server.go`) skeleton
-  - [ ] paintress.next_issue / update_gradient / append_journal の MCP tool 定義
-  - [ ] `/expedition next` slash command (= `plugins/paintress/skills/` 経由)
+  - [x] feat/jun15-mcp-pivot branch 作成 + scaffold commit (5cfaef9)
+  - [x] MCP server endpoint (= `internal/session/mcp_server.go`) skeleton + `paintress mcp` cobra subcommand (9dcccd6)
+  - [x] paintress.next_issue / update_gradient / append_journal の MCP tool **interface fixed + stub** (b735e8c)
+  - [x] `/expedition-next` slash command の skill definition (= `plugins/paintress/skills/expedition-next/SKILL.md`)
   - [ ] synthetic D-Mail fixture contract test (= inbox に YAML fixture を置いて consume)
-  - [ ] `internal/session/expedition.go` の `claude -p` invocation を MCP に置換、 semgrep exclude path を削除
+  - [ ] `internal/session/expedition.go` の `claude -p` invocation を MCP に置換、 semgrep exclude path を削除 (= **Phase 1 完了 marker**)
   - [ ] OTel span で MCP tool invocation 数と slash command 実行回数を記録
 
 ## Next Actions
