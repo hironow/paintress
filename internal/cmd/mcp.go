@@ -1,0 +1,38 @@
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/hironow/paintress/internal/session"
+)
+
+// newMCPCommand exposes `paintress mcp` as a stdio MCP server entry
+// point for the refs/issues/0027 jun15 MCP pivot. A claude code
+// interactive session loads this binary via --mcp-config and calls
+// paintress tools from inside the human-initiated subscription quota.
+//
+// Phase 1 MVP exposes only paintress.ping. Real tools (next_issue,
+// update_gradient, append_journal) land in subsequent commits on
+// feat/jun15-mcp-pivot.
+func newMCPCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "mcp",
+		Short: "Run paintress as an MCP server over stdio (refs/issues/0027 Phase 1 MVP)",
+		Long: `Start a Model Context Protocol server reading JSON-RPC 2.0
+messages on stdin and writing responses on stdout.
+
+Designed for embedding in a claude code interactive session via
+--mcp-config so inference stays on the session's subscription quota
+rather than crossing into the Agent SDK credit pool that gates
+'claude -p' from 2026-06-15.
+
+Phase 1 MVP scope: only the paintress.ping health check is exposed.
+Real tools (paintress.next_issue, paintress.update_gradient,
+paintress.append_journal) ship in subsequent commits on the
+feat/jun15-mcp-pivot branch.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil)
+			return srv.Serve(cmd.Context())
+		},
+	}
+}
