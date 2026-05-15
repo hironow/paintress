@@ -22,7 +22,7 @@ MCP server pivot 完了時に削除する。
   - [x] MCP server endpoint (= `internal/session/mcp_server.go`) skeleton + `paintress mcp` cobra subcommand (9dcccd6)
   - [x] paintress.next_issue / update_gradient / append_journal の MCP tool **interface fixed + stub** (b735e8c)
   - [x] `/expedition-next` slash command の skill definition (= `plugins/paintress/skills/expedition-next/SKILL.md`)
-  - [ ] synthetic D-Mail fixture contract test (= inbox に YAML fixture を置いて consume)
+  - [x] synthetic D-Mail fixture contract test (= `internal/domain/dmail_envelope.go` 9-field schema + `tests/fixtures/dmail/*.yaml + .body.md` pair + 8 sub-test)
   - [ ] `internal/session/expedition.go` の `claude -p` invocation を MCP に置換、 semgrep exclude path を削除 (= **Phase 1 完了 marker**)
   - [ ] OTel span で MCP tool invocation 数と slash command 実行回数を記録
 
