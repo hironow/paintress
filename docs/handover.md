@@ -1,16 +1,23 @@
 # Handover
 
-**Last updated:** 2026-05-15 (asia/tokyo)
+**Last updated:** 2026-05-15 (asia/tokyo, post sub-A)
 **Updated by:** Claude Opus 4.7 session
 
 ## Current State
 
-`feat/jun15-mcp-pivot` long-lived branch を切り、 refs/issues/0027
-(jun15 MCP pivot v4) の Phase 1 MVP scaffold を入れた。 paintress repo
-の semgrep gate (`.semgrep/jun15-no-headless-llm.yaml`) が 0 finding で
-動作する。 既存 `internal/session/expedition.go` の `claude -p`
-invocation は transitional exclude path で一時許容、 後続 commit で
-MCP server pivot 完了時に削除する。
+`feat/jun15-mcp-pivot` long-lived branch に **6 commit landed**
+(origin に push 済)。 refs/issues/0027 (jun15 MCP pivot v4) の Phase 1
+MVP は **sub-A 完了**、 残作業は sub-B (= semgrep transitional exclude
+削除 + skipped test 完全削除) と sub-C (= ADR 0017 + handover
+finalize)。
+
+paintress repo の billing-boundary は機能している:
+
+- `.semgrep/jun15-no-headless-llm.yaml` 5 rule で headless LLM 経路を block
+- `internal/session/expedition.go` から `claude -p` invocation block (~335 行) を完全削除済
+- production code 内で `Expedition.Run()` を呼ぶと `ErrMCPPivotDeprecated` が返却
+- transitional exclude `internal/session/expedition.go` は yaml に残るが、 実コードからは LLM 呼び出しなし (= sub-B で exclude 自体を削除して機械的 enforce 化)
+- MCP server (= `paintress mcp` subcommand) は 4 tool (paintress.ping / next_issue / update_gradient / append_journal) を expose、 全 stub だが contract 固定済
 
 ## In Progress
 
@@ -21,22 +28,28 @@ MCP server pivot 完了時に削除する。
   - [x] feat/jun15-mcp-pivot branch 作成 + scaffold commit (5cfaef9)
   - [x] MCP server endpoint (= `internal/session/mcp_server.go`) skeleton + `paintress mcp` cobra subcommand (9dcccd6)
   - [x] paintress.next_issue / update_gradient / append_journal の MCP tool **interface fixed + stub** (b735e8c)
-  - [x] `/expedition-next` slash command の skill definition (= `plugins/paintress/skills/expedition-next/SKILL.md`)
-  - [x] synthetic D-Mail fixture contract test (= `internal/domain/dmail_envelope.go` 9-field schema + `tests/fixtures/dmail/*.yaml + .body.md` pair + 8 sub-test)
-  - [ ] `internal/session/expedition.go` の `claude -p` invocation を MCP に置換、 semgrep exclude path を削除 (= **Phase 1 完了 marker**)
-  - [ ] OTel span で MCP tool invocation 数と slash command 実行回数を記録
+  - [x] `/expedition-next` slash command の skill definition (= `plugins/paintress/skills/expedition-next/SKILL.md`) (15497e4)
+  - [x] synthetic D-Mail fixture contract test (= `internal/domain/dmail_envelope.go` 9-field schema + `tests/fixtures/dmail/*.yaml + .body.md` pair + 8 sub-test) (3840915)
+  - [x] **sub-A**: `internal/session/expedition.go` の `claude -p` invocation を deprecate stub に置換 (= 691 行削除 / 83 行追加、 LLM invocation block ~335 行完全除去) (8249449)
+  - [ ] **sub-B**: `.semgrep/jun15-no-headless-llm.yaml` の `internal/session/expedition.go` transitional exclude 削除 + `expedition_test.go` の 9 skipped test 完全削除 + nolint:unused 2 件削除 (= 完全 active な gate)
+  - [ ] **sub-C**: `docs/adr/0017-mcp-pivot.md` 追加 (= architectural pin) + `docs/handover.md` finalize + plugins README finalize
+  - [ ] OTel span で MCP tool invocation 数と slash command 実行回数を記録 (= refs 0027 §8 受入 b/c、 sub-C 以降で実装)
 
 ## Next Actions
 
-1. MCP server endpoint skeleton を `internal/adapter/input/mcp/server.go` に
-   配置 (= 雛形、 tool 定義は別 commit)
-2. paintress domain の event sourcing / gradient gauge / lumina 状態を
-   MCP resource として expose する design 検討
-3. `/expedition next` slash command の skill definition 雛形を
-   `plugins/paintress/skills/expedition/SKILL.md` に書く
-4. synthetic D-Mail fixture を `tests/fixtures/dmail/` に配置 (= refs 0027
-   §8 の 9-field YAML schema を follow)
-5. `expedition.go` の MCP 移行と semgrep exclude 削除を 1 PR で実施
+1. **sub-B** (= Phase 1 完了 marker、 最 priority):
+   - `.semgrep/jun15-no-headless-llm.yaml` から `internal/session/expedition.go` exclude 行を削除
+   - `internal/session/expedition_test.go` の 9 skipped test (= TestLifecycle_Init/NoInit_Then_Expedition / TestExpedition_MidMatchedRouting_* 5 件 / TestExpedition_StaleFlagClearedOnWorkDir / TestExpedition_TwoWorkersConcurrent_NoContamination) を完全削除
+   - `internal/session/expedition.go` の `//nolint:unused` 2 件 (= appendMidHighName / appendMidMatchedMail) と関連 struct field (midMatchedMu / midMatchedMails / midHighMu / midHighNames) を削除
+   - `just semgrep` 0 finding 確認 (= transitional exclude なし state で gate 機能保証)
+2. **sub-C** (= immutable pin):
+   - `docs/adr/0017-mcp-pivot.md` 起票 (= 「LLM owner inversion / Go CLI を MCP server data plane に縮約」 という architectural decision を記録、 refs 0027 を ref として cite)
+   - `docs/handover.md` を「Phase 1 全 commit landed、 main merge 待ち」 で finalize
+   - `plugins/paintress/README.md` を「Phase 1 完了、 production target」 で finalize
+3. **post-Phase 1**:
+   - feat/jun15-mcp-pivot branch の PR 化 (= main merge)
+   - cost monitoring 仕込み (= MCP tool invocation count を OTel span に追加、 slash command 実行回数を log 集計可能に)
+   - Phase 2: sightjack / amadeus / dominator に MCP pivot pattern を順次横展開 (= refs 0027 §7 Phase 2 scope、 6/15 以降継続)
 
 ## Known Risks / Blockers
 
