@@ -585,6 +585,7 @@ func TestSwarmMode_DeadlineExceeded_ReturnsNonZero(t *testing.T) {
 // context deadline during expedition execution does not increment failure
 // counters or trigger gommage.
 func TestSwarmMode_DeadlineExceeded_NotCountedAsFailure(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -662,6 +663,7 @@ func TestSwarmMode_SingleWorker_WithWorktreePool(t *testing.T) {
 // receiving StatusComplete is counted in the summary totals so printSummary
 // does not under-report executed expeditions.
 func TestSwarmMode_StatusComplete_CountedInSummary(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -749,6 +751,7 @@ func TestSwarmMode_RunResetsCounters(t *testing.T) {
 // flag checkpoint are still written — matching the behavior of all other
 // failure paths (err != nil, StatusFailed).
 func TestSwarmMode_StatusParseError_WritesJournalAndFlag(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -955,6 +958,7 @@ func TestPaintress_HandoverSummary_ZeroValues(t *testing.T) {
 // to Continent's flag.md. Workers=2, MaxExpeditions=2: each worker runs 1
 // expedition, then reconcileFlags picks the highest and consolidates.
 func TestSwarmMode_TwoWorkers_Consolidation(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -1088,6 +1092,7 @@ __EXPEDITION_END__`
 // mid-expedition across multiple workers. Each worker's script writes a unique
 // HIGH severity D-Mail during execution; the inbox watcher detects them.
 func TestSwarmMode_TwoWorkers_MidHighSeverityAggregation(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -1182,6 +1187,7 @@ echo '%s'
 // releaseWorkDir, another worker could reclaim the worktree and overwrite
 // the flag.md, losing the completion checkpoint.
 func TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -1232,6 +1238,7 @@ func TestSwarmMode_TwoWorkers_StatusComplete_WritesFlag(t *testing.T) {
 // WorktreePool.Init force-removes old worktrees (and their flag.md files),
 // and reconcileFlags runs after Init, so stale checkpoints are invisible.
 func TestSwarmMode_StaleWorktreeFlag_IgnoredAfterInit(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	dir := setupTestRepo(t)
 
 	srv := newTestServer(t)
@@ -1491,6 +1498,7 @@ func TestGommage_ArchivesInboxDMails(t *testing.T) {
 // the atomic counter ceiling `exp >= startExp + MaxExpeditions` in
 // paintress_expedition.go:33 prevents an infinite expedition loop.
 func TestTermination_MaxExpeditions_CeilingStopsWorker(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	// given: non-DryRun with MaxExpeditions=2, Claude always returns success
 	dir := setupTestRepo(t)
 
@@ -1548,6 +1556,7 @@ __EXPEDITION_END__`
 // review.go:103 `for cycle := 1; cycle <= maxReviewGateCycles` prevents an
 // infinite review-fix cycle.
 func TestTermination_ReviewLoop_CycleCapStopsLoop(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	// given: Claude returns success with a PR URL, review always fails
 	dir := setupTestRepo(t)
 	setupGitRepoWithBranch(t, dir, "feat/term-test")
@@ -1619,6 +1628,7 @@ __EXPEDITION_END__`
 // via Run() that consecutive skips trigger early exit, analogous to the
 // gommage pattern for consecutive failures.
 func TestSkipReview_RunsReviewOnPastPRs(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	// given: a repo with a past PR in pr-index.jsonl
 	dir := setupTestRepo(t)
 	srv := newTestServer(t)
@@ -1681,6 +1691,7 @@ __EXPEDITION_END__`
 }
 
 func TestTermination_ConsecutiveSkips_StopsWorker(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	// given: Claude always returns status=skipped (simulating all issues In Review)
 	dir := setupTestRepo(t)
 
@@ -1810,6 +1821,7 @@ func (d *fastRecoveryDecider) DecideRecovery(reasons []string) domain.RecoveryDe
 func (d *fastRecoveryDecider) ResetRecovery() { d.attempts = 0 }
 
 func TestGommageRecovery_TimeoutThenSuccess(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	// white-box-reason: integration test verifying the full recovery flow
 	// requires access to internal counters and recovery state
 	dir := setupTestRepo(t)
@@ -1851,6 +1863,7 @@ func TestGommageRecovery_TimeoutThenSuccess(t *testing.T) {
 }
 
 func TestGommageRecovery_MaxRetriesThenHalt(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027)")
 	// white-box-reason: integration test verifying recovery cap behavior
 	if testing.Short() {
 		t.Skip("skipping slow integration test in short mode")

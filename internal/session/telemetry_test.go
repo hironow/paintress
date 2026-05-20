@@ -132,6 +132,7 @@ func TestSpan_Expedition_HasAttributes(t *testing.T) {
 }
 
 func TestSpan_ClaudeInvoke_RecordsTimeoutEvent(t *testing.T) {
+	t.Skip("Run() deprecated post jun15 MCP pivot (refs/issues/0027); legacy LLM invocation span test retired")
 	exporter := setupTestTracer(t)
 
 	dir := t.TempDir()

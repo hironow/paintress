@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,6 +60,7 @@ func fakeMakeCmd(output string, exitCode int) func(ctx context.Context, name str
 	return func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--"}
 		cs = append(cs, args...)
+		// nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command -- standard Go subprocess test pattern: os.Args[0] is this test binary, cs is a fixed test-driver flag list [permanent]
 		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = append(os.Environ(),
 			"GO_TEST_HELPER_PROCESS=1",
@@ -321,166 +321,30 @@ func TestBuildPrompt_NoContextSection_WhenEmpty(t *testing.T) {
 	}
 }
 
-func TestExpedition_Run_Success(t *testing.T) {
-	reportOutput := `Analyzing codebase...
-Tests passed.
-
-__EXPEDITION_REPORT__
-expedition: 1
-issue_id: AWE-42
-issue_title: Add button
-mission_type: implement
-branch: feat/AWE-42
-pr_url: https://github.com/org/repo/pull/1
-status: success
-reason: done
-remaining_issues: 5
-bugs_found: 0
-bug_issues: none
-__EXPEDITION_END__`
-
-	exp := newTestExpedition(t, reportOutput, 0)
+// TestExpedition_Run_IsDeprecatedPostMCPPivot replaces nine legacy Run()
+// behaviour tests that previously asserted on stdout streaming, prompt
+// file writes, output file writes, rate-limit detection, and context
+// cancellation paths. The Phase 1 completion commit on the
+// feat/jun15-mcp-pivot branch removed the entire `claude -p` invocation
+// block (~335 lines) and replaced Run() with a fail-fast stub that
+// returns ErrMCPPivotDeprecated. The legacy expectations belong to the
+// pre-pivot Go CLI control plane and no longer apply; the new
+// expectation is that Run() always reports the deprecation so callers
+// migrate to the claude code /expedition-next skill.
+func TestExpedition_Run_IsDeprecatedPostMCPPivot(t *testing.T) {
+	exp := newTestExpedition(t, "ignored output", 0)
 	ctx := context.Background()
 
-	output, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	if !containsStr(output, "__EXPEDITION_REPORT__") {
-		t.Error("output should contain report markers")
-	}
-
-	report, status := domain.ParseReport(output, 1)
-	if status != domain.StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
-	}
-	if report.IssueID != "AWE-42" {
-		t.Errorf("IssueID = %q", report.IssueID)
-	}
-}
-
-func TestExpedition_Run_Complete(t *testing.T) {
-	exp := newTestExpedition(t, "__EXPEDITION_COMPLETE__", 0)
-	ctx := context.Background()
-
-	output, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	_, status := domain.ParseReport(output, 1)
-	if status != domain.StatusComplete {
-		t.Fatalf("got %v, want StatusComplete", status)
-	}
-}
-
-func TestExpedition_Run_CommandFailure(t *testing.T) {
-	exp := newTestExpedition(t, "error occurred", 1)
-	ctx := context.Background()
-
-	_, err := exp.Run(ctx)
-	if err == nil {
-		t.Fatal("expected error for non-zero exit code")
-	}
-}
-
-func TestExpedition_Run_WritesPromptFile(t *testing.T) {
-	exp := newTestExpedition(t, "output", 0)
-	ctx := context.Background()
-
-	exp.Run(ctx)
-
-	promptFile := filepath.Join(exp.LogDir, "expedition-001-prompt.md")
-	if _, err := os.Stat(promptFile); errors.Is(err, fs.ErrNotExist) {
-		t.Error("prompt file should be created")
-	}
-
-	content, err := os.ReadFile(promptFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !containsStr(string(content), "Expedition #1") {
-		t.Error("prompt file should contain expedition prompt")
-	}
-}
-
-func TestExpedition_Run_WritesOutputFile(t *testing.T) {
-	exp := newTestExpedition(t, "mock output data", 0)
-	ctx := context.Background()
-
-	exp.Run(ctx)
-
-	outputFile := filepath.Join(exp.LogDir, "expedition-001-output.txt")
-	if _, err := os.Stat(outputFile); errors.Is(err, fs.ErrNotExist) {
-		t.Error("output file should be created")
-	}
-}
-
-func TestExpedition_Run_JsonOutputStillWritesFile(t *testing.T) {
-	// given — OutputFormat is "json" (streaming should go to stderr, not stdout)
-	exp := newTestExpedition(t, "json mode output", 0)
-	exp.Config.OutputFormat = "json"
-	ctx := context.Background()
-
-	// when
 	out, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — output file must still contain the data
-	outputFile := filepath.Join(exp.LogDir, "expedition-001-output.txt")
-	data, err := os.ReadFile(outputFile)
-	if err != nil {
-		t.Fatalf("read output file: %v", err)
-	}
-	if !strings.Contains(string(data), "json mode output") {
-		t.Errorf("output file should contain streaming data, got %q", string(data))
-	}
-	// returned output should also contain the data
-	if !strings.Contains(out, "json mode output") {
-		t.Errorf("returned output should contain data, got %q", out)
-	}
-}
-
-func TestExpedition_Run_UsesActiveModel(t *testing.T) {
-	exp := newTestExpedition(t, "output", 0)
-	exp.Reserve.CheckOutput("rate limit") // Switch to sonnet
-
-	if exp.Reserve.ActiveModel() != "sonnet" {
-		t.Fatalf("expected reserve to be sonnet, got %q", exp.Reserve.ActiveModel())
-	}
-
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-	// The test verifies it doesn't crash when using reserve model
-}
-
-func TestExpedition_Run_ContextCanceled(t *testing.T) {
-	exp := newTestExpedition(t, "output", 0)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
-
-	_, err := exp.Run(ctx)
 	if err == nil {
-		t.Fatal("expected error for canceled context")
+		t.Fatal("expected Run() to return an error post jun15 MCP pivot, got nil")
 	}
-}
-
-func TestExpedition_Run_RateLimitDetection(t *testing.T) {
-	// Output contains a rate limit signal — Reserve should detect it
-	exp := newTestExpedition(t, "Error: rate limit exceeded, switching models", 0)
-
-	ctx := context.Background()
-	exp.Run(ctx)
-
-	// After detecting rate limit in output, Reserve should have switched
-	// Note: the detection happens during streaming, which may or may not fire
-	// depending on timing. At minimum, we verify no panic/crash.
+	if !errors.Is(err, ErrMCPPivotDeprecated) {
+		t.Errorf("Run() error = %v, want ErrMCPPivotDeprecated", err)
+	}
+	if out != "" {
+		t.Errorf("Run() output = %q, want empty (no LLM invocation)", out)
+	}
 }
 
 func TestNewPaintress_BasicConfig(t *testing.T) {
@@ -546,126 +410,13 @@ func TestNewPaintress_ModelWithSpaces(t *testing.T) {
 	}
 }
 
-func TestExpedition_Run_WatcherLogsCurrentIssue(t *testing.T) {
-	dir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
+// Removed in refs/issues/0027 Phase 1 (jun15 MCP pivot completion):
+// Run() no longer invokes claude -p, so flag.md / watcher / streaming
+// path tests retired with it.
 
-	// Shell script that writes flag.md then outputs a report
-	script := filepath.Join(dir, "write-flag.sh")
-	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-# Write current_issue to flag.md
-cat > %s << 'FLAGEOF'
-current_issue: MY-239
-current_title: flag watcher test
-FLAGEOF
-# Wait for watcher to detect
-sleep 1
-echo "done"
-`, flagPath)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	logPath := filepath.Join(logDir, "test-watcher.log")
-	logger := platform.NewLogger(io.Discard, false)
-	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	logger.SetExtraWriter(logFile)
-	defer logFile.Close()
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   logger,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, logger),
-	}
-
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// Check log file for issue detection
-	logContent, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read log: %v", err)
-	}
-
-	if !containsStr(string(logContent), "MY-239") {
-		t.Errorf("log should contain issue ID 'MY-239', got:\n%s", string(logContent))
-	}
-}
-
-// TestExpedition_Run_WatcherReadsFromWorkDir_NotContinent verifies that
-// in worktree mode (WorkDir != Continent), the flag watcher polls
-// WorkDir/.expedition/.run/flag.md — NOT Continent's (MY-362).
-func TestExpedition_Run_WatcherReadsFromWorkDir_NotContinent(t *testing.T) {
-	continent := t.TempDir()
-	workDir := t.TempDir() // simulate worktree — different from continent
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
-	// WorkDir's .expedition/.run/ is created by Run()
-
-	// Script writes flag.md to WORKDIR (where Claude runs), not Continent
-	workDirFlagPath := filepath.Join(workDir, ".expedition", ".run", "flag.md")
-	script := filepath.Join(workDir, "write-flag.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-mkdir -p %s
-cat > %s << 'FLAGEOF'
-current_issue: TREE-42
-current_title: worktree watcher test
-FLAGEOF
-sleep 1
-echo "done"
-`, filepath.Dir(workDirFlagPath), workDirFlagPath)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	logPath := filepath.Join(logDir, "test-worktree-watcher.log")
-	logger := platform.NewLogger(io.Discard, false)
-	logFile, _ := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	logger.SetExtraWriter(logFile)
-	defer logFile.Close()
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: continent,
-		WorkDir:   workDir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   logger,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, logger),
-	}
-
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	logContent, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read log: %v", err)
-	}
-
-	if !containsStr(string(logContent), "TREE-42") {
-		t.Errorf("watcher should detect issue from WORKDIR flag.md; log:\n%s", string(logContent))
-	}
-}
+// TestExpedition_Run_WatcherReadsFromWorkDir_NotContinent (removed):
+// Worktree watcher test removed in jun15 MCP pivot: Run() no longer
+// spawns claude -p so WorkDir flag.md polling has nothing to wait on.
 
 func TestExpedition_BuildPrompt_ContainsFlagWriteInstruction(t *testing.T) {
 	dir := t.TempDir()
@@ -809,139 +560,16 @@ func TestBuildPrompt_MalformedConfig_NoPanic(t *testing.T) {
 	}
 }
 
-// TestLifecycle_Init_Then_Expedition verifies the full lifecycle:
-// paintress init (config.yaml) → expedition run → prompt file contains Linear scope.
-// External world (Claude) is stubbed via fakeMakeCmd.
-func TestLifecycle_Init_Then_Expedition(t *testing.T) {
-	dir := t.TempDir()
-	logDir := t.TempDir()
+// TestLifecycle_Init_Then_Expedition removed in refs/issues/0027 Phase 1
+// sub-C: the full init→expedition→prompt-file lifecycle relied on the
+// deleted Run() body. Phase 2 will reintroduce a fresh test against the
+// MCP-server-driven workflow, exercising init config + the new prompt
+// assembly without invoking claude -p.
 
-	// Phase 1: set up config as if `paintress init` was run
-	initCfg := &domain.ProjectConfig{
-		Tracker: domain.IssueTrackerConfig{
-			Team:    "MY",
-			Project: "paintress",
-		},
-	}
-	if err := SaveProjectConfig(dir, initCfg); err != nil {
-		t.Fatalf("SaveProjectConfig: %v", err)
-	}
-
-	// Verify config was persisted
-	cfg, err := LoadProjectConfig(dir)
-	if err != nil {
-		t.Fatalf("LoadProjectConfig: %v", err)
-	}
-	if cfg.Tracker.Team != "MY" || cfg.Tracker.Project != "paintress" {
-		t.Fatalf("unexpected config: team=%q project=%q", cfg.Tracker.Team, cfg.Tracker.Project)
-	}
-
-	// Phase 2: run expedition with fake Claude (outputs a valid report)
-	reportOutput := `Working on issue...
-
-__EXPEDITION_REPORT__
-expedition: 1
-issue_id: MY-100
-issue_title: lifecycle test
-mission_type: implement
-branch: feat/MY-100
-pr_url: https://github.com/org/repo/pull/99
-status: success
-reason: done
-failure_type: none
-insight: lifecycle works
-remaining_issues: 3
-bugs_found: 0
-bug_issues: none
-__EXPEDITION_END__`
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-		makeCmd:  fakeMakeCmd(reportOutput, 0),
-	}
-
-	ctx := context.Background()
-	output, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// Phase 3: verify expedition output is valid
-	report, status := domain.ParseReport(output, 1)
-	if status != domain.StatusSuccess {
-		t.Fatalf("got %v, want StatusSuccess", status)
-	}
-	if report.IssueID != "MY-100" {
-		t.Errorf("IssueID = %q, want MY-100", report.IssueID)
-	}
-
-	// Phase 4: verify the prompt file contains Linear scope from init
-	promptFile := filepath.Join(logDir, "expedition-001-prompt.md")
-	promptContent, err := os.ReadFile(promptFile)
-	if err != nil {
-		t.Fatalf("read prompt file: %v", err)
-	}
-	prompt := string(promptContent)
-
-	if !containsStr(prompt, "MY") {
-		t.Error("prompt file should contain Linear team 'MY' from init")
-	}
-	if !containsStr(prompt, "paintress") {
-		t.Error("prompt file should contain Linear project 'paintress' from init")
-	}
-	if !containsStr(prompt, "Linear Scope") {
-		t.Error("prompt file should contain 'Linear Scope' section")
-	}
-}
-
-// TestLifecycle_NoInit_Then_Expedition verifies that expedition works
-// without prior init — no Linear Scope section in prompt.
-func TestLifecycle_NoInit_Then_Expedition(t *testing.T) {
-	dir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-		makeCmd:  fakeMakeCmd("__EXPEDITION_COMPLETE__", 0),
-	}
-
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	promptFile := filepath.Join(logDir, "expedition-001-prompt.md")
-	promptContent, err := os.ReadFile(promptFile)
-	if err != nil {
-		t.Fatalf("read prompt file: %v", err)
-	}
-
-	if containsStr(string(promptContent), "Linear Scope") {
-		t.Error("prompt should NOT contain Linear Scope when no init was done")
-	}
-}
+// TestLifecycle_NoInit_Then_Expedition removed in refs/issues/0027
+// Phase 1 sub-C: the prompt file produced by Run() no longer exists
+// since Run() returns ErrMCPPivotDeprecated. Phase 2 will reintroduce
+// a fresh test against the MCP-server-driven prompt assembly.
 
 func TestBuildPrompt_ContainsMissionSection(t *testing.T) {
 	dir := t.TempDir()
@@ -1026,299 +654,24 @@ func TestMidMatchedDMails_ReturnsCopy(t *testing.T) {
 	}
 }
 
-func TestExpedition_MidMatchedRouting_MatchesCurrentIssue(t *testing.T) {
-	// given — expedition with a shell script that:
-	//   1. writes current_issue to flag.md
-	//   2. writes a matching D-Mail to inbox/
-	//   3. writes a non-matching D-Mail to inbox/
-	dir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
+// TestExpedition_MidMatchedRouting_MatchesCurrentIssue removed in
+// refs/issues/0027 Phase 1 sub-C: the current-issue routing happy
+// path lived inside Run() body. Phase 2 MCP wiring will reintroduce
+// a fresh test against the new contract.
 
-	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
-	inboxDir := filepath.Join(dir, ".expedition", "inbox")
+// TestExpedition_MidMatchedRouting_NoCurrentIssue_NoMatch removed in
+// refs/issues/0027 Phase 1 sub-C: the absence-of-current-issue routing
+// guard lived inside Run() body. Phase 2 MCP wiring will reintroduce a
+// fresh test.
 
-	script := filepath.Join(dir, "route-test.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-# Step 1: Write current_issue to flag.md
-cat > %s << 'FLAGEOF'
-current_issue: MY-42
-current_title: route test issue
-FLAGEOF
-# Step 2: Wait for watcher to pick up flag
-sleep 1
-# Step 3: Write matching D-Mail (issues contains MY-42)
-cat > %s/spec-matched.md << 'DMEOF'
----
-name: spec-matched
-kind: specification
-description: matched d-mail
-issues:
-  - MY-42
----
+// TestExpedition_MidMatchedRouting_StaleFlagIgnored removed in
+// refs/issues/0027 Phase 1 sub-C: stale flag-clearing path lived in
+// Run() body. Phase 2 MCP wiring will reintroduce a fresh test.
 
-Matched body
-DMEOF
-# Step 4: Write non-matching D-Mail (issues contains MY-99)
-cat > %s/spec-unmatched.md << 'DMEOF2'
----
-name: spec-unmatched
-kind: specification
-description: unmatched d-mail
-issues:
-  - MY-99
----
-
-Unmatched body
-DMEOF2
-# Step 5: Wait for inbox watcher to process
-sleep 1
-echo "done"
-`, flagPath, inboxDir, inboxDir)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — only the matching D-Mail should be in midMatchedMails
-	matched := exp.MidMatchedDMails()
-	if len(matched) != 1 {
-		t.Fatalf("expected 1 matched d-mail, got %d: %v", len(matched), matched)
-	}
-	if matched[0].Name != "spec-matched" {
-		t.Errorf("matched[0].Name = %q, want spec-matched", matched[0].Name)
-	}
-}
-
-func TestExpedition_MidMatchedRouting_NoCurrentIssue_NoMatch(t *testing.T) {
-	// given — expedition that writes D-Mails but never sets current_issue
-	dir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
-
-	inboxDir := filepath.Join(dir, ".expedition", "inbox")
-	script := filepath.Join(dir, "no-issue-test.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-# Write D-Mail without setting current_issue in flag
-cat > %s/spec-orphan.md << 'DMEOF'
----
-name: spec-orphan
-kind: specification
-description: orphan d-mail
-issues:
-  - MY-42
----
-
-Orphan body
-DMEOF
-sleep 1
-echo "done"
-`, inboxDir)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — no matches (currentIssue was never set)
-	matched := exp.MidMatchedDMails()
-	if len(matched) != 0 {
-		t.Errorf("expected 0 matched d-mails when no current_issue, got %d", len(matched))
-	}
-}
-
-// TestExpedition_MidMatchedRouting_StaleFlagIgnored verifies that a
-// stale current_issue in flag.md from a previous interrupted expedition
-// does not cause incorrect routing. Run() should clear stale current_issue
-// before starting the watchFlag watcher.
-func TestExpedition_MidMatchedRouting_StaleFlagIgnored(t *testing.T) {
-	// given — flag.md already has a stale current_issue from a prior run
-	dir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
-
-	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
-	inboxDir := filepath.Join(dir, ".expedition", "inbox")
-
-	// Pre-populate flag.md with stale current_issue (simulates interrupted prior run)
-	os.WriteFile(flagPath, []byte("current_issue: STALE-99\ncurrent_title: stale issue\n"), 0644)
-
-	// Script does NOT write current_issue — only drops a D-Mail for STALE-99
-	script := filepath.Join(dir, "stale-test.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-# Write a D-Mail that matches the STALE issue (should NOT be routed)
-sleep 0.5
-cat > %s/spec-stale.md << 'DMEOF'
----
-name: spec-stale
-kind: specification
-description: d-mail for stale issue
-issues:
-  - STALE-99
----
-
-Stale body
-DMEOF
-sleep 1
-echo "done"
-`, inboxDir)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — stale current_issue should have been cleared;
-	// the D-Mail for STALE-99 should NOT be in midMatchedMails
-	matched := exp.MidMatchedDMails()
-	if len(matched) != 0 {
-		t.Errorf("expected 0 matched d-mails (stale issue should be ignored), got %d: %v", len(matched), matched)
-	}
-}
-
-// TestExpedition_MidMatchedRouting_HighSeverityAlsoRouted verifies that
-// a HIGH severity D-Mail matching the current issue is collected in both
-// midHighNames (for notification) and midMatchedMails (for follow-up).
-func TestExpedition_MidMatchedRouting_HighSeverityAlsoRouted(t *testing.T) {
-	// given — expedition writes current_issue, then a HIGH severity D-Mail matching it
-	dir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", ".run"), 0755)
-	os.MkdirAll(filepath.Join(dir, ".expedition", "inbox"), 0755)
-
-	flagPath := filepath.Join(dir, ".expedition", ".run", "flag.md")
-	inboxDir := filepath.Join(dir, ".expedition", "inbox")
-
-	script := filepath.Join(dir, "high-route-test.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-# Step 1: Write current_issue to flag.md
-cat > %s << 'FLAGEOF'
-current_issue: MY-42
-current_title: high severity route test
-FLAGEOF
-# Step 2: Wait for watcher to pick up flag
-sleep 1
-# Step 3: Write HIGH severity D-Mail matching the issue
-cat > %s/urgent-spec.md << 'DMEOF'
----
-name: urgent-spec
-kind: specification
-description: urgent matched d-mail
-severity: high
-issues:
-  - MY-42
----
-
-Urgent body
-DMEOF
-# Step 4: Wait for inbox watcher to process
-sleep 1
-echo "done"
-`, flagPath, inboxDir)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — should appear in BOTH midHighNames and midMatchedMails
-	highNames := exp.MidHighSeverityDMails()
-	if len(highNames) != 1 || highNames[0] != "urgent-spec" {
-		t.Errorf("expected midHighNames=[urgent-spec], got %v", highNames)
-	}
-
-	matched := exp.MidMatchedDMails()
-	if len(matched) != 1 {
-		t.Fatalf("expected 1 matched d-mail (HIGH severity), got %d: %v", len(matched), matched)
-	}
-	if matched[0].Name != "urgent-spec" {
-		t.Errorf("matched[0].Name = %q, want urgent-spec", matched[0].Name)
-	}
-}
+// TestExpedition_MidMatchedRouting_HighSeverityAlsoRouted removed in
+// refs/issues/0027 Phase 1 sub-C: HIGH severity mid-expedition routing
+// lived inside Run() body. Phase 2 MCP wiring will reintroduce a
+// severity-aware test against the new contract.
 
 func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
 	exp := &Expedition{}
@@ -1343,304 +696,21 @@ func TestMidMatchedDMails_ConcurrentSafe(t *testing.T) {
 }
 
 // TestExpedition_MidMatchedRouting_WorkDirIsolation verifies that when
-// WorkDir differs from Continent (Workers>0 worktree mode), watchFlag
-// monitors {WorkDir}/.expedition/.run/flag.md — not Continent's.
-// This ensures per-worker isolation: each worker detects only the issue
-// written by its own Claude process running in its worktree.
-func TestExpedition_MidMatchedRouting_WorkDirIsolation(t *testing.T) {
-	// given — separate Continent and WorkDir (simulates Workers>0 worktree)
-	continent := t.TempDir()
-	workDir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(continent, ".expedition", "inbox"), 0755)
-	// WorkDir's .expedition/.run/ will be created by Run()
+// TestExpedition_MidMatchedRouting_WorkDirIsolation removed in refs/issues/0027
+// Phase 1 sub-C: the WorkDir-isolated flag watcher lived inside the deleted
+// Run() body. Phase 2 wiring will reintroduce flag isolation as part of the
+// MCP server contract, with a fresh per-worker test against that contract.
 
-	workDirFlagPath := filepath.Join(workDir, ".expedition", ".run", "flag.md")
-	continentInboxDir := filepath.Join(continent, ".expedition", "inbox")
+// TestExpedition_StaleFlagClearedOnWorkDir removed in refs/issues/0027
+// Phase 1 sub-C: the WorkDir stale-flag clearing happened inside the
+// deleted Run() body. Phase 2 wiring will reintroduce flag handling
+// as an MCP tool, with a fresh test against that contract.
 
-	// Script writes current_issue to WorkDir (where Claude runs),
-	// then drops a matching D-Mail into Continent's inbox (shared).
-	script := filepath.Join(workDir, "workdir-isolation-test.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-# Write current_issue to WorkDir flag.md (Claude writes relative to cmd.Dir)
-mkdir -p %s
-cat > %s << 'FLAGEOF'
-current_issue: WORKER-1
-current_title: worker isolation test
-FLAGEOF
-# Wait for watcher to detect
-sleep 1
-# Drop matching D-Mail into Continent's shared inbox
-cat > %s/spec-worker1.md << 'DMEOF'
----
-name: spec-worker1
-kind: specification
-description: d-mail for worker 1
-issues:
-  - WORKER-1
----
-
-Worker 1 body
-DMEOF
-# Wait for inbox watcher to process
-sleep 1
-echo "done"
-`, filepath.Dir(workDirFlagPath), workDirFlagPath, continentInboxDir)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: continent,
-		WorkDir:   workDir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — watchFlag should have detected current_issue from WorkDir,
-	// and the matching D-Mail should be routed
-	matched := exp.MidMatchedDMails()
-	if len(matched) != 1 {
-		t.Fatalf("expected 1 matched d-mail (from WorkDir flag), got %d: %v", len(matched), matched)
-	}
-	if matched[0].Name != "spec-worker1" {
-		t.Errorf("matched[0].Name = %q, want spec-worker1", matched[0].Name)
-	}
-}
-
-// TestExpedition_StaleFlagClearedOnWorkDir verifies that when WorkDir
-// differs from Continent, a stale current_issue in {WorkDir}/.expedition/.run/flag.md
-// is cleared before the expedition starts — preventing incorrect D-Mail routing.
-func TestExpedition_StaleFlagClearedOnWorkDir(t *testing.T) {
-	// given — WorkDir has stale current_issue from a prior interrupted run
-	continent := t.TempDir()
-	workDir := t.TempDir()
-	logDir := t.TempDir()
-	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(continent, ".expedition", "inbox"), 0755)
-	os.MkdirAll(filepath.Join(workDir, ".expedition", ".run"), 0755)
-
-	// Pre-populate WorkDir's flag.md with stale current_issue
-	staleFlagPath := filepath.Join(workDir, ".expedition", ".run", "flag.md")
-	os.WriteFile(staleFlagPath, []byte("current_issue: STALE-77\ncurrent_title: stale from prior run\n"), 0644)
-
-	continentInboxDir := filepath.Join(continent, ".expedition", "inbox")
-
-	// Script does NOT write current_issue — only drops a D-Mail for STALE-77
-	script := filepath.Join(workDir, "stale-workdir-test.sh")
-	scriptContent := fmt.Sprintf(`#!/bin/bash
-sleep 0.5
-cat > %s/spec-stale77.md << 'DMEOF'
----
-name: spec-stale77
-kind: specification
-description: d-mail for stale issue
-issues:
-  - STALE-77
----
-
-Stale body
-DMEOF
-sleep 1
-echo "done"
-`, continentInboxDir)
-	os.WriteFile(script, []byte(scriptContent), 0755)
-
-	exp := &Expedition{
-		Number:    1,
-		Continent: continent,
-		WorkDir:   workDir,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script,
-		},
-		LogDir:   logDir,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	if err != nil {
-		t.Fatalf("Run() error: %v", err)
-	}
-
-	// then — stale current_issue should have been cleared from WorkDir's flag.md;
-	// the D-Mail for STALE-77 should NOT be in midMatchedMails
-	matched := exp.MidMatchedDMails()
-	if len(matched) != 0 {
-		t.Errorf("expected 0 matched d-mails (stale WorkDir flag should be cleared), got %d: %v", len(matched), matched)
-	}
-
-	// Also verify the stale current_issue was actually removed from flag.md
-	flag := ReadFlag(workDir)
-	if flag.CurrentIssue != "" {
-		t.Errorf("WorkDir flag.md should have current_issue cleared, got %q", flag.CurrentIssue)
-	}
-}
-
-// TestExpedition_TwoWorkersConcurrent_NoContamination verifies that two
-// expeditions running concurrently with separate WorkDirs do not cross-
-// contaminate each other's current_issue routing. Each worker should only
-// collect D-Mails matching its own issue.
-func TestExpedition_TwoWorkersConcurrent_NoContamination(t *testing.T) {
-	// given — shared Continent, two separate WorkDirs
-	continent := t.TempDir()
-	workDir1 := t.TempDir()
-	workDir2 := t.TempDir()
-	logDir1 := t.TempDir()
-	logDir2 := t.TempDir()
-	os.MkdirAll(filepath.Join(continent, ".expedition", "journal"), 0755)
-	os.MkdirAll(filepath.Join(continent, ".expedition", "inbox"), 0755)
-
-	continentInboxDir := filepath.Join(continent, ".expedition", "inbox")
-	workDirFlag1 := filepath.Join(workDir1, ".expedition", ".run", "flag.md")
-	workDirFlag2 := filepath.Join(workDir2, ".expedition", ".run", "flag.md")
-
-	// Worker 1: writes ISSUE-W1, waits, then drops D-Mails for both issues
-	script1 := filepath.Join(workDir1, "worker1.sh")
-	script1Content := fmt.Sprintf(`#!/bin/bash
-mkdir -p %s
-cat > %s << 'FLAGEOF'
-current_issue: ISSUE-W1
-current_title: worker 1 issue
-FLAGEOF
-sleep 1
-# Drop D-Mails for both worker issues into shared inbox
-cat > %s/dmail-w1.md << 'DMEOF'
----
-name: dmail-w1
-kind: specification
-description: d-mail for worker 1
-issues:
-  - ISSUE-W1
----
-
-Worker 1 content
-DMEOF
-cat > %s/dmail-w2.md << 'DMEOF2'
----
-name: dmail-w2
-kind: specification
-description: d-mail for worker 2
-issues:
-  - ISSUE-W2
----
-
-Worker 2 content
-DMEOF2
-sleep 1
-echo "done"
-`, filepath.Dir(workDirFlag1), workDirFlag1, continentInboxDir, continentInboxDir)
-	os.WriteFile(script1, []byte(script1Content), 0755)
-
-	// Worker 2: writes ISSUE-W2, waits for D-Mails to appear
-	script2 := filepath.Join(workDir2, "worker2.sh")
-	script2Content := fmt.Sprintf(`#!/bin/bash
-mkdir -p %s
-cat > %s << 'FLAGEOF'
-current_issue: ISSUE-W2
-current_title: worker 2 issue
-FLAGEOF
-sleep 3
-echo "done"
-`, filepath.Dir(workDirFlag2), workDirFlag2)
-	os.WriteFile(script2, []byte(script2Content), 0755)
-
-	exp1 := &Expedition{
-		Number:    1,
-		Continent: continent,
-		WorkDir:   workDir1,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script1,
-		},
-		LogDir:   logDir1,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-	exp2 := &Expedition{
-		Number:    2,
-		Continent: continent,
-		WorkDir:   workDir2,
-		Config: domain.Config{
-			BaseBranch: "main",
-			DevURL:     "http://localhost:3000",
-			TimeoutSec: 30,
-			ClaudeCmd:  script2,
-		},
-		LogDir:   logDir2,
-		Logger:   platform.NewLogger(io.Discard, false),
-		DataOut:  io.Discard,
-		Gradient: harness.NewGradientGauge(5),
-		Reserve:  harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// when — run both expeditions concurrently
-	ctx := context.Background()
-	var wg sync.WaitGroup
-	var err1, err2 error
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		_, err1 = exp1.Run(ctx)
-	}()
-	go func() {
-		defer wg.Done()
-		_, err2 = exp2.Run(ctx)
-	}()
-	wg.Wait()
-
-	if err1 != nil {
-		t.Fatalf("Worker 1 Run() error: %v", err1)
-	}
-	if err2 != nil {
-		t.Fatalf("Worker 2 Run() error: %v", err2)
-	}
-
-	// then — each worker should only have matched its own issue's D-Mail
-	matched1 := exp1.MidMatchedDMails()
-	matched2 := exp2.MidMatchedDMails()
-
-	// Worker 1 should have matched dmail-w1 (ISSUE-W1), not dmail-w2
-	if len(matched1) != 1 {
-		t.Errorf("Worker 1: expected 1 matched d-mail, got %d: %v", len(matched1), matched1)
-	} else if matched1[0].Name != "dmail-w1" {
-		t.Errorf("Worker 1: matched[0].Name = %q, want dmail-w1", matched1[0].Name)
-	}
-
-	// Worker 2 should have matched dmail-w2 (ISSUE-W2), not dmail-w1
-	if len(matched2) != 1 {
-		t.Errorf("Worker 2: expected 1 matched d-mail, got %d: %v", len(matched2), matched2)
-	} else if matched2[0].Name != "dmail-w2" {
-		t.Errorf("Worker 2: matched[0].Name = %q, want dmail-w2", matched2[0].Name)
-	}
-}
+// TestExpedition_TwoWorkersConcurrent_NoContamination removed in
+// refs/issues/0027 Phase 1 sub-B: the cross-worker D-Mail routing it
+// exercised lived inside the deleted Run() body. The Phase 2 commit
+// that wires sightjack → paintress through real MCP tools will
+// reintroduce a concurrency test against the MCP-server contract.
 
 func TestNewPaintress_NoDev_NoDevServer(t *testing.T) {
 	dir := t.TempDir()
@@ -1945,14 +1015,6 @@ func TestExpeditionPrompt_WaveMode_NoLinearReference(t *testing.T) {
 	}
 }
 
-func TestExpedition_Run_ShortTimeout(t *testing.T) {
-	exp := newTestExpedition(t, "output", 0)
-	exp.Config.TimeoutSec = 1 // very short timeout
-
-	ctx := context.Background()
-	_, err := exp.Run(ctx)
-	// With 1-second timeout, process should complete fine (mock is fast)
-	if err != nil {
-		t.Logf("short timeout error (may be acceptable): %v", err)
-	}
-}
+// TestExpedition_Run_ShortTimeout removed in refs/issues/0027 Phase 1
+// sub-B: Run() no longer invokes claude -p, so the timeout-relative
+// behavior it exercised no longer applies.
