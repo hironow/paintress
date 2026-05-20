@@ -1,5 +1,10 @@
 # paintress claude code plugin (jun15 MCP pivot)
 
+**Status:** Phase 1 MVP complete (= ADR 0017 landed). Production target
+for the post-2026-06-15 architecture where claude code interactive
+sessions own LLM inference and the paintress Go CLI exposes its
+data/control plane as an MCP server.
+
 Skills and (later) agents that drive the paintress MCP server from a
 human-initiated claude code interactive session, per refs/issues/0027
 (jun15 MCP pivot Phase 1 MVP).
