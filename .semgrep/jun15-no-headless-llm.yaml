@@ -8,15 +8,13 @@
 # - Test fixtures and archives = excluded (allowlist)
 # - Active docs / markdown = out of scope (mention is allowed)
 #
-# Phase 1 MVP transitional excludes (= post-pivot will be removed):
-# - internal/session/expedition.go: still calls `claude -p` until the MCP
-#   pivot replaces the prompt building with an MCP server interface.
-#   Removing the exclude requires deleting the `"-p", prompt,` arg pair
-#   from `expedition.go` and routing inference through the claude code
-#   session's MCP client.
-#
-# Acceptance gate for Phase 1 completion: every transitional exclude
-# below is deleted and `just semgrep` stays at 0 finding.
+# Phase 1 MVP transitional excludes: NONE (all removed in sub-B commit).
+# - internal/session/expedition.go: previously listed because Run() called
+#   `claude -p` via exec.Command. Run() was rewritten to return
+#   ErrMCPPivotDeprecated in commit 8249449 (sub-A) and the matching
+#   exclude was removed in sub-B once `just semgrep` proved 0 finding
+#   without it. Future production code attempting any `claude -p` /
+#   Anthropic SDK / ANTHROPIC_API_KEY path will block at this gate.
 
 rules:
   - id: jun15-no-claude-print-exec-go
@@ -34,9 +32,6 @@ rules:
           - pattern: exec.CommandContext(..., "claude", "--print", ...)
     paths:
       exclude:
-        # Phase 1 transitional: remove this line in the same commit that
-        # deletes the -p arg pair from expedition.go.
-        - internal/session/expedition.go
         # Test fixtures that intentionally invoke a fake claude binary.
         - tests/**
 

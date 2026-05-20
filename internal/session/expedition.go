@@ -112,23 +112,14 @@ func (e *Expedition) MidMatchedDMails() []domain.DMail {
 	return append([]domain.DMail(nil), e.midMatchedMails...)
 }
 
-// appendMidHighName appends a HIGH severity D-Mail name (thread-safe).
-//
-//nolint:unused // expires: 2026-07-15 — retained for the sub-B MCP-pivot commit which deletes the legacy MidMatched routing helpers after the ADR lands.
-func (e *Expedition) appendMidHighName(name string) {
-	e.midHighMu.Lock()
-	defer e.midHighMu.Unlock()
-	e.midHighNames = append(e.midHighNames, name)
-}
-
-// appendMidMatchedMail appends an issue-matched D-Mail (thread-safe).
-//
-//nolint:unused // expires: 2026-07-15 — retained for the sub-B MCP-pivot commit which deletes the legacy MidMatched routing helpers after the ADR lands.
-func (e *Expedition) appendMidMatchedMail(dm domain.DMail) {
-	e.midMatchedMu.Lock()
-	defer e.midMatchedMu.Unlock()
-	e.midMatchedMails = append(e.midMatchedMails, dm)
-}
+// Writer methods (appendMidHighName / appendMidMatchedMail) were
+// removed in refs/issues/0027 Phase 1 sub-B together with the LLM
+// invocation block in Run(). The reader methods MidMatchedDMails()
+// and MidHighSeverityDMails() below are retained because production
+// callers (e.g. internal/session/improvement_metadata.go) still
+// invoke them; with the writer gone they consistently return empty
+// slices, which is the correct post-pivot behaviour until the MCP
+// server tools take over inbox routing.
 
 // MidHighSeverityDMails returns names of HIGH severity D-Mails received mid-expedition.
 func (e *Expedition) MidHighSeverityDMails() []string {
