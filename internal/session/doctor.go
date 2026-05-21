@@ -244,33 +244,25 @@ func RunDoctor(ctx context.Context, claudeCmd string, continent string, repair b
 				checks = append(checks, checkLinearMCP(mcpOutput, err))
 			}
 
-			// Inference: runs independently of mcp list result.
-			// MCP config issues don't affect core inference capability.
-			inferCtx, inferCancel := context.WithTimeout(ctx, 3*time.Minute)
-			inferCmd := newShellCmd(inferCtx, claudeCmd, "--print", "--verbose", "--output-format", "stream-json", "--max-turns", "1", "1+1=")
-			// Filter CLAUDECODE only for the doctor inference probe to prevent
-			// nested-session errors. Other subprocesses must preserve CLAUDECODE.
-			if inferCmd.Env != nil {
-				inferCmd.Env = platform.FilterEnv(inferCmd.Env, "CLAUDECODE")
-			} else {
-				inferCmd.Env = platform.FilterEnv(os.Environ(), "CLAUDECODE")
-			}
-			inferOut, inferErr := inferCmd.Output()
-			inferCancel()
-			inferOutput := string(inferOut)
-			inferResult := checkClaudeInference(strings.TrimSpace(ExtractStreamResult(inferOutput)), inferErr)
-			checks = append(checks, inferResult)
-
-			// Context budget check: skip if inference failed
-			if inferResult.Status != domain.CheckOK {
-				checks = append(checks, domain.DoctorCheck{
-					Name:    "context-budget",
-					Status:  domain.CheckSkip,
-					Message: "skipped (inference failed)",
-				})
-			} else {
-				checks = append(checks, CheckContextBudget(inferOutput, continent))
-			}
+			// claude-inference: skipped post jun15 MCP pivot
+			// (refs/issues/0027 Phase 1 + 0028 §4.2 residue cleanup).
+			// The probe previously invoked `claude --print "1+1="` to
+			// verify Claude CLI inference capability; that headless
+			// invocation is forbidden post pivot. Validate via
+			// /expedition-next in claude code instead.
+			checks = append(checks, domain.DoctorCheck{
+				Name:    "claude-inference",
+				Status:  domain.CheckSkip,
+				Message: "skipped (MCP pivot, refs/issues/0027); validate via claude code /expedition-next",
+			})
+			// context-budget: skipped because the inference probe no
+			// longer produces stream-json output to measure against
+			// the budget. Track via OTel from in-session runs instead.
+			checks = append(checks, domain.DoctorCheck{
+				Name:    "context-budget",
+				Status:  domain.CheckSkip,
+				Message: "skipped (inference probe disabled post MCP pivot)",
+			})
 		}
 	}
 
