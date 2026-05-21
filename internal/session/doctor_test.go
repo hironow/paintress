@@ -739,13 +739,19 @@ func TestRunDoctor_MCPChecks_AllPassWithFakeClaude(t *testing.T) {
 			}
 		case "claude-inference":
 			inferFound = true
-			if c.Status != domain.CheckOK {
-				t.Errorf("claude-inference should be OK with fake-claude, message: %s", c.Message)
+			// Post jun15 MCP pivot (refs/issues/0027 + 0028 §4.2),
+			// the inference probe no longer invokes `claude --print`;
+			// it always reports CheckSkip regardless of the binary
+			// presence. See doctor.go for rationale.
+			if c.Status != domain.CheckSkip {
+				t.Errorf("claude-inference should be Skip post MCP pivot, got status=%v message=%s", c.Status, c.Message)
 			}
 		case "context-budget":
 			budgetFound = true
-			if c.Status != domain.CheckOK {
-				t.Errorf("context-budget should be OK with fake-claude, message: %s", c.Message)
+			// Same as claude-inference: skipped because no stream-json
+			// is produced for the budget calculation post pivot.
+			if c.Status != domain.CheckSkip {
+				t.Errorf("context-budget should be Skip post MCP pivot, got status=%v message=%s", c.Status, c.Message)
 			}
 		}
 	}

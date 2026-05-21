@@ -1,26 +1,36 @@
 # Handover
 
-**Last updated:** 2026-05-22 (asia/tokyo, Phase 4 #4 emitter wiring landed)
+**Last updated:** 2026-05-22 (asia/tokyo, 0028 residue cleanup landed)
 **Updated by:** Claude Opus 4.7 session
 
 ## Current State
 
-jun15 MCP pivot (refs/issues/0027) **全 phase 完了 + archive 入り**。
+jun15 MCP pivot (refs/issues/0027) **全 phase 完了 + archive 入り**、
+**かつ 0028 helper-level residue cleanup も完了**。
 `feat/jun15-mcp-pivot` long-lived branch から始まり、 Phase 2-4 の
-follow-up 含めて **5 ツール共通の MCP server-first architecture が main
-merged** で確立。
+follow-up + 0028 helper-level stub 含めて **5 ツール共通の MCP
+server-first architecture が main merged** で確立。
 
 paintress 固有の jun15 landmark:
 
 - ADR 0017 (= `docs/adr/0017-mcp-pivot.md`) で architectural pin 固定
+- ADR 0018 (= `docs/adr/0018-mcp-pivot-helper-level-stub.md`) で
+  helper-level enforcement extend (= ClaudeAdapter / doctor probe /
+  issues cobra の stub 完了、 0017 の §Enforcement inventory gap 補強)
 - 4 MCP tool 全 real impl + emitter wiring 済 (= ping / next_issue /
   update_gradient / append_journal)
 - Phase 4 #4 (PR #218 `03afd1e`): `port.ExpeditionEventEmitter` を cmd
   composition root で構築し session に注入、 update_gradient →
   EventGradientChanged / append_journal → EventExpeditionCompleted を
   event store に自動 emit
-- `.semgrep/jun15-no-headless-llm.yaml` 5 rule で headless LLM 経路を
-  permanent block (= transitional exclude なし、 production path に逃げ道なし)
+- 0028 residue cleanup: `ClaudeAdapter.RunDetailed` 280 行を
+  ErrMCPPivotDeprecated 返却 stub に圧縮、 `doctor.go` の
+  claude-inference probe を unconditional CheckSkip、
+  `paintress issues` cobra を fast-fail (= 副作用ゼロで deprecation
+  message)
+- `.semgrep/jun15-no-headless-llm.yaml` **6 rule** (= 0017 base 5 +
+  0018 追加 `jun15-no-print-flag-literal-go`) で headless LLM 経路 +
+  dynamic args spread を permanent block (= 5 ツール symmetric)
 - `internal/session/expedition.Run()` は `ErrMCPPivotDeprecated` を返す
   fail-fast stub のまま、 LLM invocation block は完全除去
 - `/expedition-next` skill (`plugins/paintress/skills/`) が claude code
@@ -30,8 +40,8 @@ paintress 固有の jun15 landmark:
 
 ## In Progress
 
-なし。 jun15 MCP pivot に関する作業は完了し refs 0027 は archive (=
-`tap/refs/HTMLification/docs/archive/0027-jun15-mcp-pivot.html`)。
+なし。 jun15 MCP pivot + 0028 residue cleanup ともに完了。 refs 0027
+は archive、 0028 は archive 待ち (= 本 PR merge 後)。
 
 ## Next Actions
 
@@ -70,7 +80,13 @@ paintress 固有の jun15 landmark:
 ## Relevant Files and Commands
 
 - `docs/adr/0017-mcp-pivot.md` - architectural pin (Phase 1 完了 marker)
-- `.semgrep/jun15-no-headless-llm.yaml` - billing-boundary gate (5 rule)
+- `docs/adr/0018-mcp-pivot-helper-level-stub.md` - 0017 §Enforcement
+  inventory の helper-level gap 補強 ADR (= 0028 residue cleanup の
+  rationale + acceptance criteria を記録)
+- `.semgrep/jun15-no-headless-llm.yaml` - billing-boundary gate
+  (6 rule、 0018 で `jun15-no-print-flag-literal-go` 追加)
+- `internal/session/claude_adapter.go` - ErrMCPPivotDeprecated 即返却
+  stub (= 0018 で 280 行 → 60 行に圧縮)
 - `internal/session/mcp_server.go` - JSON-RPC 2.0 stdio MCP server (4 tool real impl + emitter wiring)
 - `internal/cmd/mcp.go` - `paintress mcp` cobra subcommand (= EventStore + ExpeditionAggregate + ExpeditionEventEmitter を構築して session に注入)
 - `internal/domain/dmail_envelope.go` - 9-field cross-tool message schema

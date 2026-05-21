@@ -1,42 +1,31 @@
 ## paintress issues
 
-List Linear issues via Claude MCP
+DEPRECATED post jun15 MCP pivot (refs/issues/0027)
 
 ### Synopsis
 
-Query Linear issues via Claude MCP tools for the configured team and project.
+DEPRECATED post jun15 MCP pivot.
 
-Reads the team/project from .expedition/config.yaml. Supports filtering
-by issue state (e.g. todo, in-progress). Hyphens in state names are
-converted to spaces automatically.
+The previous implementation invoked the Claude CLI subprocess to query
+Linear issues via the Linear MCP tools. Post jun15 MCP pivot
+(refs/issues/0027 + 0028 §4.2 residue cleanup), headless Claude
+invocations are forbidden. Use claude code with the paintress MCP
+server attached instead:
 
-If path is omitted, the current working directory is used.
+  claude --plugin-dir ./plugins/paintress \
+         --mcp-config '{"paintress":{"command":"paintress","args":["mcp"]}}'
+
+Then call the paintress.next_issue MCP tool from your session.
 
 ```
 paintress issues [path] [flags]
-```
-
-### Examples
-
-```
-  # List all issues (current directory)
-  paintress issues
-
-  # List all issues (explicit path)
-  paintress issues /path/to/repo
-
-  # Filter by state
-  paintress issues --state todo,in-progress /path/to/repo
-
-  # JSON output for scripting
-  paintress issues -o json /path/to/repo
 ```
 
 ### Options
 
 ```
   -h, --help           help for issues
-  -s, --state string   Comma-separated state filter (e.g. todo,in-progress)
+  -s, --state string   (deprecated) state filter, no longer applied
 ```
 
 ### Options inherited from parent commands
