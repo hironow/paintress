@@ -27,7 +27,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 * [paintress dead-letters](paintress_dead-letters.md)	 - Manage dead-lettered outbox items
 * [paintress doctor](paintress_doctor.md)	 - Run health checks
 * [paintress init](paintress_init.md)	 - Initialize project configuration
-* [paintress issues](paintress_issues.md)	 - List Linear issues via Claude MCP
+* [paintress issues](paintress_issues.md)	 - DEPRECATED post jun15 MCP pivot (refs/issues/0027)
 * [paintress mcp](paintress_mcp.md)	 - Run paintress as an MCP server over stdio (refs/issues/0027 Phase 1 MVP)
 * [paintress mcp-config](paintress_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [paintress rebuild](paintress_rebuild.md)	 - Rebuild projections from event store
