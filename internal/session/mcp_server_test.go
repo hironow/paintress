@@ -208,8 +208,8 @@ func TestMCPServer_NextIssue_RealImpl_WithPRIndex(t *testing.T) {
 	}
 }
 
-func TestMCPServer_UpdateGradientStub_EchoesDelta(t *testing.T) {
-	// given
+func TestMCPServer_UpdateGradient_UninitializedContinent(t *testing.T) {
+	// given: empty continent → uninitialized response with delta echo.
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":3}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
@@ -219,20 +219,47 @@ func TestMCPServer_UpdateGradientStub_EchoesDelta(t *testing.T) {
 		t.Fatalf("Serve: %v", err)
 	}
 
-	// then: stub echoes the requested delta so the contract is testable
-	// end-to-end before the real gradient gauge wiring lands.
+	// then
 	body := decodeFirstText(t, &out)
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty continent)", body["initialized"])
+	}
 	if got, _ := body["delta"].(float64); int(got) != 3 {
 		t.Errorf("delta = %v, want 3", body["delta"])
 	}
-	if got, _ := body["new_level"].(float64); int(got) != 3 {
-		t.Errorf("new_level = %v, want 3 (stub mirrors delta)", body["new_level"])
+}
+
+func TestMCPServer_UpdateGradient_RealImpl_EmptyEventStore(t *testing.T) {
+	// given: temp continent dir with no events yet → current_level = 0.
+	continent := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":5}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: initialized=true, current=0, delta=5, preview=5.
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if got, _ := body["current_level"].(float64); int(got) != 0 {
+		t.Errorf("current_level = %v, want 0", body["current_level"])
+	}
+	if got, _ := body["preview_level"].(float64); int(got) != 5 {
+		t.Errorf("preview_level = %v, want 5", body["preview_level"])
+	}
+	if body["persistence"] != "preview-only" {
+		t.Errorf("persistence = %v, want preview-only", body["persistence"])
 	}
 }
 
-func TestMCPServer_AppendJournalStub_EchoesEntry(t *testing.T) {
-	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","status":"completed"}}}` + "\n")
+func TestMCPServer_AppendJournal_UninitializedContinent(t *testing.T) {
+	// given: empty continent → uninitialized response.
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","status":"completed"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -241,17 +268,69 @@ func TestMCPServer_AppendJournalStub_EchoesEntry(t *testing.T) {
 		t.Fatalf("Serve: %v", err)
 	}
 
-	// then: stub echoes the entry untouched.
+	// then
 	body := decodeFirstText(t, &out)
-	entry, ok := body["entry"].(map[string]any)
-	if !ok {
-		t.Fatalf("entry missing: %v", body)
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty continent)", body["initialized"])
 	}
-	if entry["issue_id"] != "PAI-1" {
-		t.Errorf("issue_id = %v, want PAI-1", entry["issue_id"])
+}
+
+func TestMCPServer_AppendJournal_RealImpl_PersistsToFilesystem(t *testing.T) {
+	// given: temp continent + minimal valid input.
+	continent := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","issue_title":"Fix login","status":"completed","pr_url":"https://github.com/example/repo/pull/7","reason":"validated"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
 	}
-	if entry["status"] != "completed" {
-		t.Errorf("status = %v, want completed", entry["status"])
+
+	// then: persisted=true + journal file exists + pr-index appended.
+	body := decodeFirstText(t, &out)
+	if body["persisted"] != true {
+		t.Errorf("persisted = %v, want true (body=%v)", body["persisted"], body)
+	}
+	if got, _ := body["expedition"].(float64); int(got) != 42 {
+		t.Errorf("expedition = %v, want 42", body["expedition"])
+	}
+	if body["issue_id"] != "PAI-1" {
+		t.Errorf("issue_id = %v, want PAI-1", body["issue_id"])
+	}
+	// journal file on disk
+	journalDir := domain.JournalDir(continent)
+	if _, err := os.Stat(filepath.Join(journalDir, "042.md")); err != nil {
+		t.Errorf("journal file 042.md missing: %v", err)
+	}
+	// pr-index appended
+	if body["pr_index_updated"] != true {
+		t.Errorf("pr_index_updated = %v, want true", body["pr_index_updated"])
+	}
+	if _, err := os.Stat(filepath.Join(journalDir, "pr-index.jsonl")); err != nil {
+		t.Errorf("pr-index.jsonl missing: %v", err)
+	}
+}
+
+func TestMCPServer_AppendJournal_RealImpl_RejectsMissingRequiredFields(t *testing.T) {
+	// given: empty issue_id is invalid.
+	continent := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":1,"status":"completed"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then
+	body := decodeFirstText(t, &out)
+	if body["persisted"] != false {
+		t.Errorf("persisted = %v, want false (missing issue_id)", body["persisted"])
+	}
+	if _, ok := body["reason"]; !ok {
+		t.Errorf("reason missing: %v", body)
 	}
 }
 

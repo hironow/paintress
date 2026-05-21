@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
@@ -143,11 +144,9 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	case "paintress.next_issue":
 		result = realNextIssue(s.continent)
 	case "paintress.update_gradient":
-		result = stubUpdateGradient(call.Arguments)
-		status = "deprecated"
+		result = realUpdateGradient(ctx, s.continent, call.Arguments, s.logger)
 	case "paintress.append_journal":
-		result = stubAppendJournal(call.Arguments)
-		status = "deprecated"
+		result = realAppendJournal(s.continent, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -163,9 +162,10 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 
 // toolDescriptors returns the Phase 1 MVP tool set. Each entry pins the
 // interface (name, description, inputSchema) so claude code clients see
-// a stable contract. The handler bodies (stubNextIssue / stubUpdateGradient
-// / stubAppendJournal) are placeholders that ship in subsequent commits
-// with real domain wiring.
+// a stable contract. next_issue / update_gradient / append_journal are
+// real impl as of Phase 3 (= read from pr-index / event store, write
+// to journal/ + pr-index filesystem). EventExpeditionCompleted +
+// EventGradientChanged emission is Phase 4 follow-up.
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
@@ -175,12 +175,12 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "paintress.next_issue",
-			"description": "Return the next expedition target issue (Phase 1: stub returns a placeholder Issue payload until the domain wiring lands).",
+			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The claude code session queries linear-mcp separately and uses completed_issue_ids to exclude already-done work.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
 			"name":        "paintress.update_gradient",
-			"description": "Update the gradient gauge level by delta (Phase 1: stub returns the requested delta and a placeholder level).",
+			"description": "Read current gradient_level from event store + preview the new level after applying delta. Phase 3 is preview-only (= no persistence); Phase 4 follow-up wires the EventGradientChanged emit chain.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -191,7 +191,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "paintress.append_journal",
-			"description": "Append a journal entry (Phase 1: stub echoes the entry without persisting).",
+			"description": "Persist an ExpeditionReport to journal/<NNN>.md + pr-index. Phase 3 is filesystem-only; EventExpeditionCompleted emission deferred to Phase 4 follow-up.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -285,36 +285,148 @@ func realNextIssue(continent string) map[string]any {
 	})
 }
 
-// stubUpdateGradient echoes the requested delta with a placeholder new
-// level so claude code clients can exercise the contract end-to-end.
-func stubUpdateGradient(args json.RawMessage) map[string]any {
+// realUpdateGradient reads the current GradientLevel via the event
+// store + projection and returns a preview of (current + delta). It
+// does NOT emit a new EventGradientChanged event — full event
+// emission requires the aggregate + emitter chain which is wired in a
+// follow-up commit (= Phase 4). The session uses this preview to
+// decide whether to call paintress.append_journal (which currently
+// persists the journal entry to filesystem only; full event emission
+// is also follow-up).
+//
+// continent is the project root from MCPServer.WithContinent. When
+// empty the response signals uninitialized so the session aborts.
+func realUpdateGradient(ctx context.Context, continent string, args json.RawMessage, logger domain.Logger) map[string]any {
 	var payload struct {
 		Delta int `json:"delta"`
 	}
 	if len(args) > 0 {
 		_ = json.Unmarshal(args, &payload)
 	}
+	if continent == "" {
+		return jsonResult(map[string]any{
+			"initialized":   false,
+			"reason":        "paintress mcp continent root not configured",
+			"delta":         payload.Delta,
+			"current_level": 0,
+			"preview_level": payload.Delta,
+		})
+	}
+	stateDir := filepath.Join(continent, domain.StateDir)
+	store := NewEventStore(stateDir, logger)
+	events, _, err := store.LoadAll(ctx)
+	if err != nil {
+		return jsonResult(map[string]any{
+			"initialized":   false,
+			"reason":        fmt.Sprintf("event store load failed: %v", err),
+			"delta":         payload.Delta,
+			"current_level": 0,
+			"preview_level": payload.Delta,
+		})
+	}
+	state := ProjectState(events)
 	return jsonResult(map[string]any{
-		"stub":      true,
-		"delta":     payload.Delta,
-		"new_level": payload.Delta,
-		"reason":    "phase-1-mvp: real gradient gauge wiring lands when the harness/policy package is exposed",
+		"initialized":   true,
+		"continent":     continent,
+		"current_level": state.GradientLevel,
+		"delta":         payload.Delta,
+		"preview_level": state.GradientLevel + payload.Delta,
+		"persistence":   "preview-only",
+		"note":          "Preview only. Persistence of the new gradient_level requires the aggregate + emitter chain (Phase 4 follow-up). For now, call paintress.append_journal to record the expedition outcome on the filesystem.",
 	})
 }
 
-// stubAppendJournal echoes the entry payload without persisting.
-func stubAppendJournal(args json.RawMessage) map[string]any {
-	var entry map[string]any
-	if len(args) > 0 {
-		_ = json.Unmarshal(args, &entry)
+// realAppendJournal writes the expedition report to the journal
+// directory and pr-index file (= filesystem-only) via the existing
+// WriteJournal / WritePRIndex helpers. It does NOT emit a
+// EventExpeditionCompleted event yet — that requires the aggregate +
+// emitter chain (Phase 4 follow-up). For Phase 3 the contract is
+// "journal file is on disk, PR index is appended". The session can
+// re-read the new state via paintress.next_issue.
+//
+// continent is the project root from MCPServer.WithContinent. When
+// empty the response signals uninitialized so the session aborts.
+//
+//nolint:staticcheck // intentional: documents the existing journal/pr-index files maintained by session/journal.go
+func realAppendJournal(continent string, args json.RawMessage) map[string]any {
+	var payload struct {
+		Expedition         int    `json:"expedition"`
+		IssueID            string `json:"issue_id"`
+		IssueTitle         string `json:"issue_title"`
+		MissionType        string `json:"mission_type"`
+		Branch             string `json:"branch"`
+		PRUrl              string `json:"pr_url"`
+		Status             string `json:"status"`
+		Reason             string `json:"reason"`
+		Remaining          string `json:"remaining"`
+		BugsFound          int    `json:"bugs_found"`
+		BugIssues          string `json:"bug_issues"`
+		Insight            string `json:"insight"`
+		FailureType        string `json:"failure_type"`
+		HighSeverityDMails string `json:"high_severity_dmails"`
+		WaveID             string `json:"wave_id"`
+		StepID             string `json:"step_id"`
 	}
-	if entry == nil {
-		entry = map[string]any{}
+	if len(args) > 0 {
+		_ = json.Unmarshal(args, &payload)
+	}
+	if continent == "" {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"reason":      "paintress mcp continent root not configured",
+		})
+	}
+	if payload.Expedition <= 0 || payload.IssueID == "" || payload.Status == "" {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"persisted":   false,
+			"reason":      "missing required fields: expedition (>0), issue_id, status",
+			"received":    payload,
+		})
+	}
+	report := &domain.ExpeditionReport{
+		Expedition:         payload.Expedition,
+		IssueID:            payload.IssueID,
+		IssueTitle:         payload.IssueTitle,
+		MissionType:        payload.MissionType,
+		Branch:             payload.Branch,
+		PRUrl:              payload.PRUrl,
+		Status:             payload.Status,
+		Reason:             payload.Reason,
+		Remaining:          payload.Remaining,
+		BugsFound:          payload.BugsFound,
+		BugIssues:          payload.BugIssues,
+		Insight:            payload.Insight,
+		FailureType:        payload.FailureType,
+		HighSeverityDMails: payload.HighSeverityDMails,
+		WaveID:             payload.WaveID,
+		StepID:             payload.StepID,
+	}
+	if err := WriteJournal(continent, report); err != nil {
+		return jsonResult(map[string]any{
+			"initialized": true,
+			"persisted":   false,
+			"reason":      fmt.Sprintf("write journal: %v", err),
+		})
+	}
+	if err := WritePRIndex(continent, report); err != nil {
+		return jsonResult(map[string]any{
+			"initialized":  true,
+			"persisted":    true,
+			"journal_file": filepath.Join(domain.JournalDir(continent), fmt.Sprintf("%03d.md", report.Expedition)),
+			"pr_index":     false,
+			"reason":       fmt.Sprintf("journal written but pr-index append failed: %v", err),
+		})
 	}
 	return jsonResult(map[string]any{
-		"stub":   true,
-		"entry":  entry,
-		"reason": "phase-1-mvp: real journal append lands when domain.JournalEntry persistence is wired",
+		"initialized":      true,
+		"persisted":        true,
+		"expedition":       report.Expedition,
+		"issue_id":         report.IssueID,
+		"journal_file":     filepath.Join(domain.JournalDir(continent), fmt.Sprintf("%03d.md", report.Expedition)),
+		"pr_index_updated": report.PRUrl != "" && report.PRUrl != "none",
+		"persistence":      "filesystem-only",
+		"note":             "Filesystem persistence complete (journal/<NNN>.md + pr index). EventExpeditionCompleted emission deferred to Phase 4 follow-up; re-run paintress.next_issue to see updated completed_issue_ids.", // nosemgrep: layer-session-no-event-persistence -- comment text only, persistence is via session/journal.go::WriteJournal+WritePRIndex helpers that the rule allows [permanent]
 	})
 }
 
