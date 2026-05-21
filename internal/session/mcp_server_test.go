@@ -8,10 +8,80 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
+
+// recordingEmitter is a minimal ExpeditionEventEmitter for white-box
+// testing of MCP wiring. It records emit calls + appends the event to
+// the configured store so the test can assert event store state.
+// It does not implement the full ExpeditionEventEmitter contract;
+// methods unused by the MCP tools return nil.
+type recordingEmitter struct {
+	store     port.EventStore
+	gradients []domain.GradientChangedData
+	completes []domain.ExpeditionCompletedData
+}
+
+func (r *recordingEmitter) EmitGradientChange(level int, operator string, now time.Time) error {
+	r.gradients = append(r.gradients, domain.GradientChangedData{Level: level, Operator: operator})
+	ev, err := domain.NewEvent(domain.EventGradientChanged, domain.GradientChangedData{Level: level, Operator: operator}, now)
+	if err != nil {
+		return err
+	}
+	_, err = r.store.Append(context.Background(), ev)
+	return err
+}
+
+func (r *recordingEmitter) EmitCompleteExpedition(expedition int, status, issueID, bugsFound, waveID, stepID string, now time.Time) error { // nolint: revive
+	r.completes = append(r.completes, domain.ExpeditionCompletedData{
+		Expedition: expedition,
+		Status:     status,
+		IssueID:    issueID,
+		WaveID:     waveID,
+		StepID:     stepID,
+		BugsFound:  bugsFound,
+	})
+	ev, err := domain.NewEvent(domain.EventExpeditionCompleted, domain.ExpeditionCompletedData{
+		Expedition: expedition,
+		Status:     status,
+		IssueID:    issueID,
+		WaveID:     waveID,
+		StepID:     stepID,
+		BugsFound:  bugsFound,
+	}, now)
+	if err != nil {
+		return err
+	}
+	_, err = r.store.Append(context.Background(), ev)
+	return err
+}
+
+// Below: unused ExpeditionEventEmitter methods (Nop satisfies the port).
+func (r *recordingEmitter) EmitStartExpedition(_, _ int, _ string, _ time.Time) error {
+	return nil
+}
+func (r *recordingEmitter) EmitSpecRegistered(_ string, _ []domain.WaveStepDef, _ string, _ time.Time) error {
+	return nil
+}
+func (r *recordingEmitter) EmitInboxReceived(_, _ string, _ time.Time) error      { return nil }
+func (r *recordingEmitter) EmitGommage(_ int, _ time.Time) error                  { return nil }
+func (r *recordingEmitter) EmitRetryAttempted(_ string, _ int, _ time.Time) error { return nil }
+func (r *recordingEmitter) EmitEscalated(_ string, _ []string, _ time.Time) error { return nil }
+func (r *recordingEmitter) EmitResolved(_ string, _ []string, _ time.Time) error  { return nil }
+func (r *recordingEmitter) EmitDMailStaged(_ string, _ time.Time) error           { return nil }
+func (r *recordingEmitter) EmitDMailFlushed(_ int, _ time.Time) error             { return nil }
+func (r *recordingEmitter) EmitDMailArchived(_ string, _ time.Time) error         { return nil }
+func (r *recordingEmitter) EmitGommageRecovery(_ int, _, _ string, _ int, _ string, _ time.Time) error {
+	return nil
+}
+func (r *recordingEmitter) EmitCheckpoint(_ int, _, _ string, _ int, _ time.Time) error {
+	return nil
+}
+func (r *recordingEmitter) SetSeqAllocator(_ port.SeqAllocator) {}
 
 func TestMCPServer_ListsAllPhase1Tools(t *testing.T) {
 	// given
@@ -309,6 +379,127 @@ func TestMCPServer_AppendJournal_RealImpl_PersistsToFilesystem(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(journalDir, "pr-index.jsonl")); err != nil {
 		t.Errorf("pr-index.jsonl missing: %v", err)
+	}
+}
+
+func TestMCPServer_UpdateGradient_Phase4_EmitsGradientChangedEvent(t *testing.T) {
+	// given: temp continent with recording emitter wired.
+	continent := t.TempDir()
+	stateDir := filepath.Join(continent, domain.StateDir)
+	store := session.NewEventStore(stateDir, nil)
+	emitter := &recordingEmitter{store: store}
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":50,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":3}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: response reports persistence='event-store' + new_level reflected.
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Fatalf("initialized = %v, want true: %v", body["initialized"], body)
+	}
+	if body["persistence"] != "event-store" {
+		t.Errorf("persistence = %v, want event-store", body["persistence"])
+	}
+	if got, _ := body["new_level"].(float64); int(got) != 3 {
+		t.Errorf("new_level = %v, want 3", body["new_level"])
+	}
+	// event store contains exactly one EventGradientChanged with level=3.
+	events, _, err := store.LoadAll(context.Background())
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	gradEvents := 0
+	for _, ev := range events {
+		if ev.Type == domain.EventGradientChanged {
+			gradEvents++
+			var data domain.GradientChangedData
+			if err := json.Unmarshal(ev.Data, &data); err != nil {
+				t.Fatalf("decode gradient event: %v", err)
+			}
+			if data.Level != 3 {
+				t.Errorf("gradient event level = %d, want 3", data.Level)
+			}
+		}
+	}
+	if gradEvents != 1 {
+		t.Errorf("EventGradientChanged count = %d, want 1: %v", gradEvents, events)
+	}
+}
+
+func TestMCPServer_UpdateGradient_Phase4_PreviewWhenEmitterDisabled(t *testing.T) {
+	// given: emitter NOT enabled (default) → preview-only contract retained.
+	continent := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":51,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":5}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: persistence=preview-only + no event emitted.
+	body := decodeFirstText(t, &out)
+	if body["persistence"] != "preview-only" {
+		t.Errorf("persistence = %v, want preview-only (emitter disabled)", body["persistence"])
+	}
+	stateDir := filepath.Join(continent, domain.StateDir)
+	store := session.NewEventStore(stateDir, nil)
+	events, _, _ := store.LoadAll(context.Background())
+	for _, ev := range events {
+		if ev.Type == domain.EventGradientChanged {
+			t.Errorf("unexpected EventGradientChanged: %v", ev)
+		}
+	}
+}
+
+func TestMCPServer_AppendJournal_Phase4_EmitsExpeditionCompletedEvent(t *testing.T) {
+	// given: temp continent with recording emitter wired.
+	continent := t.TempDir()
+	stateDir := filepath.Join(continent, domain.StateDir)
+	store := session.NewEventStore(stateDir, nil)
+	emitter := &recordingEmitter{store: store}
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":52,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":7,"issue_id":"PAI-7","status":"success","pr_url":"https://example/pull/7","wave_id":"w-1","step_id":"s-1"}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent).WithEmitter(emitter)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: persistence='event-store+filesystem' + event emitted.
+	body := decodeFirstText(t, &out)
+	if body["persisted"] != true {
+		t.Fatalf("persisted = %v, want true: %v", body["persisted"], body)
+	}
+	if body["persistence"] != "event-store+filesystem" {
+		t.Errorf("persistence = %v, want event-store+filesystem", body["persistence"])
+	}
+	events, _, err := store.LoadAll(context.Background())
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	completedCount := 0
+	for _, ev := range events {
+		if ev.Type == domain.EventExpeditionCompleted {
+			completedCount++
+			var data domain.ExpeditionCompletedData
+			if err := json.Unmarshal(ev.Data, &data); err != nil {
+				t.Fatalf("decode expedition completed: %v", err)
+			}
+			if data.Expedition != 7 || data.IssueID != "PAI-7" || data.Status != "success" {
+				t.Errorf("ExpeditionCompletedData mismatch: %+v", data)
+			}
+		}
+	}
+	if completedCount != 1 {
+		t.Errorf("EventExpeditionCompleted count = %d, want 1", completedCount)
 	}
 }
 

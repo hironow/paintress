@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
+	"github.com/hironow/paintress/internal/usecase"
 )
 
 // newMCPCommand exposes `paintress mcp` as a stdio MCP server entry
@@ -44,7 +47,25 @@ subsequent commits.`,
 			if err != nil {
 				return err
 			}
-			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).WithContinent(continent)
+			// Emitter is wired by default (refs/issues/0027 Phase 4
+			// follow-up #4): update_gradient / append_journal append
+			// EventGradientChanged / EventExpeditionCompleted via the
+			// usecase ExpeditionEventEmitter. LLM firing remains
+			// human-initiated — events land only when the claude-code
+			// session calls the MCP tool.
+			stateDir := filepath.Join(continent, domain.StateDir)
+			store := session.NewEventStore(stateDir, nil)
+			emitter := usecase.NewExpeditionEventEmitter(
+				cmd.Context(),
+				domain.NewExpeditionAggregate(),
+				store,
+				nil,
+				&domain.NopLogger{},
+				"paintress.mcp",
+			)
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).
+				WithContinent(continent).
+				WithEmitter(emitter)
 			return srv.Serve(cmd.Context())
 		},
 	}

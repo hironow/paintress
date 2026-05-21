@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
+	"github.com/hironow/paintress/internal/usecase/port"
 )
 
 // MCPServer is a minimal stdio-based Model Context Protocol server
@@ -41,6 +43,7 @@ type MCPServer struct {
 	out       io.Writer
 	logger    domain.Logger
 	continent string
+	emitter   port.ExpeditionEventEmitter
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
@@ -58,6 +61,21 @@ func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer 
 // resolve journal / pr-index paths. Returns s for chaining.
 func (s *MCPServer) WithContinent(continent string) *MCPServer {
 	s.continent = continent
+	return s
+}
+
+// WithEmitter wires the usecase ExpeditionEventEmitter used to emit
+// EventGradientChanged / EventExpeditionCompleted from
+// paintress.update_gradient / paintress.append_journal
+// (refs/issues/0027 Phase 4 follow-up #4). Passing nil keeps the tools
+// in preview-only / filesystem-only mode, preserving the Phase 3
+// contract. cmd composition root constructs a real emitter; tests
+// pass nil to keep emission opt-in.
+//
+// LLM firing remains human-initiated: emission happens only when the
+// claude-code session calls the MCP tool.
+func (s *MCPServer) WithEmitter(emitter port.ExpeditionEventEmitter) *MCPServer {
+	s.emitter = emitter
 	return s
 }
 
@@ -144,9 +162,9 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	case "paintress.next_issue":
 		result = realNextIssue(s.continent)
 	case "paintress.update_gradient":
-		result = realUpdateGradient(ctx, s.continent, call.Arguments, s.logger)
+		result = realUpdateGradient(ctx, s.continent, s.emitter, call.Arguments, s.logger)
 	case "paintress.append_journal":
-		result = realAppendJournal(s.continent, call.Arguments)
+		result = realAppendJournal(s.continent, s.emitter, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -296,7 +314,7 @@ func realNextIssue(continent string) map[string]any {
 //
 // continent is the project root from MCPServer.WithContinent. When
 // empty the response signals uninitialized so the session aborts.
-func realUpdateGradient(ctx context.Context, continent string, args json.RawMessage, logger domain.Logger) map[string]any {
+func realUpdateGradient(ctx context.Context, continent string, emitter port.ExpeditionEventEmitter, args json.RawMessage, logger domain.Logger) map[string]any {
 	var payload struct {
 		Delta int `json:"delta"`
 	}
@@ -325,14 +343,36 @@ func realUpdateGradient(ctx context.Context, continent string, args json.RawMess
 		})
 	}
 	state := ProjectState(events)
+	newLevel := state.GradientLevel + payload.Delta
+	if emitter == nil {
+		return jsonResult(map[string]any{
+			"initialized":   true,
+			"continent":     continent,
+			"current_level": state.GradientLevel,
+			"delta":         payload.Delta,
+			"preview_level": newLevel,
+			"persistence":   "preview-only",
+			"note":          "Preview only. Emitter not wired; cmd composition root injects one via MCPServer.WithEmitter to persist EventGradientChanged.",
+		})
+	}
+	if err := emitter.EmitGradientChange(newLevel, "mcp.update_gradient", time.Now().UTC()); err != nil {
+		return jsonResult(map[string]any{
+			"initialized":   true,
+			"continent":     continent,
+			"current_level": state.GradientLevel,
+			"delta":         payload.Delta,
+			"preview_level": newLevel,
+			"persistence":   "preview-only",
+			"reason":        fmt.Sprintf("emit gradient change: %v", err),
+		})
+	}
 	return jsonResult(map[string]any{
 		"initialized":   true,
 		"continent":     continent,
 		"current_level": state.GradientLevel,
 		"delta":         payload.Delta,
-		"preview_level": state.GradientLevel + payload.Delta,
-		"persistence":   "preview-only",
-		"note":          "Preview only. Persistence of the new gradient_level requires the aggregate + emitter chain (Phase 4 follow-up). For now, call paintress.append_journal to record the expedition outcome on the filesystem.",
+		"new_level":     newLevel,
+		"persistence":   "event-store",
 	})
 }
 
@@ -348,7 +388,7 @@ func realUpdateGradient(ctx context.Context, continent string, args json.RawMess
 // empty the response signals uninitialized so the session aborts.
 //
 //nolint:staticcheck // intentional: documents the existing journal/pr-index files maintained by session/journal.go
-func realAppendJournal(continent string, args json.RawMessage) map[string]any {
+func realAppendJournal(continent string, emitter port.ExpeditionEventEmitter, args json.RawMessage) map[string]any {
 	var payload struct {
 		Expedition         int    `json:"expedition"`
 		IssueID            string `json:"issue_id"`
@@ -418,6 +458,31 @@ func realAppendJournal(continent string, args json.RawMessage) map[string]any {
 			"reason":       fmt.Sprintf("journal written but pr-index append failed: %v", err),
 		})
 	}
+	if emitter == nil {
+		return jsonResult(map[string]any{
+			"initialized":      true,
+			"persisted":        true,
+			"expedition":       report.Expedition,
+			"issue_id":         report.IssueID,
+			"journal_file":     filepath.Join(domain.JournalDir(continent), fmt.Sprintf("%03d.md", report.Expedition)),
+			"pr_index_updated": report.PRUrl != "" && report.PRUrl != "none",
+			"persistence":      "filesystem-only",
+			"note":             "Filesystem persistence complete (journal/<NNN>.md + pr index). Emitter not wired; cmd composition root injects one via MCPServer.WithEmitter to also emit EventExpeditionCompleted.", // nosemgrep: layer-session-no-event-persistence -- comment text only, persistence is via session/journal.go::WriteJournal+WritePRIndex helpers that the rule allows [permanent]
+		})
+	}
+	bugsFoundStr := strconv.Itoa(report.BugsFound)
+	if err := emitter.EmitCompleteExpedition(report.Expedition, report.Status, report.IssueID, bugsFoundStr, report.WaveID, report.StepID, time.Now().UTC()); err != nil {
+		return jsonResult(map[string]any{
+			"initialized":      true,
+			"persisted":        true,
+			"expedition":       report.Expedition,
+			"issue_id":         report.IssueID,
+			"journal_file":     filepath.Join(domain.JournalDir(continent), fmt.Sprintf("%03d.md", report.Expedition)),
+			"pr_index_updated": report.PRUrl != "" && report.PRUrl != "none",
+			"persistence":      "filesystem-only",
+			"reason":           fmt.Sprintf("emit expedition completed: %v", err),
+		})
+	}
 	return jsonResult(map[string]any{
 		"initialized":      true,
 		"persisted":        true,
@@ -425,8 +490,7 @@ func realAppendJournal(continent string, args json.RawMessage) map[string]any {
 		"issue_id":         report.IssueID,
 		"journal_file":     filepath.Join(domain.JournalDir(continent), fmt.Sprintf("%03d.md", report.Expedition)),
 		"pr_index_updated": report.PRUrl != "" && report.PRUrl != "none",
-		"persistence":      "filesystem-only",
-		"note":             "Filesystem persistence complete (journal/<NNN>.md + pr index). EventExpeditionCompleted emission deferred to Phase 4 follow-up; re-run paintress.next_issue to see updated completed_issue_ids.", // nosemgrep: layer-session-no-event-persistence -- comment text only, persistence is via session/journal.go::WriteJournal+WritePRIndex helpers that the rule allows [permanent]
+		"persistence":      "event-store+filesystem",
 	})
 }
 
