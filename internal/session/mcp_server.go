@@ -29,19 +29,35 @@ import (
 // Protocol: JSON-RPC 2.0 over stdio, one envelope per line. Stderr
 // carries human-readable diagnostics (per the project stdout/stderr
 // separation invariant).
+//
+// continent is the project root directory (= paintress's "continent"
+// abstraction) used to resolve journal / pr-index paths for the
+// real-impl MCP tools. When empty, real-impl tools fall back to
+// returning an "uninitialized" payload so the claude code session can
+// surface a clear error to the operator.
 type MCPServer struct {
-	in     io.Reader
-	out    io.Writer
-	logger domain.Logger
+	in        io.Reader
+	out       io.Writer
+	logger    domain.Logger
+	continent string
 }
 
 // NewMCPServer wires explicit I/O so tests can drive the server
 // without subprocess overhead. Passing nil for logger uses NopLogger.
+// continent defaults to empty string; use WithContinent to configure
+// it, typically to os.Getwd() in the cobra subcommand RunE.
 func NewMCPServer(in io.Reader, out io.Writer, logger domain.Logger) *MCPServer {
 	if logger == nil {
 		logger = &domain.NopLogger{}
 	}
 	return &MCPServer{in: in, out: out, logger: logger}
+}
+
+// WithContinent sets the project root used by real-impl MCP tools to
+// resolve journal / pr-index paths. Returns s for chaining.
+func (s *MCPServer) WithContinent(continent string) *MCPServer {
+	s.continent = continent
+	return s
 }
 
 // jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this skeleton
@@ -125,8 +141,7 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	case "paintress.ping":
 		result = textResult("pong")
 	case "paintress.next_issue":
-		result = stubNextIssue()
-		status = "deprecated"
+		result = realNextIssue(s.continent)
 	case "paintress.update_gradient":
 		result = stubUpdateGradient(call.Arguments)
 		status = "deprecated"
@@ -209,14 +224,64 @@ func jsonResult(data any) map[string]any {
 	return map[string]any{"content": []map[string]any{{"type": "text", "text": string(body)}}}
 }
 
-// stubNextIssue returns a fixed placeholder Issue payload. Replaced by
-// real domain wiring in a subsequent commit on feat/jun15-mcp-pivot.
-func stubNextIssue() map[string]any {
+// realNextIssue surfaces paintress's local journal state (= completed
+// issue ids + next expedition number + last PR) so the claude code
+// session can decide which Linear issue to fetch next via linear-mcp.
+//
+// paintress does NOT call linear-mcp itself (= that would re-introduce
+// claude-driven inference, the very thing this pivot removes). The
+// session, with both paintress mcp and linear-mcp attached, reads
+// completed_issue_ids from this tool and excludes them from its
+// linear-mcp query.
+//
+// continent is the project root resolved via WithContinent (typically
+// os.Getwd() in the cobra subcommand). When empty or the journal
+// directory is missing, the response indicates an uninitialized
+// project so the session surfaces a clear error.
+func realNextIssue(continent string) map[string]any {
+	if continent == "" {
+		return jsonResult(map[string]any{
+			"initialized":            false,
+			"reason":                 "paintress mcp continent root not configured (start `paintress mcp` from the project root or pass via WithContinent)",
+			"next_expedition_number": 1,
+			"completed_issue_ids":    []string{},
+		})
+	}
+	entries, err := ReadPRIndex(continent)
+	if err != nil {
+		return jsonResult(map[string]any{
+			"initialized": false,
+			"reason":      fmt.Sprintf("pr-index read failed: %v", err),
+			"continent":   continent,
+		})
+	}
+
+	completedIDs := make([]string, 0, len(entries))
+	maxExp := 0
+	var lastPR map[string]any
+	for _, e := range entries {
+		completedIDs = append(completedIDs, e.IssueID)
+		if e.Expedition > maxExp {
+			maxExp = e.Expedition
+		}
+	}
+	if len(entries) > 0 {
+		last := entries[len(entries)-1]
+		lastPR = map[string]any{
+			"expedition": last.Expedition,
+			"issue_id":   last.IssueID,
+			"pr_url":     last.PRUrl,
+		}
+	}
+
 	return jsonResult(map[string]any{
-		"stub":     true,
-		"issue":    nil,
-		"reason":   "phase-1-mvp: real implementation lands when the domain wiring commit replaces this stub",
-		"contract": map[string]any{"id": "string", "title": "string", "priority": "integer", "status": "string", "labels": "array of string"},
+		"initialized":            true,
+		"continent":              continent,
+		"next_expedition_number": maxExp + 1,
+		"completed_issue_ids":    completedIDs,
+		"last_pr":                lastPR,
+		"journal_dir":            domain.JournalDir(continent),
+		"instruction":            "Query linear-mcp for unstarted issues, exclude completed_issue_ids, pick highest priority. Persist completion via paintress.append_journal after the expedition.",
 	})
 }
 
