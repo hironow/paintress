@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
 	"github.com/hironow/paintress/internal/session"
@@ -11,9 +13,9 @@ import (
 // interactive session loads this binary via --mcp-config and calls
 // paintress tools from inside the human-initiated subscription quota.
 //
-// Phase 1 MVP exposes only paintress.ping. Real tools (next_issue,
-// update_gradient, append_journal) land in subsequent commits on
-// feat/jun15-mcp-pivot.
+// continent is resolved from the cwd (= operator launches `paintress
+// mcp` from the project root). real-impl tools (= paintress.next_issue)
+// use this to read journal / pr-index state. ping is continent-agnostic.
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
@@ -26,12 +28,23 @@ Designed for embedding in a claude code interactive session via
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
-Phase 1 MVP scope: only the paintress.ping health check is exposed.
-Real tools (paintress.next_issue, paintress.update_gradient,
-paintress.append_journal) ship in subsequent commits on the
-feat/jun15-mcp-pivot branch.`,
+The continent (= project root) is resolved from the current working
+directory. paintress.next_issue reads pr-index.jsonl + journal/ under
+this directory to surface completed issue ids + next expedition
+number. The claude code session itself queries linear-mcp for raw
+issue data and uses paintress.next_issue's completed_issue_ids to
+exclude already-done work.
+
+Phase 1 MVP scope (Phase 3 real impl): paintress.ping + real
+paintress.next_issue + 2 remaining stubs (paintress.update_gradient,
+paintress.append_journal). Real wiring for the 2 stubs ships in
+subsequent commits.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil)
+			continent, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			srv := session.NewMCPServer(cmd.InOrStdin(), cmd.OutOrStdout(), nil).WithContinent(continent)
 			return srv.Serve(cmd.Context())
 		},
 	}

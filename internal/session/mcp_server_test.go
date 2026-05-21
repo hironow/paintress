@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/session"
 )
 
@@ -111,8 +114,10 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	}
 }
 
-func TestMCPServer_NextIssueStub(t *testing.T) {
-	// given
+func TestMCPServer_NextIssue_UninitializedContinent(t *testing.T) {
+	// given: NewMCPServer without WithContinent → continent is empty.
+	// Real impl must signal "uninitialized" so the claude code session
+	// surfaces a clear error rather than acting on stale defaults.
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
@@ -122,14 +127,84 @@ func TestMCPServer_NextIssueStub(t *testing.T) {
 		t.Fatalf("Serve: %v", err)
 	}
 
-	// then: stub payload includes a "stub": true flag so clients can
-	// detect placeholder responses during Phase 1 MVP rollout.
+	// then
 	body := decodeFirstText(t, &out)
-	if body["stub"] != true {
-		t.Errorf("stub flag missing: %v", body)
+	if body["initialized"] != false {
+		t.Errorf("initialized = %v, want false (empty continent)", body["initialized"])
 	}
-	if _, ok := body["contract"]; !ok {
-		t.Errorf("contract descriptor missing: %v", body)
+	if _, ok := body["reason"]; !ok {
+		t.Errorf("reason missing: %v", body)
+	}
+}
+
+func TestMCPServer_NextIssue_RealImpl_EmptyJournal(t *testing.T) {
+	// given: temp continent dir with no journal / pr-index yet.
+	continent := t.TempDir()
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: initialized=true, no completed work, next expedition = 1.
+	body := decodeFirstText(t, &out)
+	if body["initialized"] != true {
+		t.Errorf("initialized = %v, want true", body["initialized"])
+	}
+	if got, _ := body["next_expedition_number"].(float64); int(got) != 1 {
+		t.Errorf("next_expedition_number = %v, want 1", body["next_expedition_number"])
+	}
+	if ids, _ := body["completed_issue_ids"].([]any); len(ids) != 0 {
+		t.Errorf("completed_issue_ids = %v, want empty []", body["completed_issue_ids"])
+	}
+	if body["last_pr"] != nil {
+		t.Errorf("last_pr = %v, want nil", body["last_pr"])
+	}
+}
+
+func TestMCPServer_NextIssue_RealImpl_WithPRIndex(t *testing.T) {
+	// given: temp continent with pr-index.jsonl containing 2 entries.
+	continent := t.TempDir()
+	journalDir := domain.JournalDir(continent)
+	if err := os.MkdirAll(journalDir, 0o755); err != nil {
+		t.Fatalf("mkdir journal: %v", err)
+	}
+	prIndex := filepath.Join(journalDir, "pr-index.jsonl")
+	prBody := `{"expedition":1,"issue_id":"X-1","pr_url":"https://github.com/example/repo/pull/1"}
+{"expedition":2,"issue_id":"X-2","pr_url":"https://github.com/example/repo/pull/2"}
+`
+	if err := os.WriteFile(prIndex, []byte(prBody), 0o644); err != nil {
+		t.Fatalf("write pr-index: %v", err)
+	}
+
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
+	var out bytes.Buffer
+	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
+
+	// when
+	if err := srv.Serve(context.Background()); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	// then: completed_issue_ids = [X-1, X-2], next_expedition_number = 3,
+	// last_pr.issue_id = X-2.
+	resp := decodeFirstText(t, &out)
+	if resp["initialized"] != true {
+		t.Errorf("initialized = %v, want true", resp["initialized"])
+	}
+	if got, _ := resp["next_expedition_number"].(float64); int(got) != 3 {
+		t.Errorf("next_expedition_number = %v, want 3", resp["next_expedition_number"])
+	}
+	ids, _ := resp["completed_issue_ids"].([]any)
+	if len(ids) != 2 || ids[0] != "X-1" || ids[1] != "X-2" {
+		t.Errorf("completed_issue_ids = %v, want [X-1, X-2]", resp["completed_issue_ids"])
+	}
+	lastPR, _ := resp["last_pr"].(map[string]any)
+	if lastPR == nil || lastPR["issue_id"] != "X-2" {
+		t.Errorf("last_pr.issue_id = %v, want X-2 (got %v)", "X-2", lastPR)
 	}
 }
 

@@ -52,36 +52,47 @@ cd path/to/paintress && go build -o ./dist/paintress ./cmd/paintress
    attached — abort and ask the human to relaunch claude with
    `--mcp-config`.
 
-2. **Fetch the next expedition target**. Call
-   `mcp__paintress__paintress_next_issue` with no arguments. During
-   Phase 1 MVP the response is a stub:
+2. **Fetch journal state from paintress**. Call
+   `mcp__paintress__paintress_next_issue` with no arguments. Real impl
+   (Phase 3) returns paintress's local journal state:
 
    ```json
    {
-     "stub": true,
-     "issue": null,
-     "reason": "phase-1-mvp: real implementation lands when ...",
-     "contract": {"id": "string", "title": "string", "priority": "integer", "status": "string", "labels": "array of string"}
+     "initialized": true,
+     "continent": "/path/to/project",
+     "next_expedition_number": 5,
+     "completed_issue_ids": ["X-1", "X-2", "X-3", "X-4"],
+     "last_pr": {"expedition": 4, "issue_id": "X-4", "pr_url": "https://..."},
+     "journal_dir": "/path/to/project/.paintress/journals",
+     "instruction": "Query linear-mcp for unstarted issues, exclude completed_issue_ids, pick highest priority. Persist completion via paintress.append_journal after the expedition."
    }
    ```
 
-   While `stub == true`, **do NOT proceed to implementation**.
-   Surface the contract descriptor to the human so they can verify
-   the expected shape, and stop. Real wiring lands in a subsequent
-   commit on the `feat/jun15-mcp-pivot` branch — at that point this
-   skill resumes with steps 3-5 enabled.
+   If `initialized == false`, **abort**: the operator launched
+   `paintress mcp` from outside a paintress-initialized project root.
+   Ask them to relaunch `claude` from the project directory.
 
-3. **(Post-stub) Implement the fix**. Read the issue body, plan the
+   paintress does NOT query Linear itself (= that would re-introduce
+   claude-driven inference). The session is responsible for fetching
+   raw issues via `linear-mcp` and excluding `completed_issue_ids`.
+
+3. **Query linear-mcp for the next unstarted issue**. With the
+   completed_issue_ids from step 2, call your attached linear-mcp
+   tool (e.g. `mcp__linear-mcp__list_issues`) and filter out those
+   ids. Pick the highest-priority unstarted issue. If multiple have
+   the same priority, prefer the oldest.
+
+5. **Implement the fix**. Read the issue body, plan the
    change, and apply edits via Read / Edit / Write / Bash. Use the
    project's existing test command (configured in `continent-config.yaml`)
    to validate. No `claude -p` invocations are allowed at any point.
 
-4. **(Post-stub) Update the gradient gauge**. Call
+6. **(Post-stub) Update the gradient gauge**. Call
    `mcp__paintress__paintress_update_gradient` with `{"delta": <signed>}`
    to record success (+1) or failure (-1). The response is currently
    a stub that echoes the delta as `new_level`.
 
-5. **(Post-stub) Append the journal entry**. Call
+7. **(Post-stub) Append the journal entry**. Call
    `mcp__paintress__paintress_append_journal` with the expedition
    metadata (expedition number / issue_id / status / pr_url / etc.).
    Phase 1 stub echoes the entry without persisting; the real wiring
