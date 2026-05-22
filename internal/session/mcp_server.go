@@ -67,10 +67,11 @@ func (s *MCPServer) WithContinent(continent string) *MCPServer {
 // WithEmitter wires the usecase ExpeditionEventEmitter used to emit
 // EventGradientChanged / EventExpeditionCompleted from
 // paintress.update_gradient / paintress.append_journal
-// (refs/issues/0027 Phase 4 follow-up #4). Passing nil keeps the tools
-// in preview-only / filesystem-only mode, preserving the Phase 3
-// contract. cmd composition root constructs a real emitter; tests
-// pass nil to keep emission opt-in.
+// (refs/issues/0027 Phase 4 follow-up #4). The cmd composition root
+// always wires a real emitter, so production calls persist events.
+// Passing nil falls back to preview-only (update_gradient) /
+// filesystem-only (append_journal), which tests use to keep emission
+// opt-in.
 //
 // LLM firing remains human-initiated: emission happens only when the
 // claude-code session calls the MCP tool.
@@ -198,7 +199,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "paintress.update_gradient",
-			"description": "Read current gradient_level from event store + preview the new level after applying delta. Phase 3 is preview-only (= no persistence); Phase 4 follow-up wires the EventGradientChanged emit chain.",
+			"description": "Read current gradient_level from the event store, apply delta, and persist an EventGradientChanged event (persistence='event-store'). Returns current_level + new_level. Falls back to a preview without persisting when no emitter is wired.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -209,7 +210,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "paintress.append_journal",
-			"description": "Persist an ExpeditionReport to journal/<NNN>.md + pr-index. Phase 3 is filesystem-only; EventExpeditionCompleted emission deferred to Phase 4 follow-up.",
+			"description": "Persist an ExpeditionReport to journal/<NNN>.md + pr-index and emit an EventExpeditionCompleted event (persistence='event-store+filesystem'). Falls back to filesystem-only when no emitter is wired.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -304,13 +305,12 @@ func realNextIssue(continent string) map[string]any {
 }
 
 // realUpdateGradient reads the current GradientLevel via the event
-// store + projection and returns a preview of (current + delta). It
-// does NOT emit a new EventGradientChanged event — full event
-// emission requires the aggregate + emitter chain which is wired in a
-// follow-up commit (= Phase 4). The session uses this preview to
-// decide whether to call paintress.append_journal (which currently
-// persists the journal entry to filesystem only; full event emission
-// is also follow-up).
+// store + projection, applies the delta, and emits an
+// EventGradientChanged via the injected emitter (Phase 4 follow-up #4,
+// persistence='event-store'). When no emitter is wired (tests /
+// opt-out), it returns a preview of (current + delta) without
+// persisting. The session can re-read the new level via the next
+// projection.
 //
 // continent is the project root from MCPServer.WithContinent. When
 // empty the response signals uninitialized so the session aborts.
@@ -377,12 +377,12 @@ func realUpdateGradient(ctx context.Context, continent string, emitter port.Expe
 }
 
 // realAppendJournal writes the expedition report to the journal
-// directory and pr-index file (= filesystem-only) via the existing
-// WriteJournal / WritePRIndex helpers. It does NOT emit a
-// EventExpeditionCompleted event yet — that requires the aggregate +
-// emitter chain (Phase 4 follow-up). For Phase 3 the contract is
-// "journal file is on disk, PR index is appended". The session can
-// re-read the new state via paintress.next_issue.
+// directory and pr-index file via the existing WriteJournal /
+// WritePRIndex helpers, then emits an EventExpeditionCompleted via the
+// injected emitter (Phase 4 follow-up #4, persistence=
+// 'event-store+filesystem'). When no emitter is wired (tests /
+// opt-out), it persists filesystem-only. The session can re-read the
+// new state via paintress.next_issue.
 //
 // continent is the project root from MCPServer.WithContinent. When
 // empty the response signals uninitialized so the session aborts.
