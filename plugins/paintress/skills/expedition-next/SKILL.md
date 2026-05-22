@@ -1,11 +1,11 @@
 ---
 name: expedition-next
 description: >-
-  Phase 1 MVP slash command for the paintress jun15 MCP pivot
-  (refs/issues/0027). Triggers when the user types "/expedition-next",
+  Slash command for the paintress expedition runner (refs/issues/0027
+  jun15 MCP pivot). Triggers when the user types "/expedition-next",
   asks to "pick the next paintress issue", "run one paintress expedition
   via MCP", or "test the paintress MCP server end-to-end". Drives the
-  paintress MCP server's stub tools (next_issue / update_gradient /
+  paintress MCP server's tools (next_issue / update_gradient /
   append_journal) from inside a human-initiated claude code interactive
   session so inference stays on the subscription quota rather than the
   Agent SDK credit pool that gates `claude -p` from 2026-06-15.
@@ -25,7 +25,7 @@ allowed-tools:
   - mcp__paintress__paintress_append_journal
 ---
 
-# /expedition-next — paintress MCP pivot Phase 1 MVP
+# /expedition-next — paintress expedition runner
 
 Human-initiated entry point. Drives the paintress MCP server's tools
 without ever invoking `claude -p`, so all inference happens inside
@@ -45,6 +45,11 @@ If `paintress mcp` is not on PATH, build it first:
 cd path/to/paintress && go build -o ./dist/paintress ./cmd/paintress
 ```
 
+`paintress mcp` must be started from the project root so it can resolve
+the continent (`.paintress/` journals + event store). The MCP server
+answers the `initialize` handshake, then exposes ping / next_issue /
+update_gradient / append_journal.
+
 ## Workflow
 
 1. **Verify MCP wiring**. Call `mcp__paintress__paintress_ping`. The
@@ -53,8 +58,8 @@ cd path/to/paintress && go build -o ./dist/paintress ./cmd/paintress
    `--mcp-config`.
 
 2. **Fetch journal state from paintress**. Call
-   `mcp__paintress__paintress_next_issue` with no arguments. Real impl
-   (Phase 3) returns paintress's local journal state:
+   `mcp__paintress__paintress_next_issue` with no arguments. It returns
+   paintress's local journal state from the event store:
 
    ```json
    {
@@ -82,21 +87,24 @@ cd path/to/paintress && go build -o ./dist/paintress ./cmd/paintress
    ids. Pick the highest-priority unstarted issue. If multiple have
    the same priority, prefer the oldest.
 
-5. **Implement the fix**. Read the issue body, plan the
-   change, and apply edits via Read / Edit / Write / Bash. Use the
-   project's existing test command (configured in `continent-config.yaml`)
-   to validate. No `claude -p` invocations are allowed at any point.
+4. **Implement the fix**. Read the issue body, plan the change, and
+   apply edits via Read / Edit / Write / Bash. Use the project's
+   existing test command (configured in `continent-config.yaml`) to
+   validate. No `claude -p` invocations are allowed at any point.
 
-6. **(Post-stub) Update the gradient gauge**. Call
+5. **Update the gradient gauge**. Call
    `mcp__paintress__paintress_update_gradient` with `{"delta": <signed>}`
-   to record success (+1) or failure (-1). The response is currently
-   a stub that echoes the delta as `new_level`.
+   to record success (+1) or failure (-1). The tool reads the current
+   level from the event store, applies the delta, and persists an
+   `EventGradientChanged` event (`persistence: "event-store"`),
+   returning `current_level` + `new_level`.
 
-7. **(Post-stub) Append the journal entry**. Call
+6. **Append the journal entry**. Call
    `mcp__paintress__paintress_append_journal` with the expedition
    metadata (expedition number / issue_id / status / pr_url / etc.).
-   Phase 1 stub echoes the entry without persisting; the real wiring
-   commit hooks this into the existing JournalEntry event sourcing.
+   The tool writes `journal/<NNN>.md` + the pr-index AND persists an
+   `EventExpeditionCompleted` event
+   (`persistence: "event-store+filesystem"`).
 
 ## What this skill must NOT do
 
@@ -108,29 +116,29 @@ cd path/to/paintress && go build -o ./dist/paintress ./cmd/paintress
 - Auto-trigger inference from a SessionStart hook or any other
   non-human-initiated path. The slash command typed by a human is
   the only valid entry to this workflow.
-- Emit a D-Mail by writing to `outbox/` directly. Use
-  `mcp__paintress__paintress_emit_dmail` once it lands in a later
-  commit; that tool encapsulates the transactional outbox + the
-  9-field schema fixed in refs 0027 §8.
+- Emit a D-Mail by writing to `outbox/` directly. D-Mail emission is
+  not exposed as an MCP tool in this skill's tool set; the gradient +
+  journal tools above are the canonical persistence paths. The D-Mail
+  9-field schema is fixed in refs 0027 §8.
 
-## Phase 1 MVP exit criteria
+## Done criteria
 
-This skill is considered Phase 1 MVP complete when:
+An `/expedition-next` run is complete when, in a real claude code
+session with the paintress MCP server attached:
 
-1. Calling `/expedition-next` in a real claude code session with the
-   paintress MCP server attached returns the stub responses from
-   steps 1-2 without error.
-2. The synthetic D-Mail contract test (= subsequent commit) drives a
-   fixture through `inbox/` and proves consume happens only when the
-   human types `/expedition-next`, never from a hook.
-3. `expedition.go`'s `claude -p` invocation is removed and the
-   semgrep transitional exclude on `internal/session/expedition.go`
-   is deleted (= the final commit on the `feat/jun15-mcp-pivot`
-   branch flips the lint gate from advisory to enforced).
+1. `ping` returns `pong` (handshake + tool dispatch verified).
+2. `next_issue` returns `initialized: true` with the journal state.
+3. The fix is implemented and validated against the project test command.
+4. `update_gradient` returns `persistence: "event-store"` and
+   `append_journal` returns `persistence: "event-store+filesystem"`,
+   so the expedition is durably recorded.
 
 ## Related
 
-- Canonical plan: `refs/HTMLification/docs/issues/0027-jun15-mcp-pivot.html`
+- Canonical plan: `refs/HTMLification/docs/archive/0027-jun15-mcp-pivot.html`
+- Pattern reference:
+  - paintress ADR 0017 (`~/tap/paintress/docs/adr/0017-mcp-pivot.md`) — MCP pivot
+  - paintress ADR 0018 (`~/tap/paintress/docs/adr/0018-mcp-pivot-helper-level-stub.md`) — helper-level stub
 - Billing boundary table: refs 0027 §5
 - Mechanical gate (semgrep rules): refs 0027 §6 + `.semgrep/jun15-no-headless-llm.yaml`
-- D-Mail 9-field schema (Phase 1 固定): refs 0027 §8
+- D-Mail 9-field schema: refs 0027 §8
