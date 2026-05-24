@@ -1,39 +1,19 @@
 ## paintress run
 
-Run the expedition loop
+Deprecated (jun15 MCP pivot): use claude code + /expedition-next skill
 
 ### Synopsis
 
-Run the expedition loop against a target repository.
+Deprecated by the jun15 MCP pivot (2026-06-15 credit-pool split).
 
-Each expedition picks a Linear issue, creates a worktree branch,
-invokes Claude Code to implement the change, opens a pull request,
-and optionally runs a review cycle. The loop continues until
-max-expeditions is reached or the issue queue is empty.
-
-If path is omitted, the current working directory is used.
+The autonomous expedition loop no longer drives a headless 'claude -p'
+invocation. Run expeditions from a claude code interactive session via
+the /expedition-next skill, which drives paintress's MCP tools
+(next_issue / update_gradient / append_journal). Start the data-plane
+server with 'paintress mcp'.
 
 ```
 paintress run [path] [flags]
-```
-
-### Examples
-
-```
-  # Run with defaults from current directory
-  paintress run
-
-  # Run with defaults (opus model, 50 expeditions, 33min timeout)
-  paintress run /path/to/repo
-
-  # Run with sonnet fallback and 3 parallel workers
-  paintress run --model opus,sonnet --workers 3 /path/to/repo
-
-  # Dry run (generate prompts only, no Claude invocation)
-  paintress run --dry-run /path/to/repo
-
-  # Skip dev server and use custom review command
-  paintress run --no-dev --review-cmd "pnpm lint" /path/to/repo
 ```
 
 ### Options

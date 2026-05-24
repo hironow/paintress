@@ -31,7 +31,7 @@ The Paintress — drives the Expedition loop for Claude Code.
 * [paintress mcp](paintress_mcp.md)	 - Run paintress as an MCP server over stdio (expedition journal/gradient data plane)
 * [paintress mcp-config](paintress_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
 * [paintress rebuild](paintress_rebuild.md)	 - Rebuild projections from event store
-* [paintress run](paintress_run.md)	 - Run the expedition loop
+* [paintress run](paintress_run.md)	 - Deprecated (jun15 MCP pivot): use claude code + /expedition-next skill
 * [paintress sessions](paintress_sessions.md)	 - Manage AI coding sessions
 * [paintress status](paintress_status.md)	 - Show paintress operational status
 * [paintress update](paintress_update.md)	 - Self-update paintress to the latest release

@@ -131,6 +131,11 @@ func TestRunCommand_NotifyApproveFlagsLongOnly(t *testing.T) {
 }
 
 func TestRunCmd_FailsWithoutInit(t *testing.T) {
+	// DEPRECATED (jun15 round-2): `paintress run` is now a deprecation stub
+	// (expeditions move to the /expedition-next skill + MCP tools). This test
+	// asserted the old init-guard behavior; it is removed with the orphaned
+	// expedition pipeline in round-3.
+	t.Skip("paintress run deprecated post jun15 MCP pivot (round-2); pipeline removal + this test deleted in round-3")
 	// given: empty directory with no .expedition/
 	dir := t.TempDir()
 
