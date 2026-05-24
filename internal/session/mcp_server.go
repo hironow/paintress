@@ -16,13 +16,14 @@ import (
 	"github.com/hironow/paintress/internal/usecase/port"
 )
 
-// MCPServer is a minimal stdio-based Model Context Protocol server
-// scaffolded for the refs/issues/0027 jun15 MCP pivot (Phase 1 MVP).
+// MCPServer is a stdio-based Model Context Protocol server for the
+// refs/issues/0027 jun15 MCP pivot.
 //
-// This is a SKELETON: only the paintress.ping health-check tool is
-// exposed. Real tools (paintress.next_issue, paintress.update_gradient,
-// paintress.append_journal, ...) ship in subsequent commits on the
-// feat/jun15-mcp-pivot branch.
+// All four tools are real implementations: paintress.ping (health
+// check), paintress.next_issue (reads journal + pr-index state), and
+// paintress.update_gradient + paintress.append_journal (persist
+// EventGradientChanged / EventExpeditionCompleted via the event store
+// when an emitter is wired; cmd wires one by default).
 //
 // Wire it into a claude code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
@@ -80,7 +81,7 @@ func (s *MCPServer) WithEmitter(emitter port.ExpeditionEventEmitter) *MCPServer 
 	return s
 }
 
-// jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this skeleton
+// jsonrpcMessage is the minimum JSON-RPC 2.0 envelope this server
 // understands. Method-specific params decode on demand from
 // Params (json.RawMessage).
 type jsonrpcMessage struct {
@@ -210,12 +211,12 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	return err
 }
 
-// toolDescriptors returns the Phase 1 MVP tool set. Each entry pins the
-// interface (name, description, inputSchema) so claude code clients see
-// a stable contract. next_issue / update_gradient / append_journal are
-// real impl as of Phase 3 (= read from pr-index / event store, write
-// to journal/ + pr-index filesystem). EventExpeditionCompleted +
-// EventGradientChanged emission is Phase 4 follow-up.
+// toolDescriptors returns the tool set. Each entry pins the interface
+// (name, description, inputSchema) so claude code clients see a stable
+// contract. next_issue / update_gradient / append_journal are real
+// impl: they read pr-index / event store and write journal/ + pr-index;
+// update_gradient / append_journal also emit EventGradientChanged /
+// EventExpeditionCompleted when an emitter is wired (cmd wires one).
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{

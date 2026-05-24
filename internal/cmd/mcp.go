@@ -17,12 +17,13 @@ import (
 // paintress tools from inside the human-initiated subscription quota.
 //
 // continent is resolved from the cwd (= operator launches `paintress
-// mcp` from the project root). real-impl tools (= paintress.next_issue)
-// use this to read journal / pr-index state. ping is continent-agnostic.
+// mcp` from the project root). The real-impl tools (next_issue /
+// update_gradient / append_journal) use it to read/write journal /
+// pr-index / event-store state. ping is continent-agnostic.
 func newMCPCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "mcp",
-		Short: "Run paintress as an MCP server over stdio (refs/issues/0027 Phase 1 MVP)",
+		Short: "Run paintress as an MCP server over stdio (expedition journal/gradient data plane)",
 		Long: `Start a Model Context Protocol server reading JSON-RPC 2.0
 messages on stdin and writing responses on stdout.
 
@@ -38,10 +39,11 @@ number. The claude code session itself queries linear-mcp for raw
 issue data and uses paintress.next_issue's completed_issue_ids to
 exclude already-done work.
 
-Phase 1 MVP scope (Phase 3 real impl): paintress.ping + real
-paintress.next_issue + 2 remaining stubs (paintress.update_gradient,
-paintress.append_journal). Real wiring for the 2 stubs ships in
-subsequent commits.`,
+Exposes paintress.ping, paintress.next_issue (reads journal +
+pr-index to surface completed issue ids + next expedition number),
+and paintress.update_gradient + paintress.append_journal (persist
+gradient / expedition-completed events to the event store, with a
+journal/ + pr-index filesystem write).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			continent, err := os.Getwd()
 			if err != nil {

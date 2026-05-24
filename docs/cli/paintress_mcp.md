@@ -1,6 +1,6 @@
 ## paintress mcp
 
-Run paintress as an MCP server over stdio (refs/issues/0027 Phase 1 MVP)
+Run paintress as an MCP server over stdio (expedition journal/gradient data plane)
 
 ### Synopsis
 
@@ -19,10 +19,11 @@ number. The claude code session itself queries linear-mcp for raw
 issue data and uses paintress.next_issue's completed_issue_ids to
 exclude already-done work.
 
-Phase 1 MVP scope (Phase 3 real impl): paintress.ping + real
-paintress.next_issue + 2 remaining stubs (paintress.update_gradient,
-paintress.append_journal). Real wiring for the 2 stubs ships in
-subsequent commits.
+Exposes paintress.ping, paintress.next_issue (reads journal +
+pr-index to surface completed issue ids + next expedition number),
+and paintress.update_gradient + paintress.append_journal (persist
+gradient / expedition-completed events to the event store, with a
+journal/ + pr-index filesystem write).
 
 ```
 paintress mcp [flags]
