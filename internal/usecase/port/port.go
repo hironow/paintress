@@ -286,12 +286,6 @@ func (*NopExpeditionEventEmitter) EmitCheckpoint(_ int, _, _ string, _ int, _ ti
 	return nil
 }
 
-// ProjectOps handles project configuration and issue fetching.
-type ProjectOps interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port interface cluster cohesive set; see CheckpointScanner [permanent]
-	LoadProjectConfig(absPath string) (*domain.ProjectConfig, error)
-	FetchIssuesViaMCP(ctx context.Context, runner ProviderRunner, team, project, workDir string) ([]domain.Issue, error)
-}
-
 // DoctorOps runs diagnostic checks.
 type DoctorOps interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port interface cluster cohesive set; see CheckpointScanner [permanent]
 	RunDoctor(ctx context.Context, claudeCmd string, continent string, repair bool, mode domain.TrackingMode) []domain.DoctorCheck

@@ -19,7 +19,6 @@ func TestNewRegistry_LoadsAllPrompts(t *testing.T) {
 		"expedition_en",
 		"expedition_fr",
 		"expedition_ja",
-		"fetch_issues",
 		"follow_up",
 		"mission_en_linear",
 		"mission_en_wave",
@@ -188,37 +187,6 @@ func TestRegistry_FollowUpMatchesLegacy(t *testing.T) {
 	} {
 		if !strings.Contains(result, want) {
 			t.Errorf("follow_up output missing expected fragment: %q", want)
-		}
-	}
-}
-
-func TestRegistry_FetchIssuesMatchesLegacy(t *testing.T) {
-	// given
-	reg, err := NewRegistry()
-	if err != nil {
-		t.Fatalf("NewRegistry() error: %v", err)
-	}
-
-	// when
-	result, err := reg.Expand("fetch_issues", map[string]string{
-		"team":           `"TEAM"`,
-		"project_clause": ` for project "MyProject"`,
-		"output_path":    "/tmp/issues.json",
-	})
-	if err != nil {
-		t.Fatalf("Expand() error: %v", err)
-	}
-
-	// then
-	for _, want := range []string{
-		"mcp__linear__list_issues",
-		`"TEAM"`,
-		`for project "MyProject"`,
-		"/tmp/issues.json",
-		"JSON array",
-	} {
-		if !strings.Contains(result, want) {
-			t.Errorf("fetch_issues output missing expected fragment: %q", want)
 		}
 	}
 }
