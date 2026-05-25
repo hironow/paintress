@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 	"github.com/hironow/paintress/internal/session"
 )
@@ -203,43 +202,6 @@ func TestScanJournalsForLumina_EmptyMission(t *testing.T) {
 		}
 	}
 	// If no lumina was created, that's also acceptable for empty mission
-}
-
-// ═══════════════════════════════════════════════
-// Expedition Edge Cases
-// ═══════════════════════════════════════════════
-
-func TestExpedition_BuildPrompt_ZeroNumber(t *testing.T) {
-	e := &session.Expedition{
-		Number:    0,
-		Continent: "/tmp",
-		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  harness.NewGradientGauge(5),
-		Reserve:   harness.NewReserveParty("opus", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	prompt := e.BuildPrompt()
-	if !strings.Contains(prompt, "Expedition #0") {
-		t.Error("should handle expedition number 0")
-	}
-}
-
-func TestExpedition_BuildPrompt_EmptyConfig(t *testing.T) {
-	e := &session.Expedition{
-		Number:    1,
-		Continent: "",
-		Config:    domain.Config{}, // all empty
-		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  harness.NewGradientGauge(5),
-		Reserve:   harness.NewReserveParty("", nil, platform.NewLogger(io.Discard, false)),
-	}
-
-	// Should not panic with empty config
-	prompt := e.BuildPrompt()
-	if prompt == "" {
-		t.Error("prompt should not be empty even with empty config")
-	}
 }
 
 // ═══════════════════════════════════════════════

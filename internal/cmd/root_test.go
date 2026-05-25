@@ -83,68 +83,22 @@ func TestNewRootCommand_HasSubcommands(t *testing.T) {
 	// when
 	subs := root.Commands()
 
-	// then: expect 6 subcommands
+	// then: data-plane subcommands are registered (run/issues removed in jun15 MCP pivot)
 	names := make(map[string]bool)
 	for _, s := range subs {
 		names[s.Name()] = true
 	}
-	want := []string{"run", "init", "doctor", "issues", "archive-prune", "version", "update"}
+	want := []string{"init", "doctor", "status", "archive-prune", "version", "update", "mcp", "sessions"}
 	for _, name := range want {
 		if !names[name] {
 			t.Errorf("subcommand %q not registered", name)
 		}
 	}
-}
-
-func TestNewRootCommand_BarePathDelegatesToRun(t *testing.T) {
-	// given — a bare repo path (no "run" subcommand), using NeedsDefaultRun
-	args := []string{"/nonexistent/repo"}
-	root := cmd.NewRootCommand()
-	buf := new(bytes.Buffer)
-	root.SetOut(buf)
-	root.SetErr(buf)
-
-	if cmd.NeedsDefaultRun(root, args) {
-		root.SetArgs(append([]string{"run"}, args...))
-	} else {
-		root.SetArgs(args)
-	}
-
-	// when
-	err := root.Execute()
-
-	// then — should fail with a run-related error, NOT "unknown command"
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if strings.Contains(err.Error(), "unknown command") {
-		t.Errorf("got 'unknown command' error, expected delegation to run: %v", err)
-	}
-}
-
-func TestNewRootCommand_RunFlagsWithoutSubcommand(t *testing.T) {
-	// given — run-specific flags without "run" subcommand
-	args := []string{"--model", "opus", "/nonexistent/repo"}
-	root := cmd.NewRootCommand()
-	buf := new(bytes.Buffer)
-	root.SetOut(buf)
-	root.SetErr(buf)
-
-	if cmd.NeedsDefaultRun(root, args) {
-		root.SetArgs(append([]string{"run"}, args...))
-	} else {
-		root.SetArgs(args)
-	}
-
-	// when
-	err := root.Execute()
-
-	// then — should fail with a run-related error, NOT "unknown flag"
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if strings.Contains(err.Error(), "unknown flag") {
-		t.Errorf("got 'unknown flag' error, expected delegation to run: %v", err)
+	// run / issues were retired by the jun15 MCP pivot.
+	for _, name := range []string{"run", "issues"} {
+		if names[name] {
+			t.Errorf("subcommand %q should be removed (jun15 MCP pivot)", name)
+		}
 	}
 }
 
