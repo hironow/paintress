@@ -19,9 +19,8 @@
 ## CLI Reference
 
 - [paintress](cli/paintress.md) — Root command
+- [paintress mcp](cli/paintress_mcp.md) — Run the MCP server over stdio (expedition journal/gradient data plane)
 - [paintress init](cli/paintress_init.md) — Initialize project configuration
-- [paintress run](cli/paintress_run.md) — Run the expedition loop
-- [paintress issues](cli/paintress_issues.md) — List Linear issues via Claude MCP
 - [paintress status](cli/paintress_status.md) — Show operational status
 - [paintress config](cli/paintress_config.md) — View or update project configuration
 - [paintress config show](cli/paintress_config_show.md) — Show current configuration

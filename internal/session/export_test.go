@@ -20,7 +20,6 @@ var ExportShellName = shellName
 var ExportShellFlag = shellFlag
 var ExportExtractValue = extractValue
 var ExportParseKV = parseKV
-var ExportReconcileFlags = reconcileFlags
 var ExportCheckClaudeAuth = checkClaudeAuth
 var ExportCheckLinearMCP = checkLinearMCP
 var ExportCheckContinent = checkContinent
@@ -80,14 +79,4 @@ func ExportNewLocalGitExecutor() port.GitExecutor {
 // ExportInitGitRepoForWorktreeWithCommit wraps initGitRepoForWorktreeWithCommit for external tests.
 func ExportInitGitRepoForWorktreeWithCommit(t *testing.T) string {
 	return initGitRepoForWorktreeWithCommit(t)
-}
-
-// ExportCorrectionMetadataForReport wraps correctionMetadataForReport for external tests.
-func ExportCorrectionMetadataForReport(report *domain.ExpeditionReport, expedition *Expedition) domain.CorrectionMetadata {
-	return correctionMetadataForReport(report, expedition)
-}
-
-// ExportAnnotateReportDMail wraps annotateReportDMail for external tests.
-func ExportAnnotateReportDMail(mail *domain.DMail, report *domain.ExpeditionReport, expedition *Expedition) {
-	annotateReportDMail(mail, report, expedition)
 }

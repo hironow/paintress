@@ -8,7 +8,6 @@ import (
 
 	"github.com/hironow/paintress/internal/domain"
 	"github.com/hironow/paintress/internal/platform"
-	"github.com/hironow/paintress/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -26,10 +25,9 @@ var loggerKey loggerKeyType
 // shutdownTracer holds the OTel tracer shutdown function registered by
 // PersistentPreRunE. cobra.OnFinalize calls it after Execute completes.
 var (
-	shutdownTracer  func(context.Context) error
-	shutdownMeter   func(context.Context) error
-	sharedStreamBus interface{ Close() }
-	finalizerOnce   sync.Once
+	shutdownTracer func(context.Context) error
+	shutdownMeter  func(context.Context) error
+	finalizerOnce  sync.Once
 )
 
 func init() {
@@ -41,8 +39,8 @@ func init() {
 func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:     "paintress",
-		Short:   "Claude Code expedition orchestrator",
-		Long:    "The Paintress — drives the Expedition loop for Claude Code.",
+		Short:   "Expedition journal/gradient MCP data plane",
+		Long:    "The Paintress — exposes the expedition journal/gradient data plane over MCP for a claude code interactive session (jun15 MCP pivot).",
 		Version: Version,
 		// Silence usage on RunE errors (cobra prints usage by default on error)
 		SilenceUsage:  true,
@@ -71,19 +69,6 @@ func NewRootCommand() *cobra.Command {
 			spanCtx := startRootSpan(ctx, cmd.Name())
 			cmd.SetContext(spanCtx)
 
-			// StreamBus: process-wide live session event bus.
-			streamBus := platform.NewInProcessSessionBus()
-			session.SetStreamBus(streamBus)
-			sharedStreamBus = streamBus
-
-			// Production subscriber: bridge stream events to logger.
-			sub := streamBus.Subscribe(64)
-			go func() {
-				for ev := range sub.C() {
-					logger.Debug("stream: %s [%s] session=%s", ev.Type, ev.Tool, ev.SessionID)
-				}
-			}()
-
 			return nil
 		},
 	}
@@ -91,9 +76,6 @@ func NewRootCommand() *cobra.Command {
 	finalizerOnce.Do(func() {
 		cobra.OnFinalize(func() {
 			endRootSpan()
-			if sharedStreamBus != nil {
-				sharedStreamBus.Close()
-			}
 			if shutdownMeter != nil {
 				shutdownMeter(context.Background())
 			}
@@ -112,11 +94,9 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().Bool("linear", false, "Use Linear MCP for issue tracking (default: wave-centric mode)")
 
 	rootCmd.AddCommand(
-		newRunCommand(),
 		newInitCommand(),
 		newDoctorCommand(),
 		newStatusCommand(),
-		newIssuesCommand(),
 		newArchivePruneCommand(),
 		newCleanCommand(),
 		newRebuildCommand(),

@@ -1,23 +1,21 @@
 # Paintress
 
-**An autonomous expedition loop that picks Linear issues, implements code changes, opens PRs, and iterates through review cycles until the backlog is drained.**
+**An MCP server + data plane for the Expedition workflow: it serves the expedition journal/gradient read models from the session's continent dir and persists expedition-completed / gradient events.**
 
-Paintress uses [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to automatically process Linear issues — implementing code, running tests, creating PRs, running code reviews, verifying UI, and fixing bugs — with no human intervention, until every issue is done. In Swarm Mode (`--workers N`), multiple expeditions run in parallel using git worktrees for isolation.
+Following the jun15 MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Paintress the Go CLI is now a pure data plane: it serves completed-issue ids and the next expedition number over MCP, persists gradient + expedition-completed events to the event store, and provides the supporting data-plane commands (init, doctor, status, sessions, archive-prune, ...). The headless autonomous loop — the `claude --print` subprocess, swarm worktree pool, review gate, gommage recovery, and D-Mail composition — has been retired. The Expedition workflow now fires from the claude-code session via the `/expedition-next` skill and the paintress MCP tools (see `plugins/paintress/skills/expedition-next/SKILL.md`).
 
 ```bash
-paintress --model opus,sonnet ./your-repo
+paintress mcp
 ```
 
-This single command makes Paintress repeat the following cycle:
+`paintress mcp` starts the MCP server (over stdio, embedded via `--mcp-config`). Its tools expose:
 
-1. Fetch an unfinished issue from Linear
-2. Analyze it and determine the mission type: implement / verify / fix
-3. Claude Code creates a branch, implements, tests, opens a PR
-4. Run code review gate — review comments trigger automatic fixes (up to 3 cycles)
-5. Record results, move to the next issue
-6. Stop when all issues are complete or max expeditions reached
-7. Enter D-Mail waiting mode — monitor inbox/ via fsnotify for incoming D-Mails
-8. On D-Mail arrival, re-run the expedition loop; on timeout (default 30m), exit
+1. `paintress.ping` — health check
+2. `paintress.next_issue` — reads `pr-index.jsonl` + `journal/` to surface completed issue ids + the next expedition number
+3. `paintress.update_gradient` — persists a gradient-changed event to the event store
+4. `paintress.append_journal` — persists an expedition-completed event (journal + pr-index write)
+
+The claude-code session reads these read models, runs the expedition itself (implement / verify / fix, branch + PR), and writes report D-Mails to `outbox/` via the skill workflow — paintress no longer drives the LLM or composes D-Mails. Inference stays on the session's subscription quota rather than crossing into the Agent SDK credit pool that gates `claude --print` from 2026-06-15.
 
 ## Why "Paintress"?
 
@@ -234,27 +232,16 @@ When `--workers 0`, no pool is created and expeditions run directly on the repos
 | Inbox watcher | fsnotify: detect d-mails arriving mid-expedition | D-Mail courier |
 | Timeout watchdog | context.WithTimeout | Gommage (time's up) |
 
-## Code Review Gate
-
-After a successful Expedition creates a PR, Paintress runs an automated code review via a configurable command (default: `codex review --base main`). The review tool is customizable via `--review-cmd` and can be any linter, code review tool, or custom script. The review runs outside the LLM context window to avoid polluting the Expedition's Canvas.
-
-- **Pass**: Review finds no actionable issues → proceed to next Expedition
-- **Fail**: Review comments tagged `[P0]`–`[P4]` are detected → Claude Code resumes the Expedition session (`--continue`) to fix them, reusing full implementation context
-- **Retry**: Up to 3 review-fix cycles per Expedition; unresolved insights are recorded in the journal
-- **Timeout**: The entire review loop is bounded by the expedition timeout (`--timeout`)
-- **Rate limit / error**: Review is skipped gracefully (logged as WARN, does not block the loop)
-
-The review command is customizable via `--review-cmd`. Set to empty string (`--review-cmd ""`) to disable.
-
 ## Scope
 
-**What Paintress does:**
+**What Paintress does (post jun15 MCP pivot):**
 
-- Autonomously pick Linear issues and implement code changes via Claude Code
-- Create branches, run tests, open PRs, and iterate through code review cycles
-- Manage parallel expeditions in isolated git worktrees (Swarm Mode)
-- Send report D-Mails to downstream tools after successful expeditions
-- Enter D-Mail waiting mode after expeditions complete, re-running on incoming D-Mails
+- Serve the expedition journal/gradient read models over MCP (`next_issue`) to a claude-code session
+- Persist gradient-changed + expedition-completed events to the event store (`update_gradient` / `append_journal`)
+- Provide the supporting data-plane commands (init, doctor, status, sessions, archive-prune, rebuild, dead-letters)
+- Generate the claude-code MCP wiring (`mcp-config generate`)
+
+The expedition workflow itself (pick an issue, implement, test, open a PR, send report D-Mails) now runs inside the claude-code session via the `/expedition-next` skill — paintress no longer drives the LLM, runs a swarm worktree pool, or composes D-Mails.
 
 **What Paintress does NOT do:**
 
@@ -296,21 +283,22 @@ on startup and removes them on shutdown. No manual `git worktree` commands neede
 
 ## Subcommands
 
-Running `paintress` without a subcommand defaults to `run` (expedition loop).
+The headless `run` and `issues` subcommands were retired by the jun15 MCP pivot. The expedition workflow now runs from a claude-code session via the `/expedition-next` skill + the `paintress mcp` data-plane server.
 
 | Command | Description |
 |---------|-------------|
-| `run` | Run expedition loop (default) |
+| `mcp` | Run the MCP server over stdio (expedition journal/gradient data plane) |
 | `init` | Initialize `.expedition/config.yaml` |
 | `doctor` | Check environment health |
-| `issues` | Query Linear issues via Claude MCP |
+| `sessions` / `sessions enter` / `sessions list` | Inspect and enter recorded coding sessions |
 | `config show` / `config set` | View or update configuration |
 | `status` | Show operational status |
 | `clean` | Remove state directory |
 | `rebuild` | Rebuild projections from event store |
 | `archive-prune` | Prune old archived D-Mail files |
+| `dead-letters` | Inspect / purge dead-letter D-Mails |
 | `version` | Print version info |
-| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for subprocess isolation |
+| `mcp-config generate` | Generate `.mcp.json` and `.claude/settings.json` for the claude-code session |
 | `update` | Self-update to the latest release |
 
 All commands accept an optional `[path]` argument (defaults to cwd). For flags, examples, and full reference per subcommand, see [docs/cli/](docs/cli/).
@@ -319,11 +307,11 @@ All commands accept an optional `[path]` argument (defaults to cwd). For flags, 
 
 ```bash
 paintress init                          # set up .expedition/
-paintress mcp-config generate           # Claude subprocess isolation settings
-paintress run                           # expedition loop
-paintress run -n                        # dry run
-paintress run -m opus,sonnet -w 3       # swarm mode
+paintress mcp-config generate           # claude-code MCP wiring
+paintress mcp                           # start the data-plane MCP server (embed via --mcp-config)
 ```
+
+Then run the Expedition workflow from a claude-code session via the `/expedition-next` skill.
 
 ## Configuration
 
@@ -337,8 +325,8 @@ Paintress instruments key operations (expedition, review loop, worktree pool, de
 # Start Jaeger (all-in-one trace viewer)
 docker compose -f docker/compose.yaml up -d
 
-# Run paintress with tracing enabled
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress run
+# Run the paintress MCP server with tracing enabled
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 paintress mcp
 
 # View traces at http://localhost:16686
 ```

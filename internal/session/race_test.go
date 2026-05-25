@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/hironow/paintress/internal/domain"
-	"github.com/hironow/paintress/internal/harness"
 	"github.com/hironow/paintress/internal/platform"
 )
 
@@ -134,47 +133,6 @@ func TestRace_DevServer_ConcurrentFieldAccess(t *testing.T) {
 			ds.mu.Lock() // nosemgrep: adr0005-mutex-lock-without-defer-unlock -- intentional short critical section with explicit Unlock [permanent]
 			_ = ds.running
 			ds.mu.Unlock()
-		}()
-	}
-	wg.Wait()
-}
-
-// === Expedition: Streaming + Reserve integration ===
-
-func TestRace_Expedition_ConcurrentReserveCheck(t *testing.T) {
-	dir := t.TempDir()
-	rp := harness.NewReserveParty("opus", []string{"sonnet"}, platform.NewLogger(io.Discard, false))
-	g := harness.NewGradientGauge(5)
-
-	e := &Expedition{
-		Number:    1,
-		Continent: dir,
-		Config:    domain.Config{BaseBranch: "main", DevURL: "http://localhost:3000"},
-		Logger:    platform.NewLogger(io.Discard, false),
-		Gradient:  g,
-		Reserve:   rp,
-	}
-
-	var wg sync.WaitGroup
-
-	// Simulate concurrent access: BuildPrompt + Reserve ops + Gradient ops
-	for i := 0; i < 20; i++ {
-		wg.Add(4)
-		go func() {
-			defer wg.Done()
-			_ = e.BuildPrompt()
-		}()
-		go func() {
-			defer wg.Done()
-			rp.CheckOutput("normal output")
-		}()
-		go func() {
-			defer wg.Done()
-			_ = rp.ActiveModel()
-		}()
-		go func() {
-			defer wg.Done()
-			g.Charge()
 		}()
 	}
 	wg.Wait()

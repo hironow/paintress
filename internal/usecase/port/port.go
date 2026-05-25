@@ -229,12 +229,6 @@ type FeedbackActionHandler interface { // nosemgrep: structure.multiple-exported
 	HandleFeedbackAction(ctx context.Context, dm domain.DMail, workDir string, remaining time.Duration)
 }
 
-// FollowUpRunner executes follow-up expeditions triggered by D-Mail feedback.
-// Implemented in session layer (Claude CLI subprocess), injected into usecase by cmd.
-type FollowUpRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port interface cluster cohesive set; see CheckpointScanner [permanent]
-	RunFollowUp(ctx context.Context, dmails []domain.DMail, workDir string, remaining time.Duration)
-}
-
 // InboxArchiver archives consumed inbox D-Mails to the archive directory.
 // Implemented in session layer (filesystem I/O), injected into usecase by cmd.
 type InboxArchiver interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port interface cluster cohesive set; see CheckpointScanner [permanent]
@@ -290,16 +284,6 @@ func (*NopExpeditionEventEmitter) EmitGommageRecovery(_ int, _, _ string, _ int,
 }
 func (*NopExpeditionEventEmitter) EmitCheckpoint(_ int, _, _ string, _ int, _ time.Time) error {
 	return nil
-}
-
-// ExpeditionRunner wraps the session-layer expedition orchestrator.
-type ExpeditionRunner interface { // nosemgrep: structure.multiple-exported-interfaces-go -- port interface cluster cohesive set; see CheckpointScanner [permanent]
-	SetEmitter(emitter ExpeditionEventEmitter)
-	SetPreFlightTriager(triager PreFlightTriager)
-	SetFeedbackHandler(handler FeedbackActionHandler)
-	SetTargetProvider(tp TargetProvider)
-	SetTrackingMode(mode domain.TrackingMode)
-	Run(ctx context.Context) int
 }
 
 // ProjectOps handles project configuration and issue fetching.

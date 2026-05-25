@@ -9,7 +9,8 @@ Initialize a .expedition/ directory in the target repository.
 If path is omitted, the current working directory is used.
 Use --team and --project flags for non-interactive mode, or omit
 flags for interactive prompts. This must be run once before
-'paintress run' can operate on the repository.
+the paintress MCP data plane ('paintress mcp') can operate on
+the repository.
 
 ```
 paintress init [path] [flags]
@@ -54,5 +55,5 @@ paintress init [path] [flags]
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Expedition journal/gradient MCP data plane
 

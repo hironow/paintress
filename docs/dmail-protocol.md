@@ -156,7 +156,13 @@ D-mails arriving mid-expedition are detected by `watchInbox` (fsnotify) and logg
 
 ## HIGH Severity Gate
 
-When inbox contains `high` severity d-mails, paintress runs a pre-flight gate:
+> Note: the headless pre-flight HIGH-severity gate that ran inside the
+> autonomous expedition loop was retired with the jun15 MCP pivot. The
+> `Notifier` / `Approver` ports below remain in the codebase and back the
+> sessions / approval flows; severity-aware gating now happens inside the
+> claude-code session that drives the expedition workflow.
+
+The gate combines two ports:
 
 1. `Notifier.Notify()` — Desktop notification (fire-and-forget)
 2. `Approver.RequestApproval()` — Blocking approval request
