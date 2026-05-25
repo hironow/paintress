@@ -26,6 +26,6 @@ Inspect and purge outbox items that have exceeded the maximum retry count.
 
 ### SEE ALSO
 
-* [paintress](paintress.md)	 - Claude Code expedition orchestrator
+* [paintress](paintress.md)	 - Expedition journal/gradient MCP data plane
 * [paintress dead-letters purge](paintress_dead-letters_purge.md)	 - Purge dead-lettered outbox items
 

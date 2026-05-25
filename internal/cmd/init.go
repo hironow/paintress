@@ -21,7 +21,8 @@ func newInitCommand() *cobra.Command {
 If path is omitted, the current working directory is used.
 Use --team and --project flags for non-interactive mode, or omit
 flags for interactive prompts. This must be run once before
-'paintress run' can operate on the repository.`,
+the paintress MCP data plane ('paintress mcp') can operate on
+the repository.`,
 		Example: `  # Initialize current directory
   paintress init
 
