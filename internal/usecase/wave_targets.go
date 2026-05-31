@@ -40,7 +40,7 @@ func (p *waveTargetProvider) FetchTargets(ctx context.Context) ([]domain.Expedit
 	// Conflict rebase unblocks merge → convergence progresses.
 	standalone, sErr := p.collectWavelessFeedbackTargets(ctx)
 	if sErr != nil {
-		return progress.PendingTargets(), nil // non-fatal: fall back to wave targets only
+		return progress.PendingTargets(), nil //nolint:nilerr // non-fatal: fallback to wave targets only
 	}
 	targets := standalone
 	targets = append(targets, progress.PendingTargets()...)
