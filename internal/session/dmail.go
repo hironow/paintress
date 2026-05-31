@@ -37,7 +37,8 @@ func SendDMail(ctx context.Context, store port.OutboxStore, d domain.DMail, emit
 		return fmt.Errorf("dmail: actor type: %w", err)
 	}
 	d.Metadata = metadata
-	if err := harness.ValidateDMail(d); err != nil {
+	err = harness.ValidateDMail(d)
+	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.dmail"))
 		return fmt.Errorf("dmail: validate: %w", err)
@@ -50,7 +51,8 @@ func SendDMail(ctx context.Context, store port.OutboxStore, d domain.DMail, emit
 	}
 
 	filename := d.Name + ".md"
-	if err := store.Stage(ctx, filename, data); err != nil {
+	err = store.Stage(ctx, filename, data)
+	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.dmail"))
 		return fmt.Errorf("dmail: stage: %w", err)
