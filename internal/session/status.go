@@ -60,7 +60,7 @@ func applyLatestProviderMetadata(ctx context.Context, stateDir string, report *d
 	if err != nil {
 		return
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	records, err := store.List(ctx, port.ListSessionOpts{Limit: 1})
 	if err != nil || len(records) == 0 {
 		return

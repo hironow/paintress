@@ -81,7 +81,7 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 	initTestRepo(t, ctx, c, dir)
 
 	skillsDir := fmt.Sprintf("%s/.expedition/skills", dir)
-	
+
 	// List skills inside container to find subdirectory names (like "dmail-sendable")
 	// For testing, we can just delete SKILL.md under all subdirectories of skills directory
 	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("rm -f %s/*/SKILL.md", skillsDir)})

@@ -81,7 +81,7 @@ func WritePRIndex(continent string, report *domain.ExpeditionReport) error {
 	if err != nil {
 		return fmt.Errorf("pr index: open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = f.Write(data)
 	return err
 }

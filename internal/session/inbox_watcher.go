@@ -24,14 +24,14 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm domain
 		return
 	}
 
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher() // nosemgrep: adr0005-fsnotify-watcher-without-close -- watcher is closed in the goroutine owning the event loop [permanent]
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.inbox"))
 		span.SetAttributes(attribute.Int("inbox.watch.event.count", 0))
 		return
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	if err := watcher.Add(inboxDir); err != nil {
 		span.RecordError(err)

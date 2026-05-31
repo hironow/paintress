@@ -113,7 +113,7 @@ func ParseReport(output string, expNum int) (*ExpeditionReport, ReportStatus) {
 		case "remaining_issues":
 			report.Remaining = val
 		case "bugs_found":
-			fmt.Sscanf(val, "%d", &report.BugsFound)
+			_, _ = fmt.Sscanf(val, "%d", &report.BugsFound)
 		case "bug_issues":
 			report.BugIssues = val
 		case "insight":

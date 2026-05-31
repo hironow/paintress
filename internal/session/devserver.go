@@ -75,7 +75,7 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	// Check if dev server is already running externally
 	client := &http.Client{Timeout: 2 * time.Second}
 	if resp, err := client.Get(ds.url); err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		ds.setRunning(true)
 		span.AddEvent("devserver.ready", trace.WithAttributes(attribute.Bool("external", true)))
 		ds.logger.OK("%s", fmt.Sprintf(domain.Msg("devserver_already"), ds.url))
@@ -93,12 +93,12 @@ func (ds *DevServer) Start(ctx context.Context) error {
 	ds.process.Stderr = logFile
 
 	if err := ds.process.Start(); err != nil {
-		logFile.Close()
+		_ = logFile.Close()
 		return fmt.Errorf("dev server start failed: %w", err)
 	}
 
 	go func() {
-		defer logFile.Close()
+		defer func() { _ = logFile.Close() }()
 		_ = ds.process.Wait()
 		ds.setRunning(false)
 	}()
@@ -128,7 +128,7 @@ func (ds *DevServer) waitReady(ctx context.Context) error {
 		case <-ticker.C:
 			resp, err := client.Get(ds.url)
 			if err == nil {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return nil
 			}
 		}

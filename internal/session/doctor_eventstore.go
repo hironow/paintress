@@ -31,7 +31,7 @@ func checkDeadLetters(ctx context.Context, continent string) domain.DoctorCheck 
 			Message: "outbox store unavailable",
 		}
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 	count, err := store.DeadLetterCount(ctx)
 	if err != nil {
 		return domain.DoctorCheck{
@@ -99,7 +99,7 @@ func checkEventStore(continent string) domain.DoctorCheck {
 			}
 			lines++
 		}
-		f.Close()
+		_ = f.Close()
 		if err := scanner.Err(); err != nil {
 			return domain.DoctorCheck{
 				Name:    "events",
