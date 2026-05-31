@@ -54,7 +54,7 @@ func sendApprove(ctx context.Context, bot botAPI, channelID, message string, tim
 	if err := bot.Open(); err != nil {
 		return false, fmt.Errorf("failed to open Discord session: %w", err)
 	}
-	defer bot.Close()
+	defer func() { _ = bot.Close() }()
 
 	result := make(chan bool, 1)
 	var sentID atomic.Value // stores the sent message ID (string)

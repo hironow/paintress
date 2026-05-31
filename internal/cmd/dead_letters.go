@@ -76,7 +76,7 @@ func runDeadLettersPurge(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("open outbox store: %w", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	count, err := store.DeadLetterCount(cmd.Context())
 	if err != nil {
