@@ -147,7 +147,7 @@ func runSocketMode(ctx context.Context, sm *socketmode.Client, events chan<- soc
 			if !ok {
 				continue
 			}
-			sm.Ack(*evt.Request)
+			_ = sm.Ack(*evt.Request)
 
 			for _, action := range cb.ActionCallback.BlockActions {
 				select {
