@@ -53,6 +53,7 @@ func UpdateProjectConfig(continent string, key string, value string) error { // 
 	return SaveProjectConfig(continent, cfg)
 }
 
+//nolint:gocyclo // flat but wide field dispatch switch statement
 func setProjectConfigField(cfg *domain.ProjectConfig, key string, value string) error {
 	switch key {
 	case "tracker.team":

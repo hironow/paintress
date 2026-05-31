@@ -57,6 +57,7 @@ git-tracked, so deletions should be reviewed and committed.`,
 	return cmd
 }
 
+//nolint:gocyclo // CLI flags parsing and interactive prompts orchestration is flat but highly branched
 func runArchivePrune(cmd *cobra.Command, args []string) error {
 	execute := mustBool(cmd, "execute")
 	if execute && cmd.Flags().Changed("dry-run") {
