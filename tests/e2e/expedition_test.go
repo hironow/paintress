@@ -3,29 +3,24 @@
 package e2e
 
 import (
-	"errors"
-	"io/fs"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"context"
+	"fmt"
 	"testing"
 )
 
 // TestE2E_PaintressInit verifies that `paintress init` creates the expected
 // directory structure in a clean working directory.
 func TestE2E_PaintressInit(t *testing.T) {
-	dir := t.TempDir()
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_paintress_init"
 
-	// given: a git repository
-	git := exec.Command("git", "init", dir)
-	if err := git.Run(); err != nil {
-		t.Fatalf("git init: %v", err)
-	}
+	// given: a git repository inside container
+	execInContainer(t, ctx, c, []string{"mkdir", "-p", dir})
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("cd %s && git init --initial-branch=main", dir)})
 
 	// when: run paintress init (requires repo path as positional arg)
-	initCmd := exec.Command("paintress", "init", "--lang", "en", dir)
-	initCmd.Dir = dir
-	out, err := initCmd.Output()
+	out, _, err := runCmd(t, ctx, c, dir, "init", "--lang", "en", dir)
 	if err != nil {
 		t.Fatalf("paintress init: %v\n%s", err, out)
 	}
@@ -38,9 +33,9 @@ func TestE2E_PaintressInit(t *testing.T) {
 		".expedition/archive",
 		".expedition/.run",
 	} {
-		path := filepath.Join(dir, sub)
-		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-			t.Errorf("expected directory %s to exist", sub)
+		path := fmt.Sprintf("%s/%s", dir, sub)
+		if !dirExistsInContainer(t, ctx, c, path) {
+			t.Errorf("expected directory %s to exist in container", path)
 		}
 	}
 }
