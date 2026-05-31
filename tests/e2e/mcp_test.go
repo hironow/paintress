@@ -3,44 +3,33 @@
 package e2e
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 )
 
-func paintressBin() string {
-	if env := os.Getenv("PAINTRESS_BIN"); env != "" {
-		return env
-	}
-	return "paintress"
-}
-
 func TestE2E_MCPServerToolsList(t *testing.T) {
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_mcp"
+	initTestRepo(t, ctx, c, dir)
+
 	// given
 	input := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
 
 	// when
-	cmd := exec.Command(paintressBin(), "mcp")
-	cmd.Stdin = strings.NewReader(input)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
+	stdout, _, err := runCmdStdin(t, ctx, c, dir, input, "mcp")
 	if err != nil {
-		t.Fatalf("mcp command failed: %v\nstderr: %s", err, stderr.String())
+		t.Fatalf("mcp command failed: %v", err)
 	}
 
 	// then
-	outStr := stdout.String()
-	idx := strings.Index(outStr, `{"jsonrpc"`)
+	idx := strings.Index(stdout, `{"jsonrpc"`)
 	if idx < 0 {
-		t.Fatalf("no JSON-RPC response found in stdout: %s", outStr)
+		t.Fatalf("no JSON-RPC response found in stdout: %s", stdout)
 	}
-	jsonStr := outStr[idx:]
+	jsonStr := stdout[idx:]
 
 	var resp struct {
 		JSONRPC string `json:"jsonrpc"`

@@ -3,12 +3,12 @@
 package e2e
 
 import (
-	"encoding/json"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"context"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/testcontainers/testcontainers-go"
 )
 
 type doctorJSONCheck struct {
@@ -22,56 +22,34 @@ type doctorJSONOutput struct {
 	Checks []doctorJSONCheck `json:"checks"`
 }
 
-func initPaintressProject(t *testing.T, dir string) {
-	t.Helper()
-	git := exec.Command("git", "init", dir)
-	if err := git.Run(); err != nil {
-		t.Fatalf("git init: %v", err)
-	}
-	initCmd := exec.Command("paintress", "init", "--lang", "en", dir)
-	initCmd.Dir = dir
-	out, err := initCmd.Output()
-	if err != nil {
-		t.Fatalf("paintress init: %v\n%s", err, out)
-	}
-}
-
-func runDoctorJSON(t *testing.T, dir string, repair bool) doctorJSONOutput {
+func runDoctorJSON(t *testing.T, ctx context.Context, c testcontainers.Container, dir string, repair bool) doctorJSONOutput {
 	t.Helper()
 	args := []string{"doctor", "--output", "json"}
 	if repair {
 		args = append(args, "--repair")
 	}
 	args = append(args, dir)
-	doctorCmd := exec.Command("paintress", args...)
-	out, _ := doctorCmd.Output()
+	stdout, _, err := runCmd(t, ctx, c, dir, args...)
+	if err != nil {
+		t.Logf("doctor returned non-zero (expected for failed checks): %v", err)
+	}
 
-	// Find JSON object start
-	raw := string(out)
-	idx := strings.Index(raw, "{")
-	if idx < 0 {
-		t.Fatalf("no JSON object found in doctor output: %s", raw)
-	}
 	var result doctorJSONOutput
-	if err := json.Unmarshal([]byte(raw[idx:]), &result); err != nil {
-		t.Fatalf("failed to parse doctor JSON: %v\nraw: %s", err, raw[idx:])
-	}
+	parseJSONOutput(t, stdout, &result)
 	return result
 }
 
 func TestDoctorRepair_StalePID(t *testing.T) {
-	// given: initialized project with stale watch.pid
-	dir := t.TempDir()
-	initPaintressProject(t, dir)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_stale"
+	initTestRepo(t, ctx, c, dir)
 
-	pidDir := filepath.Join(dir, ".expedition")
-	pidPath := filepath.Join(pidDir, "watch.pid")
-	if err := os.WriteFile(pidPath, []byte("99999\n"), 0644); err != nil {
-		t.Fatalf("write pid: %v", err)
-	}
+	pidPath := fmt.Sprintf("%s/.expedition/watch.pid", dir)
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidPath)})
 
 	// when: run doctor --repair --json
-	result := runDoctorJSON(t, dir, true)
+	result := runDoctorJSON(t, ctx, c, dir, true)
 
 	// then: stale-pid check should be FIX
 	found := false
@@ -91,30 +69,25 @@ func TestDoctorRepair_StalePID(t *testing.T) {
 	}
 
 	// Verify PID file was actually removed
-	if _, err := os.Stat(pidPath); err == nil {
+	if fileExistsInContainer(t, ctx, c, pidPath) {
 		t.Error("watch.pid should have been removed but still exists")
 	}
 }
 
 func TestDoctorRepair_MissingSkillMD(t *testing.T) {
-	// given: initialized project with SKILL.md deleted
-	dir := t.TempDir()
-	initPaintressProject(t, dir)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_skills"
+	initTestRepo(t, ctx, c, dir)
 
-	skillsDir := filepath.Join(dir, ".expedition", "skills")
-	entries, err := os.ReadDir(skillsDir)
-	if err != nil {
-		t.Fatalf("read skills dir: %v", err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			skillMD := filepath.Join(skillsDir, entry.Name(), "SKILL.md")
-			os.Remove(skillMD)
-		}
-	}
+	skillsDir := fmt.Sprintf("%s/.expedition/skills", dir)
+	
+	// List skills inside container to find subdirectory names (like "dmail-sendable")
+	// For testing, we can just delete SKILL.md under all subdirectories of skills directory
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("rm -f %s/*/SKILL.md", skillsDir)})
 
 	// when: run doctor --repair --json
-	result := runDoctorJSON(t, dir, true)
+	result := runDoctorJSON(t, ctx, c, dir, true)
 
 	// then: skills check should be FIX (regenerated)
 	found := false
@@ -131,29 +104,27 @@ func TestDoctorRepair_MissingSkillMD(t *testing.T) {
 		t.Errorf("skills FIX check not found in results")
 	}
 
-	// Verify SKILL.md was actually regenerated
-	for _, entry := range entries {
-		if entry.IsDir() {
-			skillMD := filepath.Join(skillsDir, entry.Name(), "SKILL.md")
-			if _, err := os.Stat(skillMD); err != nil {
-				t.Errorf("SKILL.md not regenerated: %s", skillMD)
-			}
+	// Verify SKILL.md was actually regenerated (we can check a few known ones or just that they exist)
+	expectedSkills := []string{"dmail-sendable", "dmail-readable"}
+	for _, skill := range expectedSkills {
+		path := fmt.Sprintf("%s/%s/SKILL.md", skillsDir, skill)
+		if !fileExistsInContainer(t, ctx, c, path) {
+			t.Errorf("SKILL.md not regenerated for %s: %s", skill, path)
 		}
 	}
 }
 
 func TestDoctorRepair_NoRepairFlag(t *testing.T) {
-	// given: initialized project with stale watch.pid but no --repair
-	dir := t.TempDir()
-	initPaintressProject(t, dir)
+	ctx := context.Background()
+	c := buildTestContainer(t, ctx)
+	dir := "/workspace/t_doctor_norepair"
+	initTestRepo(t, ctx, c, dir)
 
-	pidPath := filepath.Join(dir, ".expedition", "watch.pid")
-	if err := os.WriteFile(pidPath, []byte("99999\n"), 0644); err != nil {
-		t.Fatalf("write pid: %v", err)
-	}
+	pidPath := fmt.Sprintf("%s/.expedition/watch.pid", dir)
+	execInContainer(t, ctx, c, []string{"sh", "-c", fmt.Sprintf("echo '99999' > %s", pidPath)})
 
 	// when: run doctor --json WITHOUT --repair
-	result := runDoctorJSON(t, dir, false)
+	result := runDoctorJSON(t, ctx, c, dir, false)
 
 	// then: stale-pid check should NOT appear
 	for _, check := range result.Checks {
@@ -163,7 +134,7 @@ func TestDoctorRepair_NoRepairFlag(t *testing.T) {
 	}
 
 	// Verify PID file still exists
-	if _, err := os.Stat(pidPath); err != nil {
+	if !fileExistsInContainer(t, ctx, c, pidPath) {
 		t.Error("watch.pid should still exist but was removed")
 	}
 }
