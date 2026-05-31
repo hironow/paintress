@@ -33,7 +33,8 @@ func watchInbox(ctx context.Context, continent string, onNewDMail func(dm domain
 	}
 	defer func() { _ = watcher.Close() }()
 
-	if err := watcher.Add(inboxDir); err != nil {
+	err = watcher.Add(inboxDir)
+	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.stage", "paintress.inbox"))
 		span.SetAttributes(attribute.Int("inbox.watch.event.count", 0))

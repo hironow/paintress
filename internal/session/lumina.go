@@ -37,8 +37,8 @@ func ScanJournalsForLumina(continent string) []domain.Lumina {
 
 	for _, f := range files {
 		group.Submit(func() journalData {
-			content, err := os.ReadFile(f)
-			if err != nil {
+			content, readErr := os.ReadFile(f)
+			if readErr != nil {
 				return journalData{}
 			}
 			text := string(content)
