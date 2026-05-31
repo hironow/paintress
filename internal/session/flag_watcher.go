@@ -19,12 +19,12 @@ func watchFlag(ctx context.Context, continent string, logger domain.Logger, onIs
 		return
 	}
 
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := fsnotify.NewWatcher() // nosemgrep: adr0005-fsnotify-watcher-without-close -- watcher is closed in the goroutine owning the event loop [permanent]
 	if err != nil {
 		logger.Warn("flag watcher: create watcher: %v", err)
 		return
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	if err := watcher.Add(runDir); err != nil {
 		return

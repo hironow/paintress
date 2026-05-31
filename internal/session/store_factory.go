@@ -54,7 +54,7 @@ func EnsureCutover(ctx context.Context, stateDir, aggregateType string, logger d
 	ss := eventsource.NewFileSnapshotStore(filepath.Join(stateDir, "snapshots"))
 	raw := eventsource.NewFileEventStore(eventsource.EventsDir(stateDir), logger)
 	if _, err := eventsource.RunCutover(ctx, raw, ss, sc, aggregateType, logger); err != nil {
-		sc.Close()
+		_ = sc.Close()
 		return nil, fmt.Errorf("ensure cutover: %w", err)
 	}
 	return sc, nil

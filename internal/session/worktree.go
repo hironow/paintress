@@ -93,7 +93,7 @@ func (wp *WorktreePool) Init(ctx context.Context) error {
 		name := fmt.Sprintf("worker-%03d", i+1)
 		path := filepath.Join(wp.poolDir, name)
 
-		wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path)
+		_, _ = wp.git.Git(ctx, wp.repoDir, "worktree", "remove", "-f", path)
 
 		if _, err := wp.git.Git(ctx, wp.repoDir, "worktree", "add", "--detach", path, wp.baseBranch); err != nil {
 			return fmt.Errorf("worktree add %s: %w", name, err)

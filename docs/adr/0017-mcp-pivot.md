@@ -121,7 +121,7 @@ subprocess that calls the model.
   `paintress mcp` stdio server advertises and dispatches the four
   Phase 1 tools (paintress.ping plus the three stubs).
 - `internal/session/expedition_test.go::TestExpedition_Run_IsDeprecatedPostMCPPivot`
-  - one test proves Expedition.Run() returns
+    - one test proves Expedition.Run() returns
   `ErrMCPPivotDeprecated` and produces no output.
 - `internal/domain/dmail_envelope_test.go` - five tests cover the
   YAML schema, required-field validation, idempotency-key dedup,
@@ -177,11 +177,11 @@ subprocess that calls the model.
   rounds and the acceptance criteria checklist.
 - ADR 0009 (event sourcing), ADR 0010 (event sourcing with
   projections), ADR 0011 (usecase / adapter dependency inversion)
-  - the architectural layers this ADR preserves.
+    - the architectural layers this ADR preserves.
 - ADR 0005 (three-way approval contract), ADR 0013 (preflight
   D-Mail triage) - the D-Mail invariants the new envelope schema
   must keep honouring once Phase 2 wiring lands.
-- https://code.claude.com/docs/en/headless - 2026-06-15 credit
+- <https://code.claude.com/docs/en/headless> - 2026-06-15 credit
   pool change announcement and `--bare` mode documentation.
-- https://support.claude.com/en/articles/15036540 - per-plan
+- <https://support.claude.com/en/articles/15036540> - per-plan
   credit allocation table.

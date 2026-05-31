@@ -18,7 +18,7 @@ func ReadFlag(continent string) domain.ExpeditionFlag {
 	if err != nil {
 		return f
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -26,7 +26,7 @@ func ReadFlag(continent string) domain.ExpeditionFlag {
 		if k, v, ok := parseKV(line); ok {
 			switch k {
 			case "last_expedition":
-				fmt.Sscanf(v, "%d", &f.LastExpedition)
+				_, _ = fmt.Sscanf(v, "%d", &f.LastExpedition)
 			case "last_updated":
 				f.LastUpdated = v
 			case "last_issue":
@@ -40,7 +40,7 @@ func ReadFlag(continent string) domain.ExpeditionFlag {
 			case "current_title":
 				f.CurrentTitle = v
 			case "mid_high_severity":
-				fmt.Sscanf(v, "%d", &f.MidHighSeverity)
+				_, _ = fmt.Sscanf(v, "%d", &f.MidHighSeverity)
 			}
 		}
 	}

@@ -366,7 +366,7 @@ func CheckFsnotify() domain.DoctorCheck {
 			Hint:    "on Linux, increase inotify limit: sysctl fs.inotify.max_user_watches=524288",
 		}
 	}
-	defer w.Close()
+	defer w.Close() //nolint:errcheck
 	return domain.DoctorCheck{
 		Name:    "fsnotify",
 		Status:  domain.CheckOK,
@@ -511,7 +511,7 @@ func checkWritability(continent string) domain.DoctorCheck {
 			Hint:    "check file permissions on the .expedition/ directory",
 		}
 	}
-	os.Remove(probe)
+	_ = os.Remove(probe)
 
 	return domain.DoctorCheck{
 		Name:    "writable",
