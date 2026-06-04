@@ -71,7 +71,7 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 
 ## MCP Pivot Boundary
 
-Paintress no longer starts a Claude subprocess, owns a worktree swarm, runs review gates, or composes D-Mails from the Go CLI. LLM execution and repository modification are owned by a human-initiated claude-code session attached to `paintress mcp`.
+Paintress does not own model inference, manage a worktree swarm, run review gates, or compose D-Mails from the Go CLI. LLM execution and repository modification are owned by a human-initiated Claude Code session attached to `paintress mcp`.
 
 - `paintress mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
 - `paintress.next_issue` reads completed issue ids, the next expedition number, and the latest PR from local projections.
