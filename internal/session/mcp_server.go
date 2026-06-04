@@ -25,7 +25,7 @@ import (
 // EventGradientChanged / EventExpeditionCompleted via the event store
 // when an emitter is wired; cmd wires one by default).
 //
-// Wire it into a claude code interactive session via --mcp-config so
+// Wire it into a Claude Code interactive session via --mcp-config so
 // inference stays on the human-initiated session's subscription quota
 // rather than crossing into the Agent SDK credit pool that gates
 // `claude -p` from 2026-06-15.
@@ -37,7 +37,7 @@ import (
 // continent is the project root directory (= paintress's "continent"
 // abstraction) used to resolve journal / pr-index paths for the
 // real-impl MCP tools. When empty, real-impl tools fall back to
-// returning an "uninitialized" payload so the claude code session can
+// returning an "uninitialized" payload so the Claude Code session can
 // surface a clear error to the operator.
 type MCPServer struct {
 	in        io.Reader
@@ -161,7 +161,7 @@ func (s *MCPServer) handle(ctx context.Context, line []byte) error {
 const mcpProtocolVersion = "2024-11-05"
 
 // initializeResult builds the MCP initialize handshake response. The
-// claude code session sends `initialize` first; without a valid reply
+// Claude Code session sends `initialize` first; without a valid reply
 // it never proceeds to tools/list. The server advertises its supported
 // protocol version + the tools capability.
 func initializeResult() map[string]any {
@@ -212,7 +212,7 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 }
 
 // toolDescriptors returns the tool set. Each entry pins the interface
-// (name, description, inputSchema) so claude code clients see a stable
+// (name, description, inputSchema) so Claude Code clients see a stable
 // contract. next_issue / update_gradient / append_journal are real
 // impl: they read pr-index / event store and write journal/ + pr-index;
 // update_gradient / append_journal also emit EventGradientChanged /
@@ -226,7 +226,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "paintress.next_issue",
-			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The claude code session queries linear-mcp separately and uses completed_issue_ids to exclude already-done work.",
+			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The Claude Code session queries linear-mcp separately and uses completed_issue_ids to exclude already-done work.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
@@ -276,7 +276,7 @@ func jsonResult(data any) map[string]any {
 }
 
 // realNextIssue surfaces paintress's local journal state (= completed
-// issue ids + next expedition number + last PR) so the claude code
+// issue ids + next expedition number + last PR) so the Claude Code
 // session can decide which Linear issue to fetch next via linear-mcp.
 //
 // paintress does NOT call linear-mcp itself (= that would re-introduce

@@ -40,7 +40,7 @@ func NewRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:     "paintress",
 		Short:   "Expedition journal/gradient MCP data plane",
-		Long:    "The Paintress — exposes the expedition journal/gradient data plane over MCP for a claude code interactive session (jun15 MCP pivot).",
+		Long:    "The Paintress — exposes the expedition journal/gradient data plane over MCP for a Claude Code interactive session (jun15 MCP pivot).",
 		Version: Version,
 		// Silence usage on RunE errors (cobra prints usage by default on error)
 		SilenceUsage:  true,

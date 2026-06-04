@@ -186,7 +186,7 @@ func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 
 func TestMCPServer_NextIssue_UninitializedContinent(t *testing.T) {
 	// given: NewMCPServer without WithContinent → continent is empty.
-	// Real impl must signal "uninitialized" so the claude code session
+	// Real impl must signal "uninitialized" so the Claude Code session
 	// surfaces a clear error rather than acting on stale defaults.
 	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
 	var out bytes.Buffer
