@@ -4,7 +4,7 @@ Expedition journal/gradient MCP data plane
 
 ### Synopsis
 
-The Paintress — exposes the expedition journal/gradient data plane over MCP for a claude code interactive session (jun15 MCP pivot).
+The Paintress — exposes the expedition journal/gradient data plane over MCP for a Claude Code interactive session (jun15 MCP pivot).
 
 ### Options
 
@@ -28,7 +28,7 @@ The Paintress — exposes the expedition journal/gradient data plane over MCP fo
 * [paintress doctor](paintress_doctor.md)	 - Run health checks
 * [paintress init](paintress_init.md)	 - Initialize project configuration
 * [paintress mcp](paintress_mcp.md)	 - Run paintress as an MCP server over stdio (expedition journal/gradient data plane)
-* [paintress mcp-config](paintress_mcp-config.md)	 - Manage MCP configuration for Claude subprocess isolation
+* [paintress mcp-config](paintress_mcp-config.md)	 - Manage MCP wiring for Claude Code sessions
 * [paintress rebuild](paintress_rebuild.md)	 - Rebuild projections from event store
 * [paintress sessions](paintress_sessions.md)	 - Manage AI coding sessions
 * [paintress status](paintress_status.md)	 - Show paintress operational status

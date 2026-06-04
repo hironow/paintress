@@ -7,7 +7,7 @@ Run paintress as an MCP server over stdio (expedition journal/gradient data plan
 Start a Model Context Protocol server reading JSON-RPC 2.0
 messages on stdin and writing responses on stdout.
 
-Designed for embedding in a claude code interactive session via
+Designed for embedding in a Claude Code interactive session via
 --mcp-config so inference stays on the session's subscription quota
 rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
@@ -15,7 +15,7 @@ rather than crossing into the Agent SDK credit pool that gates
 The continent (= project root) is resolved from the current working
 directory. paintress.next_issue reads pr-index.jsonl + journal/ under
 this directory to surface completed issue ids + next expedition
-number. The claude code session itself queries linear-mcp for raw
+number. The Claude Code session itself queries linear-mcp for raw
 issue data and uses paintress.next_issue's completed_issue_ids to
 exclude already-done work.
 

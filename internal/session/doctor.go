@@ -249,11 +249,11 @@ func RunDoctor(ctx context.Context, claudeCmd string, continent string, repair b
 			// The probe previously invoked `claude --print "1+1="` to
 			// verify Claude CLI inference capability; that headless
 			// invocation is forbidden post pivot. Validate via
-			// /expedition-next in claude code instead.
+			// /expedition-next in Claude Code instead.
 			checks = append(checks, domain.DoctorCheck{
 				Name:    "claude-inference",
 				Status:  domain.CheckSkip,
-				Message: "skipped (MCP pivot, refs/issues/0027); validate via claude code /expedition-next",
+				Message: "skipped (MCP pivot, refs/issues/0027); validate via Claude Code /expedition-next",
 			})
 			// context-budget: skipped because the inference probe no
 			// longer produces stream-json output to measure against

@@ -6,7 +6,7 @@ description: >-
   asks to "pick the next paintress issue", "run one paintress expedition
   via MCP", or "test the paintress MCP server end-to-end". Drives the
   paintress MCP server's tools (next_issue / update_gradient /
-  append_journal) from inside a human-initiated claude code interactive
+  append_journal) from inside a human-initiated Claude Code interactive
   session so inference stays on the subscription quota rather than the
   Agent SDK credit pool that gates `claude -p` from 2026-06-15.
 version: 0.1.0
@@ -29,7 +29,7 @@ allowed-tools:
 
 Human-initiated entry point. Drives the paintress MCP server's tools
 without ever invoking `claude -p`, so all inference happens inside
-this interactive claude code session's subscription quota.
+this interactive Claude Code session's subscription quota.
 
 ## Prerequisites
 
@@ -123,7 +123,7 @@ update_gradient / append_journal.
 
 ## Done criteria
 
-An `/expedition-next` run is complete when, in a real claude code
+An `/expedition-next` run is complete when, in a real Claude Code
 session with the paintress MCP server attached:
 
 1. `ping` returns `pong` (handshake + tool dispatch verified).
