@@ -106,7 +106,7 @@ Additional systems that improve expedition quality across runs:
 
 ### Issue Claim Registry
 
-`IssueClaimRegistry` prevents multiple parallel workers (Swarm Mode) from working on the same Linear issue simultaneously. Thread-safe via mutex; `TryClaim` returns the holding expedition number on conflict.
+Retired with the headless worker pool. Current duplicate-work prevention happens in the claude-code session and PR/index projections rather than a Go-managed worker registry.
 
 ### Duration Percentiles
 
@@ -118,7 +118,7 @@ Additional systems that improve expedition quality across runs:
 
 ### Worktree Health Check
 
-`AcquireContext` runs a `git status` health check on acquired worktrees before returning them to workers. If the worktree is corrupted or inaccessible, it is automatically force-recycled and a fresh worktree is created. Acquired worktrees are also cleaned up on `Shutdown`.
+Retired with Go-managed worker worktrees. The CLI does not create, acquire, or recycle git worktrees after the MCP pivot.
 
 ### Context File Size Guard
 
@@ -134,7 +134,7 @@ Escalation events fire once per failure streak rather than on every consecutive 
 
 ### Label-Based Issue Exclusion
 
-`ExcludeIssuesByLabel` filters Linear issues by label (case-insensitive match), allowing teams to exclude issues tagged with specific labels from the expedition loop.
+Retired with the Linear-driven expedition loop. Work selection now happens in the claude-code session using the configured issue source and the `paintress.next_issue` read model.
 
 ## D-Mail Protocol
 
@@ -153,84 +153,44 @@ Full protocol details: **[docs/dmail-protocol.md](docs/dmail-protocol.md)** | Di
 ## Architecture
 
 ```
-Paintress (binary)         <- Outside the repository
+claude-code session
     |
-    |  Pre-flight:
-    |  +-- goroutine: parallel journal scan -> Lumina extraction
-    |  +-- PreflightCheckRemote (verify git remote exists)
-    |  +-- WorktreePool.Init (when --workers >= 1)
-    |
-    |  Per Expedition:
-    |  +-- IssueClaimRegistry.TryClaim (Swarm Mode dedup)
-    |  +-- triagePreFlightDMails (escalate/resolve/retry)
-    |  +-- Gradient Gauge check -> difficulty hint
-    |  +-- Reserve Party check -> primary recovery attempt
-    |  +-- StrategyForCycle -> fix strategy selection
-    |  +-- ReflectionAccumulator -> stagnation detection
-    |
+    |  /expedition-next skill
+    |  +-- chooses implementation work
+    |  +-- edits the repository
+    |  +-- runs verification
+    |  +-- opens or updates a PR
+    |  +-- writes report D-Mails
+    |  +-- calls paintress MCP tools for durable state
     v
-Monolith (Linear)          <- Fully external
+paintress mcp              <- MCP server / data plane
     |
+    |  paintress.next_issue      -> read journal + PR index projections
+    |  paintress.update_gradient -> append gradient-changed event
+    |  paintress.append_journal  -> write journal / PR index + event
     v
-WorktreePool               <- Isolated worktrees for parallel workers (Swarm Mode)
-    |
-    v
-Expedition (Claude Code)   <- One session per issue
-    |
-    v
-Review Gate (exec)         <- Code review tool + Claude Code --continue (up to 3 cycles)
-    |
-    v
-D-Mail Waiting Loop        <- fsnotify inbox/ watch (--idle-timeout, default 30m)
-    |                         On D-Mail arrival: re-run expedition loop
-    |                         On timeout/signal: clean exit
-    v
-Continent (Git repo)       <- Persistent world
-    +-- src/
-    +-- CLAUDE.md
-    +-- .expedition/
-         +-- config.yaml   <- Project config (paintress init)
-         +-- journal/
-         |    +-- 001.md, 002.md, ...
-         +-- context/      <- User-provided .md files injected into prompts
-         +-- skills/       <- Agent skill manifests (SKILL.md)
-         +-- inbox/        <- Incoming d-mails (gitignored, transient)
-         +-- outbox/       <- Outgoing d-mails (gitignored, transient)
-         +-- archive/      <- Processed d-mails (tracked, audit trail)
-         +-- insights/     <- Insight Ledger (tracked, lumina.md + gommage.md)
-         +-- events/       <- Append-only event store (JSONL, gitignored)
-         +-- .run/         <- Ephemeral (gitignored)
-              +-- flag.md       <- Checkpoint (consolidated from per-worker flags at exit)
-              +-- logs/         <- Expedition logs
-              +-- worktrees/    <- Managed by WorktreePool
-                   +-- worker-001/
-                   |    +-- .expedition/.run/flag.md  <- Per-worker checkpoint
-                   +-- worker-002/
-                        +-- .expedition/.run/flag.md  <- Per-worker checkpoint
+.expedition/
+    +-- config.yaml
+    +-- journal/
+    +-- skills/
+    +-- inbox/
+    +-- outbox/
+    +-- archive/
+    +-- insights/
+    +-- events/
+    +-- .run/
 ```
 
-### WorktreePool Lifecycle (`--workers >= 1`)
-
-1. **Init** — `git worktree prune`, then for each worker: force-remove leftover → `git worktree add --detach` → run `--setup-cmd` if set
-2. **Acquire** — Worker claims a worktree from the pool (blocks if all in use). `AcquireContext` runs a `git status` health check; corrupted worktrees are force-recycled and re-created automatically.
-3. **Release** — After each expedition: `git checkout --detach <base-branch>` → `git reset --hard <base-branch>` → `git clean -fd -e .expedition` → return to pool. The `-e .expedition` exclusion preserves per-worker flag.md across releases. Checkout/reset failures trigger automatic worktree recycling.
-4. **Consolidate** — After all workers complete: `reconcileFlags` scans all worktree flag.md files, picks max(LastExpedition), writes it back to Continent's flag.md for human inspection and next startup.
-5. **Shutdown** — On exit (30s timeout, independent of parent context): `git worktree remove -f` each → `git worktree prune`
-
-When `--workers 0`, no pool is created and expeditions run directly on the repository. The flag.md path unifies: `flagDir = workDir` (worktree path when Workers>0, Continent when Workers=0). No mutex is needed — each worker has exclusive access to its own flag.md. `reconcileFlags` skips worktree glob scan when workers=0, reading only the Continent flag.md to avoid stale worktree contamination from crashed prior runs.
+The former headless run loop, worker pool, review gate, and D-Mail waiting loop are retired. They are preserved only as historical concepts in old ADRs and journal entries, not as live CLI behavior.
 
 ## Goroutines
 
 | Goroutine | Role | Game Concept |
 |-----------|------|-------------|
-| Signal handler | SIGINT/SIGTERM → context cancel | — |
-| Dev server | Background startup & monitoring | Camp |
-| Journal scanner | Parallel file reads → Lumina extraction | Resting at Flag |
-| Worker (N) | Expedition loop per worktree (Swarm Mode) | Expedition Party |
-| Output streaming | stdout tee + rate limit detection | Reserve Party standby |
-| Flag watcher | fsnotify: detect issue selection in real-time | Expedition Flag |
-| Inbox watcher | fsnotify: detect d-mails arriving mid-expedition | D-Mail courier |
-| Timeout watchdog | context.WithTimeout | Gommage (time's up) |
+| Signal handler | SIGINT/SIGTERM -> context cancel | - |
+| MCP server loop | JSON-RPC over stdio | Expedition ledger |
+| Event replay | Rebuild local projections | Journal reread |
+| Archive prune | Retention cleanup | Old flag cleanup |
 
 ## Scope
 
@@ -245,9 +205,9 @@ The expedition workflow itself (pick an issue, implement, test, open a PR, send 
 
 **What Paintress does NOT do:**
 
-- Edit Linear issues directly (only reads issues for implementation)
-- Manage git branches on the main repository (uses worktrees for isolation)
-- Handle authentication setup (assumes Linear, GitHub CLI, and Claude Code are pre-configured)
+- Edit issue tracker records directly (the claude-code session owns work selection)
+- Manage git branches or worktrees from the Go CLI
+- Handle authentication setup (assumes issue source access, GitHub CLI, and Claude Code are pre-configured)
 - Verify post-merge design integrity (amadeus handles that)
 
 ## Setup
@@ -262,7 +222,7 @@ just install
 # Initialize project config (Linear team key, etc.)
 paintress init /path/to/your/repo
 
-# Generate Claude subprocess isolation settings
+# Generate claude-code MCP wiring
 paintress mcp-config generate /path/to/your/repo
 
 # Upgrade existing project (regenerate SKILL.md, etc.)
@@ -278,8 +238,6 @@ paintress /path/to/your/repo
 Paintress creates `.expedition/` with config, journal entries, and ephemeral
 runtime state under `.run/` automatically. Mission and Lumina content are
 embedded directly in the expedition prompt (no separate files on disk).
-Git worktrees for Swarm Mode are also fully managed — Paintress creates them
-on startup and removes them on shutdown. No manual `git worktree` commands needed.
 
 ## Subcommands
 
@@ -319,7 +277,7 @@ Paintress stores project configuration in `.expedition/config.yaml` (generated b
 
 ## Tracing (OpenTelemetry)
 
-Paintress instruments key operations (expedition, review loop, worktree pool, dev server) with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+Paintress instruments command roots and MCP tool handlers with OpenTelemetry spans and events. Tracing is off by default (noop tracer) and activates when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
 
 ```bash
 # Start Jaeger (all-in-one trace viewer)
@@ -385,9 +343,9 @@ See [docs/conformance.md](docs/conformance.md) for the full conformance table (s
 - Go 1.26+
 - [just](https://just.systems/) task runner
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
-- A code review CLI (for code review gate, customizable via `--review-cmd`, e.g. tools that output `[P0]`–`[P4]` priorities)
+- GitHub CLI / review tooling used by the claude-code session
 - [GitHub CLI](https://cli.github.com/) for Pull Request operations
-- Linear: accessible for Issue operations (e.g. Linear MCP)
+- Issue source access for the claude-code session
 - [Docker](https://www.docker.com/) for tracing (Jaeger) and container tests
 - Browser automation (for verify missions): e.g. Playwright, Chrome DevTools
 

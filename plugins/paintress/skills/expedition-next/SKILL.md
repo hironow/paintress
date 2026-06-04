@@ -137,8 +137,8 @@ session with the paintress MCP server attached:
 
 - Canonical plan: `refs/HTMLification/docs/archive/0027-jun15-mcp-pivot.html`
 - Pattern reference:
-  - paintress ADR 0017 (`~/tap/paintress/docs/adr/0017-mcp-pivot.md`) — MCP pivot
-  - paintress ADR 0018 (`~/tap/paintress/docs/adr/0018-mcp-pivot-helper-level-stub.md`) — helper-level stub
+    - paintress ADR 0017 (`~/tap/paintress/docs/adr/0017-mcp-pivot.md`) — MCP pivot
+    - paintress ADR 0018 (`~/tap/paintress/docs/adr/0018-mcp-pivot-helper-level-stub.md`) — helper-level stub
 - Billing boundary table: refs 0027 §5
 - Mechanical gate (semgrep rules): refs 0027 §6 + `.semgrep/jun15-no-headless-llm.yaml`
 - D-Mail 9-field schema: refs 0027 §8
