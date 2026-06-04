@@ -138,7 +138,7 @@ This makes `ClassifyGommage(reasons []string)` a true pure function — it only 
 
 - `releaseWorkDir()` is NOT called
 - Worktree preserves committed and uncommitted changes
-- Next retry starts Claude subprocess in the same worktree
+- Next retry resumes the retired headless LLM runner in the same worktree
 - Claude receives `git log --oneline base..HEAD` + `git diff --stat` as context
 
 ### Cleanup Policy (3 layers)
@@ -152,7 +152,7 @@ This makes `ClassifyGommage(reasons []string)` a true pure function — it only 
 1. `paintress run` checks event store for `expedition.checkpoint` events without a subsequent `expedition.completed`
 2. Returns `[]IncompleteExpedition` — one per unfinished worker. Under `--workers=N`, up to N incomplete expeditions may exist
 3. For each incomplete: if worktree still exists on disk and git state is valid, resume that expedition
-4. Claude subprocess receives resume context: `git log --oneline` + `git diff --stat`
+4. The retired headless LLM runner receives resume context: `git log --oneline` + `git diff --stat`
 5. Claude reads files as needed via its `Read` tool (lightweight context injection)
 6. Expeditions that cannot be resumed (missing worktree, corrupted git) are logged and their worktrees cleaned up
 
