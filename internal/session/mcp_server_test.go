@@ -127,6 +127,9 @@ func TestMCPServer_ListsAllPhase1Tools(t *testing.T) {
 			t.Errorf("missing Phase 1 tool: %s", name)
 		}
 	}
+	if strings.Contains(out.String(), "linear-mcp") {
+		t.Errorf("tools list should not mention linear-mcp after MCP pivot: %q", out.String())
+	}
 }
 
 func TestMCPServer_CallsPingTool(t *testing.T) {
@@ -233,6 +236,9 @@ func TestMCPServer_NextIssue_RealImpl_EmptyJournal(t *testing.T) {
 	if body["last_pr"] != nil {
 		t.Errorf("last_pr = %v, want nil", body["last_pr"])
 	}
+	if strings.Contains(out.String(), "linear-mcp") {
+		t.Errorf("next_issue response should not mention linear-mcp after MCP pivot: %q", out.String())
+	}
 }
 
 func TestMCPServer_NextIssue_RealImpl_WithPRIndex(t *testing.T) {
@@ -275,6 +281,9 @@ func TestMCPServer_NextIssue_RealImpl_WithPRIndex(t *testing.T) {
 	lastPR, _ := resp["last_pr"].(map[string]any)
 	if lastPR == nil || lastPR["issue_id"] != "X-2" {
 		t.Errorf("last_pr.issue_id = %v, want X-2 (got %v)", "X-2", lastPR)
+	}
+	if instruction, _ := resp["instruction"].(string); strings.Contains(instruction, "linear-mcp") {
+		t.Errorf("instruction should not mention linear-mcp after MCP pivot: %q", instruction)
 	}
 }
 

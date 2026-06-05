@@ -226,7 +226,7 @@ func toolDescriptors() []map[string]any {
 		},
 		{
 			"name":        "paintress.next_issue",
-			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The Claude Code session queries linear-mcp separately and uses completed_issue_ids to exclude already-done work.",
+			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The Claude Code session uses completed_issue_ids to exclude already-done work from the configured issue source.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
@@ -277,13 +277,11 @@ func jsonResult(data any) map[string]any {
 
 // realNextIssue surfaces paintress's local journal state (= completed
 // issue ids + next expedition number + last PR) so the Claude Code
-// session can decide which Linear issue to fetch next via linear-mcp.
+// session can decide which configured issue source item to handle next.
 //
-// paintress does NOT call linear-mcp itself (= that would re-introduce
-// claude-driven inference, the very thing this pivot removes). The
-// session, with both paintress mcp and linear-mcp attached, reads
-// completed_issue_ids from this tool and excludes them from its
-// linear-mcp query.
+// paintress does NOT call external issue MCP servers itself. The
+// session reads completed_issue_ids from this tool and excludes them
+// while selecting work from the configured issue source.
 //
 // continent is the project root resolved via WithContinent (typically
 // os.Getwd() in the cobra subcommand). When empty or the journal
@@ -332,7 +330,7 @@ func realNextIssue(continent string) map[string]any {
 		"completed_issue_ids":    completedIDs,
 		"last_pr":                lastPR,
 		"journal_dir":            domain.JournalDir(continent),
-		"instruction":            "Query linear-mcp for unstarted issues, exclude completed_issue_ids, pick highest priority. Persist completion via paintress.append_journal after the expedition.",
+		"instruction":            "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via paintress.append_journal after the expedition.",
 	})
 }
 
