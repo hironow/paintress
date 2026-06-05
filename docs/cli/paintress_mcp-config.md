@@ -15,7 +15,6 @@ allowlist when the file exists.
 
 ```
   paintress mcp-config generate
-  paintress mcp-config generate --linear
   paintress mcp-config generate --force
 ```
 

@@ -15,9 +15,9 @@ rather than crossing into the Agent SDK credit pool that gates
 The continent (= project root) is resolved from the current working
 directory. paintress.next_issue reads pr-index.jsonl + journal/ under
 this directory to surface completed issue ids + next expedition
-number. The Claude Code session itself queries linear-mcp for raw
-issue data and uses paintress.next_issue's completed_issue_ids to
-exclude already-done work.
+number. The Claude Code session itself reads the configured issue
+source and uses paintress.next_issue's completed_issue_ids to exclude
+already-done work.
 
 Exposes paintress.ping, paintress.next_issue (reads journal +
 pr-index to surface completed issue ids + next expedition number),
