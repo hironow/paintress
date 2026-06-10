@@ -78,6 +78,7 @@ Paintress does not own model inference, manage a worktree swarm, run review gate
 - `update_gradient` persists gradient-changed events.
 - `append_journal` persists expedition-completed events and writes journal / PR-index state.
 - `dmail` emits report D-Mails through the transactional outbox — the only sanctioned emission path (refs issue 0031).
+- `get_insights` reads the learning loop: insight-ledger files plus a live Lumina pattern scan recomputed from journals per call (read-only; refs issue 0034).
 - The `/expedition-next` skill performs implementation, verification, PR creation, and report D-Mail composition from the claude-code session.
 
 Ref: ADR 0017, ADR 0018, `internal/session/mcp_server.go`, `plugins/paintress/skills/expedition-next/SKILL.md`
