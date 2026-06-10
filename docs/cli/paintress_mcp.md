@@ -13,15 +13,15 @@ rather than crossing into the Agent SDK credit pool that gates
 'claude -p' from 2026-06-15.
 
 The continent (= project root) is resolved from the current working
-directory. paintress.next_issue reads pr-index.jsonl + journal/ under
+directory. next_issue reads pr-index.jsonl + journal/ under
 this directory to surface completed issue ids + next expedition
 number. The Claude Code session itself reads the configured issue
-source and uses paintress.next_issue's completed_issue_ids to exclude
+source and uses next_issue's completed_issue_ids to exclude
 already-done work.
 
-Exposes paintress.ping, paintress.next_issue (reads journal +
+Exposes ping, next_issue (reads journal +
 pr-index to surface completed issue ids + next expedition number),
-and paintress.update_gradient + paintress.append_journal (persist
+and update_gradient + append_journal (persist
 gradient / expedition-completed events to the event store, with a
 journal/ + pr-index filesystem write).
 
