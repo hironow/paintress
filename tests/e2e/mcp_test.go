@@ -54,10 +54,10 @@ func TestE2E_MCPServerToolsList(t *testing.T) {
 	}
 
 	expectedTools := map[string]bool{
-		"paintress.ping":            false,
-		"paintress.next_issue":      false,
-		"paintress.update_gradient": false,
-		"paintress.append_journal":  false,
+		"ping":            false,
+		"next_issue":      false,
+		"update_gradient": false,
+		"append_journal":  false,
 	}
 
 	for _, tool := range resp.Result.Tools {
