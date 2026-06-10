@@ -1,16 +1,14 @@
 ---
 name: expedition-next
 description: >-
-  Slash command for the paintress expedition runner (jun15 MCP pivot).
-  Triggers when the user types "/expedition-next", asks to "pick the
-  next paintress issue", "run one paintress expedition via MCP",
-  "次の expedition を実行して", or "test the paintress MCP server
-  end-to-end". Drives the paintress MCP server's tools (next_issue /
-  update_gradient / append_journal) from inside a human-initiated
-  Claude Code interactive session so inference stays on the
-  subscription quota rather than the Agent SDK credit pool that gates
-  `claude -p` from 2026-06-15.
-version: 0.3.1
+  Run one paintress expedition (human-invoked /expedition-next;
+  「次の expedition を実行して」): consult learned patterns, pick the
+  next specification from the inbox, implement it on a branch, persist
+  progress, and emit the report d-mail — via the paintress MCP tools
+  (get_insights / next_issue / update_gradient / append_journal /
+  dmail). One invocation = one expedition. All inference stays inside
+  this interactive session (jun15 billing invariant; see body).
+version: 0.3.2
 argument-hint: "(none) - reads next issue from paintress MCP and runs one expedition"
 disable-model-invocation: true
 allowed-tools:
@@ -67,8 +65,8 @@ cd path/to/paintress && go build -o ./dist/paintress ./cmd/paintress
 
 `paintress mcp` must be started from the project root so it can resolve
 the continent (`.expedition/` journal + event store). The MCP server
-answers the `initialize` handshake, then exposes ping / next_issue /
-update_gradient / append_journal.
+answers the `initialize` handshake, then exposes ping / get_insights /
+next_issue / update_gradient / append_journal / dmail.
 
 ## Workflow
 
@@ -95,7 +93,7 @@ update_gradient / append_journal.
      "completed_issue_ids": ["X-1", "X-2", "X-3", "X-4"],
      "last_pr": {"expedition": 4, "issue_id": "X-4", "pr_url": "https://..."},
      "journal_dir": "/path/to/project/.expedition/journal",
-     "instruction": "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via paintress.append_journal after the expedition."
+     "instruction": "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via append_journal after the expedition."
    }
    ```
 
@@ -112,7 +110,7 @@ update_gradient / append_journal.
 
    - `Glob` for `.expedition/inbox/*.md`, `Read` the frontmatter, and
      collect the issue ids the specs describe.
-   - Exclude every id in `completed_issue_ids` from step 2.
+   - Exclude every id in `completed_issue_ids` from step 3.
    - Pick the highest-priority unstarted item; tie-break by oldest.
    - Reading inbox files is safe (phonewave delivers atomically via
      temp-file-rename); never write to `inbox/` or move its files.
@@ -164,9 +162,12 @@ update_gradient / append_journal.
 - **MCP tool error mid-run**: report the tool name and the error
   surface, stop. Do not retry more than once.
 - **Verification failure you cannot fix within the spec's scope**:
-  record the failure via `update_gradient` with `delta: -1`, leave the
-  branch unpushed (or push as draft if partially valuable), report
-  exactly what failed (command + output tail), stop.
+  record the failure via `update_gradient` with `delta: -1` (at most
+  once per attempt — re-invoking the same failed attempt must not
+  decrement again), do NOT append a journal entry (the issue stays
+  eligible for a retry), leave the branch unpushed (or push as draft
+  if partially valuable), report exactly what failed (command +
+  output tail), stop.
 - **Ambiguous spec**: ask the human instead of guessing — a
   specification D-Mail is a contract, not a suggestion.
 
@@ -178,7 +179,10 @@ an issue is only excluded once `append_journal` has persisted it.
 Before re-implementing, check whether the working branch from the
 aborted run already exists (`git branch --list`) and resume it instead
 of starting over. Never call `append_journal` twice for the same
-expedition number.
+expedition number. If a previous run journaled the expedition but died
+before emitting the report (check `last_pr` from `next_issue`), re-emit
+the report d-mail first — `dmail` re-sends are idempotent upserts by
+name — before picking a new issue.
 
 ## What this skill must NOT do
 
