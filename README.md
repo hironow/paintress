@@ -2,7 +2,7 @@
 
 **An MCP server + data plane for the Expedition workflow: it serves the expedition journal/gradient read models from the session's continent dir and persists expedition-completed / gradient events.**
 
-Following the jun15 MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Paintress the Go CLI is now a pure data plane: it serves completed-issue ids and the next expedition number over MCP, persists gradient + expedition-completed events to the event store, and provides the supporting data-plane commands (init, doctor, status, sessions, archive-prune, ...). The headless autonomous loop — the `claude --print` subprocess, swarm worktree pool, review gate, gommage recovery, and D-Mail composition — has been retired. The Expedition workflow now fires from the claude-code session via the `/expedition-next` skill and the paintress MCP tools (see `plugins/paintress/skills/expedition-next/SKILL.md`).
+Following the jun15 MCP pivot, LLM ownership moved to a human-initiated [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session. Paintress the Go CLI is now a pure data plane: it serves completed-issue ids and the next expedition number over MCP, persists gradient + expedition-completed events to the event store, and provides the supporting data-plane commands (init, doctor, status, sessions, archive-prune, ...). The headless autonomous loop — the `claude --print` subprocess, swarm worktree pool, review gate, gommage recovery, and D-Mail composition — has been retired. The Expedition workflow now fires from the claude-code session via the `/expedition-next` skill (materialized into the project's `.claude/skills/` by `paintress init`; canonical source `internal/platform/templates/claude-skills/expedition-next/SKILL.md`).
 
 ```bash
 paintress mcp
@@ -10,10 +10,11 @@ paintress mcp
 
 `paintress mcp` starts the MCP server (over stdio, embedded via `--mcp-config`). Its tools expose:
 
-1. `paintress.ping` — health check
-2. `paintress.next_issue` — reads `pr-index.jsonl` + `journal/` to surface completed issue ids + the next expedition number
-3. `paintress.update_gradient` — persists a gradient-changed event to the event store
-4. `paintress.append_journal` — persists an expedition-completed event (journal + pr-index write)
+1. `ping` — health check
+2. `next_issue` — reads `pr-index.jsonl` + `journal/` to surface completed issue ids + the next expedition number
+3. `update_gradient` — persists a gradient-changed event to the event store
+4. `append_journal` — persists an expedition-completed event (journal + pr-index write)
+5. `dmail` — emit a report D-Mail via the transactional outbox (refs issue 0031)
 
 The claude-code session reads these read models, runs the expedition itself (implement / verify / fix, branch + PR), and writes report D-Mails to `outbox/` via the skill workflow — paintress no longer drives the LLM or composes D-Mails. Inference stays on the session's subscription quota rather than crossing into the Agent SDK credit pool that gates `claude --print` from 2026-06-15.
 
@@ -134,7 +135,7 @@ Escalation events fire once per failure streak rather than on every consecutive 
 
 ### Label-Based Issue Exclusion
 
-Retired with the Linear-driven expedition loop. Work selection now happens in the claude-code session using the configured issue source and the `paintress.next_issue` read model.
+Retired with the Linear-driven expedition loop. Work selection now happens in the claude-code session using the configured issue source and the `next_issue` read model.
 
 ## D-Mail Protocol
 

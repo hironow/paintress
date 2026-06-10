@@ -19,9 +19,9 @@ import (
 // MCPServer is a stdio-based Model Context Protocol server for the
 // refs/issues/0027 jun15 MCP pivot.
 //
-// All four tools are real implementations: paintress.ping (health
-// check), paintress.next_issue (reads journal + pr-index state), and
-// paintress.update_gradient + paintress.append_journal (persist
+// All four tools are real implementations: ping (health
+// check), next_issue (reads journal + pr-index state), and
+// update_gradient + append_journal (persist
 // EventGradientChanged / EventExpeditionCompleted via the event store
 // when an emitter is wired; cmd wires one by default).
 //
@@ -67,7 +67,7 @@ func (s *MCPServer) WithContinent(continent string) *MCPServer {
 
 // WithEmitter wires the usecase ExpeditionEventEmitter used to emit
 // EventGradientChanged / EventExpeditionCompleted from
-// paintress.update_gradient / paintress.append_journal
+// update_gradient / append_journal
 // (refs/issues/0027 Phase 4 follow-up #4). The cmd composition root
 // always wires a real emitter, so production calls persist events.
 // Passing nil falls back to preview-only (update_gradient) /
@@ -169,6 +169,10 @@ func initializeResult() map[string]any {
 		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 		"serverInfo":      map[string]any{"name": "paintress", "version": "0.1.0"},
+		// instructions feed Claude Code's deferred tool loading (Tool
+		// Search): only tool names + this summary are in context at
+		// startup, so it must say what the server is FOR.
+		"instructions": "paintress is the implementer data plane of the tap 5-tool ecosystem: read the expedition journal state (next_issue), persist progress (update_gradient, append_journal), and emit report d-mails through the transactional outbox (dmail). Drive it from the /expedition-next skill in a human-initiated session.",
 	}
 }
 
@@ -190,14 +194,16 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	status := "ok"
 	var result map[string]any
 	switch call.Name {
-	case "paintress.ping":
+	case "ping":
 		result = textResult("pong")
-	case "paintress.next_issue":
+	case "next_issue":
 		result = realNextIssue(s.continent)
-	case "paintress.update_gradient":
+	case "update_gradient":
 		result = realUpdateGradient(ctx, s.continent, s.emitter, call.Arguments, s.logger)
-	case "paintress.append_journal":
+	case "append_journal":
 		result = realAppendJournal(s.continent, s.emitter, call.Arguments)
+	case "dmail":
+		result = realDMail(ctx, s.continent, s.emitter, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -220,17 +226,17 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "paintress.ping",
+			"name":        "ping",
 			"description": "Health check. Returns 'pong'.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "paintress.next_issue",
+			"name":        "next_issue",
 			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The Claude Code session uses completed_issue_ids to exclude already-done work from the configured issue source.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "paintress.update_gradient",
+			"name":        "update_gradient",
 			"description": "Read current gradient_level from the event store, apply delta, and persist an EventGradientChanged event (persistence='event-store'). Returns current_level + new_level. Falls back to a preview without persisting when no emitter is wired.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -241,7 +247,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "paintress.append_journal",
+			"name":        "append_journal",
 			"description": "Persist an ExpeditionReport to journal/<NNN>.md + pr-index and emit an EventExpeditionCompleted event (persistence='event-store+filesystem'). Falls back to filesystem-only when no emitter is wired.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -256,6 +262,24 @@ func toolDescriptors() []map[string]any {
 					"pr_url":       map[string]any{"type": "string"},
 				},
 				"required": []any{"expedition", "issue_id", "status"},
+			},
+		},
+		{
+			"name":        "dmail",
+			"description": "Emit a D-Mail through the transactional outbox (refs issue 0031). Arguments map onto the D-Mail v1 schema; paintress may emit kind: report. Never write outbox/ directly — this tool is the canonical atomic path (SQLite stage -> flush) that phonewave delivery depends on. Re-sending the same name is an idempotent upsert.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind":        map[string]any{"type": "string", "description": "report"},
+					"name":        map[string]any{"type": "string", "description": "unique d-mail name (becomes <name>.md; e.g. pt-report-<issue>-<expedition>)"},
+					"description": map[string]any{"type": "string", "description": "one-line summary (required by schema v1)"},
+					"body":        map[string]any{"type": "string", "description": "markdown body (expedition report)"},
+					"issues":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "related issue ids"},
+					"severity":    map[string]any{"type": "string", "description": "low / medium / high (optional)"},
+					"priority":    map[string]any{"type": "integer", "description": "priority (optional)"},
+					"metadata":    map[string]any{"type": "object", "description": "string map; project_id / actor_type injected automatically"},
+				},
+				"required": []any{"kind", "name", "description", "body"},
 			},
 		},
 	}
@@ -330,7 +354,7 @@ func realNextIssue(continent string) map[string]any {
 		"completed_issue_ids":    completedIDs,
 		"last_pr":                lastPR,
 		"journal_dir":            domain.JournalDir(continent),
-		"instruction":            "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via paintress.append_journal after the expedition.",
+		"instruction":            "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via append_journal after the expedition.",
 	})
 }
 
@@ -412,7 +436,7 @@ func realUpdateGradient(ctx context.Context, continent string, emitter port.Expe
 // injected emitter (Phase 4 follow-up #4, persistence=
 // 'event-store+filesystem'). When no emitter is wired (tests /
 // opt-out), it persists filesystem-only. The session can re-read the
-// new state via paintress.next_issue.
+// new state via next_issue.
 //
 // continent is the project root from MCPServer.WithContinent. When
 // empty the response signals uninitialized so the session aborts.
