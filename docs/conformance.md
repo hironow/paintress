@@ -74,9 +74,10 @@ Ref: `.semgrep/layers.yaml`, ADR S0029
 Paintress does not own model inference, manage a worktree swarm, run review gates, or compose D-Mails from the Go CLI. LLM execution and repository modification are owned by a human-initiated Claude Code session attached to `paintress mcp`.
 
 - `paintress mcp` implements the MCP lifecycle (`initialize`, `notifications/initialized`, `tools/list`, `tools/call`) over stdio.
-- `paintress.next_issue` reads completed issue ids, the next expedition number, and the latest PR from local projections.
-- `paintress.update_gradient` persists gradient-changed events.
-- `paintress.append_journal` persists expedition-completed events and writes journal / PR-index state.
+- `next_issue` reads completed issue ids, the next expedition number, and the latest PR from local projections.
+- `update_gradient` persists gradient-changed events.
+- `append_journal` persists expedition-completed events and writes journal / PR-index state.
+- `dmail` emits report D-Mails through the transactional outbox — the only sanctioned emission path (refs issue 0031).
 - The `/expedition-next` skill performs implementation, verification, PR creation, and report D-Mail composition from the claude-code session.
 
 Ref: ADR 0017, ADR 0018, `internal/session/mcp_server.go`, `plugins/paintress/skills/expedition-next/SKILL.md`

@@ -111,10 +111,10 @@ func TestMCPServer_ListsAllPhase1Tools(t *testing.T) {
 		t.Fatalf("tools list missing: %v", result["tools"])
 	}
 	want := map[string]bool{
-		"paintress.ping":            false,
-		"paintress.next_issue":      false,
-		"paintress.update_gradient": false,
-		"paintress.append_journal":  false,
+		"ping":            false,
+		"next_issue":      false,
+		"update_gradient": false,
+		"append_journal":  false,
 	}
 	for _, t0 := range tools {
 		entry, _ := t0.(map[string]any)
@@ -134,7 +134,7 @@ func TestMCPServer_ListsAllPhase1Tools(t *testing.T) {
 
 func TestMCPServer_CallsPingTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"paintress.ping","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ping","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -164,7 +164,7 @@ func TestMCPServer_CallsPingTool(t *testing.T) {
 
 func TestMCPServer_RejectsUnknownTool(t *testing.T) {
 	// given
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"paintress.does_not_exist","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"does_not_exist","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -191,7 +191,7 @@ func TestMCPServer_NextIssue_UninitializedContinent(t *testing.T) {
 	// given: NewMCPServer without WithContinent → continent is empty.
 	// Real impl must signal "uninitialized" so the Claude Code session
 	// surfaces a clear error rather than acting on stale defaults.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"next_issue","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -213,7 +213,7 @@ func TestMCPServer_NextIssue_UninitializedContinent(t *testing.T) {
 func TestMCPServer_NextIssue_RealImpl_EmptyJournal(t *testing.T) {
 	// given: temp continent dir with no journal / pr-index yet.
 	continent := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"next_issue","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
 
@@ -256,7 +256,7 @@ func TestMCPServer_NextIssue_RealImpl_WithPRIndex(t *testing.T) {
 		t.Fatalf("write pr-index: %v", err)
 	}
 
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"paintress.next_issue","arguments":{}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"next_issue","arguments":{}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
 
@@ -289,7 +289,7 @@ func TestMCPServer_NextIssue_RealImpl_WithPRIndex(t *testing.T) {
 
 func TestMCPServer_UpdateGradient_UninitializedContinent(t *testing.T) {
 	// given: empty continent → uninitialized response with delta echo.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":3}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"update_gradient","arguments":{"delta":3}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -311,7 +311,7 @@ func TestMCPServer_UpdateGradient_UninitializedContinent(t *testing.T) {
 func TestMCPServer_UpdateGradient_RealImpl_EmptyEventStore(t *testing.T) {
 	// given: temp continent dir with no events yet → current_level = 0.
 	continent := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":5}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"update_gradient","arguments":{"delta":5}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
 
@@ -338,7 +338,7 @@ func TestMCPServer_UpdateGradient_RealImpl_EmptyEventStore(t *testing.T) {
 
 func TestMCPServer_AppendJournal_UninitializedContinent(t *testing.T) {
 	// given: empty continent → uninitialized response.
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","status":"completed"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","status":"completed"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil)
 
@@ -357,7 +357,7 @@ func TestMCPServer_AppendJournal_UninitializedContinent(t *testing.T) {
 func TestMCPServer_AppendJournal_RealImpl_PersistsToFilesystem(t *testing.T) {
 	// given: temp continent + minimal valid input.
 	continent := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","issue_title":"Fix login","status":"completed","pr_url":"https://github.com/example/repo/pull/7","reason":"validated"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"append_journal","arguments":{"expedition":42,"issue_id":"PAI-1","issue_title":"Fix login","status":"completed","pr_url":"https://github.com/example/repo/pull/7","reason":"validated"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
 
@@ -397,7 +397,7 @@ func TestMCPServer_UpdateGradient_Phase4_EmitsGradientChangedEvent(t *testing.T)
 	stateDir := filepath.Join(continent, domain.StateDir)
 	store := session.NewEventStore(stateDir, nil)
 	emitter := &recordingEmitter{store: store}
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":50,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":3}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":50,"method":"tools/call","params":{"name":"update_gradient","arguments":{"delta":3}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent).WithEmitter(emitter)
 
@@ -443,7 +443,7 @@ func TestMCPServer_UpdateGradient_Phase4_EmitsGradientChangedEvent(t *testing.T)
 func TestMCPServer_UpdateGradient_Phase4_PreviewWhenEmitterDisabled(t *testing.T) {
 	// given: emitter NOT enabled (default) → preview-only contract retained.
 	continent := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":51,"method":"tools/call","params":{"name":"paintress.update_gradient","arguments":{"delta":5}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":51,"method":"tools/call","params":{"name":"update_gradient","arguments":{"delta":5}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
 
@@ -473,7 +473,7 @@ func TestMCPServer_AppendJournal_Phase4_EmitsExpeditionCompletedEvent(t *testing
 	stateDir := filepath.Join(continent, domain.StateDir)
 	store := session.NewEventStore(stateDir, nil)
 	emitter := &recordingEmitter{store: store}
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":52,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":7,"issue_id":"PAI-7","status":"success","pr_url":"https://example/pull/7","wave_id":"w-1","step_id":"s-1"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":52,"method":"tools/call","params":{"name":"append_journal","arguments":{"expedition":7,"issue_id":"PAI-7","status":"success","pr_url":"https://example/pull/7","wave_id":"w-1","step_id":"s-1"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent).WithEmitter(emitter)
 
@@ -515,7 +515,7 @@ func TestMCPServer_AppendJournal_Phase4_EmitsExpeditionCompletedEvent(t *testing
 func TestMCPServer_AppendJournal_RealImpl_RejectsMissingRequiredFields(t *testing.T) {
 	// given: empty issue_id is invalid.
 	continent := t.TempDir()
-	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"paintress.append_journal","arguments":{"expedition":1,"status":"completed"}}}` + "\n")
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"append_journal","arguments":{"expedition":1,"status":"completed"}}}` + "\n")
 	var out bytes.Buffer
 	srv := session.NewMCPServer(in, &out, nil).WithContinent(continent)
 
@@ -601,6 +601,7 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 		Result struct {
 			ProtocolVersion string                     `json:"protocolVersion"`
 			Capabilities    map[string]json.RawMessage `json:"capabilities"`
+			Instructions    string                     `json:"instructions"`
 			ServerInfo      struct {
 				Name string `json:"name"`
 			} `json:"serverInfo"`
@@ -617,6 +618,9 @@ func TestMCPServer_Initialize_Handshake(t *testing.T) {
 	}
 	if resp.Result.ServerInfo.Name != "paintress" {
 		t.Errorf("serverInfo.name = %q, want paintress", resp.Result.ServerInfo.Name)
+	}
+	if !strings.Contains(resp.Result.Instructions, "implementer") {
+		t.Errorf("instructions = %q, want a one-paragraph implementer role summary", resp.Result.Instructions)
 	}
 }
 
