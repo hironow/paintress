@@ -204,6 +204,8 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 		result = realAppendJournal(s.continent, s.emitter, call.Arguments)
 	case "dmail":
 		result = realDMail(ctx, s.continent, s.emitter, call.Arguments)
+	case "get_insights":
+		result = realGetInsights(s.continent, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
 		return s.respondError(msg.ID, -32601, fmt.Sprintf("unknown tool: %s", call.Name))
@@ -280,6 +282,16 @@ func toolDescriptors() []map[string]any {
 					"metadata":    map[string]any{"type": "object", "description": "string map; project_id / actor_type injected automatically"},
 				},
 				"required": []any{"kind", "name", "description", "body"},
+			},
+		},
+		{
+			"name":        "get_insights",
+			"description": "Read the learning loop (refs issue 0034): persisted insight-ledger files from .expedition/insights/ plus a live Lumina pattern scan recomputed from the journals (failure / success / high-severity patterns). Consult before implementing to avoid repeating past failures. Read-only and idempotent; empty state returns empty arrays.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"kind": map[string]any{"type": "string", "description": "optional filename-prefix filter (e.g. lumina / gommage)"},
+				},
 			},
 		},
 	}
