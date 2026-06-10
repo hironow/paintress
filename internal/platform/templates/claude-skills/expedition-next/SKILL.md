@@ -10,7 +10,7 @@ description: >-
   Claude Code interactive session so inference stays on the
   subscription quota rather than the Agent SDK credit pool that gates
   `claude -p` from 2026-06-15.
-version: 0.3.0
+version: 0.3.1
 argument-hint: "(none) - reads next issue from paintress MCP and runs one expedition"
 disable-model-invocation: true
 allowed-tools:
@@ -22,6 +22,7 @@ allowed-tools:
   - Glob
   - Agent
   - mcp__paintress__ping
+  - mcp__paintress__get_insights
   - mcp__paintress__next_issue
   - mcp__paintress__update_gradient
   - mcp__paintress__append_journal
@@ -76,7 +77,13 @@ update_gradient / append_journal.
    attached — abort and ask the human to relaunch claude with
    `--mcp-config`.
 
-2. **Fetch journal state from paintress**. Call
+2. **Consult the learning loop**. Call `mcp__paintress__get_insights`
+   with no arguments. Review `live_lumina`: defensive patterns
+   (`failure-pattern` / `high-severity-alert`) are past mistakes — do
+   not repeat them this expedition; `success-pattern` entries are
+   proven approaches. Empty result = no history yet, proceed.
+
+3. **Fetch journal state from paintress**. Call
    `mcp__paintress__next_issue` with no arguments. It returns
    paintress's local journal state from the event store:
 
@@ -96,7 +103,7 @@ update_gradient / append_journal.
    `paintress mcp` from outside a paintress-initialized project root.
    Ask them to relaunch `claude` from the project directory.
 
-3. **Pick the next issue from the configured issue source (wave
+4. **Pick the next issue from the configured issue source (wave
    mode)**. The default issue source is the **specification D-Mails
    that sightjack produced and phonewave delivered into
    `.expedition/inbox/`** (`kind: specification`, YAML frontmatter +
@@ -112,7 +119,7 @@ update_gradient / append_journal.
    - If the inbox holds no unstarted spec, report "no work available"
      and stop — do not invent work.
 
-4. **Implement the fix on a branch**. Read the spec body, plan the
+5. **Implement the fix on a branch**. Read the spec body, plan the
    change, then:
 
    - create a working branch (e.g. `fix/...` or `feat/...`),
@@ -126,28 +133,28 @@ update_gradient / append_journal.
 
    No `claude -p` invocations are allowed at any point.
 
-5. **Update the gradient gauge**. Call
+6. **Update the gradient gauge**. Call
    `mcp__paintress__update_gradient` with `{"delta": <signed>}`
    — `+1` for success, `-1` for failure. The tool reads the current
    level from the event store, applies the delta, persists an
    `EventGradientChanged` event (`persistence: "event-store"`), and
    returns `current_level` + `new_level`.
 
-6. **Append the journal entry**. Call
+7. **Append the journal entry**. Call
    `mcp__paintress__append_journal` with the expedition
    metadata (expedition number / issue_id / status / pr_url / etc.).
    The tool writes `journal/<NNN>.md` + the pr-index AND persists an
    `EventExpeditionCompleted` event
    (`persistence: "event-store+filesystem"`).
 
-7. **Emit the report d-mail**. Call `mcp__paintress__dmail` with
+8. **Emit the report d-mail**. Call `mcp__paintress__dmail` with
    `{kind: "report", name: "pt-report-<issue>-<expedition>",
    description, body, issues}` — the expedition report for the
    verifier. The tool runs the transactional outbox (stage → atomic
    flush); phonewave delivers it to the reviewer's inbox. Re-sending
    the same name is an idempotent upsert.
 
-8. **Report**. End with: expedition number, issue id, PR URL,
+9. **Report**. End with: expedition number, issue id, PR URL,
    verification result, gradient change, report d-mail name, and what
    the human should do next (review the PR / re-invoke for the next
    expedition).
