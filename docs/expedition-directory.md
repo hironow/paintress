@@ -8,7 +8,7 @@ This document describes what each directory/file does, who creates it, and how i
 ```
 .expedition/
   .gitignore            # auto-managed by ValidateContinent
-  config.yaml           # project-scoped settings (Linear team/project)
+  config.yaml           # project-scoped settings (tracker scope)
   journal/
     001.md              # expedition #1 journal entry
     002.md              # expedition #2 journal entry
@@ -109,7 +109,7 @@ The expedition prompt template embeds some content inline and references other f
 | Context | `context/*.md` | `ReadContextFiles` -> concatenation |
 | D-Mail Inbox | `inbox/*.md` | `ScanInbox` -> `FormatDMailForPrompt` |
 | Mission | Hardcoded text | `MissionText()` |
-| Linear Scope | `config.yaml` | `LoadProjectConfig` |
+| Tracker Scope | `config.yaml` | `LoadProjectConfig` |
 | Environment | CLI flags | Direct field mapping |
 
 ### File Path References (Claude Code reads these itself)

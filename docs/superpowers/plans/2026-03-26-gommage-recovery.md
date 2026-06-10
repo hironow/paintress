@@ -1,5 +1,11 @@
 # E15 Gommage Recovery Strategy — Implementation Plan
 
+> Status note (post jun15 MCP pivot): this design targeted the retired
+> headless expedition loop. The Gommage *classification* survives as domain
+> logic (`internal/domain/gommage_classifier.go`); the loop-side recovery
+> execution described below is historical. Kept for design rationale.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace paintress's uniform Gommage halt with class-aware recovery that retries transient failures in-place, preserves worktree progress, and resumes after session restart.

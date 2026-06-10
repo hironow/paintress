@@ -28,7 +28,7 @@ This structure maps directly to AI agent loop design:
 | Game Concept | Paintress | Design Meaning |
 |---|---|---|
 | **Paintress** | This binary | External force that drives the loop |
-| **Monolith** | Linear backlog | The remaining issue count is inscribed |
+| **Monolith** | Issue backlog | The remaining issue count is inscribed |
 | **Expedition** | One Claude Code execution | Departs with fresh context each time |
 | **Expedition Flag** | `.expedition/.run/flag.md` | Per-worker checkpoint, consolidated at exit |
 | **Journal** | `.expedition/journal/` | Record of past decisions and lessons |
@@ -219,7 +219,7 @@ brew install hironow/tap/paintress
 # Or build from source
 just install
 
-# Initialize project config (Linear team key, etc.)
+# Initialize project config (.expedition/config.yaml)
 paintress init /path/to/your/repo
 
 # Generate claude-code MCP wiring

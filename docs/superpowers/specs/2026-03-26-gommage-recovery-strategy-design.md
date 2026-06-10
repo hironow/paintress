@@ -1,5 +1,11 @@
 # Gommage Recovery Strategy — Design Spec
 
+> Status note (post jun15 MCP pivot): this design targeted the retired
+> headless expedition loop. The Gommage *classification* survives as domain
+> logic (`internal/domain/gommage_classifier.go`); the loop-side recovery
+> execution described below is historical. Kept for design rationale.
+
+
 ## Problem
 
 paintress Gommage fires when `consecutiveFailures >= 3`. The current behavior is uniform: always halt the expedition loop and escalate via D-Mail. This causes unnecessary downtime for transient failures (timeout, rate limit, parse error) that could self-heal with a retry after appropriate cooldown.

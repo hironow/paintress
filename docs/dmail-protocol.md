@@ -31,7 +31,7 @@ dmail-schema-version: "1"
 | `name` | string | Yes | Unique message identifier (e.g., `pt-report-my-42_9e1d4f8a`) |
 | `kind` | string | Yes | Message type: `report`, `specification`, `design-feedback`, `implementation-feedback`, `convergence`, `ci-result`, `stall-escalation` |
 | `description` | string | Yes | Human-readable summary |
-| `issues` | string[] | No | Related Linear issue IDs |
+| `issues` | string[] | No | Related issue IDs |
 | `severity` | string | No | `high` triggers the approval gate |
 | `action` | string | No | Requested action (e.g., `implement`, `review`, `fix`) |
 | `priority` | int | No | Priority level (0 = unset, higher = more urgent) |
