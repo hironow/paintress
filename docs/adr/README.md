@@ -72,3 +72,4 @@
 | [0017](0017-mcp-pivot.md) | MCP pivot: claude code session owns LLM, paintress Go CLI is MCP server data plane |
 | [0018](0018-mcp-pivot-helper-level-stub.md) | MCP pivot helper-level stub: extend enforcement to ClaudeAdapter / doctor probe / issues cobra |
 | [0019](0019-mcp-dmail-and-project-wiring.md) | MCP dmail emission and project wiring |
+| [0020](0020-learning-loop-read-exposure.md) | Learning-Loop Read Exposure (get_insights) |

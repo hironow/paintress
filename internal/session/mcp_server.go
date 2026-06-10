@@ -172,7 +172,7 @@ func initializeResult() map[string]any {
 		// instructions feed Claude Code's deferred tool loading (Tool
 		// Search): only tool names + this summary are in context at
 		// startup, so it must say what the server is FOR.
-		"instructions": "paintress is the implementer data plane of the tap 5-tool ecosystem: read the expedition journal state (next_issue), persist progress (update_gradient, append_journal), and emit report d-mails through the transactional outbox (dmail). Drive it from the /expedition-next skill in a human-initiated session.",
+		"instructions": "paintress is the implementer data plane of the tap 5-tool ecosystem: read the expedition journal state (next_issue), consult learned patterns (get_insights — live Lumina scan + insight ledger), persist progress (update_gradient, append_journal), and emit report d-mails through the transactional outbox (dmail). Drive it from the /expedition-next skill in a human-initiated session.",
 	}
 }
 

@@ -15,6 +15,7 @@ paintress mcp
 3. `update_gradient` — persists a gradient-changed event to the event store
 4. `append_journal` — persists an expedition-completed event (journal + pr-index write)
 5. `dmail` — emit a report D-Mail via the transactional outbox (refs issue 0031)
+6. `get_insights` — read the learning loop: persisted insight files + live Lumina pattern scan from journals (refs issue 0034)
 
 The claude-code session reads these read models, runs the expedition itself (implement / verify / fix, branch + PR), and writes report D-Mails to `outbox/` via the skill workflow — paintress no longer drives the LLM or composes D-Mails. Inference stays on the session's subscription quota rather than crossing into the Agent SDK credit pool that gates `claude --print` from 2026-06-15.
 
