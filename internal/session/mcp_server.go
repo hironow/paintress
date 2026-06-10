@@ -169,6 +169,10 @@ func initializeResult() map[string]any {
 		"protocolVersion": mcpProtocolVersion,
 		"capabilities":    map[string]any{"tools": map[string]any{"listChanged": false}},
 		"serverInfo":      map[string]any{"name": "paintress", "version": "0.1.0"},
+		// instructions feed Claude Code's deferred tool loading (Tool
+		// Search): only tool names + this summary are in context at
+		// startup, so it must say what the server is FOR.
+		"instructions": "paintress is the implementer data plane of the tap 5-tool ecosystem: read the expedition journal state (next_issue), persist progress (update_gradient, append_journal), and emit report d-mails through the transactional outbox (dmail). Drive it from the /expedition-next skill in a human-initiated session.",
 	}
 }
 
