@@ -19,9 +19,9 @@ import (
 // MCPServer is a stdio-based Model Context Protocol server for the
 // refs/issues/0027 jun15 MCP pivot.
 //
-// All four tools are real implementations: paintress.ping (health
-// check), paintress.next_issue (reads journal + pr-index state), and
-// paintress.update_gradient + paintress.append_journal (persist
+// All four tools are real implementations: ping (health
+// check), next_issue (reads journal + pr-index state), and
+// update_gradient + append_journal (persist
 // EventGradientChanged / EventExpeditionCompleted via the event store
 // when an emitter is wired; cmd wires one by default).
 //
@@ -67,7 +67,7 @@ func (s *MCPServer) WithContinent(continent string) *MCPServer {
 
 // WithEmitter wires the usecase ExpeditionEventEmitter used to emit
 // EventGradientChanged / EventExpeditionCompleted from
-// paintress.update_gradient / paintress.append_journal
+// update_gradient / append_journal
 // (refs/issues/0027 Phase 4 follow-up #4). The cmd composition root
 // always wires a real emitter, so production calls persist events.
 // Passing nil falls back to preview-only (update_gradient) /
@@ -190,13 +190,13 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 	status := "ok"
 	var result map[string]any
 	switch call.Name {
-	case "paintress.ping":
+	case "ping":
 		result = textResult("pong")
-	case "paintress.next_issue":
+	case "next_issue":
 		result = realNextIssue(s.continent)
-	case "paintress.update_gradient":
+	case "update_gradient":
 		result = realUpdateGradient(ctx, s.continent, s.emitter, call.Arguments, s.logger)
-	case "paintress.append_journal":
+	case "append_journal":
 		result = realAppendJournal(s.continent, s.emitter, call.Arguments)
 	default:
 		platform.RecordMCPInvocation(ctx, call.Name, "error", time.Since(start))
@@ -220,17 +220,17 @@ func (s *MCPServer) handleToolsCall(ctx context.Context, msg jsonrpcMessage) err
 func toolDescriptors() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "paintress.ping",
+			"name":        "ping",
 			"description": "Health check. Returns 'pong'.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "paintress.next_issue",
+			"name":        "next_issue",
 			"description": "Return paintress's local journal state (completed_issue_ids + next_expedition_number + last_pr). The Claude Code session uses completed_issue_ids to exclude already-done work from the configured issue source.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "paintress.update_gradient",
+			"name":        "update_gradient",
 			"description": "Read current gradient_level from the event store, apply delta, and persist an EventGradientChanged event (persistence='event-store'). Returns current_level + new_level. Falls back to a preview without persisting when no emitter is wired.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -241,7 +241,7 @@ func toolDescriptors() []map[string]any {
 			},
 		},
 		{
-			"name":        "paintress.append_journal",
+			"name":        "append_journal",
 			"description": "Persist an ExpeditionReport to journal/<NNN>.md + pr-index and emit an EventExpeditionCompleted event (persistence='event-store+filesystem'). Falls back to filesystem-only when no emitter is wired.",
 			"inputSchema": map[string]any{
 				"type": "object",
@@ -330,7 +330,7 @@ func realNextIssue(continent string) map[string]any {
 		"completed_issue_ids":    completedIDs,
 		"last_pr":                lastPR,
 		"journal_dir":            domain.JournalDir(continent),
-		"instruction":            "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via paintress.append_journal after the expedition.",
+		"instruction":            "Read the configured issue source, exclude completed_issue_ids, pick the highest-priority unstarted item. Persist completion via append_journal after the expedition.",
 	})
 }
 
@@ -412,7 +412,7 @@ func realUpdateGradient(ctx context.Context, continent string, emitter port.Expe
 // injected emitter (Phase 4 follow-up #4, persistence=
 // 'event-store+filesystem'). When no emitter is wired (tests /
 // opt-out), it persists filesystem-only. The session can re-read the
-// new state via paintress.next_issue.
+// new state via next_issue.
 //
 // continent is the project root from MCPServer.WithContinent. When
 // empty the response signals uninitialized so the session aborts.
