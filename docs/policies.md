@@ -5,35 +5,45 @@ Errors are logged (if logger is non-nil) but never propagated — `Dispatch()` a
 
 ## Location
 
-- Engine: `internal/usecase/policy.go`
-- Handlers: `internal/usecase/policy_handlers.go`
-- Policy definitions: `internal/domain/policy.go`
-- Registration: `internal/usecase/expedition.go` → `registerExpeditionPolicies()`
+- Engine: `internal/usecase/policy.go` (implements `port.EventDispatcher`)
+- Policy declarations: `internal/domain/types.go` → `var Policies` (declarative WHEN/THEN registry)
+- Wiring: `internal/usecase/emitter.go` (EventStore persistence + dispatch)
 
-## Event → Handler Mapping
+## Post jun15 MCP pivot: declarative registry only
 
-| Policy Name | WHEN [EVENT] | THEN [COMMAND] | Side Effects |
+The headless expedition loop that executed these policies was retired with the
+jun15 MCP pivot (ADR 0017/0018). **No handlers are registered in production code
+today** — the `domain.Policies` registry documents the reactive intent, and the
+reactions are driven by the human-initiated Claude Code session via the
+`/expedition-next` skill and the paintress MCP tools.
+
+| Policy Name | WHEN [EVENT] | THEN [COMMAND] | Executed by (post-pivot) |
 |---|---|---|---|
-| ExpeditionCompletedStageReport | expedition.completed | StageReport | Log (Info) + Desktop Notify + Metrics |
-| InboxReceivedProcessFeedback | inbox.received | ProcessFeedback | Log (Debug) + Metrics |
-| GradientChangedTriggerGommage | gradient.changed | TriggerGommage | Log (Info) + Desktop Notify + Metrics |
-| DMailStagedFlushOutbox | dmail.staged | FlushOutbox | Log (Info) + Desktop Notify + Metrics |
+| ExpeditionCompletedStageReport | expedition.completed | StageReport | Claude Code session (skill workflow; emission tool gap tracked in refs issue 0031) |
+| InboxReceivedProcessFeedback | inbox.received | ProcessFeedback | Claude Code session (reads inbox D-Mails) |
+| GradientChangedTriggerGommage | gradient.changed | TriggerGommage | Claude Code session (gauge read model) |
+| DMailStagedFlushOutbox | dmail.staged | FlushOutbox | transactional outbox (stage → atomic flush) |
 
-## Gommage Recovery
+## Gommage classification (domain logic, still live)
 
-When `consecutiveFailures >= 3`, the Gommage guard fires. Instead of always halting, the system classifies the failure streak and decides retry vs halt:
+`internal/domain/gommage_classifier.go` classifies a failure streak by majority
+vote over reason keywords. The classification itself is pure domain logic and
+remains live as a read model; the recovery *actions* below describe the
+declarative intent that the session applies post-pivot.
 
-| Class | Detection | Recovery |
-|-------|-----------|----------|
+| Class | Detection | Recovery intent |
+|-------|-----------|-----------------|
 | `timeout` | "timeout" in reason | Switch model + cooldown + retry same issue |
 | `rate_limit` | "rate_limit" marker in reason | Cooldown + retry same issue |
 | `parse_error` | "parse_error" in reason | Inject Lumina hint + retry same issue |
-| `blocker` | "blocker" in reason | Halt + escalate (traditional behavior) |
-| `systematic` | No majority class (default) | Halt + escalate (traditional behavior) |
+| `blocker` | "blocker" in reason | Halt + escalate |
+| `systematic` | No majority class (default) | Halt + escalate |
 
-Recovery is capped at 2 retries per failure streak. After exhaustion, the system halts and escalates. The `RecoveryDecider` port interface (`usecase/port/port.go`) enables dependency injection and testing.
+Recovery is capped at 2 retries per failure streak. After exhaustion, halt and
+escalate to the human. The `RecoveryDecider` port interface
+(`usecase/port/port.go`) enables dependency injection and testing.
 
-New events: `gommage.recovery`, `expedition.checkpoint`.
+Events: `gommage.recovery`, `expedition.checkpoint`.
 
 ## Event Payload Format
 
@@ -51,8 +61,3 @@ New events: `gommage.recovery`, `expedition.checkpoint`.
 
 Best-effort (at-most-once). Handler failures are silently logged.
 No retry, no dead-letter queue, no error propagation to callers.
-
-## Skeleton Handlers
-
-InboxReceivedProcessFeedback is an observation-only placeholder
-(Debug log + Metrics, no notification).

@@ -1,5 +1,11 @@
 # Approval Contract
 
+> Status note (post jun15 MCP pivot): the headless pre-flight gate that drove
+> this contract was retired; no production code path calls
+> `RequestApproval()` today. The contract and the adapters
+> (`StdinApprover` / `CmdApprover` / `AutoApprover`) remain implemented and
+> documented here as the canonical approval protocol for any future wiring.
+
 The pre-flight HIGH severity gate uses a three-way approval contract. `Approver.RequestApproval()` returns `(approved bool, err error)`, producing three distinct outcomes that paintress handles differently.
 
 ## Three-Way Contract
