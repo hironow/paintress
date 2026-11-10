@@ -10,7 +10,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/google/uuid v1.6.0
-	github.com/slack-go/slack v0.32.0
+	github.com/slack-go/slack v0.34.0
 	github.com/spf13/cobra v1.10.2
 	github.com/testcontainers/testcontainers-go v0.44.0
 	go.opentelemetry.io/otel v1.47.0
@@ -22,7 +22,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/sys v0.49.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 )
 
 require (
